@@ -22,6 +22,7 @@ import { Historique } from "./components/Historique";
 import { Simulateur } from "./components/Simulateur";
 import { AProposLimites } from "./components/AProposLimites";
 import { AvertissementHorsPerimetre } from "./components/AvertissementHorsPerimetre";
+import { ConfirmationImport } from "./components/ConfirmationImport";
 
 const dateDuJour = new Date().toISOString().slice(0, 10);
 
@@ -29,6 +30,8 @@ export default function App() {
   const [donnees, setDonnees] = useState<DonneesApp | null>(null);
   const [onglet, setOnglet] = useState<Onglet>("dashboard");
   const [erreurImport, setErreurImport] = useState<string | null>(null);
+  const [fichierEnAttenteImport, setFichierEnAttenteImport] = useState<File | null>(null);
+  const [importEnCours, setImportEnCours] = useState(false);
   const chargementTermine = useRef(false);
   const inputImportRef = useRef<HTMLInputElement>(null);
 
@@ -88,25 +91,42 @@ export default function App() {
     setDonnees((d) => (d ? { ...d, profil: profilModifie } : d));
   }
 
-  function exporter() {
-    const contenu = exporterJSON(donnees!);
+  function declencherTelechargement(nomFichier: string, contenu: string) {
     const blob = new Blob([contenu], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `cadence-export-${dateDuJour}.json`;
+    a.download = nomFichier;
     a.click();
     URL.revokeObjectURL(url);
   }
 
-  async function importer(fichier: File) {
+  function exporter() {
+    declencherTelechargement(`cadence-export-${dateDuJour}.json`, exporterJSON(donnees!));
+  }
+
+  /**
+   * Ordre non négociable (devoir sacré n°1) :
+   *   1. sauvegarde de secours de l'état actuel → téléchargée, inconditionnellement ;
+   *   2. validation complète du fichier importé (JSON valide + schemaVersion + forme Zod) ;
+   *   3. écriture du nouvel état UNIQUEMENT si (2) a réussi.
+   * Si (2) lève, on tombe dans le catch : setDonnees n'est jamais appelé, l'état
+   * existant n'a donc pas bougé — la sauvegarde de l'étape 1 reste disponible.
+   */
+  async function confirmerImport() {
+    if (!fichierEnAttenteImport || !donnees) return;
+    setImportEnCours(true);
     try {
-      const texte = await fichier.text();
-      const importees = importerJSON(texte);
-      setDonnees(importees);
+      declencherTelechargement(`cadence-sauvegarde-avant-import-${dateDuJour}.json`, exporterJSON(donnees)); // (1)
+      const texte = await fichierEnAttenteImport.text();
+      const importees = importerJSON(texte); // (2) — lève si invalide, rien n'est écrit
+      setDonnees(importees); // (3)
       setErreurImport(null);
-    } catch {
-      setErreurImport("Fichier invalide : ce n'est pas un export Cadence reconnu.");
+    } catch (erreur) {
+      setErreurImport(erreur instanceof Error ? erreur.message : "Fichier invalide : ce n'est pas un export Cadence reconnu.");
+    } finally {
+      setImportEnCours(false);
+      setFichierEnAttenteImport(null);
     }
   }
 
@@ -131,12 +151,24 @@ export default function App() {
               className="hidden"
               onChange={(e) => {
                 const fichier = e.target.files?.[0];
-                if (fichier) importer(fichier);
+                if (fichier) setFichierEnAttenteImport(fichier);
+                e.target.value = ""; // permet de resélectionner le même fichier ensuite
               }}
             />
           </div>
         </div>
         {erreurImport && <p className="text-sm text-red">{erreurImport}</p>}
+
+        {fichierEnAttenteImport && (
+          <ConfirmationImport
+            nbContratsActuels={donnees.contrats.length}
+            profilActuel={Boolean(donnees.profil)}
+            nomFichier={fichierEnAttenteImport.name}
+            enCours={importEnCours}
+            onAnnuler={() => setFichierEnAttenteImport(null)}
+            onConfirmer={confirmerImport}
+          />
+        )}
 
         {onglet === "dashboard" &&
           calculs &&

@@ -7,6 +7,15 @@ import type { Contrat, PeriodeAssimilee, Profil } from "../types";
 
 const CLE_STOCKAGE = "cadence:v1:donnees";
 
+/**
+ * Version du SCHÉMA du fichier export/import JSON — distincte de
+ * `franceTravailConfig.meta.version` (qui décrit les règles réglementaires).
+ * Un fichier dont `schemaVersion` ne correspond pas EXACTEMENT à cette
+ * constante est refusé à l'import, jamais interprété au mieux : on ne gère
+ * pas encore de migration entre versions de schéma.
+ */
+export const SCHEMA_VERSION_DONNEES = 1;
+
 export interface DonneesApp {
   profil: Profil | null;
   contrats: Contrat[];
@@ -75,16 +84,42 @@ export async function sauvegarderDonnees(donnees: DonneesApp): Promise<void> {
   window.localStorage.setItem(CLE_STOCKAGE, JSON.stringify(donnees));
 }
 
-/** Sérialise les données pour l'export JSON (filet anti-perte, cf. §11.A). */
-export function exporterJSON(donnees: DonneesApp): string {
-  return JSON.stringify({ version: 1, ...donnees }, null, 2);
+/**
+ * Sérialise les données pour l'export JSON (filet anti-perte, cf. §11.A).
+ * `dateExport` est un paramètre (pas `new Date()` interne) pour rester
+ * testable de façon déterministe — en production, l'appelant ne le passe
+ * jamais, il prend simplement l'instant présent par défaut.
+ */
+export function exporterJSON(donnees: DonneesApp, dateExport: Date = new Date()): string {
+  return JSON.stringify({ schemaVersion: SCHEMA_VERSION_DONNEES, exporteLe: dateExport.toISOString(), ...donnees }, null, 2);
 }
 
-/** Parse et valide un fichier JSON importé. Lève une erreur explicite si le format est invalide, jamais de correction silencieuse. */
+/**
+ * Parse et valide un fichier JSON importé. Trois échecs distincts, trois
+ * messages distincts (JSON invalide / version de schéma inconnue / forme
+ * invalide) — dans les trois cas la fonction LÈVE, elle ne retourne jamais
+ * un état partiel : tant qu'elle n'a pas rendu un objet, rien ne doit être
+ * écrit par l'appelant (devoir sacré n°1 — l'état existant doit survivre
+ * intact à un import raté).
+ */
 export function importerJSON(contenu: string): DonneesApp {
-  const parse = donneesAppSchema.safeParse(JSON.parse(contenu));
+  let brut: unknown;
+  try {
+    brut = JSON.parse(contenu);
+  } catch {
+    throw new Error("Ce fichier n'est pas un JSON valide.");
+  }
+
+  const schemaVersionRecue = typeof brut === "object" && brut !== null ? (brut as Record<string, unknown>).schemaVersion : undefined;
+  if (schemaVersionRecue !== SCHEMA_VERSION_DONNEES) {
+    throw new Error(
+      `Ce fichier a été exporté par une version différente de Cadence (version ${schemaVersionRecue ?? "inconnue"}, attendue ${SCHEMA_VERSION_DONNEES}) — import refusé, pas de conversion automatique.`,
+    );
+  }
+
+  const parse = donneesAppSchema.safeParse(brut);
   if (!parse.success) {
-    throw new Error("Le fichier importé n'a pas le format attendu par Cadence.");
+    throw new Error("Ce fichier n'a pas la structure attendue par Cadence.");
   }
   return parse.data;
 }

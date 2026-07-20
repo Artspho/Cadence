@@ -70,10 +70,13 @@ src/
     areBrute.ts  areNette.ts  prediction.ts  alertes.ts  cycles.ts
     __tests__/
   lib/extractionBulletin.ts       # import PDF (V2)
-  storage/localStorageAdapter.ts
-  components/                      # Dashboard, ProjectionChart, ContractForm,
+  storage/localStorageAdapter.ts  # + export/import JSON (schemaVersion, anti-écrasement)
+    __tests__/
+  components/                     # Dashboard, ProjectionChart, ContractForm,
                                    # ContractList, ImportBulletins, AlertCenter,
-                                   # Historique, Simulateur
+                                   # Historique, Simulateur, TopBar, Onboarding,
+                                   # AProposLimites, AvertissementHorsPerimetre,
+                                   # ConfirmationImport
   App.tsx  main.tsx  index.css
 ```
 
@@ -85,7 +88,7 @@ src/
 - ✅ Design tokens (Tailwind + `index.css`) alignés sur la maquette.
 - ✅ `engine/` complet et testé : `periodeReference`, `decompteHeures`, `salaireReference`,
   `areBrute` (+ `calculerAJBrutePourFenetre`), `areNette`, `prediction`, `alertes`, `cycles`
-  — **45 tests Vitest**, tous verts.
+  — **52 tests Vitest**, tous verts (dont 7 sur `storage/`).
 - ✅ `storage/`, `components/`, câblage `App.tsx` — bêta fonctionnelle de bout en bout
   (onboarding → tableau de bord → contrats → import PDF → historique → simulateur → à propos).
 - ✅ **Bug corrigé** : un profil neuf sans date anniversaire connue n'affiche plus jamais le
@@ -119,6 +122,15 @@ src/
   allongée et à la franchise salaires). Garde-fou ajouté pour la bande 60-62 € où l'allocation est
   déjà au plancher après la seule retraite complémentaire — sans lui, l'écrêtement aurait produit
   un montant négatif et un net > brut.
+- ✅ **Export/import JSON complet** (devoir sacré n°1, §11.A) : `schemaVersion` distinct de
+  `franceTravailConfig.meta.version`, 3 refus distincts à l'import (JSON invalide / version de
+  schéma inconnue / forme Zod invalide), jamais d'écriture avant validation complète. Anti-
+  écrasement : `ConfirmationImport.tsx` déclenche une sauvegarde automatique de l'état actuel
+  (téléchargée, inconditionnellement) **avant** de valider le fichier importé, qui n'écrase l'état
+  en place que si la validation réussit — ordre vérifié par construction dans `App.tsx`
+  (`confirmerImport`), pas seulement documenté. Testé en round-trip (y compris sur l'état vide
+  d'un tout premier utilisateur) et manuellement dans le navigateur (import valide, JSON corrompu,
+  état préservé après refus).
 - ⬜ **Non traité (V2/V3) :** coordination européenne (périodes U1/PDU1) — même famille qu'Annexe 8/article 65, hors périmètre Annexe 10 pur. Aucune logique ni champ de données ne l'anticipe encore (détail dans `docs/SPEC.md` §10 et §11.C). Ne pas confondre avec le champ `territoire` du contrat, qui couvre un cas différent (cachet ponctuel joué en EEE/Suisse/UK mais déclaré en France).
 - 🔁 **Vérifications régulières de viabilité :** au minimum à chaque revalorisation connue
   (SMIC/PMSS au 1er janvier et lors des hausses en cours d'année, ex. 1er juin 2026) et à chaque
