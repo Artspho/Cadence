@@ -64,10 +64,16 @@ describe("calculerAJBrutePourFenetre", () => {
     expect(decompte.total).toBeGreaterThan(franceTravailConfig.seuilHeures);
   });
 
-  it("tant que le SMIC n'est pas renseigné (config réelle), se rabat sur le calcul standard sans planter", () => {
+  it("sans SMIC renseigné, se rabat sur le calcul standard sans planter", () => {
+    // Construit sa propre config avec smicHoraireBrut: null plutôt que de s'appuyer sur l'état
+    // réel de franceTravailConfig : ce test vérifie un comportement de repli qui doit rester vrai
+    // quel que soit le SMIC en config réelle, y compris après une future revalorisation (le jour
+    // où franceTravailConfig aura de nouveau un SMIC à jour, ce test doit continuer de passer).
     const { fenetre, decompte } = construireFenetreReadmissionEtendue();
-    const resultat = calculerAJBrutePourFenetre(fenetre, decompte.total, 20000, 1000, franceTravailConfig);
-    const standard = calculerAJBrute({ salaireRetenu: 20000, nht: 1000, config: franceTravailConfig });
+    const configSansSmic = { ...franceTravailConfig, valeursDatees: { ...franceTravailConfig.valeursDatees, smicHoraireBrut: null } };
+
+    const resultat = calculerAJBrutePourFenetre(fenetre, decompte.total, 20000, 1000, configSansSmic);
+    const standard = calculerAJBrute({ salaireRetenu: 20000, nht: 1000, config: configSansSmic });
     expect(resultat).toEqual(standard);
   });
 

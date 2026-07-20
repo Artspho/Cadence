@@ -15,9 +15,9 @@ import { z } from "zod";
  */
 export const franceTravailConfig = {
   meta: {
-    version: "2026.03",
-    dateEntreeVigueur: "2026-03-01",
-    source: "Guide France Travail — Intermittents du spectacle, éd. mars 2026",
+    version: "2026.06",
+    dateEntreeVigueur: "2026-06-01",
+    source: "Guide France Travail — Intermittents du spectacle, éd. mars 2026 (constantes du régime) ; arrêté du 22 mai 2026 (SMIC horaire brut)",
     avertissement:
       "Estimation indicative. Ne se substitue pas à une notification officielle de France Travail.",
   },
@@ -111,7 +111,7 @@ export const franceTravailConfig = {
 
   // ── Valeurs volatiles à renseigner (revalorisées régulièrement) ──
   valeursDatees: {
-    smicHoraireBrut: null as number | null, // 🔶 TODO (réadmission allongée + heures non quantifiées)
+    smicHoraireBrut: 12.31 as number | null, // ✅ arrêté du 22 mai 2026, en vigueur au 01/06/2026 (ancienne valeur : 12,02 € au 01/01/2026)
     smicMensuelBrut: null as number | null, // 🔶 TODO (franchise salaires)
     smicJournalierBrut: null as number | null, // 🔶 TODO (franchise salaires)
     pmssMensuel: null as number | null, // 🔶 TODO (plafond de cumul)
