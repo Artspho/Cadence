@@ -7,6 +7,9 @@ suis, qu'est-ce que je dois faire »).
 
 > Spec complète et faisant foi : **`docs/SPEC.md`**. Maquette visuelle de référence :
 > **`docs/maquette_dashboard.html`**. En cas de doute, ces deux fichiers priment.
+> Registre de validation : **`docs/validation.md`** — compare les chiffres de Cadence au
+> simulateur officiel France Travail et aux notifications réelles. Les cellules ne se
+> remplissent qu'à partir d'une vraie comparaison, jamais d'un exemple fictif.
 
 ---
 
