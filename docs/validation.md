@@ -49,3 +49,20 @@ donne 51,86 € — confirme que ce profil n'est pas Alsace-Moselle. La branche 
 pas faire passer l'allocation sous un plancher lié au SMIC. Formule du SPEC §6.5 incomplète.
 À corriger UNIQUEMENT une fois la règle sourcée ET `smicHoraireBrut` renseigné en config. Ne pas
 deviner.
+
+### 2026-07-20 — Règle CSG/CRDS établie (à implémenter, NE PAS coder avant calibration #2)
+
+- **Assiette** : 98,25 % de l'AJ brute (abattement de 1,75 %), pas le SJM.
+- **Taux** : CSG 6,2 % ou 3,8 % + CRDS 0,5 % — déjà en config (`cotisations.tauxCSG`, `cotisations.tauxCRDS`), rien à ajouter côté taux.
+- **Exonération** : aucune CSG/CRDS si l'AJ brute ≤ SMIC journalier.
+- **Écrêtement** : le prélèvement CSG/CRDS ne peut jamais faire passer l'AJ nette sous le SMIC journalier (= SMIC horaire × 35/7, arrondi).
+- **Bugs identifiés** (les deux à corriger ensemble) :
+  (a) l'assiette actuelle est le SJM au lieu de l'AJ brute → facteur d'erreur ~8 sur ce cas ;
+  (b) l'écrêtement est totalement absent du code actuel.
+- **Valeur sourcée** : SMIC horaire brut = **12,31 €** au 01/06/2026 (source officielle
+  info.gouv.fr / travail-emploi.gouv.fr) → SMIC journalier ≈ 12,31 × 35/7 = 61,55 €, arrondi à
+  **62 €**.
+- **Réconciliation vérifiée au centime sur le cas Fictif #2** : retraite complémentaire (1,91 €)
+  + CSG/CRDS écrêtée (1,68 €) = 3,59 € de prélèvements → net = 65,59 − 3,59 = **62,00 €**, exactement
+  l'attendu du simulateur officiel, et exactement le SMIC journalier ci-dessus (le plancher
+  d'écrêtement explique très précisément pourquoi le net tombe pile sur ce montant).

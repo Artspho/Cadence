@@ -117,6 +117,13 @@ src/
   §6.5 incomplète. Directement lié au TODO `smicHoraireBrut` ci-dessus : à corriger UNIQUEMENT une
   fois la règle d'écrêtement sourcée ET cette valeur renseignée. Ne pas deviner.
 - ⬜ **Non traité (V2/V3) :** coordination européenne (périodes U1/PDU1) — même famille qu'Annexe 8/article 65, hors périmètre Annexe 10 pur. Aucune logique ni champ de données ne l'anticipe encore (détail dans `docs/SPEC.md` §10 et §11.C). Ne pas confondre avec le champ `territoire` du contrat, qui couvre un cas différent (cachet ponctuel joué en EEE/Suisse/UK mais déclaré en France).
+- 🔁 **Vérifications régulières de viabilité :** au minimum à chaque revalorisation connue
+  (SMIC/PMSS au 1er janvier et lors des hausses en cours d'année, ex. 1er juin 2026) et à chaque
+  nouvelle convention d'assurance chômage, re-vérifier **toutes** les valeurs de
+  `franceTravailConfig.ts` contre la source officielle **ET** rejouer les cas de
+  `docs/validation.md` contre le simulateur officiel. Objectif : garantir dans la durée les deux
+  devoirs sacrés (pas de perte de données, pas de chiffre faux). Rappel : la config est
+  actuellement datée « 2026.03 », donc **antérieure** à la revalorisation SMIC du 1er juin 2026.
 
 **Prochaines pistes** (au choix, pas d'ordre imposé) : les deux limites connues ci-dessus, ou les
 autres items du §11.A du SPEC encore ouverts (PWA réellement installable, alignement visuel fin
