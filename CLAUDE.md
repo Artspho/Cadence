@@ -85,7 +85,7 @@ src/
 - ✅ Design tokens (Tailwind + `index.css`) alignés sur la maquette.
 - ✅ `engine/` complet et testé : `periodeReference`, `decompteHeures`, `salaireReference`,
   `areBrute` (+ `calculerAJBrutePourFenetre`), `areNette`, `prediction`, `alertes`, `cycles`
-  — **41 tests Vitest**, tous verts.
+  — **45 tests Vitest**, tous verts.
 - ✅ `storage/`, `components/`, câblage `App.tsx` — bêta fonctionnelle de bout en bout
   (onboarding → tableau de bord → contrats → import PDF → historique → simulateur → à propos).
 - ✅ **Bug corrigé** : un profil neuf sans date anniversaire connue n'affiche plus jamais le
@@ -106,24 +106,28 @@ src/
   modification d'UI touchant `App.tsx`, `Onboarding.tsx` ou `AProposLimites.tsx`, **re-vérifier à
   la main** : cocher/décocher `activiteHorsAnnexe10` et confirmer qu'aucun chiffre n'apparaît sur
   Dashboard/Historique/Simulateur tant que la case est cochée.
-- 🔶 **Limite connue :** `config.valeursDatees.smicHoraireBrut` et `.pmssMensuel` sont à `null`
-  (TODO volontaire, cf. `franceTravailConfig.ts`) — à renseigner depuis la source officielle avant
-  toute mise en production. Tant que `smicHoraireBrut` est `null`, la formule réadmission allongée
-  (point ci-dessus) reste inactive et se rabat silencieusement sur le calcul standard.
-- ❌ **Bug confirmé par validation (`docs/validation.md`, cas Fictif #2) :** `areNette.ts` applique
-  CSG (6,2 %) + CRDS (0,5 %) sur le SJM entier, sans la règle d'écrêtement qui limite le
-  prélèvement pour ne pas faire passer l'allocation sous un plancher lié au SMIC. Écart confirmé
-  de 12,08 €/jour face au simulateur officiel dès que l'AJ brute dépasse 60 €. Formule du SPEC
-  §6.5 incomplète. Directement lié au TODO `smicHoraireBrut` ci-dessus : à corriger UNIQUEMENT une
-  fois la règle d'écrêtement sourcée ET cette valeur renseignée. Ne pas deviner.
+- ✅ **`config.valeursDatees.smicHoraireBrut` renseigné** (12,31 €, arrêté du 22 mai 2026, en
+  vigueur au 01/06/2026) — la formule réadmission allongée (point ci-dessus) est donc réellement
+  active dès qu'un profil réadmission a une fenêtre étendue. `.pmssMensuel` reste à `null` (TODO
+  volontaire, module indemnisation mensuelle V2, non utilisé ailleurs).
+- ✅ **Bug CSG/CRDS corrigé** (`docs/validation.md`, cas Fictif #2/#3) : `areNette.ts` calculait
+  CSG (6,2 %) + CRDS (0,5 %) sur le SJM entier au lieu de l'allocation après retraite — écart d'un
+  facteur ~8, invisible avant ces deux cas de validation. Corrigé : assiette = 98,25 % de
+  l'allocation après retraite (`cotisations.tauxAssietteCSGCRDS`), écrêtement au plancher
+  `cotisations.plancherEcretementJournalier` (62 €, source simulateur officiel FT — **distinct**
+  de `valeursDatees.smicHoraireBrut`/`smicJournalierBrut`, qui restent réservés à la réadmission
+  allongée et à la franchise salaires). Garde-fou ajouté pour la bande 60-62 € où l'allocation est
+  déjà au plancher après la seule retraite complémentaire — sans lui, l'écrêtement aurait produit
+  un montant négatif et un net > brut.
 - ⬜ **Non traité (V2/V3) :** coordination européenne (périodes U1/PDU1) — même famille qu'Annexe 8/article 65, hors périmètre Annexe 10 pur. Aucune logique ni champ de données ne l'anticipe encore (détail dans `docs/SPEC.md` §10 et §11.C). Ne pas confondre avec le champ `territoire` du contrat, qui couvre un cas différent (cachet ponctuel joué en EEE/Suisse/UK mais déclaré en France).
 - 🔁 **Vérifications régulières de viabilité :** au minimum à chaque revalorisation connue
   (SMIC/PMSS au 1er janvier et lors des hausses en cours d'année, ex. 1er juin 2026) et à chaque
   nouvelle convention d'assurance chômage, re-vérifier **toutes** les valeurs de
   `franceTravailConfig.ts` contre la source officielle **ET** rejouer les cas de
   `docs/validation.md` contre le simulateur officiel. Objectif : garantir dans la durée les deux
-  devoirs sacrés (pas de perte de données, pas de chiffre faux). Rappel : la config est
-  actuellement datée « 2026.03 », donc **antérieure** à la revalorisation SMIC du 1er juin 2026.
+  devoirs sacrés (pas de perte de données, pas de chiffre faux). La config est actuellement
+  datée « 2026.06 » (alignée sur la revalorisation SMIC du 1er juin 2026) — prochaine échéance
+  connue : la revalorisation SMIC/PMSS du 1er janvier suivant.
 
 **Prochaines pistes** (au choix, pas d'ordre imposé) : les deux limites connues ci-dessus, ou les
 autres items du §11.A du SPEC encore ouverts (PWA réellement installable, alignement visuel fin
