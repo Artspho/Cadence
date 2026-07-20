@@ -29,9 +29,16 @@ s'accordent ne prouvent rien (elles peuvent se tromper de la même façon).
 
 | Cas | Entrées (annexe / situation / période / heures / SR brut) | FT : AJ brute + durée | Cadence : AJ brute + durée | Écart | Verdict |
 |-----|-----------------------------------------------------------|-----------------------|----------------------------|-------|---------|
-| A — central   | A10 / … / … / ~600-700 h / SR confortable | | | | |
+| Réel #1 — notification FT du 03/02/2026 | A10 / réadmission / période 24/03/2025→17/01/2026 (~299 j, pas d'allongement) / 710 h / SR 9229,35 € brut avant abattement | 53,81 € net (durée non communiquée) | 55,02 € brut → 53,81 € net (durée non exercée dans ce test) | 0,00 € | ✅ concordant |
 | B — 500 h     | A10 / … / … / 500 h / … (statut seul, FT ne rend rien <507 h) | | | | |
 | B — 520 h     | A10 / … / … / 520 h / … | | | | |
 | C — cachets   | A10 / … / … / majorité de cachets / … | | | | |
 
 Verdict : ✅ concordant · ⚠️ écart à expliquer · ❌ bug à corriger
+
+**Note sur le cas Réel #1** : chemin de calcul exercé = A + B + C (formule standard, pas de
+période allongée) → SJM → palier retraite complémentaire seule (31,96 € < AJ brute ≤ 60 €,
+donc pas de CSG/CRDS sur ce cas). Cohérence croisée vérifiée sur le régime Alsace-Moselle : le
+calcul sans cotisation locale tombe pile sur le net réel (53,81 €), celui avec cotisation locale
+donne 51,86 € — confirme que ce profil n'est pas Alsace-Moselle. La branche CSG/CRDS (AJ brute
+> 60 €) reste à éprouver sur un futur cas réel, tout comme la formule réadmission allongée.
