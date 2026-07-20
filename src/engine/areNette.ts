@@ -11,7 +11,7 @@ export function calculerSJM(sr: number, nht: number, config: FranceTravailConfig
 }
 
 export function calculerAJNette(ajBrute: number, sjm: number, profil: Profil, config: FranceTravailConfig): AJNetteResultat {
-  const { seuilExoneration, seuilRetraiteCompl, tauxRetraiteComplementaire, tauxCSG, tauxCRDS, tauxAlsaceMoselle } = config.cotisations;
+  const { seuilExoneration, seuilRetraiteCompl, tauxRetraiteComplementaire, tauxCSG, tauxCRDS, tauxAlsaceMoselle, tauxAssietteCSGCRDS, plancherEcretementJournalier } = config.cotisations;
   const detailCotisations: DetailCotisation[] = [];
 
   if (ajBrute < seuilExoneration) {
@@ -23,12 +23,35 @@ export function calculerAJNette(ajBrute: number, sjm: number, profil: Profil, co
   let net = ajBrute - retraite;
 
   if (ajBrute > seuilRetraiteCompl) {
-    const taux = profil.baremeCSG === "reduit" ? tauxCSG.reduit : tauxCSG.normal;
-    const csg = taux * sjm;
-    const crds = tauxCRDS * sjm;
-    detailCotisations.push({ libelle: `CSG (${(taux * 100).toFixed(2).replace(/\.?0+$/, "")} % du SJM)`, montant: csg });
-    detailCotisations.push({ libelle: "CRDS (0,5 % du SJM)", montant: crds });
-    net -= csg + crds;
+    if (plancherEcretementJournalier == null) {
+      throw new Error(
+        "CSG/CRDS : plancher d'écrêtement manquant (config.cotisations.plancherEcretementJournalier). " +
+          "Renseigner cette valeur depuis la source officielle avant de lancer ce calcul — aucune approximation n'est appliquée.",
+      );
+    }
+
+    // Bande 60 € < AJ brute et allocation déjà au plancher (ou en dessous) une
+    // fois la retraite complémentaire déduite : aucune CSG/CRDS ne peut être
+    // prélevée sans faire passer l'allocation sous ce plancher — donc on ne
+    // prélève rien. Sans cette branche, l'écrêtement ci-dessous calculerait un
+    // montant NÉGATIF (net > brut), un chiffre faux (devoir sacré n°2).
+    if (net > plancherEcretementJournalier) {
+      const taux = profil.baremeCSG === "reduit" ? tauxCSG.reduit : tauxCSG.normal;
+      const assiette = tauxAssietteCSGCRDS * net; // 98,25 % de l'allocation APRÈS retraite, pas le SJM
+      const csgTheorique = taux * assiette;
+      const crdsTheorique = tauxCRDS * assiette;
+      const netSansEcretement = net - csgTheorique - crdsTheorique;
+
+      if (netSansEcretement < plancherEcretementJournalier) {
+        const montantEcrete = net - plancherEcretementJournalier; // net > plancher ici, donc toujours > 0
+        detailCotisations.push({ libelle: `CSG + CRDS écrêtées (plancher ${plancherEcretementJournalier} €/j)`, montant: montantEcrete });
+        net = plancherEcretementJournalier;
+      } else {
+        detailCotisations.push({ libelle: `CSG (${(taux * 100).toFixed(2).replace(/\.?0+$/, "")} % de l'allocation après retraite)`, montant: csgTheorique });
+        detailCotisations.push({ libelle: "CRDS (0,5 % de l'allocation après retraite)", montant: crdsTheorique });
+        net = netSansEcretement;
+      }
+    }
   }
 
   if (profil.alsaceMoselle) {
