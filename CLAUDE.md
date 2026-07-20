@@ -110,6 +110,12 @@ src/
   (TODO volontaire, cf. `franceTravailConfig.ts`) — à renseigner depuis la source officielle avant
   toute mise en production. Tant que `smicHoraireBrut` est `null`, la formule réadmission allongée
   (point ci-dessus) reste inactive et se rabat silencieusement sur le calcul standard.
+- ❌ **Bug confirmé par validation (`docs/validation.md`, cas Fictif #2) :** `areNette.ts` applique
+  CSG (6,2 %) + CRDS (0,5 %) sur le SJM entier, sans la règle d'écrêtement qui limite le
+  prélèvement pour ne pas faire passer l'allocation sous un plancher lié au SMIC. Écart confirmé
+  de 12,08 €/jour face au simulateur officiel dès que l'AJ brute dépasse 60 €. Formule du SPEC
+  §6.5 incomplète. Directement lié au TODO `smicHoraireBrut` ci-dessus : à corriger UNIQUEMENT une
+  fois la règle d'écrêtement sourcée ET cette valeur renseignée. Ne pas deviner.
 - ⬜ **Non traité (V2/V3) :** coordination européenne (périodes U1/PDU1) — même famille qu'Annexe 8/article 65, hors périmètre Annexe 10 pur. Aucune logique ni champ de données ne l'anticipe encore (détail dans `docs/SPEC.md` §10 et §11.C). Ne pas confondre avec le champ `territoire` du contrat, qui couvre un cas différent (cachet ponctuel joué en EEE/Suisse/UK mais déclaré en France).
 
 **Prochaines pistes** (au choix, pas d'ordre imposé) : les deux limites connues ci-dessus, ou les

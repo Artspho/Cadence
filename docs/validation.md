@@ -30,6 +30,7 @@ s'accordent ne prouvent rien (elles peuvent se tromper de la même façon).
 | Cas | Entrées (annexe / situation / période / heures / SR brut) | FT : AJ brute + durée | Cadence : AJ brute + durée | Écart | Verdict |
 |-----|-----------------------------------------------------------|-----------------------|----------------------------|-------|---------|
 | Réel #1 — notification FT du 03/02/2026 | A10 / réadmission / période 24/03/2025→17/01/2026 (~299 j, pas d'allongement) / 710 h / SR 9229,35 € brut avant abattement | 53,81 € net (durée non communiquée) | 55,02 € brut → 53,81 € net (durée non exercée dans ce test) | 0,00 € | ✅ concordant |
+| Fictif #2 — simulateur officiel | A10 / 710 h / SR 14 579 € brut avant abattement (pas d'enseignement/formation, pas Alsace-Moselle) | A+B+C = 65,59 € · retraite compl. = 1,91 € · CSG/CRDS = 1,68 € · **net = 62,00 €** | A+B+C = 65,59 € ✅ · retraite compl. = 1,91 € ✅ · CSG/CRDS = 13,76 € ❌ · **net = 49,92 €** ❌ | 0,00 € (A+B+C, retraite) / **12,08 €** (CSG/CRDS, net) | ❌ écart confirmé sur la branche CSG/CRDS |
 | B — 500 h     | A10 / … / … / 500 h / … (statut seul, FT ne rend rien <507 h) | | | | |
 | B — 520 h     | A10 / … / … / 520 h / … | | | | |
 | C — cachets   | A10 / … / … / majorité de cachets / … | | | | |
@@ -42,3 +43,9 @@ donc pas de CSG/CRDS sur ce cas). Cohérence croisée vérifiée sur le régime 
 calcul sans cotisation locale tombe pile sur le net réel (53,81 €), celui avec cotisation locale
 donne 51,86 € — confirme que ce profil n'est pas Alsace-Moselle. La branche CSG/CRDS (AJ brute
 > 60 €) reste à éprouver sur un futur cas réel, tout comme la formule réadmission allongée.
+
+**Note sur le cas Fictif #2 — Bug détecté par validation** : `areNette.ts` applique CSG (6,2 %)
++ CRDS (0,5 %) sur le SJM entier, sans la règle d'écrêtement qui limite le prélèvement pour ne
+pas faire passer l'allocation sous un plancher lié au SMIC. Formule du SPEC §6.5 incomplète.
+À corriger UNIQUEMENT une fois la règle sourcée ET `smicHoraireBrut` renseigné en config. Ne pas
+deviner.
