@@ -1,10 +1,47 @@
-# docs/validation.md — Validation des chiffres de Cadence
+# Registre de validation — Cadence
+
+> Mémoire durable des vérifications du calcul contre une SOURCE EXTERNE
+> (simulateur officiel France Travail + notifications réelles). À relire en
+> début de session, au même titre que SPEC.md.
+
+## État en un coup d'œil — à jour au 20/07/2026
+
+**Distinction clé :** « règle vérifiée » (le calcul attendu colle à la source
+externe) ≠ « code conforme » (Cadence produit ce chiffre). Les deux ne
+coïncident pas encore.
+
+### ✅ Validé — code Cadence = source externe
+- **Cas réel #1** (notif FT 03/02/2026) : A10, réadmission, 710 h, SR 9 229,35 € →
+  net 53,81 €. Écart 0,00 €. Couvre A+B+C, SJM, retraite compl. seule (AJ ≤ 60 €).
+
+### 🔶 Règle établie et prouvée, mais PAS ENCORE dans le code
+- **CSG/CRDS** : **règle** prouvée 2× contre le simulateur officiel — le code, lui, ne la produit pas encore.
+  - Cas #2 (SR 14 579 €, écrêté) : CSG/CRDS 1,68 €, net 62,00 € — teste le plancher SMIC.
+  - Cas #3 (SR 50 000 €, non écrêté) : CSG/CRDS 4,63 €, net 65,73 € — teste assiette + taux nus.
+  - Règle : assiette = 98,25 % de l'AJ brute APRÈS retraite ; écrêtement = le
+    prélèvement ne peut faire passer l'AJ nette sous le SMIC journalier
+    (SMIC horaire × 35/7 arrondi ≈ 62 € au 01/06/2026).
+  - ⚠️ Bug actuel dans areNette.ts : CSG/CRDS calculée sur le SJM (~facteur 8).
+    À corriger, puis transformer #2 et #3 en tests permanents (cas fictifs).
+
+### ⬜ Tourne en prod, PAS encore validé en externe
+- **Réadmission allongée** (fenêtre > 365 j) : activée depuis le SMIC renseigné
+  (commit fda6b8e). Jamais confrontée au simulateur ni à une notif réelle.
+  Montant plus juste qu'avant mais non vérifié → à valider avant toute bêta
+  incluant ces profils.
+
+## Prochaine action
+Corriger areNette.ts (assiette + écrêtement), cas #2 et #3 en tests permanents.
+
+---
+
+## Historique détaillé des cas
 
 Objet : prouver que le calcul colle à la réalité, en comparant les sorties de
 Cadence à une source qui fait autorité. C'est la vérification qui compte le plus,
 bien au-delà des tests unitaires.
 
-## Source de vérité (par ordre de confiance)
+### Source de vérité (par ordre de confiance)
 
 1. Notification officielle France Travail — le plus fort : teste aussi les heures
    RÉELLEMENT retenues par FT (un contrat non déclaré, une heure requalifiée…).
@@ -14,7 +51,7 @@ bien au-delà des tests unitaires.
 On ne compare JAMAIS Cadence à une estimation personnelle : deux estimations qui
 s'accordent ne prouvent rien (elles peuvent se tromper de la même façon).
 
-## Règles de comparaison
+### Règles de comparaison
 
 - Brut à brut : le simulateur rend une AJ brute → ne pas comparer au net.
 - Zone centrale obligatoire : SR ni très bas ni très haut. Tant que
@@ -25,12 +62,13 @@ s'accordent ne prouvent rien (elles peuvent se tromper de la même façon).
 - Preuve : capture d'écran datée du simulateur (l'outil peut évoluer).
 - Règle absolue : un faux « vert » ou un faux « Bloqué » → on arrête tout.
 
-## Cas testés
+### Cas testés
 
 | Cas | Entrées (annexe / situation / période / heures / SR brut) | FT : AJ brute + durée | Cadence : AJ brute + durée | Écart | Verdict |
 |-----|-----------------------------------------------------------|-----------------------|----------------------------|-------|---------|
 | Réel #1 — notification FT du 03/02/2026 | A10 / réadmission / période 24/03/2025→17/01/2026 (~299 j, pas d'allongement) / 710 h / SR 9229,35 € brut avant abattement | 53,81 € net (durée non communiquée) | 55,02 € brut → 53,81 € net (durée non exercée dans ce test) | 0,00 € | ✅ concordant |
-| Fictif #2 — simulateur officiel | A10 / 710 h / SR 14 579 € brut avant abattement (pas d'enseignement/formation, pas Alsace-Moselle) | A+B+C = 65,59 € · retraite compl. = 1,91 € · CSG/CRDS = 1,68 € · **net = 62,00 €** | A+B+C = 65,59 € ✅ · retraite compl. = 1,91 € ✅ · CSG/CRDS = 13,76 € ❌ · **net = 49,92 €** ❌ | 0,00 € (A+B+C, retraite) / **12,08 €** (CSG/CRDS, net) | ❌ écart confirmé sur la branche CSG/CRDS |
+| Fictif #2 — simulateur officiel | A10 / 710 h / SR 14 579 € brut avant abattement (pas d'enseignement/formation, pas Alsace-Moselle) — cas écrêté (AJ brute proche du SMIC journalier) | A+B+C = 65,59 € · retraite compl. = 1,91 € · CSG/CRDS = 1,68 € · **net = 62,00 €** | Code actuel (`areNette.ts`, non corrigé) : A+B+C = 65,59 € ✅ · retraite compl. = 1,91 € ✅ · CSG/CRDS = 13,76 € ❌ · **net = 49,92 €** ❌ | 0,00 € (A+B+C, retraite) / **12,08 €** (CSG/CRDS, net) — écart entre le CODE actuel et FT | ✅ règle confirmée / ⬜ code Cadence à tester après correction areNette.ts |
+| Fictif #3 — simulateur officiel | A10 / 710 h / SR 50 000 € brut avant abattement (pas d'enseignement/formation, pas Alsace-Moselle) — cas non écrêté (AJ brute nettement > SMIC journalier) | A+B+C = 76,91 € · retraite compl. = 6,55 € · CSG/CRDS = 4,63 € · **net = 65,73 €** | Règle établie (calcul manuel, PAS la sortie du code actuel) : A+B+C = 76,91 € ✅ · retraite compl. = 6,55 € ✅ · CSG/CRDS = 4,63 € ✅ · **net = 65,73 €** ✅ | 0,00 € (règle établie vs simulateur officiel) | ✅ règle confirmée / ⬜ code Cadence à tester après correction areNette.ts |
 | B — 500 h     | A10 / … / … / 500 h / … (statut seul, FT ne rend rien <507 h) | | | | |
 | B — 520 h     | A10 / … / … / 520 h / … | | | | |
 | C — cachets   | A10 / … / … / majorité de cachets / … | | | | |
@@ -50,7 +88,16 @@ pas faire passer l'allocation sous un plancher lié au SMIC. Formule du SPEC §6
 À corriger UNIQUEMENT une fois la règle sourcée ET `smicHoraireBrut` renseigné en config. Ne pas
 deviner.
 
-### 2026-07-20 — Règle CSG/CRDS établie (à implémenter, NE PAS coder avant calibration #2)
+**Note sur le cas Fictif #3** : second point de calibration, volontairement choisi non écrêté
+(SR élevé, AJ brute 76,91 € bien au-dessus du SMIC journalier ≈ 62 €) pour isoler l'assiette et
+les taux nus, sans que l'écrêtement ne masque une éventuelle erreur. Le corrigé du simulateur
+officiel a été comparé au calcul de la RÈGLE établie ci-dessous (calcul manuel), pas à la sortie
+du code Cadence actuel — `areNette.ts` n'a pas été exécuté sur ce cas, il produirait un résultat
+tout aussi faux que sur #2 (même bug d'assiette sur le SJM). Concordance au centime sur les 4
+postes (A+B+C, retraite, CSG/CRDS, net) : confirme la règle une seconde fois, sur un cas de nature
+différente du #2.
+
+#### 2026-07-20 — Règle CSG/CRDS établie (à implémenter, NE PAS coder avant calibration #2)
 
 - **Assiette** : 98,25 % de l'AJ brute (abattement de 1,75 %), pas le SJM.
 - **Taux** : CSG 6,2 % ou 3,8 % + CRDS 0,5 % — déjà en config (`cotisations.tauxCSG`, `cotisations.tauxCRDS`), rien à ajouter côté taux.
@@ -67,7 +114,7 @@ deviner.
   l'attendu du simulateur officiel, et exactement le SMIC journalier ci-dessus (le plancher
   d'écrêtement explique très précisément pourquoi le net tombe pile sur ce montant).
 
-## À valider
+### À valider
 
 - **Réadmission allongée (fenêtre > 365 j)** — activée réellement depuis le commit `fda6b8e`
   (SMIC renseigné). Jamais confrontée au simulateur officiel ni à une notification réelle. À
