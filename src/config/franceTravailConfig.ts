@@ -1,0 +1,230 @@
+import { z } from "zod";
+
+/**
+ * franceTravailConfig — TOUTES les constantes réglementaires du régime
+ * Annexe 10 (musiciens classiques et assimilés) vivent ici, et nulle part
+ * ailleurs. Aucune fonction du moteur (src/engine) ne doit contenir de
+ * valeur numérique réglementaire en dur : elle doit toujours la lire ici.
+ *
+ * Source : Guide France Travail — Intermittents du spectacle, éd. mars 2026.
+ *
+ * Les valeurs marquées ✅ sont certifiées par le guide. Les valeurs
+ * marquées 🔶 TODO sont volatiles (revalorisées régulièrement, ex. SMIC,
+ * PMSS) : elles sont laissées à `null` tant qu'elles n'ont pas été
+ * recopiées depuis la source officielle. Aucune valeur n'est devinée.
+ */
+export const franceTravailConfig = {
+  meta: {
+    version: "2026.03",
+    dateEntreeVigueur: "2026-03-01",
+    source: "Guide France Travail — Intermittents du spectacle, éd. mars 2026",
+    avertissement:
+      "Estimation indicative. Ne se substitue pas à une notification officielle de France Travail.",
+  },
+
+  // ── Conditions d'affiliation ──────────────────────────────────
+  seuilHeures: 507, // ✅
+  periodeReferenceJours: 365, // ✅ 12 mois glissants (dernière FCT)
+  ageLimiteIndemnisation: 67, // ✅
+  heuresApresDemission: 455, // ✅ admission possible malgré démission
+
+  // ── Décompte des heures ───────────────────────────────────────
+  heuresParCachet: 12, // ✅
+  plafondCachetsParMois: 28, // ✅ (Annexe 10)
+  heuresParJourEEE: 6, // ✅ EEE/Suisse/UK, artistes
+  heuresAssimileesParJour: 5, // ✅ maternité, adoption, AT, ALD, suspension
+
+  // ── Heures d'enseignement (comptent pour 507 h, PAS pour le montant) ──
+  enseignement: {
+    plafondMoins50ans: 70, // ✅
+    plafond50ansEtPlus: 120, // ✅
+    plafondCumulEnseignementFormation: 338, // ✅ 2/3 de 507
+  },
+  formation: {
+    plafond: 338, // ✅ formation non rémunérée, limite 2/3
+    // Cumul enseignement + formation également plafonné à 338 h — cf. enseignement.plafondCumulEnseignementFormation
+  },
+
+  // ── Formule de l'AJ brute (Annexe 10) : AJ = A + B + C ────────
+  are: {
+    ajMinimale: 31.96, // ✅ depuis 01/07/2023
+    plancherAnnexe10: 44, // ✅ AJ brute minimale
+    plafond: 174.8, // ✅ depuis 01/01/2024
+    partieA: { seuilSR: 13700, coeffSousSeuil: 0.36, coeffAuDelaSeuil: 0.05, diviseur: 5000 }, // ✅
+    partieB: { seuilNHT: 690, coeffSousSeuil: 0.26, coeffAuDelaSeuil: 0.08, diviseur: 507 }, // ✅
+    partieC: { coeff: 0.7 }, // ✅ AJ minimale × 0,70 (Annexe 10)
+  },
+
+  // ── Cotisations sur l'AJ (pour l'AJ nette) ────────────────────
+  cotisations: {
+    seuilExoneration: 31.96, // ✅ AJ brute < ce seuil : aucune cotisation
+    seuilRetraiteCompl: 60, // ✅ 31,96 < AJ ≤ 60 : retraite compl. seule
+    tauxRetraiteComplementaire: 0.0093, // ✅ 0,93 % du SJM
+    tauxCSG: { normal: 0.062, reduit: 0.038 }, // ✅ selon barème d'imposition
+    tauxCRDS: 0.005, // ✅
+    tauxAlsaceMoselle: 0.015, // ✅ régime local
+    diviseurSJM_Annexe10: 10, // ✅ SJM = SR / (NHTM / 10)
+  },
+
+  // ── Réadmission & clause de rattrapage ────────────────────────
+  readmission: {
+    affiliationMajoreeParPeriode: 42, // ✅ h suppl. par tranche…
+    tranchePeriodeJours: 30, // ✅ …de 30 j au-delà du 365e
+    // En période allongée : diviseur A = NH × SMIC horaire ; diviseur B = NH.
+    clauseRattrapage: {
+      dureeMois: 6, // ✅
+      seuilBas: 338,
+      seuilHaut: 506, // ✅ éligibilité entre 338 et 506 h
+      ancienneteAnnees: 5, // ✅
+      ancienneteHeures: 2535, // ✅ 5 × 507 h
+      affiliation12mois: 338, // ✅ 338 h dans les 12 mois précédents
+      delaiDemandeJours: 30, // ✅
+    },
+  },
+
+  // ── Différés & franchises (module « indemnisation mensuelle », V2) ──
+  differesEtFranchises: {
+    delaiAttenteJours: 7, // ✅ une fois par période de 12 mois
+    differeSpecifiquePlafondJours: 75, // ✅ (rarement applicable aux CDDU)
+    franchiseCongesPayes: {
+      tauxAcquisition: 2.5,
+      base: 24, // ✅ (jours travaillés × 2,5) / 24
+      plafondJours: 30, // ✅
+      forfaitMensuelBas: 2, // ✅ si franchise totale ≤ 24 j
+      forfaitMensuelHaut: 3, // ✅ si franchise totale > 24 j
+    },
+    franchiseSalaires: {
+      repartitionMoisMax: 8, // ✅ répartie sur 8 mois max
+      // 🔶 TODO : transcrire la formule EXACTE de la franchise salaires
+      //     depuis le guide (implique salaires de la période, SMIC journalier).
+      formule: null,
+    },
+  },
+
+  // ── Indemnisation mensuelle & cumul (module V2) ───────────────
+  indemnisationMensuelle: {
+    seuilNonIndemnisationJours: 27, // ✅ (Annexe 10)
+    coeffJoursNonIndemnisables: 1.3, // ✅ jours travaillés × 1,3
+    diviseurJoursTravaillesA10: 10, // ✅ heures mensuelles / 10
+    plafondCumulCoeffPMSS: 1.18, // ✅ ARE + salaires ≤ 118 % du PMSS
+  },
+
+  // ── Valeurs volatiles à renseigner (revalorisées régulièrement) ──
+  valeursDatees: {
+    smicHoraireBrut: null as number | null, // 🔶 TODO (réadmission allongée + heures non quantifiées)
+    smicMensuelBrut: null as number | null, // 🔶 TODO (franchise salaires)
+    smicJournalierBrut: null as number | null, // 🔶 TODO (franchise salaires)
+    pmssMensuel: null as number | null, // 🔶 TODO (plafond de cumul)
+  },
+} as const;
+
+// ── Schéma de validation Zod ─────────────────────────────────────
+// Garantit qu'une modification de la config reste structurellement valide
+// (types, présence des champs) avant même d'être utilisée par le moteur.
+const nullableNumber = z.number().nullable();
+
+export const franceTravailConfigSchema = z.object({
+  meta: z.object({
+    version: z.string(),
+    dateEntreeVigueur: z.string(),
+    source: z.string(),
+    avertissement: z.string(),
+  }),
+  seuilHeures: z.number().positive(),
+  periodeReferenceJours: z.number().positive(),
+  ageLimiteIndemnisation: z.number().positive(),
+  heuresApresDemission: z.number().positive(),
+  heuresParCachet: z.number().positive(),
+  plafondCachetsParMois: z.number().positive(),
+  heuresParJourEEE: z.number().positive(),
+  heuresAssimileesParJour: z.number().positive(),
+  enseignement: z.object({
+    plafondMoins50ans: z.number().positive(),
+    plafond50ansEtPlus: z.number().positive(),
+    plafondCumulEnseignementFormation: z.number().positive(),
+  }),
+  formation: z.object({
+    plafond: z.number().positive(),
+  }),
+  are: z.object({
+    ajMinimale: z.number().positive(),
+    plancherAnnexe10: z.number().positive(),
+    plafond: z.number().positive(),
+    partieA: z.object({
+      seuilSR: z.number().positive(),
+      coeffSousSeuil: z.number(),
+      coeffAuDelaSeuil: z.number(),
+      diviseur: z.number().positive(),
+    }),
+    partieB: z.object({
+      seuilNHT: z.number().positive(),
+      coeffSousSeuil: z.number(),
+      coeffAuDelaSeuil: z.number(),
+      diviseur: z.number().positive(),
+    }),
+    partieC: z.object({ coeff: z.number() }),
+  }),
+  cotisations: z.object({
+    seuilExoneration: z.number(),
+    seuilRetraiteCompl: z.number(),
+    tauxRetraiteComplementaire: z.number(),
+    tauxCSG: z.object({ normal: z.number(), reduit: z.number() }),
+    tauxCRDS: z.number(),
+    tauxAlsaceMoselle: z.number(),
+    diviseurSJM_Annexe10: z.number().positive(),
+  }),
+  readmission: z.object({
+    affiliationMajoreeParPeriode: z.number().positive(),
+    tranchePeriodeJours: z.number().positive(),
+    clauseRattrapage: z.object({
+      dureeMois: z.number().positive(),
+      seuilBas: z.number(),
+      seuilHaut: z.number(),
+      ancienneteAnnees: z.number(),
+      ancienneteHeures: z.number(),
+      affiliation12mois: z.number(),
+      delaiDemandeJours: z.number(),
+    }),
+  }),
+  differesEtFranchises: z.object({
+    delaiAttenteJours: z.number(),
+    differeSpecifiquePlafondJours: z.number(),
+    franchiseCongesPayes: z.object({
+      tauxAcquisition: z.number(),
+      base: z.number(),
+      plafondJours: z.number(),
+      forfaitMensuelBas: z.number(),
+      forfaitMensuelHaut: z.number(),
+    }),
+    franchiseSalaires: z.object({
+      repartitionMoisMax: z.number(),
+      formule: z.null(),
+    }),
+  }),
+  indemnisationMensuelle: z.object({
+    seuilNonIndemnisationJours: z.number(),
+    coeffJoursNonIndemnisables: z.number(),
+    diviseurJoursTravaillesA10: z.number(),
+    plafondCumulCoeffPMSS: z.number(),
+  }),
+  valeursDatees: z.object({
+    smicHoraireBrut: nullableNumber,
+    smicMensuelBrut: nullableNumber,
+    smicJournalierBrut: nullableNumber,
+    pmssMensuel: nullableNumber,
+  }),
+});
+
+export type FranceTravailConfig = z.infer<typeof franceTravailConfigSchema>;
+
+// Valide la config au chargement du module : une erreur de structure
+// (ex. régression lors d'une mise à jour annuelle) casse au démarrage
+// plutôt que de produire un calcul silencieusement faux.
+franceTravailConfigSchema.parse(franceTravailConfig);
+
+/** Nombre de jours écoulés depuis la dernière mise à jour de la config, pour l'alerte de péremption (bandeau "règles vérifiées au…"). */
+export function joursDepuisMiseAJourConfig(dateDuJour: Date): number {
+  const entreeVigueur = new Date(franceTravailConfig.meta.dateEntreeVigueur);
+  const diffMs = dateDuJour.getTime() - entreeVigueur.getTime();
+  return Math.floor(diffMs / (1000 * 60 * 60 * 24));
+}

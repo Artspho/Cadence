@@ -1,0 +1,289 @@
+<!--
+  MAQUETTE — Tableau de bord "Cadence" (nom provisoire)
+  Direction visuelle : Finary-like. Sombre, premium, données lisibles.
+  Contenu d'exemple : un musicien Annexe 10 en cours de saison, sur trajectoire "Sécurité".
+  Ceci est une maquette statique (chiffres figés) pour valider le style avant de coder l'app React.
+-->
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Cadence — Maquette tableau de bord</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0A0C10;
+    --surface:#12161D;
+    --surface-2:#161C24;
+    --line:rgba(255,255,255,.06);
+    --line-strong:rgba(255,255,255,.1);
+    --text:#E8EDF4;
+    --muted:#8B96A6;
+    --faint:#657084;
+    --mint:#3FD69B;
+    --mint-soft:rgba(63,214,155,.14);
+    --teal:#57A9F0;
+    --violet:#9B8CFF;
+    --amber:#F5C46B;
+    --red:#F2726B;
+    --display:'Space Grotesk',system-ui,sans-serif;
+    --body:'Inter',system-ui,sans-serif;
+    --r:18px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+  body{
+    background:
+      radial-gradient(1200px 600px at 78% -8%, rgba(63,214,155,.06), transparent 60%),
+      var(--bg);
+    color:var(--text);
+    font-family:var(--body);
+    min-height:100vh;
+    padding:28px 22px 48px;
+    display:flex;justify-content:center;
+  }
+  .app{width:100%;max-width:1040px}
+
+  /* ---------- Top bar ---------- */
+  .topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:26px}
+  .brand{display:flex;align-items:center;gap:11px}
+  .logo{
+    width:30px;height:30px;border-radius:9px;
+    background:linear-gradient(150deg,var(--mint),#1FA978);
+    position:relative;flex:none;
+    box-shadow:0 0 0 1px rgba(255,255,255,.08) inset;
+  }
+  .logo::after{content:"";position:absolute;inset:0;border-radius:9px;
+    background:
+      linear-gradient(transparent 46%, rgba(10,12,16,.9) 46%, rgba(10,12,16,.9) 54%, transparent 54%);}
+  .wordmark{font-family:var(--display);font-weight:600;font-size:18px;letter-spacing:-.01em}
+  .wordmark small{color:var(--muted);font-weight:400;font-size:11px;margin-left:8px;letter-spacing:0}
+  .top-right{display:flex;align-items:center;gap:12px}
+  .pill{
+    display:inline-flex;align-items:center;gap:8px;
+    font-size:12.5px;color:var(--muted);
+    background:var(--surface);border:1px solid var(--line);
+    padding:7px 13px;border-radius:999px;
+  }
+  .pill .dot{width:6px;height:6px;border-radius:50%;background:var(--mint)}
+  .avatar{
+    width:34px;height:34px;border-radius:50%;flex:none;
+    background:linear-gradient(135deg,#2A3340,#1a2029);
+    border:1px solid var(--line-strong);
+    display:grid;place-items:center;font-family:var(--display);font-size:13px;color:#cfd8e3;
+  }
+
+  /* ---------- Hero status ---------- */
+  .hero{
+    background:linear-gradient(180deg,var(--surface),#0E1218);
+    border:1px solid var(--line);
+    border-radius:24px;padding:26px 28px 8px;margin-bottom:18px;
+    position:relative;overflow:hidden;
+  }
+  .status-row{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;flex-wrap:wrap}
+  .status-tag{
+    display:inline-flex;align-items:center;gap:9px;
+    background:var(--mint-soft);color:var(--mint);
+    border:1px solid rgba(63,214,155,.25);
+    padding:6px 12px 6px 10px;border-radius:999px;font-size:12.5px;font-weight:500;letter-spacing:.01em;
+  }
+  .status-tag svg{width:14px;height:14px}
+  .status-head h1{font-family:var(--display);font-weight:500;font-size:26px;letter-spacing:-.02em;margin:14px 0 6px}
+  .status-head p{color:var(--muted);font-size:14px;line-height:1.5;max-width:46ch}
+  .status-head p b{color:var(--text);font-weight:600}
+  .kpi{text-align:right;flex:none}
+  .kpi .big{font-family:var(--display);font-weight:600;font-size:44px;line-height:1;letter-spacing:-.03em}
+  .kpi .big span{color:var(--muted);font-size:22px;font-weight:400}
+  .kpi .sub{color:var(--muted);font-size:12.5px;margin-top:6px;letter-spacing:.02em}
+
+  /* ---------- Chart ---------- */
+  .chart-wrap{margin-top:8px}
+  .chart{width:100%;height:auto;display:block}
+  .axis-label{fill:var(--muted);font-family:var(--body);font-size:11px}
+  .tick{fill:#657084;font-family:var(--body);font-size:10.5px}
+
+  /* ---------- Cards row ---------- */
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+  .card{
+    background:var(--surface);border:1px solid var(--line);
+    border-radius:var(--r);padding:20px;
+  }
+  .card .label{color:var(--muted);font-size:12px;letter-spacing:.03em;text-transform:uppercase;margin-bottom:14px;font-weight:500}
+  .amount{font-family:var(--display);font-weight:600;font-size:34px;letter-spacing:-.02em}
+  .amount span{font-size:17px;color:var(--muted);font-weight:400}
+  .card .note{color:var(--muted);font-size:12.5px;margin-top:8px}
+  .card .note.pos{color:var(--mint)}
+
+  /* stacked bar */
+  .bar{display:flex;height:12px;border-radius:6px;overflow:hidden;margin:2px 0 16px}
+  .bar i{display:block;height:100%}
+  .legend{display:flex;flex-direction:column;gap:9px}
+  .legend .li{display:flex;align-items:center;justify-content:space-between;font-size:13px}
+  .legend .li .name{display:flex;align-items:center;gap:8px;color:var(--muted)}
+  .legend .li .name .sw{width:9px;height:9px;border-radius:3px;flex:none}
+  .legend .li .val{font-family:var(--display);font-weight:500;color:var(--text)}
+  .legend .li .val small{color:var(--muted);font-weight:400;font-size:11px;margin-left:4px}
+
+  /* rythme */
+  .rythme-nums{display:flex;align-items:baseline;gap:10px}
+  .rythme-nums .n{font-family:var(--display);font-weight:600;font-size:34px;letter-spacing:-.02em}
+  .rythme-nums .u{color:var(--muted);font-size:13px}
+  .req{margin-top:14px;display:flex;flex-direction:column;gap:7px}
+  .req .track{height:8px;background:var(--surface-2);border-radius:5px;position:relative;overflow:hidden}
+  .req .track i{position:absolute;left:0;top:0;height:100%;border-radius:5px}
+  .req .cap{display:flex;justify-content:space-between;font-size:11.5px;color:var(--muted)}
+
+  .foot{margin-top:20px;display:flex;align-items:center;gap:9px;color:#616c7d;font-size:12px}
+  .foot svg{width:13px;height:13px;flex:none}
+
+  @media (max-width:760px){
+    .grid{grid-template-columns:1fr}
+    .kpi{text-align:left}
+    .status-row{flex-direction:column}
+  }
+
+  /* motion, discret */
+  @keyframes up{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  .hero,.grid>.card{animation:up .5s cubic-bezier(.2,.7,.3,1) both}
+  .grid>.card:nth-child(2){animation-delay:.06s}
+  .grid>.card:nth-child(3){animation-delay:.12s}
+  .draw{stroke-dasharray:1400;stroke-dashoffset:1400;animation:drawline 1.3s ease .15s forwards}
+  @keyframes drawline{to{stroke-dashoffset:0}}
+  @media (prefers-reduced-motion:reduce){
+    .hero,.grid>.card{animation:none}
+    .draw{animation:none;stroke-dashoffset:0}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- Top bar -->
+  <div class="topbar">
+    <div class="brand">
+      <div class="logo"></div>
+      <div class="wordmark">Cadence<small>nom provisoire</small></div>
+    </div>
+    <div class="top-right">
+      <span class="pill"><span class="dot"></span>Période 2025 – 2026</span>
+      <div class="avatar">M</div>
+    </div>
+  </div>
+
+  <!-- Hero : statut + projection -->
+  <section class="hero">
+    <div class="status-row">
+      <div class="status-head">
+        <span class="status-tag">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Sécurité
+        </span>
+        <h1>Tu es sur la bonne trajectoire.</h1>
+        <p>À ton rythme actuel, tu atteins <b>507 h autour du 12 octobre</b>, soit avant ta date anniversaire du <b>30 novembre</b>. Marge confortable.</p>
+      </div>
+      <div class="kpi">
+        <div class="big">361<span> / 507 h</span></div>
+        <div class="sub">133 jours restants · +146 h à faire</div>
+      </div>
+    </div>
+
+    <!-- Graphique de projection : x = temps, y = heures cumulées -->
+    <div class="chart-wrap">
+      <svg class="chart" viewBox="0 0 900 300" role="img" aria-label="Projection des heures cumulées jusqu'à la date anniversaire">
+        <defs>
+          <linearGradient id="fill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#3FD69B" stop-opacity=".22"/>
+            <stop offset="100%" stop-color="#3FD69B" stop-opacity="0"/>
+          </linearGradient>
+        </defs>
+
+        <!-- grille horizontale discrète -->
+        <line x1="60" y1="280" x2="860" y2="280" stroke="rgba(255,255,255,.07)"/>
+
+        <!-- ligne objectif 507 h -->
+        <line x1="60" y1="68.75" x2="860" y2="68.75" stroke="rgba(255,255,255,.18)" stroke-dasharray="3 5"/>
+        <text x="860" y="63" text-anchor="end" class="axis-label">Objectif · 507 h</text>
+
+        <!-- aire sous la courbe réelle -->
+        <path d="M60,280 L158,255 L279,217 L389,182 L498,151 L566,129 L566,280 Z" fill="url(#fill)"/>
+
+        <!-- courbe réelle (acquis) -->
+        <path class="draw" d="M60,280 L158,255 L279,217 L389,182 L498,151 L566,129"
+              fill="none" stroke="#3FD69B" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+
+        <!-- projection (dashed) -->
+        <path d="M566,129 L860,42.5" fill="none" stroke="#3FD69B" stroke-width="2.2"
+              stroke-dasharray="2 6" stroke-linecap="round" opacity=".75"/>
+
+        <!-- marqueur "aujourd'hui" -->
+        <line x1="566" y1="34" x2="566" y2="280" stroke="rgba(255,255,255,.14)"/>
+        <circle cx="566" cy="129" r="5" fill="#3FD69B" stroke="#0A0C10" stroke-width="2.5"/>
+        <text x="566" y="26" text-anchor="middle" class="axis-label">Aujourd’hui</text>
+
+        <!-- point de franchissement des 507 h -->
+        <circle cx="770" cy="68.75" r="4" fill="#0A0C10" stroke="#3FD69B" stroke-width="2"/>
+        <g transform="translate(770,68.75)">
+          <rect x="-52" y="-40" width="104" height="26" rx="8" fill="#141A21" stroke="rgba(63,214,155,.3)"/>
+          <text x="0" y="-23" text-anchor="middle" fill="#3FD69B" style="font-family:'Space Grotesk';font-size:11.5px;font-weight:500">507 h · ~12 oct</text>
+        </g>
+
+        <!-- ticks mois -->
+        <text x="60"  y="296" class="tick">déc</text>
+        <text x="197" y="296" class="tick">févr</text>
+        <text x="333" y="296" class="tick">avr</text>
+        <text x="470" y="296" class="tick">juin</text>
+        <text x="606" y="296" class="tick">août</text>
+        <text x="743" y="296" class="tick">oct</text>
+        <text x="860" y="296" text-anchor="end" class="tick">nov</text>
+      </svg>
+    </div>
+  </section>
+
+  <!-- Cartes -->
+  <div class="grid">
+
+    <!-- Allocation -->
+    <div class="card">
+      <div class="label">Allocation journalière estimée</div>
+      <div class="amount">68<span> € brut</span></div>
+      <div class="note">≈ <b style="color:var(--text)">61 € net</b> par jour · estimation indicative</div>
+    </div>
+
+    <!-- Répartition -->
+    <div class="card">
+      <div class="label">Répartition des heures</div>
+      <div class="bar">
+        <i style="width:79.8%;background:#3FD69B"></i>
+        <i style="width:11.9%;background:#57A9F0"></i>
+        <i style="width:8.3%;background:#9B8CFF"></i>
+      </div>
+      <div class="legend">
+        <div class="li"><span class="name"><span class="sw" style="background:#3FD69B"></span>Cachets</span><span class="val">288 h<small>24 cachets</small></span></div>
+        <div class="li"><span class="name"><span class="sw" style="background:#57A9F0"></span>Heures scène</span><span class="val">43 h</span></div>
+        <div class="li"><span class="name"><span class="sw" style="background:#9B8CFF"></span>Enseignement</span><span class="val">30 h<small>plafond 70 h</small></span></div>
+      </div>
+    </div>
+
+    <!-- Rythme -->
+    <div class="card">
+      <div class="label">Rythme mensuel</div>
+      <div class="rythme-nums"><span class="n">47</span><span class="u">h / mois actuel</span></div>
+      <div class="req">
+        <div class="track"><i style="width:70%;background:#3FD69B"></i></div>
+        <div class="cap"><span>Requis&nbsp;: 33 h / mois</span><span style="color:var(--mint)">marge +14 h</span></div>
+      </div>
+      <div class="note pos" style="margin-top:14px">✓ Rythme suffisant pour renouveler tes droits</div>
+    </div>
+  </div>
+
+  <div class="foot">
+    <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.6"/><path d="M12 11v5M12 8h.01" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+    Estimation indicative — ne se substitue pas à une notification officielle de France Travail.
+  </div>
+
+</div>
+</body>
+</html>

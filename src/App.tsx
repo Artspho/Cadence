@@ -1,0 +1,189 @@
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { Contrat, Profil } from "./types";
+import { franceTravailConfig } from "./config/franceTravailConfig";
+import { chargerDonnees, creerContrat, exporterJSON, importerJSON, sauvegarderDonnees, type DonneesApp } from "./storage/localStorageAdapter";
+import { calculerFenetreReference } from "./engine/periodeReference";
+import { calculerDecompteHeures } from "./engine/decompteHeures";
+import { calculerSalaireReference } from "./engine/salaireReference";
+import { calculerAJBrutePourFenetre } from "./engine/areBrute";
+import { calculerAJNette, calculerSJM } from "./engine/areNette";
+import { calculerStatutPrediction, construireSerieAcquisition } from "./engine/prediction";
+import { detecterAlertes } from "./engine/alertes";
+import { decouperExercices } from "./engine/cycles";
+import { diffJours } from "./engine/dateUtils";
+import { TopBar, type Onglet } from "./components/TopBar";
+import { Onboarding } from "./components/Onboarding";
+import { Dashboard } from "./components/Dashboard";
+import { ContractForm } from "./components/ContractForm";
+import { ContractList } from "./components/ContractList";
+import { ImportBulletins } from "./components/ImportBulletins";
+import { AlertCenter } from "./components/AlertCenter";
+import { Historique } from "./components/Historique";
+import { Simulateur } from "./components/Simulateur";
+import { AProposLimites } from "./components/AProposLimites";
+import { AvertissementHorsPerimetre } from "./components/AvertissementHorsPerimetre";
+
+const dateDuJour = new Date().toISOString().slice(0, 10);
+
+export default function App() {
+  const [donnees, setDonnees] = useState<DonneesApp | null>(null);
+  const [onglet, setOnglet] = useState<Onglet>("dashboard");
+  const [erreurImport, setErreurImport] = useState<string | null>(null);
+  const chargementTermine = useRef(false);
+  const inputImportRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    chargerDonnees().then((d) => {
+      setDonnees(d);
+      chargementTermine.current = true;
+    });
+  }, []);
+
+  useEffect(() => {
+    if (donnees && chargementTermine.current) {
+      sauvegarderDonnees(donnees);
+    }
+  }, [donnees]);
+
+  const calculs = useMemo(() => {
+    if (!donnees?.profil) return null;
+    const profil = donnees.profil;
+    const { contrats, periodes } = donnees;
+    const config = franceTravailConfig;
+
+    const fenetre = calculerFenetreReference(profil, contrats, periodes, config, dateDuJour);
+    const decompte = calculerDecompteHeures(contrats, periodes, profil, config, fenetre);
+    const { sr, sar, nht } = calculerSalaireReference(contrats, periodes, profil, config, fenetre);
+    const ajBrute = calculerAJBrutePourFenetre(fenetre, decompte.total, sar ?? sr, nht, config);
+    const sjm = calculerSJM(sr, nht, config);
+    const ajNette = calculerAJNette(ajBrute.brut, sjm, profil, config);
+    const prediction = calculerStatutPrediction(profil, contrats, periodes, config, dateDuJour);
+    const dateCap = diffJours(dateDuJour, fenetre.dateFin) >= 0 ? dateDuJour : fenetre.dateFin;
+    const serie = construireSerieAcquisition(profil, contrats, periodes, config, fenetre, dateCap);
+    const alertes = detecterAlertes(profil, contrats, periodes, config, dateDuJour);
+    const exercices = decouperExercices(profil, contrats, periodes, config, dateDuJour);
+
+    return { fenetre, decompte, ajBrute, ajNette, prediction, dateCap, serie, alertes, exercices };
+  }, [donnees]);
+
+  if (!donnees) {
+    return <div className="min-h-screen flex items-center justify-center text-muted">Chargement…</div>;
+  }
+
+  if (!donnees.profil) {
+    return <Onboarding onTerminer={(profil: Profil) => setDonnees({ ...donnees, profil })} />;
+  }
+
+  const profil = donnees.profil;
+
+  function ajouterContrat(partiel: Omit<Contrat, "id">) {
+    setDonnees((d) => (d ? { ...d, contrats: [...d.contrats, creerContrat(partiel)] } : d));
+  }
+
+  function supprimerContrat(id: string) {
+    setDonnees((d) => (d ? { ...d, contrats: d.contrats.filter((c) => c.id !== id) } : d));
+  }
+
+  function modifierProfil(profilModifie: Profil) {
+    setDonnees((d) => (d ? { ...d, profil: profilModifie } : d));
+  }
+
+  function exporter() {
+    const contenu = exporterJSON(donnees!);
+    const blob = new Blob([contenu], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `cadence-export-${dateDuJour}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function importer(fichier: File) {
+    try {
+      const texte = await fichier.text();
+      const importees = importerJSON(texte);
+      setDonnees(importees);
+      setErreurImport(null);
+    } catch {
+      setErreurImport("Fichier invalide : ce n'est pas un export Cadence reconnu.");
+    }
+  }
+
+  return (
+    <div className="min-h-screen">
+      <TopBar ongletActif={onglet} onChangerOnglet={setOnglet} periodeLabel={profil.dateAnniversaire ? `Cycle → ${profil.dateAnniversaire}` : "Première admission"} />
+
+      <main className="max-w-[1040px] mx-auto px-6 py-8 space-y-6">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <AlertCenterResume alertes={calculs?.alertes ?? []} />
+          <div className="flex items-center gap-2 text-xs">
+            <button onClick={exporter} className="px-3 py-1.5 rounded-full border border-line text-muted hover:text-ink transition-colors">
+              Exporter mes données (JSON)
+            </button>
+            <button onClick={() => inputImportRef.current?.click()} className="px-3 py-1.5 rounded-full border border-line text-muted hover:text-ink transition-colors">
+              Importer
+            </button>
+            <input
+              ref={inputImportRef}
+              type="file"
+              accept="application/json"
+              className="hidden"
+              onChange={(e) => {
+                const fichier = e.target.files?.[0];
+                if (fichier) importer(fichier);
+              }}
+            />
+          </div>
+        </div>
+        {erreurImport && <p className="text-sm text-red">{erreurImport}</p>}
+
+        {onglet === "dashboard" &&
+          calculs &&
+          (profil.activiteHorsAnnexe10 ? (
+            <AvertissementHorsPerimetre />
+          ) : (
+            <>
+              <AlertCenter alertes={calculs.alertes} />
+              <Dashboard prediction={calculs.prediction} serie={calculs.serie} fenetreDebut={calculs.fenetre.dateDebut} dateCap={calculs.dateCap} decompte={calculs.decompte} ajBrute={calculs.ajBrute} ajNette={calculs.ajNette} />
+            </>
+          ))}
+
+        {onglet === "contrats" && calculs && (
+          <div className="space-y-6">
+            <ContractForm profil={profil} config={franceTravailConfig} decompteActuel={calculs.decompte} onValider={ajouterContrat} />
+            <ContractList contrats={donnees.contrats} config={franceTravailConfig} onSupprimer={supprimerContrat} />
+          </div>
+        )}
+
+        {onglet === "import" && calculs && (
+          <ImportBulletins profil={profil} config={franceTravailConfig} decompteActuel={calculs.decompte} onImporterContrat={ajouterContrat} />
+        )}
+
+        {onglet === "historique" && calculs && (profil.activiteHorsAnnexe10 ? <AvertissementHorsPerimetre /> : <Historique exercices={calculs.exercices} />)}
+
+        {onglet === "simulateur" &&
+          calculs &&
+          (profil.activiteHorsAnnexe10 ? (
+            <AvertissementHorsPerimetre />
+          ) : (
+            <Simulateur profil={profil} contrats={donnees.contrats} periodes={donnees.periodes} config={franceTravailConfig} dateDuJour={dateDuJour} decompteActuel={calculs.decompte} />
+          ))}
+
+        {onglet === "apropos" && <AProposLimites dateDuJour={dateDuJour} profil={profil} onModifierProfil={modifierProfil} />}
+      </main>
+    </div>
+  );
+}
+
+function AlertCenterResume({ alertes }: { alertes: { niveau: string }[] }) {
+  if (alertes.length === 0) return <span />;
+  const critiques = alertes.filter((a) => a.niveau === "critique").length;
+  const attentions = alertes.filter((a) => a.niveau === "attention").length;
+  return (
+    <div className="flex items-center gap-2 text-xs text-muted">
+      {critiques > 0 && <span className="text-red">{critiques} alerte(s) critique(s)</span>}
+      {attentions > 0 && <span className="text-amber">{attentions} à surveiller</span>}
+    </div>
+  );
+}
