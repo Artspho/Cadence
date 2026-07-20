@@ -66,3 +66,12 @@ deviner.
   + CSG/CRDS écrêtée (1,68 €) = 3,59 € de prélèvements → net = 65,59 − 3,59 = **62,00 €**, exactement
   l'attendu du simulateur officiel, et exactement le SMIC journalier ci-dessus (le plancher
   d'écrêtement explique très précisément pourquoi le net tombe pile sur ce montant).
+
+## À valider
+
+- **Réadmission allongée (fenêtre > 365 j)** — activée réellement depuis le commit `fda6b8e`
+  (SMIC renseigné). Jamais confrontée au simulateur officiel ni à une notification réelle. À
+  valider avant toute bêta incluant des profils en réadmission allongée : sortir un cas au
+  simulateur officiel avec une période étendue au-delà de 365 jours, comparer l'AJ. Rappel : cette
+  branche affichait auparavant le calcul standard (montant potentiellement surévalué = faux feu
+  vert) ; le nouveau calcul est plus juste mais non encore vérifié en externe.
