@@ -64,6 +64,7 @@ Import PDF (V2) : `pdfjs-dist` **côté client** (données sensibles, jamais env
 ```
 src/
   config/franceTravailConfig.ts   # constantes légales versionnées (source mars 2026)
+    __tests__/
   types/index.ts                  # modèle de données
   engine/                         # PUR + testé
     periodeReference.ts  decompteHeures.ts  salaireReference.ts
@@ -88,7 +89,7 @@ src/
 - ✅ Design tokens (Tailwind + `index.css`) alignés sur la maquette.
 - ✅ `engine/` complet et testé : `periodeReference`, `decompteHeures`, `salaireReference`,
   `areBrute` (+ `calculerAJBrutePourFenetre`), `areNette`, `prediction`, `alertes`, `cycles`
-  — **52 tests Vitest**, tous verts (dont 7 sur `storage/`).
+  — **56 tests Vitest**, tous verts (dont 7 sur `storage/`, 4 sur `config/`).
 - ✅ `storage/`, `components/`, câblage `App.tsx` — bêta fonctionnelle de bout en bout
   (onboarding → tableau de bord → contrats → import PDF → historique → simulateur → à propos).
 - ✅ **Bug corrigé** : un profil neuf sans date anniversaire connue n'affiche plus jamais le
@@ -131,6 +132,14 @@ src/
   (`confirmerImport`), pas seulement documenté. Testé en round-trip (y compris sur l'état vide
   d'un tout premier utilisateur) et manuellement dans le navigateur (import valide, JSON corrompu,
   état préservé après refus).
+- ✅ **Bandeau « règles vérifiées » + péremption** (§11.A) : `franceTravailConfig.meta.valableJusquau`
+  (date ISO nullable, laissée à `null` — aucune échéance officielle connue à ce jour, même
+  discipline que `valeursDatees`) comparée à la date du jour par la fonction pure `estPerime`
+  (date injectée, jamais `new Date()` interne). `TopBar.tsx` (visible en permanence) et
+  `AProposLimites.tsx` (détaillé) lisent tous les deux `estPerime` — une seule source de vérité,
+  icône + mot quand périmé (jamais la couleur seule, §8.6). **Corrigé au passage** : `AProposLimites.tsx`
+  contenait depuis plusieurs sessions un seuil `SEUIL_PEREMPTION_JOURS = 365` codé en dur — un
+  seuil réglementaire deviné, jamais corrigé jusqu'ici. Supprimé, remplacé par `estPerime`.
 - ⬜ **Non traité (V2/V3) :** coordination européenne (périodes U1/PDU1) — même famille qu'Annexe 8/article 65, hors périmètre Annexe 10 pur. Aucune logique ni champ de données ne l'anticipe encore (détail dans `docs/SPEC.md` §10 et §11.C). Ne pas confondre avec le champ `territoire` du contrat, qui couvre un cas différent (cachet ponctuel joué en EEE/Suisse/UK mais déclaré en France).
 - 🔁 **Maintenance de la config** (récurrent, perso — hors app, pas de backend en bêta) : une fois
   par mois, vérifier à la source officielle SMIC (horaire / mensuel / journalier), PMSS, et les

@@ -1,7 +1,5 @@
-import { franceTravailConfig, joursDepuisMiseAJourConfig } from "../config/franceTravailConfig";
+import { estPerime, franceTravailConfig, joursDepuisMiseAJourConfig } from "../config/franceTravailConfig";
 import type { Profil } from "../types";
-
-const SEUIL_PEREMPTION_JOURS = 365; // seuil d'affichage UX, pas une durée réglementaire de validité
 
 interface AProposLimitesProps {
   dateDuJour: string;
@@ -11,7 +9,10 @@ interface AProposLimitesProps {
 
 export function AProposLimites({ dateDuJour, profil, onModifierProfil }: AProposLimitesProps) {
   const jours = joursDepuisMiseAJourConfig(new Date(dateDuJour));
-  const perime = jours > SEUIL_PEREMPTION_JOURS;
+  // estPerime compare franceTravailConfig.meta.valableJusquau (un fait déclaré, jamais un
+  // seuil de durée deviné) à dateDuJour — même fonction que TopBar.tsx, une seule source de
+  // vérité pour la péremption, plus jamais deux logiques qui divergent.
+  const perime = estPerime(new Date(dateDuJour), franceTravailConfig.meta.valableJusquau);
 
   return (
     <div className="space-y-6 max-w-[720px]">
@@ -37,8 +38,13 @@ export function AProposLimites({ dateDuJour, profil, onModifierProfil }: APropos
       </section>
 
       <div className={`rounded-card border p-5 text-sm ${perime ? "border-amber/30 bg-amber/5 text-amber" : "border-line bg-surface text-muted"}`}>
+        {perime && (
+          <span className="inline-flex items-center gap-1 font-medium mr-1">
+            <span aria-hidden>⚠</span> Règles à vérifier —
+          </span>
+        )}
         Règles vérifiées au {franceTravailConfig.meta.dateEntreeVigueur} ({jours} jours) — {franceTravailConfig.meta.source}.
-        {perime && " Ces règles ont plus d'un an : vérifie qu'aucune revalorisation n'est parue avant de t'y fier."}
+        {perime && ` Ces règles ont peut-être changé depuis le ${franceTravailConfig.meta.valableJusquau} : vérifie auprès de France Travail avant de t'y fier.`}
       </div>
 
       <section>

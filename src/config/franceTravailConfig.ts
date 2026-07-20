@@ -20,6 +20,11 @@ export const franceTravailConfig = {
     source: "Guide France Travail — Intermittents du spectacle, éd. mars 2026 (constantes du régime) ; arrêté du 22 mai 2026 (SMIC horaire brut)",
     avertissement:
       "Estimation indicative. Ne se substitue pas à une notification officielle de France Travail.",
+    // Date déclarée jusqu'à laquelle ces règles sont réputées valides — PAS un seuil de durée
+    // inventé (ex. "> 6 mois = périmé"), qui mentirait dans les deux sens. Reste `null` tant
+    // qu'aucune date certaine n'est connue (aucune échéance officielle publiée à ce jour) :
+    // même discipline que `valeursDatees` (non certain = null, jamais deviné).
+    valableJusquau: null as string | null,
   },
 
   // ── Conditions d'affiliation ──────────────────────────────────
@@ -131,6 +136,7 @@ export const franceTravailConfigSchema = z.object({
     dateEntreeVigueur: z.string(),
     source: z.string(),
     avertissement: z.string(),
+    valableJusquau: z.string().nullable(),
   }),
   seuilHeures: z.number().positive(),
   periodeReferenceJours: z.number().positive(),
@@ -226,9 +232,21 @@ export type FranceTravailConfig = z.infer<typeof franceTravailConfigSchema>;
 // plutôt que de produire un calcul silencieusement faux.
 franceTravailConfigSchema.parse(franceTravailConfig);
 
-/** Nombre de jours écoulés depuis la dernière mise à jour de la config, pour l'alerte de péremption (bandeau "règles vérifiées au…"). */
+/** Nombre de jours écoulés depuis la dernière mise à jour de la config — purement informatif (bandeau "règles vérifiées au…"), jamais un jugement de péremption. */
 export function joursDepuisMiseAJourConfig(dateDuJour: Date): number {
   const entreeVigueur = new Date(franceTravailConfig.meta.dateEntreeVigueur);
   const diffMs = dateDuJour.getTime() - entreeVigueur.getTime();
   return Math.floor(diffMs / (1000 * 60 * 60 * 24));
+}
+
+/**
+ * Les règles sont-elles réputées périmées ? Compare `valableJusquau` (un
+ * FAIT déclaré en config, jamais un seuil de durée deviné) à `dateDuJour`,
+ * passée en paramètre — jamais `new Date()` interne, pour rester testable.
+ * `null` (rien de déclaré) ou date future -> pas périmé : on ne porte aucun
+ * jugement sans base déclarée.
+ */
+export function estPerime(dateDuJour: Date, valableJusquau: string | null): boolean {
+  if (!valableJusquau) return false;
+  return dateDuJour.getTime() > new Date(valableJusquau).getTime();
 }

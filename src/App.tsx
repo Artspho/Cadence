@@ -132,7 +132,12 @@ export default function App() {
 
   return (
     <div className="min-h-screen">
-      <TopBar ongletActif={onglet} onChangerOnglet={setOnglet} periodeLabel={profil.dateAnniversaire ? `Cycle → ${profil.dateAnniversaire}` : "Première admission"} />
+      <TopBar
+        ongletActif={onglet}
+        onChangerOnglet={setOnglet}
+        periodeLabel={profil.dateAnniversaire ? `Cycle → ${profil.dateAnniversaire}` : "Première admission"}
+        dateDuJour={dateDuJour}
+      />
 
       <main className="max-w-[1040px] mx-auto px-6 py-8 space-y-6">
         <div className="flex items-center justify-between flex-wrap gap-2">

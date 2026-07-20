@@ -1,4 +1,4 @@
-import { franceTravailConfig } from "../config/franceTravailConfig";
+import { estPerime, franceTravailConfig } from "../config/franceTravailConfig";
 
 export type Onglet = "dashboard" | "contrats" | "import" | "historique" | "simulateur" | "apropos";
 
@@ -6,6 +6,7 @@ interface TopBarProps {
   ongletActif: Onglet;
   onChangerOnglet: (onglet: Onglet) => void;
   periodeLabel: string;
+  dateDuJour: string;
 }
 
 const ONGLETS: { id: Onglet; label: string }[] = [
@@ -17,7 +18,9 @@ const ONGLETS: { id: Onglet; label: string }[] = [
   { id: "apropos", label: "À propos" },
 ];
 
-export function TopBar({ ongletActif, onChangerOnglet, periodeLabel }: TopBarProps) {
+export function TopBar({ ongletActif, onChangerOnglet, periodeLabel, dateDuJour }: TopBarProps) {
+  const perime = estPerime(new Date(dateDuJour), franceTravailConfig.meta.valableJusquau);
+
   return (
     <header className="border-b border-line bg-bg/80 backdrop-blur sticky top-0 z-10">
       <div className="max-w-[1040px] mx-auto px-6 py-4 flex items-center gap-4">
@@ -42,7 +45,14 @@ export function TopBar({ ongletActif, onChangerOnglet, periodeLabel }: TopBarPro
         </nav>
       </div>
       <div className="max-w-[1040px] mx-auto px-6 pb-2 -mt-1">
-        <p className="text-[11px] text-faint">Règles vérifiées au {franceTravailConfig.meta.dateEntreeVigueur} — {franceTravailConfig.meta.source}</p>
+        <p className={`text-[11px] flex items-center gap-1.5 ${perime ? "text-amber" : "text-faint"}`}>
+          {perime && (
+            <span className="inline-flex items-center gap-1 font-medium" aria-hidden={false}>
+              <span aria-hidden>⚠</span> Règles à vérifier —
+            </span>
+          )}
+          Règles vérifiées au {franceTravailConfig.meta.dateEntreeVigueur} — {franceTravailConfig.meta.source}
+        </p>
       </div>
     </header>
   );
