@@ -13,16 +13,12 @@ coïncident pas encore.
 ### ✅ Validé — code Cadence = source externe
 - **Cas réel #1** (notif FT 03/02/2026) : A10, réadmission, 710 h, SR 9 229,35 € →
   net 53,81 €. Écart 0,00 €. Couvre A+B+C, SJM, retraite compl. seule (AJ ≤ 60 €).
-
-### 🔶 Règle établie et prouvée, mais PAS ENCORE dans le code
-- **CSG/CRDS** : **règle** prouvée 2× contre le simulateur officiel — le code, lui, ne la produit pas encore.
-  - Cas #2 (SR 14 579 €, écrêté) : CSG/CRDS 1,68 €, net 62,00 € — teste le plancher SMIC.
+- **CSG/CRDS** : **règle ET code désormais conformes** au simulateur officiel, depuis le
+  commit `f0d18ae` (test permanent au vert sur #2 et #3 — plus de repli manuel).
+  - Cas #2 (SR 14 579 €, écrêté) : CSG/CRDS 1,68 €, net 62,00 € — teste le plancher.
   - Cas #3 (SR 50 000 €, non écrêté) : CSG/CRDS 4,63 €, net 65,73 € — teste assiette + taux nus.
-  - Règle : assiette = 98,25 % de l'AJ brute APRÈS retraite ; écrêtement = le
-    prélèvement ne peut faire passer l'AJ nette sous le SMIC journalier
-    (SMIC horaire × 35/7 arrondi ≈ 62 € au 01/06/2026).
-  - ⚠️ Bug actuel dans areNette.ts : CSG/CRDS calculée sur le SJM (~facteur 8).
-    À corriger, puis transformer #2 et #3 en tests permanents (cas fictifs).
+  - Règle : assiette = 98,25 % de l'AJ brute APRÈS retraite ; écrêtement au plancher
+    `cotisations.plancherEcretementJournalier` (62 €, valeur observée — cf. « À valider »).
 
 ### ⬜ Tourne en prod, PAS encore validé en externe
 - **Réadmission allongée** (fenêtre > 365 j) : activée depuis le SMIC renseigné
@@ -31,7 +27,8 @@ coïncident pas encore.
   incluant ces profils.
 
 ## Prochaine action
-Corriger areNette.ts (assiette + écrêtement), cas #2 et #3 en tests permanents.
+Valider la réadmission allongée contre le simulateur officiel ; réconcilier l'écart de
+0,45 €/j sur le plancher d'écrêtement CSG/CRDS (cf. « À valider »).
 
 ---
 
@@ -67,8 +64,8 @@ s'accordent ne prouvent rien (elles peuvent se tromper de la même façon).
 | Cas | Entrées (annexe / situation / période / heures / SR brut) | FT : AJ brute + durée | Cadence : AJ brute + durée | Écart | Verdict |
 |-----|-----------------------------------------------------------|-----------------------|----------------------------|-------|---------|
 | Réel #1 — notification FT du 03/02/2026 | A10 / réadmission / période 24/03/2025→17/01/2026 (~299 j, pas d'allongement) / 710 h / SR 9229,35 € brut avant abattement | 53,81 € net (durée non communiquée) | 55,02 € brut → 53,81 € net (durée non exercée dans ce test) | 0,00 € | ✅ concordant |
-| Fictif #2 — simulateur officiel | A10 / 710 h / SR 14 579 € brut avant abattement (pas d'enseignement/formation, pas Alsace-Moselle) — cas écrêté (AJ brute proche du SMIC journalier) | A+B+C = 65,59 € · retraite compl. = 1,91 € · CSG/CRDS = 1,68 € · **net = 62,00 €** | Code actuel (`areNette.ts`, non corrigé) : A+B+C = 65,59 € ✅ · retraite compl. = 1,91 € ✅ · CSG/CRDS = 13,76 € ❌ · **net = 49,92 €** ❌ | 0,00 € (A+B+C, retraite) / **12,08 €** (CSG/CRDS, net) — écart entre le CODE actuel et FT | ✅ règle confirmée / ⬜ code Cadence à tester après correction areNette.ts |
-| Fictif #3 — simulateur officiel | A10 / 710 h / SR 50 000 € brut avant abattement (pas d'enseignement/formation, pas Alsace-Moselle) — cas non écrêté (AJ brute nettement > SMIC journalier) | A+B+C = 76,91 € · retraite compl. = 6,55 € · CSG/CRDS = 4,63 € · **net = 65,73 €** | Règle établie (calcul manuel, PAS la sortie du code actuel) : A+B+C = 76,91 € ✅ · retraite compl. = 6,55 € ✅ · CSG/CRDS = 4,63 € ✅ · **net = 65,73 €** ✅ | 0,00 € (règle établie vs simulateur officiel) | ✅ règle confirmée / ⬜ code Cadence à tester après correction areNette.ts |
+| Fictif #2 — simulateur officiel | A10 / 710 h / SR 14 579 € brut avant abattement (pas d'enseignement/formation, pas Alsace-Moselle) — cas écrêté (AJ brute proche du SMIC journalier) | A+B+C = 65,59 € · retraite compl. = 1,91 € · CSG/CRDS = 1,68 € · **net = 62,00 €** | Code actuel (`areNette.ts`, corrigé — commit `f0d18ae`) : A+B+C = 65,59 € ✅ · retraite compl. = 1,91 € ✅ · CSG/CRDS écrêtées = 1,68 € ✅ · **net = 62,00 €** ✅ | 0,00 € | ✅ règle prouvée ET code conforme (commit f0d18ae) |
+| Fictif #3 — simulateur officiel | A10 / 710 h / SR 50 000 € brut avant abattement (pas d'enseignement/formation, pas Alsace-Moselle) — cas non écrêté (AJ brute nettement > SMIC journalier) | A+B+C = 76,91 € · retraite compl. = 6,55 € · CSG/CRDS = 4,63 € · **net = 65,73 €** | Code actuel (`areNette.ts`, corrigé — commit `f0d18ae`) : A+B+C = 76,91 € ✅ · retraite compl. = 6,55 € ✅ · CSG/CRDS = 4,63 € ✅ · **net = 65,73 €** ✅ | 0,00 € | ✅ règle prouvée ET code conforme (commit f0d18ae) |
 | B — 500 h     | A10 / … / … / 500 h / … (statut seul, FT ne rend rien <507 h) | | | | |
 | B — 520 h     | A10 / … / … / 520 h / … | | | | |
 | C — cachets   | A10 / … / … / majorité de cachets / … | | | | |
@@ -86,7 +83,8 @@ donne 51,86 € — confirme que ce profil n'est pas Alsace-Moselle. La branche 
 + CRDS (0,5 %) sur le SJM entier, sans la règle d'écrêtement qui limite le prélèvement pour ne
 pas faire passer l'allocation sous un plancher lié au SMIC. Formule du SPEC §6.5 incomplète.
 À corriger UNIQUEMENT une fois la règle sourcée ET `smicHoraireBrut` renseigné en config. Ne pas
-deviner.
+deviner. → **Corrigé dans le commit `f0d18ae`** (voir la règle établie ci-dessous et le tableau
+ci-dessus, désormais ✅ conforme).
 
 **Note sur le cas Fictif #3** : second point de calibration, volontairement choisi non écrêté
 (SR élevé, AJ brute 76,91 € bien au-dessus du SMIC journalier ≈ 62 €) pour isoler l'assiette et
@@ -95,9 +93,10 @@ officiel a été comparé au calcul de la RÈGLE établie ci-dessous (calcul man
 du code Cadence actuel — `areNette.ts` n'a pas été exécuté sur ce cas, il produirait un résultat
 tout aussi faux que sur #2 (même bug d'assiette sur le SJM). Concordance au centime sur les 4
 postes (A+B+C, retraite, CSG/CRDS, net) : confirme la règle une seconde fois, sur un cas de nature
-différente du #2.
+différente du #2. → **Corrigé dans le commit `f0d18ae`** : `areNette.ts` produit désormais ce
+résultat directement, cas #2 et #3 transformés en tests permanents (`areNette.test.ts`).
 
-#### 2026-07-20 — Règle CSG/CRDS établie (à implémenter, NE PAS coder avant calibration #2)
+#### 2026-07-20 — Règle CSG/CRDS établie (implémentée le 2026-07-20, commit `f0d18ae`)
 
 - **Assiette** : 98,25 % de l'AJ brute (abattement de 1,75 %), pas le SJM.
 - **Taux** : CSG 6,2 % ou 3,8 % + CRDS 0,5 % — déjà en config (`cotisations.tauxCSG`, `cotisations.tauxCRDS`), rien à ajouter côté taux.
@@ -111,8 +110,9 @@ différente du #2.
   **62 €**.
 - **Réconciliation vérifiée au centime sur le cas Fictif #2** : retraite complémentaire (1,91 €)
   + CSG/CRDS écrêtée (1,68 €) = 3,59 € de prélèvements → net = 65,59 − 3,59 = **62,00 €**, exactement
-  l'attendu du simulateur officiel, et exactement le SMIC journalier ci-dessus (le plancher
-  d'écrêtement explique très précisément pourquoi le net tombe pile sur ce montant).
+  l'attendu du simulateur officiel — le plancher d'écrêtement explique très précisément pourquoi
+  le net tombe pile sur ce montant. Le rapprochement entre 62,00 € et le calcul « SMIC horaire ×
+  35/7 » ci-dessus (61,55 €) reste toutefois à éclaircir, cf. « À valider ».
 
 ### À valider
 
@@ -122,3 +122,13 @@ différente du #2.
   simulateur officiel avec une période étendue au-delà de 365 jours, comparer l'AJ. Rappel : cette
   branche affichait auparavant le calcul standard (montant potentiellement surévalué = faux feu
   vert) ; le nouveau calcul est plus juste mais non encore vérifié en externe.
+
+- **Écart non expliqué sur le plancher d'écrêtement CSG/CRDS** — `cotisations.plancherEcretementJournalier`
+  est encodé à **62,00 €**, valeur observée du simulateur officiel FT (cas #2). Or la formule
+  SMIC horaire × 35/7 donne 12,31 × 5 = **61,55 €** → écart de **0,45 €** non expliqué entre les
+  deux. La valeur encodée (62,00 €) est défendable puisqu'elle reproduit exactement le simulateur
+  sur #2 et #3, mais reste une **valeur observée**, pas dérivée d'une formule ou d'une source
+  réglementaire directe. À réconciler : soit la formule d'arrondi du SMIC journalier diffère de
+  « × 35/7 arrondi », soit une autre règle (proratisation, arrondi différent) s'applique. Ne pas
+  remplacer 62,00 € par 61,55 € sans avoir d'abord compris l'écart — ce serait échanger une valeur
+  qui colle aux deux cas validés contre une valeur qui n'a encore été confrontée à aucun cas.
