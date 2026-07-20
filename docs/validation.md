@@ -22,13 +22,15 @@ coïncident pas encore.
 
 ### ⬜ Tourne en prod, PAS encore validé en externe
 - **Réadmission allongée** (fenêtre > 365 j) : activée depuis le SMIC renseigné
-  (commit fda6b8e). Jamais confrontée au simulateur ni à une notif réelle.
-  Montant plus juste qu'avant mais non vérifié → à valider avant toute bêta
-  incluant ces profils.
+  (commit fda6b8e). Le simulateur officiel ne modélise pas l'allongement (vérifié le
+  20/07/2026) — seule une vraie notification FT peut la valider. Statut : code conforme
+  à la règle comprise, règle non prouvée contre source externe → à valider avant toute
+  bêta incluant ces profils.
 
 ## Prochaine action
-Valider la réadmission allongée contre le simulateur officiel ; réconcilier l'écart de
-0,45 €/j sur le plancher d'écrêtement CSG/CRDS (cf. « À valider »).
+Collecter une notification FT réelle d'un profil en réadmission allongée (le simulateur
+officiel ne peut pas servir de source pour cette branche, cf. « À valider ») ; réconcilier
+l'écart de 0,45 €/j sur le plancher d'écrêtement CSG/CRDS (cf. « À valider »).
 
 ---
 
@@ -116,12 +118,18 @@ résultat directement, cas #2 et #3 transformés en tests permanents (`areNette.
 
 ### À valider
 
-- **Réadmission allongée (fenêtre > 365 j)** — activée réellement depuis le commit `fda6b8e`
-  (SMIC renseigné). Jamais confrontée au simulateur officiel ni à une notification réelle. À
-  valider avant toute bêta incluant des profils en réadmission allongée : sortir un cas au
-  simulateur officiel avec une période étendue au-delà de 365 jours, comparer l'AJ. Rappel : cette
-  branche affichait auparavant le calcul standard (montant potentiellement surévalué = faux feu
-  vert) ; le nouveau calcul est plus juste mais non encore vérifié en externe.
+- **Réadmission allongée (fenêtre > 365 j)** — tourne dans le code depuis le commit `fda6b8e`
+  (diviseurs modifiés A = NH × SMIC horaire, B = NH), appliqués conformément à la règle telle que
+  comprise. **Non prouvable contre le simulateur officiel** : vérification faite le 20/07/2026 sur
+  simucalcul.pole-emploi-services.fr (version V20241009) — ses seuls champs d'entrée sont régime,
+  date de fin de contrat, heures travaillées, heures d'enseignement/formation/assimilées, salaire
+  de référence, Alsace-Moselle ; aucune entrée d'allongement de réadmission n'existe, et il calcule
+  toujours en fenêtre 365 j standard avec les diviseurs 5000/507. Le confronter validerait donc
+  contre le mauvais calcul. **Source requise** : une vraie notification FT d'un intermittent en
+  réadmission allongée, à collecter auprès d'un testeur de la bêta. **Statut : code conforme à la
+  règle comprise, règle non prouvée contre source externe.** Rappel : cette branche affichait
+  auparavant le calcul standard (montant potentiellement surévalué = faux feu vert) ; le nouveau
+  calcul est plus juste mais reste, pour l'instant, non vérifiable autrement que par une notification réelle.
 
 - **Écart non expliqué sur le plancher d'écrêtement CSG/CRDS** — `cotisations.plancherEcretementJournalier`
   est encodé à **62,00 €**, valeur observée du simulateur officiel FT (cas #2). Or la formule
