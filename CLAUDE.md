@@ -98,6 +98,15 @@ src/
 - 🔶 **Limite connue :** `calculerAJBrutePourFenetre` n'est **pas** câblée dans `engine/cycles.ts`
   — l'historique des exercices passés ignore `tranchesReadmission` et calcule toujours l'AJ brute
   avec les diviseurs standard (détail dans `docs/SPEC.md` §10).
+- 🔶 **Limite connue :** le garde-fou « situation mixte » n'a aucun test automatisé côté interface
+  (seul `detecterAlertes` est testé, cf. `engine/__tests__/alertes.test.ts`). Après toute grosse
+  modification d'UI touchant `App.tsx`, `Onboarding.tsx` ou `AProposLimites.tsx`, **re-vérifier à
+  la main** : cocher/décocher `activiteHorsAnnexe10` et confirmer qu'aucun chiffre n'apparaît sur
+  Dashboard/Historique/Simulateur tant que la case est cochée.
+- 🔶 **Limite connue :** `config.valeursDatees.smicHoraireBrut` et `.pmssMensuel` sont à `null`
+  (TODO volontaire, cf. `franceTravailConfig.ts`) — à renseigner depuis la source officielle avant
+  toute mise en production. Tant que `smicHoraireBrut` est `null`, la formule réadmission allongée
+  (point ci-dessus) reste inactive et se rabat silencieusement sur le calcul standard.
 - ⬜ **Non traité (V2/V3) :** coordination européenne (périodes U1/PDU1) — même famille qu'Annexe 8/article 65, hors périmètre Annexe 10 pur. Aucune logique ni champ de données ne l'anticipe encore (détail dans `docs/SPEC.md` §10 et §11.C). Ne pas confondre avec le champ `territoire` du contrat, qui couvre un cas différent (cachet ponctuel joué en EEE/Suisse/UK mais déclaré en France).
 
 **Prochaines pistes** (au choix, pas d'ordre imposé) : les deux limites connues ci-dessus, ou les
