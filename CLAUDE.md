@@ -132,14 +132,18 @@ src/
   d'un tout premier utilisateur) et manuellement dans le navigateur (import valide, JSON corrompu,
   état préservé après refus).
 - ⬜ **Non traité (V2/V3) :** coordination européenne (périodes U1/PDU1) — même famille qu'Annexe 8/article 65, hors périmètre Annexe 10 pur. Aucune logique ni champ de données ne l'anticipe encore (détail dans `docs/SPEC.md` §10 et §11.C). Ne pas confondre avec le champ `territoire` du contrat, qui couvre un cas différent (cachet ponctuel joué en EEE/Suisse/UK mais déclaré en France).
-- 🔁 **Vérifications régulières de viabilité :** au minimum à chaque revalorisation connue
-  (SMIC/PMSS au 1er janvier et lors des hausses en cours d'année, ex. 1er juin 2026) et à chaque
-  nouvelle convention d'assurance chômage, re-vérifier **toutes** les valeurs de
-  `franceTravailConfig.ts` contre la source officielle **ET** rejouer les cas de
-  `docs/validation.md` contre le simulateur officiel. Objectif : garantir dans la durée les deux
-  devoirs sacrés (pas de perte de données, pas de chiffre faux). La config est actuellement
-  datée « 2026.06 » (alignée sur la revalorisation SMIC du 1er juin 2026) — prochaine échéance
-  connue : la revalorisation SMIC/PMSS du 1er janvier suivant.
+- 🔁 **Maintenance de la config** (récurrent, perso — hors app, pas de backend en bêta) : une fois
+  par mois, vérifier à la source officielle SMIC (horaire / mensuel / journalier), PMSS, et les
+  plafonds ARE (AJ min 31,96 €, plancher 44 €, plafond 174,80 €) — au minimum à chaque
+  revalorisation connue (SMIC/PMSS au 1er janvier et lors des hausses en cours d'année, ex. 1er
+  juin 2026) et à chaque nouvelle convention d'assurance chômage, re-vérifier **toutes** les
+  valeurs de `franceTravailConfig.ts`. Si une valeur a bougé : mettre à jour
+  `franceTravailConfig.ts` (+ `meta.version`, `dateEntreeVigueur`, et `valableJusquau` du bandeau)
+  et rejouer tous les cas de `docs/validation.md` contre le simulateur officiel. Ferme le risque
+  « maintenance de la config non attribuée » identifié au SPEC §10. Objectif : garantir dans la
+  durée les deux devoirs sacrés (pas de perte de données, pas de chiffre faux). La config est
+  actuellement datée « 2026.06 » (alignée sur la revalorisation SMIC du 1er juin 2026) — prochaine
+  échéance connue : la revalorisation SMIC/PMSS du 1er janvier suivant.
 
 **Prochaines pistes** (au choix, pas d'ordre imposé) : les deux limites connues ci-dessus, ou les
 autres items du §11.A du SPEC encore ouverts (PWA réellement installable, alignement visuel fin
