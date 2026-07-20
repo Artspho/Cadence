@@ -491,6 +491,7 @@ Priorisés autour du but de la bêta : **donner une visibilité claire et fiable
 - **Projection honnête** : baser le futur sur les **contrats déjà signés à venir** (le simulateur devient planificateur) et afficher une **fourchette** plutôt qu'une fausse précision.
 - **Module indemnisation mensuelle** : seuil de non-indemnisation (27 j), jours non indemnisables (× 1,3), montant mensuel = AJ × jours indemnisables, plafond de cumul (118 % du PMSS).
 - **Différés & franchises** : délai d'attente (7 j / 12 mois), franchise congés payés, franchise salaires (formule à transcrire), différé spécifique, ordre d'application.
+- **Suggestion de renouvellement anticipé** : quand l'utilisateur a déjà atteint 507 h avant sa date anniversaire, signaler qu'un réexamen anticipé des droits est POSSIBLE, avec l'action à mener. ⚠️ Prérequis bloquant : la règle de comparaison ancien droit / nouveau droit doit être sourcée et validée (simulateur officiel + cas réels) AVANT toute implémentation — un réexamen anticipé peut baisser l'allocation ; suggérer sans vérifier serait un faux feu vert (devoir sacré n°2).
 
 ### 11.C — Fiabilité maximale (V3)
 - **Ingestion de l'AEM** (pièce qui fait foi) en plus des bulletins ; suivre une éventuelle **API France Travail**.
@@ -499,6 +500,10 @@ Priorisés autour du but de la bêta : **donner une visibilité claire et fiable
 - Cas de bord réglementaires : démission (455 h, IPR), maintien à 64 ans, allocations de solidarité (APS/AFD, clause de sauvegarde), proratisation du plafond de cachets sur mois partiel, rappels d'obligations (actualisation, 72 h, absence > 7 j).
 
 > L'architecture (moteur pur + config centralisée) est déjà conçue pour recevoir tout ceci sans réécriture de la logique métier.
+
+### Hors périmètre — pistes à réévaluer (pas dans la trajectoire actuelle)
+
+- **Module frais réels / impôts** : dépôt de factures + calcul automatique des frais réels pour la déclaration de revenus. Relève de la fiscalité, pas de l'assurance chômage → hors du nord de l'app (suivi des droits A10). Dilue le périmètre, engage une responsabilité fiscale, et suppose lecture/stockage de pièces sensibles (chantier type import PDF, V3). À considérer comme un produit distinct, pas comme une extension de Cadence.
 
 ---
 
