@@ -64,6 +64,7 @@ Import PDF (V2) : `pdfjs-dist` **côté client** (données sensibles, jamais env
 ```
 src/
   config/franceTravailConfig.ts   # constantes légales versionnées (source mars 2026)
+  config/contact.ts               # EMAIL_FEEDBACK + construireLienFeedback (pas réglementaire)
     __tests__/
   types/index.ts                  # modèle de données
   engine/                         # PUR + testé
@@ -89,7 +90,7 @@ src/
 - ✅ Design tokens (Tailwind + `index.css`) alignés sur la maquette.
 - ✅ `engine/` complet et testé : `periodeReference`, `decompteHeures`, `salaireReference`,
   `areBrute` (+ `calculerAJBrutePourFenetre`), `areNette`, `prediction`, `alertes`, `cycles`
-  — **56 tests Vitest**, tous verts (dont 7 sur `storage/`, 4 sur `config/`).
+  — **57 tests Vitest**, tous verts (dont 7 sur `storage/`, 5 sur `config/`).
 - ✅ `storage/`, `components/`, câblage `App.tsx` — bêta fonctionnelle de bout en bout
   (onboarding → tableau de bord → contrats → import PDF → historique → simulateur → à propos).
 - ✅ **Bug corrigé** : un profil neuf sans date anniversaire connue n'affiche plus jamais le
@@ -140,6 +141,15 @@ src/
   icône + mot quand périmé (jamais la couleur seule, §8.6). **Corrigé au passage** : `AProposLimites.tsx`
   contenait depuis plusieurs sessions un seuil `SEUIL_PEREMPTION_JOURS = 365` codé en dur — un
   seuil réglementaire deviné, jamais corrigé jusqu'ici. Supprimé, remplacé par `estPerime`.
+- ✅ **Bouton de feedback** (§11.A) : `config/contact.ts` — `EMAIL_FEEDBACK` (`null` tant que non
+  renseigné, jamais un placeholder ; renseigné à `benoit.zahra@orange.fr`) + `construireLienFeedback(email)`,
+  fonction pure sans accès à `donnees`/`profil`/`contrats` (sujet et gabarit de corps fixes,
+  aucune donnée utilisateur ne peut structurellement s'y glisser). Deux points d'accès —
+  `TopBar.tsx` (toujours visible, adresse en texte de lien) et `AProposLimites.tsx` (bouton +
+  adresse en texte lisible en dessous) — **aucun** des deux ne s'affiche si `EMAIL_FEEDBACK` est
+  `null` (pas de lien mort, pas de "null" visible), vérifié dans le navigateur dans les deux états.
+  **Remplace** l'ancien lien `mailto:?subject=...` sans destination ni gabarit qui traînait dans
+  `AProposLimites.tsx` depuis plusieurs sessions, pas un ajout en parallèle.
 - ⬜ **Non traité (V2/V3) :** coordination européenne (périodes U1/PDU1) — même famille qu'Annexe 8/article 65, hors périmètre Annexe 10 pur. Aucune logique ni champ de données ne l'anticipe encore (détail dans `docs/SPEC.md` §10 et §11.C). Ne pas confondre avec le champ `territoire` du contrat, qui couvre un cas différent (cachet ponctuel joué en EEE/Suisse/UK mais déclaré en France).
 - 🔁 **Maintenance de la config** (récurrent, perso — hors app, pas de backend en bêta) : une fois
   par mois, vérifier à la source officielle SMIC (horaire / mensuel / journalier), PMSS, et les

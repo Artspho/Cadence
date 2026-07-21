@@ -1,4 +1,5 @@
 import { estPerime, franceTravailConfig, joursDepuisMiseAJourConfig } from "../config/franceTravailConfig";
+import { EMAIL_FEEDBACK, construireLienFeedback } from "../config/contact";
 import type { Profil } from "../types";
 
 interface AProposLimitesProps {
@@ -69,9 +70,14 @@ export function AProposLimites({ dateDuJour, profil, onModifierProfil }: APropos
         </ul>
       </section>
 
-      <a href="mailto:?subject=Retour%20sur%20Cadence" className="inline-block text-sm text-mint hover:underline">
-        Donner mon avis sur Cadence →
-      </a>
+      {EMAIL_FEEDBACK && (
+        <div>
+          <a href={construireLienFeedback(EMAIL_FEEDBACK)} className="inline-block text-sm text-mint hover:underline">
+            Donner mon avis sur Cadence →
+          </a>
+          <p className="text-xs text-faint mt-1">ou écris-moi directement à {EMAIL_FEEDBACK}</p>
+        </div>
+      )}
     </div>
   );
 }

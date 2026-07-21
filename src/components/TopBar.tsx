@@ -1,4 +1,5 @@
 import { estPerime, franceTravailConfig } from "../config/franceTravailConfig";
+import { EMAIL_FEEDBACK, construireLienFeedback } from "../config/contact";
 
 export type Onglet = "dashboard" | "contrats" | "import" | "historique" | "simulateur" | "apropos";
 
@@ -44,7 +45,7 @@ export function TopBar({ ongletActif, onChangerOnglet, periodeLabel, dateDuJour 
           ))}
         </nav>
       </div>
-      <div className="max-w-[1040px] mx-auto px-6 pb-2 -mt-1">
+      <div className="max-w-[1040px] mx-auto px-6 pb-2 -mt-1 flex items-center justify-between gap-3 flex-wrap">
         <p className={`text-[11px] flex items-center gap-1.5 ${perime ? "text-amber" : "text-faint"}`}>
           {perime && (
             <span className="inline-flex items-center gap-1 font-medium" aria-hidden={false}>
@@ -53,6 +54,11 @@ export function TopBar({ ongletActif, onChangerOnglet, periodeLabel, dateDuJour 
           )}
           Règles vérifiées au {franceTravailConfig.meta.dateEntreeVigueur} — {franceTravailConfig.meta.source}
         </p>
+        {EMAIL_FEEDBACK && (
+          <a href={construireLienFeedback(EMAIL_FEEDBACK)} className="text-[11px] text-faint hover:text-muted transition-colors shrink-0">
+            Un avis ? Écris à {EMAIL_FEEDBACK}
+          </a>
+        )}
       </div>
     </header>
   );
