@@ -72,13 +72,15 @@ src/
     areBrute.ts  areNette.ts  prediction.ts  alertes.ts  cycles.ts
     __tests__/
   lib/extractionBulletin.ts       # import PDF (V2)
+  lib/dashboardVide.ts            # dashboardEstVide(contrats) — présence, jamais 0h au montant
+    __tests__/
   storage/localStorageAdapter.ts  # + export/import JSON (schemaVersion, anti-écrasement)
     __tests__/
   components/                     # Dashboard, ProjectionChart, ContractForm,
                                    # ContractList, ImportBulletins, AlertCenter,
                                    # Historique, Simulateur, TopBar, Onboarding,
                                    # AProposLimites, AvertissementHorsPerimetre,
-                                   # ConfirmationImport
+                                   # ConfirmationImport, DashboardVide
   App.tsx  main.tsx  index.css
 ```
 
@@ -90,7 +92,7 @@ src/
 - ✅ Design tokens (Tailwind + `index.css`) alignés sur la maquette.
 - ✅ `engine/` complet et testé : `periodeReference`, `decompteHeures`, `salaireReference`,
   `areBrute` (+ `calculerAJBrutePourFenetre`), `areNette`, `prediction`, `alertes`, `cycles`
-  — **57 tests Vitest**, tous verts (dont 7 sur `storage/`, 5 sur `config/`).
+  — **59 tests Vitest**, tous verts (dont 7 sur `storage/`, 5 sur `config/`, 2 sur `lib/`).
 - ✅ `storage/`, `components/`, câblage `App.tsx` — bêta fonctionnelle de bout en bout
   (onboarding → tableau de bord → contrats → import PDF → historique → simulateur → à propos).
 - ✅ **Bug corrigé** : un profil neuf sans date anniversaire connue n'affiche plus jamais le
@@ -150,6 +152,20 @@ src/
   `null` (pas de lien mort, pas de "null" visible), vérifié dans le navigateur dans les deux états.
   **Remplace** l'ancien lien `mailto:?subject=...` sans destination ni gabarit qui traînait dans
   `AProposLimites.tsx` depuis plusieurs sessions, pas un ajout en parallèle.
+- ✅ **État vide du Dashboard** (§11.A) : `lib/dashboardVide.ts` — `dashboardEstVide(contrats)` se
+  déclenche sur l'**absence de contrat** (`contrats.length === 0`), jamais sur "0 h comptée au
+  montant" (un profil 100 % enseignement a des contrats mais 0 h au montant ARE — testé
+  explicitement, dashboard normal dans ce cas). `DashboardVide.tsx` (nouveau, purement
+  présentationnel, aucune prop de date/profil) remplace **tout** le contenu normal — carte
+  allocation comprise, plus de 44 € affiché à 0 contrat — par un écran d'invitation avec bouton
+  d'action vers l'onglet Contrats. **`AlertCenter` masqué aussi dans cet état, et pas seulement
+  en effet de bord** : une alerte "rythme insuffisant" sur un compte neuf est le même faux signal
+  que le montant qu'on retire, l'autre bout du problème. **Fuite corrigée en vérifiant** : le chip
+  `AlertCenterResume` (en-tête, visible sur tous les onglets) affichait encore ce même faux signal
+  indépendamment du Dashboard — filtré désormais lui aussi quand le compte est vide (sauf l'alerte
+  `situation_mixte`, qui reste vraie indépendamment du nombre de contrats). Vérifié dans le
+  navigateur : compte neuf (aucun euro, aucune alerte, écran net) et compte avec un seul contrat
+  100 % enseignement (dashboard normal, distinction respectée).
 - ⬜ **Non traité (V2/V3) :** coordination européenne (périodes U1/PDU1) — même famille qu'Annexe 8/article 65, hors périmètre Annexe 10 pur. Aucune logique ni champ de données ne l'anticipe encore (détail dans `docs/SPEC.md` §10 et §11.C). Ne pas confondre avec le champ `territoire` du contrat, qui couvre un cas différent (cachet ponctuel joué en EEE/Suisse/UK mais déclaré en France).
 - 🔁 **Maintenance de la config** (récurrent, perso — hors app, pas de backend en bêta) : une fois
   par mois, vérifier à la source officielle SMIC (horaire / mensuel / journalier), PMSS, et les

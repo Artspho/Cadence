@@ -23,6 +23,8 @@ import { Simulateur } from "./components/Simulateur";
 import { AProposLimites } from "./components/AProposLimites";
 import { AvertissementHorsPerimetre } from "./components/AvertissementHorsPerimetre";
 import { ConfirmationImport } from "./components/ConfirmationImport";
+import { DashboardVide } from "./components/DashboardVide";
+import { dashboardEstVide } from "./lib/dashboardVide";
 
 const dateDuJour = new Date().toISOString().slice(0, 10);
 
@@ -141,7 +143,12 @@ export default function App() {
 
       <main className="max-w-[1040px] mx-auto px-6 py-8 space-y-6">
         <div className="flex items-center justify-between flex-wrap gap-2">
-          <AlertCenterResume alertes={calculs?.alertes ?? []} />
+          {/* Même correction que DashboardVide, l'autre bout du faux signal : sans contrat, les
+              alertes prédictives (ex. "rythme insuffisant") ne veulent rien dire pour un compte
+              neuf. On ne les fait pas fuiter via ce chip, visible sur tous les onglets. L'alerte
+              "situation_mixte" reste affichée dans tous les cas : elle est vraie indépendamment
+              du nombre de contrats. */}
+          <AlertCenterResume alertes={dashboardEstVide(donnees.contrats) && !profil.activiteHorsAnnexe10 ? [] : (calculs?.alertes ?? [])} />
           <div className="flex items-center gap-2 text-xs">
             <button onClick={exporter} className="px-3 py-1.5 rounded-full border border-line text-muted hover:text-ink transition-colors">
               Exporter mes données (JSON)
@@ -179,6 +186,8 @@ export default function App() {
           calculs &&
           (profil.activiteHorsAnnexe10 ? (
             <AvertissementHorsPerimetre />
+          ) : dashboardEstVide(donnees.contrats) ? (
+            <DashboardVide onAllerVersContrats={() => setOnglet("contrats")} />
           ) : (
             <>
               <AlertCenter alertes={calculs.alertes} />
