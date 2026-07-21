@@ -167,18 +167,21 @@ src/
   navigateur : compte neuf (aucun euro, aucune alerte, écran net) et compte avec un seul contrat
   100 % enseignement (dashboard normal, distinction respectée).
 - ❌ **Bug repéré, non corrigé** (trouvé pendant la tâche état-vide, hors périmètre à ce moment-là) :
-  le Dashboard peut afficher **« Vise environ Infinity h/mois »**. Cause probable — à confirmer par
-  la tâche dédiée : dans `engine/prediction.ts`, `rythmeMensuelRequis` vaut littéralement
-  `Infinity` quand `joursRestants <= 0` et `heuresRestantes > 0` (ligne `joursRestants > 0 ? ... :
-  heuresRestantes > 0 ? Infinity : 0`) — **l'`Infinity` naît bien dans `engine/`**, pas seulement à
-  l'affichage : violation potentielle de la règle d'or « jamais de division par zéro ». Repéré en
-  écrivant cette entrée (pas encore vérifié par un test dédié) : `Dashboard.tsx` protège déjà sa
-  propre lecture de cette valeur (`Number.isFinite(...) ? ... : "objectif hors d'atteinte"`), mais
-  `alertes.ts` (`actionSuggeree` du code `rythme_insuffisant`) ne protège **pas** la sienne — c'est
-  très probablement le chemin exact de la fuite observée. **Priorité de la tâche dédiée** :
-  confirmer avec un test que reproduit le cas, puis décider si le correctif se fait dans
-  `prediction.ts` (ex. `null` plutôt que `Infinity`, avec gestion explicite côté appelants) ou
-  seulement dans `alertes.ts` (garde-fou local) — trancher une fois la cause confirmée, pas avant.
+  le Dashboard peut afficher **« Vise environ Infinity h/mois »**. **Ce n'est apparemment pas une
+  division par zéro accidentelle** : dans `engine/prediction.ts`, `rythmeMensuelRequis` vaut
+  `Infinity` de façon explicite quand `joursRestants <= 0` et `heuresRestantes > 0` — vraisemblablement
+  une sentinelle volontaire pour dire "rythme inatteignable". Repéré en écrivant cette entrée (pas
+  encore vérifié par un test dédié) : `Dashboard.tsx` intercepte bien cette sentinelle
+  (`Number.isFinite(...) ? ... : "objectif hors d'atteinte"`), mais `alertes.ts` (`actionSuggeree`
+  du code `rythme_insuffisant`) ne l'intercepte pas et la laisse fuiter telle quelle jusqu'à
+  l'écran. **La règle en jeu est donc d'abord le devoir n°2** (une valeur sentinelle du moteur
+  fuit jusqu'à l'utilisateur au lieu d'être traduite en clair), pas la règle "jamais de division
+  par zéro" au sens strict. **La tâche dédiée devra** : (a) décider comment le moteur signale
+  proprement un rythme inatteignable — `Infinity` est peut-être une mauvaise sentinelle
+  précisément parce qu'un consommateur sur deux a oublié de l'intercepter ; un statut explicite
+  (ex. un champ dédié ou `null`) serait plus sûr, à concevoir pour être difficile à oublier ; (b)
+  garantir que **tous** les consommateurs (`Dashboard.tsx`, `alertes.ts`, et tout autre futur
+  appelant) traduisent ce signal en clair, pas seulement l'un des deux.
 - ⬜ **Non traité (V2/V3) :** coordination européenne (périodes U1/PDU1) — même famille qu'Annexe 8/article 65, hors périmètre Annexe 10 pur. Aucune logique ni champ de données ne l'anticipe encore (détail dans `docs/SPEC.md` §10 et §11.C). Ne pas confondre avec le champ `territoire` du contrat, qui couvre un cas différent (cachet ponctuel joué en EEE/Suisse/UK mais déclaré en France).
 - 🔁 **Maintenance de la config** (récurrent, perso — hors app, pas de backend en bêta) : une fois
   par mois, vérifier à la source officielle SMIC (horaire / mensuel / journalier), PMSS, et les
