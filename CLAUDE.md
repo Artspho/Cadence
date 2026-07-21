@@ -196,9 +196,11 @@ src/
   actuellement datée « 2026.06 » (alignée sur la revalorisation SMIC du 1er juin 2026) — prochaine
   échéance connue : la revalorisation SMIC/PMSS du 1er janvier suivant.
 
-**Prochaines pistes** (au choix, pas d'ordre imposé) : les deux limites connues ci-dessus, ou les
-autres items du §11.A du SPEC encore ouverts (PWA réellement installable, alignement visuel fin
-sur `docs/maquette_dashboard.html`, transparence du calcul).
+**Prochaines pistes** : en priorité, confirmer et corriger le bug Infinity ci-dessus — c'est le
+seul ❌ confirmé de la liste (les autres sont 🔶 limites connues ou ⬜ non traité). Sinon, sans
+ordre imposé : les deux limites connues 🔶 ci-dessus, ou les autres items du §11.A du SPEC encore
+ouverts (PWA réellement installable, alignement visuel fin sur `docs/maquette_dashboard.html`,
+transparence du calcul).
 
 ---
 
