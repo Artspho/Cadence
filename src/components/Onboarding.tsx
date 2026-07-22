@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { validerCoherenceProfil } from "../lib/coherenceProfil";
 import type { Profil } from "../types";
 
 interface OnboardingProps {
@@ -17,7 +18,9 @@ export function Onboarding({ onTerminer }: OnboardingProps) {
   const [alsaceMoselle, setAlsaceMoselle] = useState(false);
   const [regimeDeclare, setRegimeDeclare] = useState<Profil["regimeDeclare"]>("annexe10_pur");
 
-  const peutValider = dateNaissance.length > 0 && (!dateAnniversaireConnue || dateAnniversaire.length > 0);
+  const dateAnniversaireCandidate = dateAnniversaireConnue ? dateAnniversaire : "";
+  const coherence = validerCoherenceProfil({ dateNaissance, situation, dateAnniversaire: dateAnniversaireCandidate });
+  const peutValider = coherence.coherent && (!dateAnniversaireConnue || dateAnniversaire.length > 0);
 
   function valider() {
     onTerminer({
@@ -85,7 +88,12 @@ export function Onboarding({ onTerminer }: OnboardingProps) {
               className="w-full bg-surface-2 border border-line rounded-lg px-3 py-2 text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-mint"
             />
           )}
-          {!dateAnniversaireConnue && <p className="text-xs text-faint">Cadence utilisera une fenêtre glissante de 365 j se terminant aujourd'hui, en attendant que tu la renseignes.</p>}
+          {!dateAnniversaireConnue &&
+            (coherence.coherent ? (
+              <p className="text-xs text-faint">Cadence utilisera une fenêtre glissante de 365 j se terminant aujourd'hui, en attendant que tu la renseignes.</p>
+            ) : (
+              <p className="text-xs text-red">{coherence.raison}</p>
+            ))}
         </div>
 
         <label className="flex items-center gap-2 text-sm text-muted">

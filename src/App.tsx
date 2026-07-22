@@ -26,6 +26,7 @@ import { ConfirmationImport } from "./components/ConfirmationImport";
 import { DashboardVide } from "./components/DashboardVide";
 import { dashboardEstVide } from "./lib/dashboardVide";
 import { profilHorsPerimetre } from "./lib/profilHorsPerimetre";
+import { validerProfilPourEcriture } from "./lib/coherenceProfil";
 
 const dateDuJour = new Date().toISOString().slice(0, 10);
 
@@ -90,8 +91,15 @@ export default function App() {
     setDonnees((d) => (d ? { ...d, contrats: d.contrats.filter((c) => c.id !== id) } : d));
   }
 
-  function modifierProfil(profilModifie: Profil) {
-    setDonnees((d) => (d ? { ...d, profil: profilModifie } : d));
+  // Rempart devoir n°1 : forme (Zod) puis cohérence (situation/date), jamais l'un sans l'autre.
+  // Pas de fichier de sauvegarde téléchargé ici (contrairement à l'import, qui remplace TOUT) —
+  // le garde-fou tient par construction : setDonnees n'est jamais appelé tant que le candidat n'a
+  // pas passé validerProfilPourEcriture, donc l'ancien profil valide reste en place sans risque.
+  function modifierProfil(candidat: Profil) {
+    const resultat = validerProfilPourEcriture(candidat);
+    if (!resultat.ok) return resultat;
+    setDonnees((d) => (d ? { ...d, profil: resultat.profil } : d));
+    return resultat;
   }
 
   function declencherTelechargement(nomFichier: string, contenu: string) {

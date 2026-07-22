@@ -92,7 +92,7 @@ src/
 - ✅ Design tokens (Tailwind + `index.css`) alignés sur la maquette.
 - ✅ `engine/` complet et testé : `periodeReference`, `decompteHeures`, `salaireReference`,
   `areBrute` (+ `calculerAJBrutePourFenetre`), `areNette`, `prediction`, `alertes`, `cycles`
-  — **71 tests Vitest**, tous verts (dont 7 sur `storage/`, 5 sur `config/`, 9 sur `lib/`).
+  — **79 tests Vitest**, tous verts (dont 7 sur `storage/`, 5 sur `config/`, 17 sur `lib/`).
 - ✅ `storage/`, `components/`, câblage `App.tsx` — bêta fonctionnelle de bout en bout
   (onboarding → tableau de bord → contrats → import PDF → historique → simulateur → à propos).
 - ✅ **Bug corrigé** : un profil neuf sans date anniversaire connue n'affiche plus jamais le
@@ -127,6 +127,29 @@ src/
   sélectionné, et qu'il réapparaît normalement sur « Non ». Vérifié manuellement dans le
   navigateur lors de l'extension à 3 états (2026-07-22) ; à refaire après toute future
   modification de ces trois fichiers.
+- ✅ **Revalidation post-onboarding** (SPEC §11.A) : date de naissance, situation et date
+  anniversaire sont désormais modifiables après coup, dans « À propos » → « Ton profil »
+  (`AProposLimites.tsx`), plus besoin d'éditer le JSON à la main. Prudence ciblée comme prévu :
+  date de naissance libre, sans cérémonie ; situation modifiable librement mais le formulaire
+  reste cohérent ; date anniversaire modifiable avec une note explicite + une confirmation en
+  deux clics (« Enregistrer » → « Confirmer le changement ») avant toute écriture, pas de
+  changement silencieux. **Piège fermé** (trouvé en investiguant, indépendant de l'édition
+  elle-même) : réadmission + date anniversaire inconnue était déjà validable dès l'Onboarding
+  — `periodeReference.ts` aurait fait tourner l'extension de réadmission sur une fenêtre fictive
+  "se terminant aujourd'hui", un seuil ajusté plausible mais faux (devoir n°2). `lib/coherenceProfil.ts`
+  (`validerCoherenceProfil` + `validerProfilPourEcriture` + `profilSchema.refine`) bloque cette
+  combinaison aux **3 portes** qui écrivent un profil — Onboarding, édition, **et import JSON**
+  (même règle, même message partout, pas de 4e demi-rempart) — et est le point de passage unique
+  dans `App.tsx` (`modifierProfil`), pas seulement dans le composant. Devoir n°1 tenu par
+  construction : `modifierProfil` n'appelle jamais `setDonnees` avant que le candidat n'ait passé
+  Zod puis cohérence, donc l'ancien profil valide n'est jamais à risque — pas de fichier de
+  sauvegarde téléchargé pour autant (disproportionné pour 3 champs sur un profil existant, à la
+  différence de l'import qui remplace tout). `engine/` intouché : le moteur suppose désormais un
+  profil cohérent par construction, cf. `docs/validation.md`. Vérifié manuellement dans le
+  navigateur (refus Onboarding, refus édition avec le même message, recalcul complet du Dashboard
+  après confirmation d'une nouvelle date anniversaire) — pas de test React, même limite actée
+  ci-dessus ; couverture automatisée via `lib/__tests__/coherenceProfil.test.ts` (règle +
+  point de passage Zod, testés directement, sans harnais UI).
 - ✅ **`config.valeursDatees.smicHoraireBrut` renseigné** (12,31 €, arrêté du 22 mai 2026, en
   vigueur au 01/06/2026) — la formule réadmission allongée (point ci-dessus) est donc réellement
   active dès qu'un profil réadmission a une fenêtre étendue. `.pmssMensuel` reste à `null` (TODO

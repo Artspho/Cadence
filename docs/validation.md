@@ -27,6 +27,18 @@ coïncident pas encore.
   à la règle comprise, règle non prouvée contre source externe → à valider avant toute
   bêta incluant ces profils.
 
+### ✅ Invariant garanti par construction (pas une validation externe)
+- **Profil cohérent (réadmission ⇒ date anniversaire connue).** `engine/periodeReference.ts`
+  suppose cette cohérence sans jamais la vérifier lui-même — ni « règle prouvée » ni
+  « code conforme » : aucune source externe à confronter, c'est une garantie structurelle
+  interne, pas un calcul réglementaire. Piège fermé : une réadmission sans date anniversaire
+  connue faisait tourner l'extension de réadmission sur une fenêtre fictive "se terminant
+  aujourd'hui", produisant un seuil ajusté plausible mais faux. `lib/coherenceProfil.ts`
+  (`validerCoherenceProfil` + `profilSchema.refine`) bloque cette combinaison aux **3 portes**
+  qui écrivent un profil : Onboarding, édition post-onboarding (À propos, nouveau), et **import
+  JSON** (le tien ou celui d'un ami en retour d'usage, cf. SPEC §11.A) — les trois délèguent à la
+  même règle, un seul message. Détail : `CLAUDE.md` « État actuel », `docs/SPEC.md` §10.
+
 ## Prochaine action
 Collecter une notification FT réelle d'un profil en réadmission allongée (le simulateur
 officiel ne peut pas servir de source pour cette branche, cf. « À valider ») ; réconcilier

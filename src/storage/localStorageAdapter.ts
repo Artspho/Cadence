@@ -4,6 +4,7 @@
 // directement, seulement les fonctions exportées ici.
 import { z } from "zod";
 import type { Contrat, PeriodeAssimilee, Profil } from "../types";
+import { profilSchema } from "../lib/coherenceProfil";
 
 const CLE_STOCKAGE = "cadence:v1:donnees";
 
@@ -49,15 +50,9 @@ const periodeSchema = z.object({
   dateFin: z.string(),
 });
 
-const profilSchema = z.object({
-  dateNaissance: z.string(),
-  dateAnniversaire: z.string(),
-  situation: z.enum(["premiere_admission", "readmission"]),
-  alsaceMoselle: z.boolean().optional(),
-  baremeCSG: z.enum(["normal", "reduit"]).optional(),
-  activiteHorsAnnexe10: z.boolean().optional(), // déprécié, cf. types/index.ts — jamais écrit, lu en repli seulement
-  regimeDeclare: z.enum(["annexe10_pur", "mixte", "inconnu"]).optional(),
-});
+// profilSchema (forme + cohérence situation/date) vit désormais dans lib/coherenceProfil.ts —
+// unique définition, réutilisée ici ET par App.tsx (validerProfilPourEcriture), pour que l'import
+// JSON et l'édition en mémoire referment exactement la même porte (cf. lib/coherenceProfil.ts).
 
 const donneesAppSchema = z.object({
   profil: profilSchema.nullable(),

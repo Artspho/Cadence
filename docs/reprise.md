@@ -8,7 +8,7 @@ Mémoire durable à consulter au démarrage : `CLAUDE.md`, `docs/SPEC.md`, `docs
 
 Deux devoirs sacrés : (1) ne jamais perdre les données ; (2) ne jamais afficher un chiffre faux (ni faux « feu vert » rassurant, ni faux « Bloqué », ni faux montant, ni fausse alerte, ni valeur sentinelle brute).
 
-État : les deux devoirs sacrés sont tenus, la bêta a son socle. 71 tests verts, tsc propre, git à jour (dernier commit `2a154ab`, garde-fou situation mixte 3 états).
+État : les deux devoirs sacrés sont tenus, la bêta a son socle. 79 tests verts, tsc propre, git à jour (dernier lot : revalidation post-onboarding, 3 portes d'écriture profil fermées — hash exact non cité ici pour éviter l'auto-référence, cf. `git log`).
 
 ## Fait dans les sessions récentes
 
@@ -46,13 +46,32 @@ EXACTEMENT le même chemin que « mixte » (même alerte `situation_mixte`, mêm
 ne change de comportement au prochain chargement (testé explicitement, non-régression
 obligatoire). 71 tests verts, détail : `CLAUDE.md` « État actuel », `docs/SPEC.md` §10.
 
+## Fait (revalidation post-onboarding, 3 portes fermées)
+
+Date de naissance, situation et date anniversaire sont désormais modifiables après coup dans
+« À propos » → « Ton profil » (`AProposLimites.tsx`) — plus besoin d'éditer le JSON à la main.
+Prudence ciblée : naissance libre sans cérémonie ; situation modifiable mais formulaire cohérent ;
+date anniversaire modifiable avec note + confirmation en deux clics avant toute écriture, jamais
+silencieuse. **Piège trouvé en investiguant, indépendant de l'édition** : une réadmission sans date
+anniversaire connue était déjà validable dès l'Onboarding (pas seulement à l'édition) —
+`periodeReference.ts` aurait tourné sur une fenêtre fictive "se terminant aujourd'hui", un seuil
+ajusté plausible mais faux. `lib/coherenceProfil.ts` (`validerCoherenceProfil` +
+`validerProfilPourEcriture` + `profilSchema.refine`) ferme les **3 portes** qui écrivent un profil —
+Onboarding, édition, et **import JSON** (même règle, même message, pas de 4e demi-rempart) — au
+point de passage unique `App.tsx` (`modifierProfil`), jamais seulement dans le composant. Devoir
+n°1 tenu par construction (jamais de `setDonnees` avant Zod + cohérence), sans fichier de
+sauvegarde téléchargé (disproportionné pour 3 champs, à la différence de l'import qui remplace
+tout). `engine/` intouché — le moteur suppose désormais un profil cohérent par construction.
+Vérifié manuellement dans le navigateur (refus Onboarding, refus édition même message, recalcul
+complet du Dashboard après confirmation d'une date anniversaire). 79 tests verts, détail :
+`CLAUDE.md` « État actuel », `docs/SPEC.md` §10, `docs/validation.md`.
+
 ## PROCHAINE ACTION
 
-Plus rien en urgence côté garde-fous : le bug Infinity et l'extension situation mixte à 3 états
-sont posés. Priorité suivante : les deux items §11.A encore ouverts — pas de revalidation
-post-onboarding (corriger date/situation impossible sans éditer le JSON), puis transparence du
-calcul. Ensuite, sans urgence : barème CSG figé à « normal » (non bloquant), PWA. Détail complet
-de ces items et du reste : « Ensuite (backlog) » ci-dessous.
+Plus rien en urgence côté garde-fous ni côté cohérence de profil. Priorité suivante : le dernier
+item §11.A encore ouvert — transparence du calcul. Ensuite, sans urgence : barème CSG figé à
+« normal » (non bloquant), PWA. Détail complet de ces items et du reste : « Ensuite (backlog) »
+ci-dessous.
 
 ## Ensuite (backlog)
 
@@ -63,7 +82,6 @@ de ces items et du reste : « Ensuite (backlog) » ci-dessous.
   Consigné aussi dans `validation.md`.
 - Réadmission allongée jamais confrontée à source externe (le simulateur officiel ne modélise pas l'allongement → attendre une vraie notif de testeur, consigné validation.md).
 - Barème CSG figé à « normal » en dur dans l'onboarding (sous-estime le net pour barème réduit, non bloquant).
-- Pas de revalidation post-onboarding (corriger date/situation impossible sans éditer le JSON).
 - Transparence du calcul.
 - PWA.
 - Maintenance config mensuelle (déjà notée CLAUDE.md).
