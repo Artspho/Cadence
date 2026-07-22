@@ -70,7 +70,7 @@ export default function App() {
     const alertes = detecterAlertes(profil, contrats, periodes, config, dateDuJour);
     const exercices = decouperExercices(profil, contrats, periodes, config, dateDuJour);
 
-    return { fenetre, decompte, ajBrute, ajNette, prediction, dateCap, serie, alertes, exercices };
+    return { fenetre, decompte, ajBrute, ajNette, prediction, dateCap, serie, alertes, exercices, sr, nht, sar };
   }, [donnees]);
 
   if (!donnees) {
@@ -200,7 +200,18 @@ export default function App() {
           ) : (
             <>
               <AlertCenter alertes={calculs.alertes} />
-              <Dashboard prediction={calculs.prediction} serie={calculs.serie} fenetreDebut={calculs.fenetre.dateDebut} dateCap={calculs.dateCap} decompte={calculs.decompte} ajBrute={calculs.ajBrute} ajNette={calculs.ajNette} />
+              <Dashboard
+                prediction={calculs.prediction}
+                serie={calculs.serie}
+                fenetreDebut={calculs.fenetre.dateDebut}
+                dateCap={calculs.dateCap}
+                decompte={calculs.decompte}
+                ajBrute={calculs.ajBrute}
+                ajNette={calculs.ajNette}
+                sr={calculs.sr}
+                nht={calculs.nht}
+                sar={calculs.sar}
+              />
             </>
           ))}
 

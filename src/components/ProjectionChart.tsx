@@ -12,6 +12,7 @@ interface ProjectionChartProps {
   niveau: NiveauStatut;
   dateFranchissementProjetee: string | null;
   rythmeMensuelActuel: number;
+  anniversaireConnu: boolean;
 }
 
 const LARGEUR = 1000;
@@ -30,7 +31,7 @@ function formatDateCourte(iso: string): string {
   return `${parseInt(jour, 10)} ${labels[parseInt(mois, 10) - 1]}`;
 }
 
-export function ProjectionChart({ fenetreDebut, fenetreFin, dateCap, serie, seuilHeures, heuresActuelles, niveau, dateFranchissementProjetee, rythmeMensuelActuel }: ProjectionChartProps) {
+export function ProjectionChart({ fenetreDebut, fenetreFin, dateCap, serie, seuilHeures, heuresActuelles, niveau, dateFranchissementProjetee, rythmeMensuelActuel, anniversaireConnu }: ProjectionChartProps) {
   const statut = LABELS_STATUT[niveau];
 
   const { pathAcquis, pathAire, pathProjection, xToday, yToday, yLigneObjectif, xFranchissement, yFranchissement, ticksMois } = useMemo(() => {
@@ -97,7 +98,7 @@ export function ProjectionChart({ fenetreDebut, fenetreFin, dateCap, serie, seui
         <div className="text-right">
           <span className="font-display text-2xl md:text-3xl font-semibold tabular-nums tracking-tight">{Math.round(heuresActuelles)}</span>
           <span className="text-muted"> / {seuilHeures} h</span>
-          <p className="text-xs text-muted">{joursRestants > 0 ? `${joursRestants} jours restants` : "échéance atteinte"}</p>
+          <p className="text-xs text-muted">{!anniversaireConnu ? "date inconnue" : joursRestants > 0 ? `${joursRestants} jours restants` : "échéance atteinte"}</p>
         </div>
       </div>
 

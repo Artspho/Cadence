@@ -138,6 +138,25 @@ résultat directement, cas #2 et #3 transformés en tests permanents (`areNette.
   seules deux raisons existent aujourd'hui dans le type discriminé (`anniversaire_inconnu`,
   `delai_expire`), pas de 3e raison `rythme_hors_limite`. À reprendre : `docs/reprise.md`.
 
+### Dette tracée
+
+- **`StatutPrediction.joursRestants` (champ brut) reste fragile** — il peut valoir `0` sans que
+  ça signifie une vraie échéance atteinte : quand l'anniversaire est inconnu, `periodeReference.ts`
+  referme la fenêtre sur une date sentinelle ("aujourd'hui", faute de mieux), et `joursRestants`
+  hérite de cet artifice de calcul plutôt que de refléter un vrai délai. `prediction.ts` s'en
+  protège déjà en interne (`niveau`, `message` passent tous par `anniversaireConnu`), mais le champ
+  numérique lui-même n'est pas sûr par construction — trouvé via `ProjectionChart.tsx`, qui
+  recalculait sa propre version de "jours restants" à partir de `fenetreFin`/`dateCap` sans jamais
+  recevoir cette distinction, affichant à tort « échéance atteinte » à côté d'un badge « Alerte »
+  honnête. **Corrigé à cet endroit précis** (booléen `StatutPrediction.anniversaireConnu` exposé,
+  transmis à `ProjectionChart.tsx`, texte « date inconnue » quand il est faux — cf. `CLAUDE.md`
+  « État actuel », test dédié dans `prediction.test.ts`). **Reste vrai pour tout futur
+  consommateur** : quiconque lit `joursRestants` directement doit d'abord vérifier
+  `anniversaireConnu`, sous peine de retomber dans le même piège. Solution systémique en
+  backlog si un autre endroit du code y retombe un jour : transformer `joursRestants` en type
+  discriminé, sur le modèle de `RythmeRequis` (cf. `docs/reprise.md`) — pas urgent tant qu'aucun
+  autre cas ne s'est présenté.
+
 ### À valider
 
 - **Réadmission allongée (fenêtre > 365 j)** — tourne dans le code depuis le commit `fda6b8e`

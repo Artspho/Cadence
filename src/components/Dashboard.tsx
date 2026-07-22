@@ -2,6 +2,7 @@ import type { AJBruteResultat, AJNetteResultat, DecompteHeuresResultat, RythmeRe
 import type { PointSerie } from "../engine/prediction";
 import { franceTravailConfig } from "../config/franceTravailConfig";
 import { ProjectionChart } from "./ProjectionChart";
+import { DetailCalcul } from "./DetailCalcul";
 
 interface DashboardProps {
   prediction: StatutPrediction;
@@ -11,6 +12,9 @@ interface DashboardProps {
   decompte: DecompteHeuresResultat;
   ajBrute: AJBruteResultat;
   ajNette: AJNetteResultat;
+  sr: number;
+  nht: number;
+  sar: number | null;
 }
 
 // Exhaustif par construction : si une raison est ajoutée à RythmeRequis sans traiter son cas
@@ -29,7 +33,7 @@ function libelleRythmeRequis(rythmeRequis: RythmeRequis, seuilHeures: number): s
   }
 }
 
-export function Dashboard({ prediction, serie, fenetreDebut, dateCap, decompte, ajBrute, ajNette }: DashboardProps) {
+export function Dashboard({ prediction, serie, fenetreDebut, dateCap, decompte, ajBrute, ajNette, sr, nht, sar }: DashboardProps) {
   const r = decompte.repartition;
   const cachets = r.cachets;
   const scene = r.heuresScene + r.eee + r.ptp + r.assimilees;
@@ -49,6 +53,7 @@ export function Dashboard({ prediction, serie, fenetreDebut, dateCap, decompte, 
           niveau={prediction.niveau}
           dateFranchissementProjetee={prediction.dateFranchissementProjetee}
           rythmeMensuelActuel={prediction.rythmeMensuelActuel}
+          anniversaireConnu={prediction.anniversaireConnu}
         />
         <p className="text-sm text-muted mt-3">{prediction.message}</p>
       </div>
@@ -95,6 +100,8 @@ export function Dashboard({ prediction, serie, fenetreDebut, dateCap, decompte, 
           <p className="text-xs text-muted">Requis : {libelleRythmeRequis(prediction.rythmeRequis, prediction.seuilHeures)}</p>
         </div>
       </div>
+
+      <DetailCalcul decompte={decompte} ajBrute={ajBrute} ajNette={ajNette} sr={sr} nht={nht} sar={sar} />
 
       <p className="text-xs text-faint text-center pt-2">{franceTravailConfig.meta.avertissement}</p>
     </div>

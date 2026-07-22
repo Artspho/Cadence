@@ -175,6 +175,11 @@ export interface StatutPrediction {
   heuresRestantes: number;
   dateAnniversaire: string;
   joursRestants: number;
+  // false quand l'anniversaire est inconnu : dans ce cas, `dateAnniversaire` et `joursRestants`
+  // reposent sur la fenêtre fictive "se terminant aujourd'hui" (cf. periodeReference.ts) — un
+  // artifice de calcul, jamais une vraie échéance. Tout consommateur de `joursRestants` doit
+  // vérifier ce booléen avant d'en tirer un texte du type "échéance atteinte" (devoir sacré n°2).
+  anniversaireConnu: boolean;
   rythmeMensuelActuel: number; // h/mois, moyenne depuis le début de la période de référence
   rythmeRequis: RythmeRequis; // h/mois requis pour atteindre le seuil avant l'anniversaire, ou raison si inatteignable
   dateFranchissementProjetee: string | null; // date projetée d'atteinte du seuil au rythme actuel

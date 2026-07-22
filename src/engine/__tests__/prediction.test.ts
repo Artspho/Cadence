@@ -44,6 +44,12 @@ describe("calculerStatutPrediction", () => {
     expect(JSON.stringify(resultat)).not.toMatch(/Infinity/);
   });
 
+  it("anniversaireConnu vaut false quand la date anniversaire est inconnue (fenêtre fictive 'aujourd'hui', pas une vraie échéance)", () => {
+    const p = profil({ dateAnniversaire: "", situation: "premiere_admission" });
+    const resultat = calculerStatutPrediction(p, [], [], franceTravailConfig, "2026-06-01");
+    expect(resultat.anniversaireConnu).toBe(false);
+  });
+
   it("ne mute jamais les tableaux de contrats/périodes fournis (utilisable en simulation sans effet de bord)", () => {
     const p = profil({ dateAnniversaire: "2026-12-31" });
     const contrats = [contrat({ date: "2026-02-01", nbCachets: 20 })];

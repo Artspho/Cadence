@@ -79,6 +79,7 @@ export function calculerStatutPrediction(
     heuresRestantes,
     dateAnniversaire: fenetre.dateFin,
     joursRestants,
+    anniversaireConnu,
     rythmeMensuelActuel,
     rythmeRequis,
     dateFranchissementProjetee,
