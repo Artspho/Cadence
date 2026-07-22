@@ -92,7 +92,7 @@ src/
 - ✅ Design tokens (Tailwind + `index.css`) alignés sur la maquette.
 - ✅ `engine/` complet et testé : `periodeReference`, `decompteHeures`, `salaireReference`,
   `areBrute` (+ `calculerAJBrutePourFenetre`), `areNette`, `prediction`, `alertes`, `cycles`
-  — **79 tests Vitest**, tous verts (dont 7 sur `storage/`, 5 sur `config/`, 17 sur `lib/`).
+  — **80 tests Vitest**, tous verts (dont 7 sur `storage/`, 5 sur `config/`, 17 sur `lib/`).
 - ✅ `storage/`, `components/`, câblage `App.tsx` — bêta fonctionnelle de bout en bout
   (onboarding → tableau de bord → contrats → import PDF → historique → simulateur → à propos).
 - ✅ **Bug corrigé** : un profil neuf sans date anniversaire connue n'affiche plus jamais le
@@ -223,6 +223,20 @@ src/
   humainement absurde » (délai non nul mais minuscule) n'a pas de 3e raison dédiée
   (`rythme_hors_limite`) — nécessiterait un seuil de plausibilité non réglementaire (décision
   produit), consigné au backlog (`docs/reprise.md`, `docs/validation.md`).
+- ✅ **Transparence du calcul** (dernier item §11.A) : panneau `DetailCalcul.tsx`, replié par
+  défaut sur le Dashboard, montrant le décompte des heures par catégorie (dont enseignement/
+  formation retenus vs écartés), SR/NHT/SAR, l'AJ brute = A+B+C avec plancher/plafond, et le
+  détail des cotisations jusqu'à l'AJ nette. **Aucun fichier `engine/` modifié** : le moteur
+  exposait déjà tout ce détail dans ses types de retour, seul `App.tsx` ne faisait pas transiter
+  `sr`/`nht`/`sar` jusqu'au Dashboard. **Piège trouvé en le testant, corrigé au passage** :
+  `ProjectionChart.tsx` affichait « échéance atteinte » à côté d'un badge « Alerte » honnête
+  quand l'anniversaire est inconnu — la fenêtre sentinelle "aujourd'hui" (même artifice que le
+  bug Infinity ci-dessus, cf. `periodeReference.ts`) faisait recalculer localement un « jours
+  restants » à zéro sans que le composant sache qu'il ne s'agissait pas d'une vraie échéance.
+  Nouveau champ `StatutPrediction.anniversaireConnu` exposé (aucune logique changée), transmis à
+  `ProjectionChart.tsx`, qui affiche désormais « date inconnue » dans ce cas. Le champ brut
+  `joursRestants` reste une dette tracée pour tout futur consommateur direct (`docs/validation.md`,
+  section « Dette tracée »). 80 tests verts, détail complet : `docs/reprise.md`.
 - ⬜ **Non traité (V2/V3) :** coordination européenne (périodes U1/PDU1) — même famille qu'Annexe 8/article 65, hors périmètre Annexe 10 pur. Aucune logique ni champ de données ne l'anticipe encore (détail dans `docs/SPEC.md` §10 et §11.C). Ne pas confondre avec le champ `territoire` du contrat, qui couvre un cas différent (cachet ponctuel joué en EEE/Suisse/UK mais déclaré en France).
 - 🔁 **Maintenance de la config** (récurrent, perso — hors app, pas de backend en bêta) : une fois
   par mois, vérifier à la source officielle SMIC (horaire / mensuel / journalier), PMSS, et les
@@ -237,10 +251,9 @@ src/
   actuellement datée « 2026.06 » (alignée sur la revalorisation SMIC du 1er juin 2026) — prochaine
   échéance connue : la revalorisation SMIC/PMSS du 1er janvier suivant.
 
-**Prochaines pistes** : plus aucun ❌ confirmé dans la liste (le bug Infinity est corrigé
-ci-dessus), et la cohérence de profil est tenue par construction. **Priorité suivante : le
-dernier item §11.A encore ouvert — la transparence du calcul** (panneau « comment on arrive à ce
-chiffre » : A+B+C, heures comptées vs écartées ; le moteur pur fournit déjà tout ce qu'il faut).
+**Prochaines pistes** : plus aucun ❌ confirmé dans la liste, la cohérence de profil est tenue
+par construction, et tous les items §11.A sont désormais traités (transparence du calcul comprise).
+Aucune priorité imposée pour la suite — à choisir dans le backlog selon ce qui semble le plus utile.
 Sinon, sans urgence : les deux limites connues 🔶 ci-dessus, le `rythme_hors_limite` différé
 (backlog `docs/reprise.md`/`docs/validation.md`), PWA réellement installable, alignement visuel
 fin sur `docs/maquette_dashboard.html`.

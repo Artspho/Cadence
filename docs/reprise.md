@@ -8,7 +8,7 @@ Mémoire durable à consulter au démarrage : `CLAUDE.md`, `docs/SPEC.md`, `docs
 
 Deux devoirs sacrés : (1) ne jamais perdre les données ; (2) ne jamais afficher un chiffre faux (ni faux « feu vert » rassurant, ni faux « Bloqué », ni faux montant, ni fausse alerte, ni valeur sentinelle brute).
 
-État : les deux devoirs sacrés sont tenus, la bêta a son socle. 79 tests verts, tsc propre, git à jour (dernier lot : revalidation post-onboarding, 3 portes d'écriture profil fermées — hash exact non cité ici pour éviter l'auto-référence, cf. `git log`).
+État : les deux devoirs sacrés sont tenus, la bêta a son socle. 80 tests verts, tsc propre, git à jour (dernier lot : panneau de transparence du calcul + correctif « date inconnue » sur ProjectionChart, commit `505473a`).
 
 ## Fait dans les sessions récentes
 
@@ -66,24 +66,62 @@ Vérifié manuellement dans le navigateur (refus Onboarding, refus édition mêm
 complet du Dashboard après confirmation d'une date anniversaire). 79 tests verts, détail :
 `CLAUDE.md` « État actuel », `docs/SPEC.md` §10, `docs/validation.md`.
 
+## Fait (transparence du calcul + correctif « date inconnue »)
+
+Dernier item §11.A ouvert, traité en deux temps.
+
+**Panneau de transparence** (`components/DetailCalcul.tsx`) : accessible depuis le Dashboard via
+un `<details>` natif (**replié par défaut**, ouvert seulement au clic — jamais affiché en
+permanence). Montre le décompte des heures par catégorie (dont enseignement/formation retenus vs
+écartés au-delà du plafond), SR/NHT/SAR, l'AJ brute = A+B+C avec plancher/plafond appliqué ou non,
+et le détail des cotisations jusqu'à l'AJ nette. **Zéro fichier `engine/` touché** : investigation
+préalable a confirmé que `decompteHeures.ts`, `areBrute.ts`, `salaireReference.ts` et `areNette.ts`
+exposaient déjà tout ce détail dans leurs types de retour — `App.tsx` calculait déjà `sr`/`nht`/`sar`
+mais ne les faisait pas transiter jusqu'au Dashboard. Contenu vérifié manuellement contre le premier
+cas de `areBrute.test.ts` (SR 20 000 €, NHT 1000 h → A+B+C = 68,78 €) : concordance exacte.
+
+**Piège trouvé en testant le panneau sur un profil anniversaire inconnu, indépendant du panneau
+lui-même** : `ProjectionChart.tsx` affichait « échéance atteinte » à côté d'un badge « Alerte »
+honnête. Cause : le composant recalculait son propre « jours restants » à partir de
+`fenetreFin`/`dateCap` sans savoir que `periodeReference.ts` referme la fenêtre sur une date
+sentinelle (« aujourd'hui ») quand l'anniversaire est inconnu — un artifice de calcul déjà nommé
+ailleurs (bug Infinity ci-dessus), mais qui n'avait pas été audité dans ce composant précis.
+`niveau`/`message`/`rythmeRequis` restaient corrects (protégés par `anniversaireConnu` en
+interne à `prediction.ts`) : bug d'affichage confiné à cette seule phrase, pas une confusion dans
+le calcul du statut. **Corrigé (Option A, ciblée)** : nouveau champ `StatutPrediction.anniversaireConnu`
+exposé (aucune logique changée dans `prediction.ts`), transmis à `ProjectionChart.tsx`, qui affiche
+désormais « date inconnue » dans ce cas. Test dédié ajouté (`prediction.test.ts`). **Dette tracée**
+dans `docs/validation.md` (nouvelle section « Dette tracée ») : le champ brut
+`StatutPrediction.joursRestants` reste fragile pour tout futur consommateur qui le lirait
+directement sans vérifier `anniversaireConnu` — Option B (type discriminé façon `RythmeRequis`)
+en backlog si un autre endroit y retombe un jour, pas urgent aujourd'hui.
+
+80 tests verts, tsc propre. Vérifié manuellement dans le navigateur sur 3 profils (anniversaire
+connu futur, inconnu, réellement dépassé) : les trois textes désormais cohérents avec leur badge.
+Commit `505473a`.
+
 ## PROCHAINE ACTION
 
-Plus rien en urgence côté garde-fous ni côté cohérence de profil. Priorité suivante : le dernier
-item §11.A encore ouvert — la transparence du calcul (panneau « comment on arrive à ce chiffre » :
-A+B+C, heures comptées vs écartées ; le moteur pur fournit déjà tout ce qu'il faut, rien à changer
-côté engine/). Ensuite, sans urgence : barème CSG figé à « normal » (non bloquant), PWA. Détail
-complet de ces items et du reste : « Ensuite (backlog) » ci-dessous.
+Plus rien en urgence côté garde-fous, cohérence de profil, ni transparence du calcul — les items
+§11.A sont tous traités. Aucune priorité imposée pour la suite : à choisir parmi le backlog
+ci-dessous selon ce qui te semble le plus utile (candidats les moins coûteux : barème CSG figé,
+PWA ; le plus structurant côté partage : déploiement bêta). Détail complet : « Ensuite (backlog) ».
 
 ## Ensuite (backlog)
 
 - **Rythme mensuel requis fini mais absurde** (délai non nul mais minuscule → des milliers de
-  h/mois) : différé volontairement lors du correctif ci-dessus. Nécessite un seuil de
+  h/mois) : différé volontairement lors du correctif Infinity. Nécessite un seuil de
   plausibilité non réglementaire (décision produit, pas une donnée sourcée) avant d'ajouter une
   3e raison `rythme_hors_limite` au type discriminé `RythmeRequis` (guidé par le compilateur).
   Consigné aussi dans `validation.md`.
+- **`StatutPrediction.joursRestants` (champ brut) fragile pour un futur consommateur direct** —
+  peut valoir 0 sans vraie échéance (fenêtre sentinelle anniversaire inconnu). Protégé partout où
+  il est déjà consommé aujourd'hui (`prediction.ts` en interne, `ProjectionChart.tsx` depuis ce
+  lot) via `anniversaireConnu`, mais rien n'empêche structurellement un futur endroit du code de
+  l'ignorer. Solution systémique (type discriminé façon `RythmeRequis`) en backlog si ça se
+  reproduit ailleurs, consigné dans `validation.md` (« Dette tracée »).
 - Réadmission allongée jamais confrontée à source externe (le simulateur officiel ne modélise pas l'allongement → attendre une vraie notif de testeur, consigné validation.md).
 - Barème CSG figé à « normal » en dur dans l'onboarding (sous-estime le net pour barème réduit, non bloquant).
-- Transparence du calcul.
 - PWA.
 - Maintenance config mensuelle (déjà notée CLAUDE.md).
 - **Déploiement bêta** : l'app ne tourne qu'en `npm run dev` — rien à partager tant qu'elle n'est
