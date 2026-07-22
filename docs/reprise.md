@@ -8,7 +8,7 @@ Mémoire durable à consulter au démarrage : `CLAUDE.md`, `docs/SPEC.md`, `docs
 
 Deux devoirs sacrés : (1) ne jamais perdre les données ; (2) ne jamais afficher un chiffre faux (ni faux « feu vert » rassurant, ni faux « Bloqué », ni faux montant, ni fausse alerte, ni valeur sentinelle brute).
 
-État : les deux devoirs sacrés sont tenus, la bêta a son socle. 59 tests verts, tsc propre, git à jour (dernier commit doc 7d27668).
+État : les deux devoirs sacrés sont tenus, la bêta a son socle. 62 tests verts, tsc propre, git à jour (dernier commit `e517ac2`, correctif Infinity).
 
 ## Fait dans les sessions récentes
 
