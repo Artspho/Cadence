@@ -55,7 +55,8 @@ const profilSchema = z.object({
   situation: z.enum(["premiere_admission", "readmission"]),
   alsaceMoselle: z.boolean().optional(),
   baremeCSG: z.enum(["normal", "reduit"]).optional(),
-  activiteHorsAnnexe10: z.boolean().optional(),
+  activiteHorsAnnexe10: z.boolean().optional(), // déprécié, cf. types/index.ts — jamais écrit, lu en repli seulement
+  regimeDeclare: z.enum(["annexe10_pur", "mixte", "inconnu"]).optional(),
 });
 
 const donneesAppSchema = z.object({

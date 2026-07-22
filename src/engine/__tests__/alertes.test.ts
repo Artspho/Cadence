@@ -71,4 +71,25 @@ describe("detecterAlertes", () => {
     expect(alertesAvecSignalement[0].niveau).toBe("critique");
     expect(codes(alertesAvecSignalement)).not.toContain("plafond_enseignement");
   });
+
+  it("regimeDeclare 'mixte' et 'inconnu' suivent EXACTEMENT le même chemin : uniquement situation_mixte", () => {
+    const contrats = [contrat({ date: "2026-06-01", type: "enseignement", typeRemuneration: "heures", nbHeures: 90, etablissementAgree: true, enRapportAvecMetier: true })];
+
+    const pMixte = profil({ dateNaissance: "1990-01-01", dateAnniversaire: "2026-12-31", regimeDeclare: "mixte" });
+    const alertesMixte = detecterAlertes(pMixte, contrats, [], franceTravailConfig, "2026-06-15");
+    expect(alertesMixte).toHaveLength(1);
+    expect(alertesMixte[0].code).toBe("situation_mixte");
+
+    const pInconnu = profil({ dateNaissance: "1990-01-01", dateAnniversaire: "2026-12-31", regimeDeclare: "inconnu" });
+    const alertesInconnu = detecterAlertes(pInconnu, contrats, [], franceTravailConfig, "2026-06-15");
+    expect(alertesInconnu).toEqual(alertesMixte);
+  });
+
+  it("anti-faux-positif : artiste-enseignant avec regimeDeclare 'annexe10_pur' explicite reste dans le périmètre (pas situation_mixte)", () => {
+    const p = profil({ dateNaissance: "1990-01-01", dateAnniversaire: "2026-12-31", regimeDeclare: "annexe10_pur" });
+    const contrats = [contrat({ date: "2026-06-01", type: "enseignement", typeRemuneration: "heures", nbHeures: 90, etablissementAgree: true, enRapportAvecMetier: true })];
+    const alertes = detecterAlertes(p, contrats, [], franceTravailConfig, "2026-06-15");
+    expect(codes(alertes)).not.toContain("situation_mixte");
+    expect(codes(alertes)).toContain("plafond_enseignement");
+  });
 });

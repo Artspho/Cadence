@@ -466,7 +466,7 @@ Phrases courtes, voix active, du point de vue de l'utilisateur. Exemples : « Tu
 - **La saisie manuelle est un frein d'adoption.** La valeur suppose que l'utilisateur entre chaque cachet ; en pratique il décroche. L'import PDF atténue mais reste faillible, et vise le bulletin alors que la pièce qui fait foi est l'**AEM**.
 - **Projection linéaire trompeuse.** Extrapoler une pente moyenne ignore la saisonnalité (festivals l'été, creux ensuite) → peut rassurer à tort.
 - **Risque de faux « feu vert ».** Heures oubliées ou cas hors périmètre → statut « Sécurité » sur lequel l'utilisateur se fie alors qu'il perd ses droits. Le disclaimer ne suffit pas.
-- **Profils mixtes (A10 + A8 + RG) non détectés.** Résultats faux « sans le savoir » ; rien ne le signale aujourd'hui.
+- **Profils mixtes (A10 + A8 + RG) : détection par auto-déclaration, pas automatique.** Le garde-fou (`regimeDeclare` sur `Profil`, §11.A) neutralise le risque pour qui répond honnêtement à l'onboarding/« À propos » (« mixte » et « inconnu »/je-ne-sais-pas suivent le même chemin, conservateur) ; rien n'est déduit des contrats eux-mêmes, donc un profil qui répond « non » à tort resterait un faux « sans le savoir ». Détection automatique = hors périmètre (§11.C).
 - **Alertes passives.** En SPA locale, elles se calculent à l'ouverture ; une vraie alerte devrait arriver avant l'échéance, app fermée (→ backend).
 - **Onboarding / état vide non spécifiés**, alors que c'est le premier écran vu.
 - **Config sans péremption.** Rien ne signale que les règles ont vieilli ; la formule de franchise salaires reste en `TODO` (non transcrite de façon fiable).

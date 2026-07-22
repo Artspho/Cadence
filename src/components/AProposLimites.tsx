@@ -1,5 +1,6 @@
 import { estPerime, franceTravailConfig, joursDepuisMiseAJourConfig } from "../config/franceTravailConfig";
 import { EMAIL_FEEDBACK, construireLienFeedback } from "../config/contact";
+import { regimeEffectif } from "../lib/profilHorsPerimetre";
 import type { Profil } from "../types";
 
 interface AProposLimitesProps {
@@ -14,26 +15,39 @@ export function AProposLimites({ dateDuJour, profil, onModifierProfil }: APropos
   // seuil de durée deviné) à dateDuJour — même fonction que TopBar.tsx, une seule source de
   // vérité pour la péremption, plus jamais deux logiques qui divergent.
   const perime = estPerime(new Date(dateDuJour), franceTravailConfig.meta.valableJusquau);
+  const regime = regimeEffectif(profil);
 
   return (
     <div className="space-y-6 max-w-[720px]">
       <section>
         <h2 className="font-display text-lg font-medium mb-2">Ton profil</h2>
         <div className="bg-surface border border-line rounded-card p-5">
-          <label className="flex items-start gap-2 text-sm text-muted">
-            <input
-              type="checkbox"
-              className="mt-0.5"
-              checked={Boolean(profil.activiteHorsAnnexe10)}
-              onChange={(e) => onModifierProfil({ ...profil, activiteHorsAnnexe10: e.target.checked })}
-            />
-            <span>
-              Cette année, as-tu été payé pour autre chose que des concerts / prestations d'artiste&nbsp;? Par exemple du travail technique sur un spectacle
-              (son, lumière, régie…), ou un emploi salarié classique hors spectacle.
-            </span>
-          </label>
-          {profil.activiteHorsAnnexe10 && (
-            <p className="text-xs text-amber mt-2">Tant que c'est coché, le tableau de bord, l'historique et le simulateur n'affichent aucune estimation.</p>
+          <span className="block text-xs uppercase tracking-[.03em] text-muted mb-2">
+            Cette année, as-tu été payé pour autre chose que des concerts / prestations d'artiste&nbsp;? Par exemple du travail technique sur un spectacle
+            (son, lumière, régie…), ou un emploi salarié classique hors spectacle.
+          </span>
+          <div className="flex gap-2">
+            <button
+              onClick={() => onModifierProfil({ ...profil, regimeDeclare: "annexe10_pur" })}
+              className={`flex-1 rounded-lg border px-3 py-2 text-sm text-left transition-colors ${regime === "annexe10_pur" ? "border-mint bg-mint/10" : "border-line bg-surface-2"}`}
+            >
+              Non
+            </button>
+            <button
+              onClick={() => onModifierProfil({ ...profil, regimeDeclare: "mixte" })}
+              className={`flex-1 rounded-lg border px-3 py-2 text-sm text-left transition-colors ${regime === "mixte" ? "border-amber bg-amber/10" : "border-line bg-surface-2"}`}
+            >
+              Oui
+            </button>
+            <button
+              onClick={() => onModifierProfil({ ...profil, regimeDeclare: "inconnu" })}
+              className={`flex-1 rounded-lg border px-3 py-2 text-sm text-left transition-colors ${regime === "inconnu" ? "border-amber bg-amber/10" : "border-line bg-surface-2"}`}
+            >
+              Je ne sais pas
+            </button>
+          </div>
+          {regime !== "annexe10_pur" && (
+            <p className="text-xs text-amber mt-2">Tant que c'est signalé, le tableau de bord, l'historique et le simulateur n'affichent aucune estimation.</p>
           )}
         </div>
       </section>

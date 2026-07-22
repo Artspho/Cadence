@@ -15,7 +15,7 @@ export function Onboarding({ onTerminer }: OnboardingProps) {
   const [dateAnniversaireConnue, setDateAnniversaireConnue] = useState(true);
   const [dateAnniversaire, setDateAnniversaire] = useState("");
   const [alsaceMoselle, setAlsaceMoselle] = useState(false);
-  const [activiteHorsAnnexe10, setActiviteHorsAnnexe10] = useState(false);
+  const [regimeDeclare, setRegimeDeclare] = useState<Profil["regimeDeclare"]>("annexe10_pur");
 
   const peutValider = dateNaissance.length > 0 && (!dateAnniversaireConnue || dateAnniversaire.length > 0);
 
@@ -26,7 +26,7 @@ export function Onboarding({ onTerminer }: OnboardingProps) {
       situation,
       alsaceMoselle,
       baremeCSG: "normal",
-      activiteHorsAnnexe10,
+      regimeDeclare,
     });
   }
 
@@ -94,14 +94,31 @@ export function Onboarding({ onTerminer }: OnboardingProps) {
         </label>
 
         <div>
-          <label className="flex items-start gap-2 text-sm text-muted">
-            <input type="checkbox" className="mt-0.5" checked={activiteHorsAnnexe10} onChange={(e) => setActiviteHorsAnnexe10(e.target.checked)} />
-            <span>
-              Cette année, as-tu été payé pour autre chose que des concerts / prestations d'artiste&nbsp;? Par exemple du travail technique sur un spectacle
-              (son, lumière, régie…), ou un emploi salarié classique hors spectacle.
-            </span>
-          </label>
-          {activiteHorsAnnexe10 && (
+          <span className="block text-xs uppercase tracking-[.03em] text-muted mb-2">
+            Cette année, as-tu été payé pour autre chose que des concerts / prestations d'artiste&nbsp;? Par exemple du travail technique sur un spectacle
+            (son, lumière, régie…), ou un emploi salarié classique hors spectacle.
+          </span>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setRegimeDeclare("annexe10_pur")}
+              className={`flex-1 rounded-lg border px-3 py-2 text-sm text-left transition-colors ${regimeDeclare === "annexe10_pur" ? "border-mint bg-mint/10" : "border-line bg-surface-2"}`}
+            >
+              Non
+            </button>
+            <button
+              onClick={() => setRegimeDeclare("mixte")}
+              className={`flex-1 rounded-lg border px-3 py-2 text-sm text-left transition-colors ${regimeDeclare === "mixte" ? "border-amber bg-amber/10" : "border-line bg-surface-2"}`}
+            >
+              Oui
+            </button>
+            <button
+              onClick={() => setRegimeDeclare("inconnu")}
+              className={`flex-1 rounded-lg border px-3 py-2 text-sm text-left transition-colors ${regimeDeclare === "inconnu" ? "border-amber bg-amber/10" : "border-line bg-surface-2"}`}
+            >
+              Je ne sais pas
+            </button>
+          </div>
+          {regimeDeclare !== "annexe10_pur" && (
             <p className="text-xs text-amber mt-2">Cadence ne pourra pas t'afficher d'estimation dans ce cas — tu pourras revenir sur cette réponse plus tard, dans « À propos ».</p>
           )}
         </div>

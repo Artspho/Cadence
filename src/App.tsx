@@ -25,6 +25,7 @@ import { AvertissementHorsPerimetre } from "./components/AvertissementHorsPerime
 import { ConfirmationImport } from "./components/ConfirmationImport";
 import { DashboardVide } from "./components/DashboardVide";
 import { dashboardEstVide } from "./lib/dashboardVide";
+import { profilHorsPerimetre } from "./lib/profilHorsPerimetre";
 
 const dateDuJour = new Date().toISOString().slice(0, 10);
 
@@ -148,7 +149,7 @@ export default function App() {
               neuf. On ne les fait pas fuiter via ce chip, visible sur tous les onglets. L'alerte
               "situation_mixte" reste affichée dans tous les cas : elle est vraie indépendamment
               du nombre de contrats. */}
-          <AlertCenterResume alertes={dashboardEstVide(donnees.contrats) && !profil.activiteHorsAnnexe10 ? [] : (calculs?.alertes ?? [])} />
+          <AlertCenterResume alertes={dashboardEstVide(donnees.contrats) && !profilHorsPerimetre(profil) ? [] : (calculs?.alertes ?? [])} />
           <div className="flex items-center gap-2 text-xs">
             <button onClick={exporter} className="px-3 py-1.5 rounded-full border border-line text-muted hover:text-ink transition-colors">
               Exporter mes données (JSON)
@@ -184,7 +185,7 @@ export default function App() {
 
         {onglet === "dashboard" &&
           calculs &&
-          (profil.activiteHorsAnnexe10 ? (
+          (profilHorsPerimetre(profil) ? (
             <AvertissementHorsPerimetre />
           ) : dashboardEstVide(donnees.contrats) ? (
             <DashboardVide onAllerVersContrats={() => setOnglet("contrats")} />
@@ -206,11 +207,11 @@ export default function App() {
           <ImportBulletins profil={profil} config={franceTravailConfig} decompteActuel={calculs.decompte} onImporterContrat={ajouterContrat} />
         )}
 
-        {onglet === "historique" && calculs && (profil.activiteHorsAnnexe10 ? <AvertissementHorsPerimetre /> : <Historique exercices={calculs.exercices} />)}
+        {onglet === "historique" && calculs && (profilHorsPerimetre(profil) ? <AvertissementHorsPerimetre /> : <Historique exercices={calculs.exercices} />)}
 
         {onglet === "simulateur" &&
           calculs &&
-          (profil.activiteHorsAnnexe10 ? (
+          (profilHorsPerimetre(profil) ? (
             <AvertissementHorsPerimetre />
           ) : (
             <Simulateur profil={profil} contrats={donnees.contrats} periodes={donnees.periodes} config={franceTravailConfig} dateDuJour={dateDuJour} decompteActuel={calculs.decompte} />

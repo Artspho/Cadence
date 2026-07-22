@@ -8,6 +8,7 @@ import type { FranceTravailConfig } from "../config/franceTravailConfig";
 import { calculerDecompteHeures } from "./decompteHeures";
 import { calculerFenetreReference } from "./periodeReference";
 import { calculerStatutPrediction } from "./prediction";
+import { profilHorsPerimetre } from "../lib/profilHorsPerimetre";
 
 const SEUIL_APPROCHE_CUMUL_ENS_FORMATION = 0.9; // 90 % du plafond de 338 h : avertir avant d'y être
 
@@ -17,7 +18,7 @@ export function detecterAlertes(profil: Profil, contrats: Contrat[], periodes: P
   // renvoyée à côté, puisqu'elles reposeraient toutes sur un décompte/montant
   // Annexe 10 qui n'est plus fiable pour ce profil (devoir sacré n°2 : jamais
   // de faux feu vert, même partiel).
-  if (profil.activiteHorsAnnexe10) {
+  if (profilHorsPerimetre(profil)) {
     return [
       {
         code: "situation_mixte",

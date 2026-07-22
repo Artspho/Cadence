@@ -50,7 +50,15 @@ export interface Profil {
   situation: "premiere_admission" | "readmission";
   alsaceMoselle?: boolean; // cotisation locale (AJ nette)
   baremeCSG?: "normal" | "reduit"; // taux CSG applicable
-  activiteHorsAnnexe10?: boolean; // garde-fou "situation mixte" : signalé par l'utilisateur, jamais déduit
+  /** @deprecated Remplacé par `regimeDeclare`. Conservé en lecture seule pour ne jamais faire
+   * régresser un profil déjà enregistré (devoir sacré n°1) : `lib/profilHorsPerimetre.ts` le lit
+   * en repli quand `regimeDeclare` est absent. Plus jamais écrit par l'UI. */
+  activiteHorsAnnexe10?: boolean;
+  // Garde-fou "situation mixte" : signalé par l'utilisateur, jamais déduit des contrats.
+  // "annexe10_pur" = artiste (+ enseignement/formation, déjà modélisés) uniquement.
+  // "mixte" = présence de technicien (Annexe 8) ou d'un emploi hors spectacle au régime général.
+  // "inconnu" ("je ne sais pas") traité comme hors périmètre par prudence (au moindre doute → FT).
+  regimeDeclare?: "annexe10_pur" | "mixte" | "inconnu";
 }
 
 // ── Historique : un exercice = un cycle de 12 mois entre deux dates anniversaire ──

@@ -92,7 +92,7 @@ src/
 - ✅ Design tokens (Tailwind + `index.css`) alignés sur la maquette.
 - ✅ `engine/` complet et testé : `periodeReference`, `decompteHeures`, `salaireReference`,
   `areBrute` (+ `calculerAJBrutePourFenetre`), `areNette`, `prediction`, `alertes`, `cycles`
-  — **62 tests Vitest**, tous verts (dont 7 sur `storage/`, 5 sur `config/`, 2 sur `lib/`).
+  — **71 tests Vitest**, tous verts (dont 7 sur `storage/`, 5 sur `config/`, 9 sur `lib/`).
 - ✅ `storage/`, `components/`, câblage `App.tsx` — bêta fonctionnelle de bout en bout
   (onboarding → tableau de bord → contrats → import PDF → historique → simulateur → à propos).
 - ✅ **Bug corrigé** : un profil neuf sans date anniversaire connue n'affiche plus jamais le
@@ -100,11 +100,21 @@ src/
 - ✅ **Réadmission allongée branchée** : `calculerAJBrutePourFenetre` décide seule standard vs
   allongée à partir de `fenetre.tranchesReadmission`, câblée dans `App.tsx` et `Simulateur.tsx`
   (se rabat sur le standard sans planter tant que le SMIC horaire n'est pas renseigné).
-- ✅ **Garde-fou « situation mixte » implémenté** : question posée à l'onboarding (avant tout
-  premier affichage d'un chiffre) + section « Ton profil » modifiable dans l'onglet À propos ;
-  alerte `situation_mixte` exclusive dans `detecterAlertes` ; écran d'avertissement unique
-  (`AvertissementHorsPerimetre.tsx`) remplaçant Dashboard/Historique/Simulateur tant que le
-  profil est signalé hors Annexe 10 pur. Contrats et Import PDF restent utilisables normalement.
+- ✅ **Garde-fou « situation mixte » étendu à trois états** : `Profil.regimeDeclare:
+  "annexe10_pur" | "mixte" | "inconnu"` (remplace l'ancien booléen `activiteHorsAnnexe10`, gardé
+  **déprécié** en lecture seule — jamais réécrit par l'UI). Question posée à l'onboarding (avant
+  tout premier affichage d'un chiffre, ciblée technicien A8 / emploi hors spectacle — **jamais**
+  l'enseignement, qui reste cœur de cible A10 pur) + section « Ton profil » modifiable dans
+  l'onglet À propos, désormais 3 choix (Non / Oui / Je ne sais pas) au lieu d'une case à cocher.
+  « inconnu » (je-ne-sais-pas) suit **exactement** le même chemin que « mixte » (conservateur, au
+  moindre doute → France Travail) : même alerte `situation_mixte` exclusive dans `detecterAlertes`
+  (via le prédicat pur `profilHorsPerimetre()`, `lib/profilHorsPerimetre.ts` — seul import
+  `lib/` toléré dans `engine/`, fonction sans React/DOM), même écran unique
+  (`AvertissementHorsPerimetre.tsx`) remplaçant Dashboard/Historique/Simulateur. **Migration
+  (devoir sacré n°1) :** `profilHorsPerimetre()`/`regimeEffectif()` lisent `activiteHorsAnnexe10`
+  en repli quand `regimeDeclare` est absent — aucun profil déjà enregistré ne change de
+  comportement au prochain chargement (testé explicitement, cf. `profilHorsPerimetre.test.ts`).
+  Contrats et Import PDF restent utilisables normalement.
 - 🔶 **Limite connue :** `calculerAJBrutePourFenetre` n'est **pas** câblée dans `engine/cycles.ts`
   — l'historique des exercices passés ignore `tranchesReadmission` et calcule toujours l'AJ brute
   avec les diviseurs standard (détail dans `docs/SPEC.md` §10).
