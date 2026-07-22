@@ -69,9 +69,10 @@ complet du Dashboard après confirmation d'une date anniversaire). 79 tests vert
 ## PROCHAINE ACTION
 
 Plus rien en urgence côté garde-fous ni côté cohérence de profil. Priorité suivante : le dernier
-item §11.A encore ouvert — transparence du calcul. Ensuite, sans urgence : barème CSG figé à
-« normal » (non bloquant), PWA. Détail complet de ces items et du reste : « Ensuite (backlog) »
-ci-dessous.
+item §11.A encore ouvert — la transparence du calcul (panneau « comment on arrive à ce chiffre » :
+A+B+C, heures comptées vs écartées ; le moteur pur fournit déjà tout ce qu'il faut, rien à changer
+côté engine/). Ensuite, sans urgence : barème CSG figé à « normal » (non bloquant), PWA. Détail
+complet de ces items et du reste : « Ensuite (backlog) » ci-dessous.
 
 ## Ensuite (backlog)
 
@@ -85,6 +86,14 @@ ci-dessous.
 - Transparence du calcul.
 - PWA.
 - Maintenance config mensuelle (déjà notée CLAUDE.md).
+- **Déploiement bêta** : l'app ne tourne qu'en `npm run dev` — rien à partager tant qu'elle n'est
+  pas déployée. C'est une SPA statique (Vite + localStorage, pas de backend) → `build` dist/ +
+  hébergeur statique gratuit (Netlify / Vercel / Cloudflare Pages) → URL partageable. Lot à cadrer.
+- **Note testeurs (devoir n°1)** : données en `localStorage`, propres à chaque navigateur/appareil ;
+  vidage de cache = perte. Dire aux testeurs d'exporter leur JSON régulièrement (= leur sauvegarde
+  ET le retour d'usage qui te revient). Prévoir aussi, avant d'élargir au-delà du cercle d'amis, une
+  courte page « à propos » (ce que l'app fait / ne fait pas / données restent chez l'utilisateur) —
+  mentions légales absentes, limite déjà notée au SPEC §10 (« Cadre légal léger »).
 
 ## Méthode à conserver
 

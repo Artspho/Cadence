@@ -238,10 +238,12 @@ src/
   échéance connue : la revalorisation SMIC/PMSS du 1er janvier suivant.
 
 **Prochaines pistes** : plus aucun ❌ confirmé dans la liste (le bug Infinity est corrigé
-ci-dessus). Sans ordre imposé : les deux limites connues 🔶 ci-dessus, le `rythme_hors_limite`
-différé (backlog `docs/reprise.md`/`docs/validation.md`), ou les autres items du §11.A du SPEC
-encore ouverts (PWA réellement installable, alignement visuel fin sur `docs/maquette_dashboard.html`,
-transparence du calcul).
+ci-dessus), et la cohérence de profil est tenue par construction. **Priorité suivante : le
+dernier item §11.A encore ouvert — la transparence du calcul** (panneau « comment on arrive à ce
+chiffre » : A+B+C, heures comptées vs écartées ; le moteur pur fournit déjà tout ce qu'il faut).
+Sinon, sans urgence : les deux limites connues 🔶 ci-dessus, le `rythme_hors_limite` différé
+(backlog `docs/reprise.md`/`docs/validation.md`), PWA réellement installable, alignement visuel
+fin sur `docs/maquette_dashboard.html`.
 
 ---
 
