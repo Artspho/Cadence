@@ -1,7 +1,7 @@
 // Module prédictif : à ce rythme, les 507 h seront-elles atteintes avant
 // la date anniversaire ? Alimente le graphique de projection (le héros du
 // tableau de bord) et le statut feu vert / feu rouge.
-import type { Contrat, PeriodeAssimilee, Profil, StatutPrediction } from "../types";
+import type { Contrat, PeriodeAssimilee, Profil, RythmeRequis, StatutPrediction } from "../types";
 import type { FranceTravailConfig } from "../config/franceTravailConfig";
 import { ajouterJours, dansIntervalle, diffJours } from "./dateUtils";
 import { calculerDecompteHeures } from "./decompteHeures";
@@ -39,7 +39,14 @@ export function calculerStatutPrediction(
   const rythmeMensuelActuel = (heuresActuelles / joursEcoules) * JOURS_PAR_MOIS;
 
   const joursRestants = Math.max(0, diffJours(dateCap, fenetre.dateFin));
-  const rythmeMensuelRequis = joursRestants > 0 ? (heuresRestantes / joursRestants) * JOURS_PAR_MOIS : heuresRestantes > 0 ? Infinity : 0;
+  // Plus aucun Infinity ici : quand le délai est à zéro, on nomme la vraie cause (donnée
+  // manquante vs échéance réellement dépassée) plutôt que de renvoyer une sentinelle brute.
+  const rythmeRequis: RythmeRequis =
+    joursRestants > 0
+      ? { atteignable: true, heuresParMois: (heuresRestantes / joursRestants) * JOURS_PAR_MOIS }
+      : heuresRestantes > 0
+        ? { atteignable: false, raison: anniversaireConnu ? "delai_expire" : "anniversaire_inconnu" }
+        : { atteignable: true, heuresParMois: 0 };
 
   let dateFranchissementProjetee: string | null = null;
   if (heuresRestantes > 0 && rythmeMensuelActuel > 0) {
@@ -73,7 +80,7 @@ export function calculerStatutPrediction(
     dateAnniversaire: fenetre.dateFin,
     joursRestants,
     rythmeMensuelActuel,
-    rythmeMensuelRequis,
+    rythmeRequis,
     dateFranchissementProjetee,
     eligibleRattrapage,
     message,

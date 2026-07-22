@@ -18,14 +18,32 @@ Deux devoirs sacrés : (1) ne jamais perdre les données ; (2) ne jamais affiche
 - Bouton feedback : `mailto:` vers benoit.zahra@orange.fr, corps neutre sans aucune donnée utilisateur, `config/contact.ts`. Adresse null → rien affiché.
 - État vide du Dashboard : déclencheur `contrats.length === 0` (PAS `decompte.total === 0` — un profil enseignement-seul garde un dashboard normal). Masque carte allocation (fini le faux 44 €), graphe, AlertCenter + chip résumé (finie la fausse alerte « 507 h » sur compte neuf). Composant `DashboardVide`, prédicat `dashboardEstVide()` dans `lib/`.
 
+## Fait (bug Infinity corrigé)
+
+`StatutPrediction.rythmeMensuelRequis: number` (pouvait valoir `Infinity`) remplacé par
+`rythmeRequis: RythmeRequis`, type discriminé à exhaustivité forcée par le compilateur :
+`{ atteignable: true; heuresParMois: number }` ou `{ atteignable: false; raison:
+"anniversaire_inconnu" | "delai_expire" }`. Distinction volontaire des deux raisons (devoir
+n°2) : `anniversaire_inconnu` = donnée manquante (profil neuf), jamais présentée comme un délai
+expiré ; `delai_expire` = anniversaire connu et réellement dépassé. `alertes.ts` n'émet plus
+aucune alerte de rythme quand `anniversaire_inconnu` (rien n'est imminent). `Dashboard.tsx` a un
+switch exhaustif (`libelleRythmeRequis`) qui casse à la compilation si une raison est ajoutée
+sans être traitée. Tests dédiés ajoutés (prediction.test.ts, alertes.test.ts) vérifiant
+explicitement l'absence de la chaîne « Infinity ». 62 tests verts, détail : SPEC §6.6,
+`CLAUDE.md` « État actuel », `validation.md` (section « Hors périmètre de validation externe »).
+
 ## PROCHAINE ACTION
 
-Diagnostiquer/corriger le bug Infinity. Le Dashboard peut afficher « Vise environ Infinity h/mois ». Cause tracée (à la lecture, pas par test dédié) : Infinity explicite dans `engine/prediction.ts`, probablement une sentinelle « rythme inatteignable ». `Dashboard.tsx` l'intercepte, mais `alertes.ts` la laisse fuiter jusqu'à l'écran. Règle en jeu = devoir n°2 (une valeur sentinelle du moteur fuit jusqu'à l'utilisateur au lieu d'être traduite en clair).
-
-La tâche devra : (a) décider comment le moteur signale proprement un rythme inatteignable — Infinity est peut-être une mauvaise sentinelle puisqu'un consommateur sur deux a oublié de l'intercepter ; un statut explicite serait plus sûr ; (b) garantir que TOUS les consommateurs (Dashboard + alertes + autres) traduisent ce signal. Investigation avant correction.
+Aucune urgence identifiée après ce correctif — voir « Ensuite (backlog) » ci-dessous pour la suite,
+sans ordre imposé.
 
 ## Ensuite (backlog)
 
+- **Rythme mensuel requis fini mais absurde** (délai non nul mais minuscule → des milliers de
+  h/mois) : différé volontairement lors du correctif ci-dessus. Nécessite un seuil de
+  plausibilité non réglementaire (décision produit, pas une donnée sourcée) avant d'ajouter une
+  3e raison `rythme_hors_limite` au type discriminé `RythmeRequis` (guidé par le compilateur).
+  Consigné aussi dans `validation.md`.
 - Réadmission allongée jamais confrontée à source externe (le simulateur officiel ne modélise pas l'allongement → attendre une vraie notif de testeur, consigné validation.md).
 - Barème CSG figé à « normal » en dur dans l'onboarding (sous-estime le net pour barème réduit, non bloquant).
 - Pas de revalidation post-onboarding (corriger date/situation impossible sans éditer le JSON).

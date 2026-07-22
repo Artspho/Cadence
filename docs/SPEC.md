@@ -308,6 +308,14 @@ Afficher clairement « net estimé » avec avertissement (l'AJ réelle peut êtr
 Fonction pure `(profil, contrats, periodes, dateDuJour, config) → StatutPrediction` :
 - Cumule `heuresPour507`, calcule le temps restant jusqu'à l'anniversaire, projette le rythme actuel.
 - Renvoie : **`securite`** / **`alerte`** (+ heures manquantes par mois) / **`bloque`** (+ signale l'éligibilité potentielle à la **clause de rattrapage** si 338–506 h).
+- Le rythme mensuel requis (`rythmeRequis`) est un type discriminé, jamais un `number` brut pouvant
+  valoir `Infinity` : `{ atteignable: true; heuresParMois: number }` ou `{ atteignable: false;
+  raison: "anniversaire_inconnu" | "delai_expire" }`. Distinction volontaire entre les deux raisons
+  (devoir sacré n°2) : `anniversaire_inconnu` = donnée manquante (profil neuf), jamais présentée
+  comme une échéance dépassée ; `delai_expire` = anniversaire connu et réellement dépassé (niveau
+  `bloque`). Le cas « rythme fini mais humainement absurde » (délai non nul mais minuscule) n'a
+  volontairement pas de 3e raison dédiée — nécessiterait un seuil non réglementaire (décision
+  produit), différé au backlog (`reprise.md`).
 
 ---
 

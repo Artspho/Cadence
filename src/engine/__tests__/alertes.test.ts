@@ -37,6 +37,14 @@ describe("detecterAlertes", () => {
     expect(codes(alertes)).toContain("eligible_rattrapage");
   });
 
+  it("profil neuf sans date anniversaire connue : aucune alerte de rythme (rien n'est imminent), et jamais de fuite Infinity", () => {
+    const p = profil({ dateAnniversaire: "", situation: "premiere_admission" });
+    const alertes = detecterAlertes(p, [], [], franceTravailConfig, "2026-06-01");
+    expect(codes(alertes)).not.toContain("rythme_insuffisant");
+    expect(codes(alertes)).not.toContain("anniversaire_imminent");
+    expect(JSON.stringify(alertes)).not.toMatch(/Infinity/);
+  });
+
   it("ne signale rien quand l'objectif est confortablement atteint", () => {
     const p = profil({ dateAnniversaire: "2026-12-31", dateNaissance: "1990-01-01" });
     const contrats = [contrat({ date: "2026-02-01", nbCachets: 50 })]; // 600 h

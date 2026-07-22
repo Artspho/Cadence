@@ -35,15 +35,20 @@ export function detecterAlertes(profil: Profil, contrats: Contrat[], periodes: P
   const decompte = calculerDecompteHeures(contrats, periodes, profil, config, fenetre);
   const prediction = calculerStatutPrediction(profil, contrats, periodes, config, dateDuJour);
 
-  if (prediction.niveau === "alerte") {
+  if (prediction.niveau === "alerte" && prediction.rythmeRequis.atteignable) {
     alertes.push({
       code: "rythme_insuffisant",
       niveau: "attention",
       titre: "Rythme insuffisant",
       message: `À ce rythme, tu n'atteindras pas ${prediction.seuilHeures} h avant le ${prediction.dateAnniversaire}. Il manque ${Math.ceil(prediction.heuresRestantes)} h.`,
-      actionSuggeree: `Vise environ ${Math.ceil(prediction.rythmeMensuelRequis)} h/mois d'ici l'échéance pour rattraper le rythme.`,
+      actionSuggeree: `Vise environ ${Math.ceil(prediction.rythmeRequis.heuresParMois)} h/mois d'ici l'échéance pour rattraper le rythme.`,
     });
   }
+  // prediction.rythmeRequis.atteignable === false ET niveau === "alerte" signifie forcément
+  // raison "anniversaire_inconnu" (le cas "delai_expire" bascule toujours en niveau "bloque",
+  // cf. prediction.ts) : rien n'est "imminent" pour un profil dont la date anniversaire est
+  // inconnue, donc aucune alerte de rythme ici — l'invite à renseigner la date vit dans
+  // Dashboard.tsx (branche atteignable:false), pas dans une alerte.
 
   if (prediction.niveau === "bloque") {
     alertes.push({

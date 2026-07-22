@@ -116,6 +116,16 @@ résultat directement, cas #2 et #3 transformés en tests permanents (`areNette.
   le net tombe pile sur ce montant. Le rapprochement entre 62,00 € et le calcul « SMIC horaire ×
   35/7 » ci-dessus (61,55 €) reste toutefois à éclaircir, cf. « À valider ».
 
+### Hors périmètre de validation externe (décision produit en attente)
+
+- **Rythme mensuel requis fini mais humainement absurde** (`prediction.ts`, ex. délai non nul
+  mais minuscule → des milliers de h/mois) : **pas un sujet de « règle prouvée » vs « code
+  conforme »** — aucun formule officielle n'existe à confronter, c'est un seuil de plausibilité
+  à choisir (décision produit, jamais une valeur réglementaire). Volontairement différé lors de
+  la correction du bug Infinity de `rythmeRequis` (cf. SPEC §6.6, `CLAUDE.md` « État actuel ») :
+  seules deux raisons existent aujourd'hui dans le type discriminé (`anniversaire_inconnu`,
+  `delai_expire`), pas de 3e raison `rythme_hors_limite`. À reprendre : `docs/reprise.md`.
+
 ### À valider
 
 - **Réadmission allongée (fenêtre > 365 j)** — tourne dans le code depuis le commit `fda6b8e`

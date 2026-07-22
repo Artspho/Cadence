@@ -152,6 +152,14 @@ export interface AJNetteResultat {
 
 export type NiveauStatut = "securite" | "alerte" | "bloque";
 
+// Raison pour laquelle un rythme mensuel requis ne peut pas être calculé :
+// - "anniversaire_inconnu" : donnée manquante (profil neuf sans date anniversaire), pas une
+//   échéance dépassée — un message "délai expiré" serait un faux signal (devoir sacré n°2).
+// - "delai_expire" : anniversaire connu ET déjà dépassé (niveau "bloque").
+// Volontairement pas de 3e raison "rythme_hors_limite" (rythme fini mais humainement
+// absurde) : nécessite un seuil non réglementaire (décision produit), différé au backlog.
+export type RythmeRequis = { atteignable: true; heuresParMois: number } | { atteignable: false; raison: "anniversaire_inconnu" | "delai_expire" };
+
 export interface StatutPrediction {
   niveau: NiveauStatut;
   heuresActuelles: number;
@@ -160,7 +168,7 @@ export interface StatutPrediction {
   dateAnniversaire: string;
   joursRestants: number;
   rythmeMensuelActuel: number; // h/mois, moyenne depuis le début de la période de référence
-  rythmeMensuelRequis: number; // h/mois requis pour atteindre le seuil avant l'anniversaire
+  rythmeRequis: RythmeRequis; // h/mois requis pour atteindre le seuil avant l'anniversaire, ou raison si inatteignable
   dateFranchissementProjetee: string | null; // date projetée d'atteinte du seuil au rythme actuel
   eligibleRattrapage: boolean; // 338–506 h : clause de rattrapage potentiellement mobilisable
   message: string; // phrase courte, orientée utilisateur (cf. charte §8.7)

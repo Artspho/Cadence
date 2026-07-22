@@ -1,4 +1,4 @@
-import type { AJBruteResultat, AJNetteResultat, DecompteHeuresResultat, StatutPrediction } from "../types";
+import type { AJBruteResultat, AJNetteResultat, DecompteHeuresResultat, RythmeRequis, StatutPrediction } from "../types";
 import type { PointSerie } from "../engine/prediction";
 import { franceTravailConfig } from "../config/franceTravailConfig";
 import { ProjectionChart } from "./ProjectionChart";
@@ -11,6 +11,22 @@ interface DashboardProps {
   decompte: DecompteHeuresResultat;
   ajBrute: AJBruteResultat;
   ajNette: AJNetteResultat;
+}
+
+// Exhaustif par construction : si une raison est ajoutée à RythmeRequis sans traiter son cas
+// ici, `_exhaustif` cesse de typer en `never` et la compilation échoue (devoir sacré n°2).
+function libelleRythmeRequis(rythmeRequis: RythmeRequis, seuilHeures: number): string {
+  if (rythmeRequis.atteignable) return `${rythmeRequis.heuresParMois.toFixed(0)} h/mois`;
+  switch (rythmeRequis.raison) {
+    case "anniversaire_inconnu":
+      return "Renseigne ta date anniversaire pour connaître le rythme requis.";
+    case "delai_expire":
+      return `Le délai est trop court pour atteindre ${seuilHeures} h à ce rythme.`;
+    default: {
+      const _exhaustif: never = rythmeRequis.raison;
+      return _exhaustif;
+    }
+  }
 }
 
 export function Dashboard({ prediction, serie, fenetreDebut, dateCap, decompte, ajBrute, ajNette }: DashboardProps) {
@@ -70,13 +86,13 @@ export function Dashboard({ prediction, serie, fenetreDebut, dateCap, decompte, 
           <p className="font-display text-2xl font-semibold tabular-nums tracking-tight">{prediction.rythmeMensuelActuel.toFixed(0)} h/mois</p>
           <div className="h-1.5 rounded-full bg-surface-2 mt-3 mb-2 overflow-hidden">
             <div
-              className={`h-full ${prediction.rythmeMensuelActuel >= prediction.rythmeMensuelRequis ? "bg-mint" : "bg-amber"}`}
-              style={{ width: `${Math.min(100, (prediction.rythmeMensuelActuel / Math.max(1, prediction.rythmeMensuelRequis)) * 100)}%` }}
+              className={`h-full ${prediction.rythmeRequis.atteignable && prediction.rythmeMensuelActuel >= prediction.rythmeRequis.heuresParMois ? "bg-mint" : "bg-amber"}`}
+              style={{
+                width: `${prediction.rythmeRequis.atteignable ? Math.min(100, (prediction.rythmeMensuelActuel / Math.max(1, prediction.rythmeRequis.heuresParMois)) * 100) : 0}%`,
+              }}
             />
           </div>
-          <p className="text-xs text-muted">
-            Requis : {Number.isFinite(prediction.rythmeMensuelRequis) ? `${prediction.rythmeMensuelRequis.toFixed(0)} h/mois` : "objectif hors d'atteinte"}
-          </p>
+          <p className="text-xs text-muted">Requis : {libelleRythmeRequis(prediction.rythmeRequis, prediction.seuilHeures)}</p>
         </div>
       </div>
 

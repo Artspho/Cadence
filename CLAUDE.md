@@ -92,7 +92,7 @@ src/
 - ✅ Design tokens (Tailwind + `index.css`) alignés sur la maquette.
 - ✅ `engine/` complet et testé : `periodeReference`, `decompteHeures`, `salaireReference`,
   `areBrute` (+ `calculerAJBrutePourFenetre`), `areNette`, `prediction`, `alertes`, `cycles`
-  — **59 tests Vitest**, tous verts (dont 7 sur `storage/`, 5 sur `config/`, 2 sur `lib/`).
+  — **62 tests Vitest**, tous verts (dont 7 sur `storage/`, 5 sur `config/`, 2 sur `lib/`).
 - ✅ `storage/`, `components/`, câblage `App.tsx` — bêta fonctionnelle de bout en bout
   (onboarding → tableau de bord → contrats → import PDF → historique → simulateur → à propos).
 - ✅ **Bug corrigé** : un profil neuf sans date anniversaire connue n'affiche plus jamais le
@@ -166,22 +166,26 @@ src/
   `situation_mixte`, qui reste vraie indépendamment du nombre de contrats). Vérifié dans le
   navigateur : compte neuf (aucun euro, aucune alerte, écran net) et compte avec un seul contrat
   100 % enseignement (dashboard normal, distinction respectée).
-- ❌ **Bug repéré, non corrigé** (trouvé pendant la tâche état-vide, hors périmètre à ce moment-là) :
-  le Dashboard peut afficher **« Vise environ Infinity h/mois »**. **Ce n'est apparemment pas une
-  division par zéro accidentelle** : dans `engine/prediction.ts`, `rythmeMensuelRequis` vaut
-  `Infinity` de façon explicite quand `joursRestants <= 0` et `heuresRestantes > 0` — vraisemblablement
-  une sentinelle volontaire pour dire "rythme inatteignable". Repéré en écrivant cette entrée (pas
-  encore vérifié par un test dédié) : `Dashboard.tsx` intercepte bien cette sentinelle
-  (`Number.isFinite(...) ? ... : "objectif hors d'atteinte"`), mais `alertes.ts` (`actionSuggeree`
-  du code `rythme_insuffisant`) ne l'intercepte pas et la laisse fuiter telle quelle jusqu'à
-  l'écran. **La règle en jeu est donc d'abord le devoir n°2** (une valeur sentinelle du moteur
-  fuit jusqu'à l'utilisateur au lieu d'être traduite en clair), pas la règle "jamais de division
-  par zéro" au sens strict. **La tâche dédiée devra** : (a) décider comment le moteur signale
-  proprement un rythme inatteignable — `Infinity` est peut-être une mauvaise sentinelle
-  précisément parce qu'un consommateur sur deux a oublié de l'intercepter ; un statut explicite
-  (ex. un champ dédié ou `null`) serait plus sûr, à concevoir pour être difficile à oublier ; (b)
-  garantir que **tous** les consommateurs (`Dashboard.tsx`, `alertes.ts`, et tout autre futur
-  appelant) traduisent ce signal en clair, pas seulement l'un des deux.
+- ✅ **Bug Infinity corrigé** (le Dashboard pouvait afficher « Vise environ Infinity h/mois ») :
+  `StatutPrediction.rythmeMensuelRequis: number` (sentinelle `Infinity` explicite quand
+  `joursRestants <= 0` et `heuresRestantes > 0`) remplacé par `rythmeRequis: RythmeRequis`, un
+  type discriminé à exhaustivité forcée par le compilateur (`types/index.ts`) :
+  `{ atteignable: true; heuresParMois: number }` ou `{ atteignable: false; raison:
+  "anniversaire_inconnu" | "delai_expire" }`. **Deux raisons distinctes, pas une seule** :
+  `anniversaire_inconnu` (donnée manquante — profil neuf sans date anniversaire) n'est **jamais**
+  présenté comme un délai expiré, ce qui aurait été un faux signal (devoir n°2) ; `delai_expire`
+  couvre le seul cas où l'anniversaire est réellement connu et dépassé (niveau `bloque`). Plus
+  aucun `Infinity` ne peut fuiter dans le retour du moteur. Tous les consommateurs traduisent
+  désormais `atteignable:false` en clair : `Dashboard.tsx` a un switch exhaustif dédié
+  (`libelleRythmeRequis`, cassant à la compilation si une raison est ajoutée sans être traitée
+  ici) ; `alertes.ts` n'émet **aucune** alerte de rythme dans le cas `anniversaire_inconnu` (rien
+  n'est imminent pour un profil dont la date anniversaire est inconnue) — l'alerte
+  `rythme_insuffisant` ne se déclenche plus que si `atteignable: true`. Tests dédiés ajoutés
+  (`prediction.test.ts`, `alertes.test.ts`) vérifiant explicitement l'absence de la chaîne
+  « Infinity » dans les deux cas de figure. **Différé volontairement** : le cas « rythme fini mais
+  humainement absurde » (délai non nul mais minuscule) n'a pas de 3e raison dédiée
+  (`rythme_hors_limite`) — nécessiterait un seuil de plausibilité non réglementaire (décision
+  produit), consigné au backlog (`docs/reprise.md`, `docs/validation.md`).
 - ⬜ **Non traité (V2/V3) :** coordination européenne (périodes U1/PDU1) — même famille qu'Annexe 8/article 65, hors périmètre Annexe 10 pur. Aucune logique ni champ de données ne l'anticipe encore (détail dans `docs/SPEC.md` §10 et §11.C). Ne pas confondre avec le champ `territoire` du contrat, qui couvre un cas différent (cachet ponctuel joué en EEE/Suisse/UK mais déclaré en France).
 - 🔁 **Maintenance de la config** (récurrent, perso — hors app, pas de backend en bêta) : une fois
   par mois, vérifier à la source officielle SMIC (horaire / mensuel / journalier), PMSS, et les
@@ -196,10 +200,10 @@ src/
   actuellement datée « 2026.06 » (alignée sur la revalorisation SMIC du 1er juin 2026) — prochaine
   échéance connue : la revalorisation SMIC/PMSS du 1er janvier suivant.
 
-**Prochaines pistes** : en priorité, confirmer et corriger le bug Infinity ci-dessus — c'est le
-seul ❌ confirmé de la liste (les autres sont 🔶 limites connues ou ⬜ non traité). Sinon, sans
-ordre imposé : les deux limites connues 🔶 ci-dessus, ou les autres items du §11.A du SPEC encore
-ouverts (PWA réellement installable, alignement visuel fin sur `docs/maquette_dashboard.html`,
+**Prochaines pistes** : plus aucun ❌ confirmé dans la liste (le bug Infinity est corrigé
+ci-dessus). Sans ordre imposé : les deux limites connues 🔶 ci-dessus, le `rythme_hors_limite`
+différé (backlog `docs/reprise.md`/`docs/validation.md`), ou les autres items du §11.A du SPEC
+encore ouverts (PWA réellement installable, alignement visuel fin sur `docs/maquette_dashboard.html`,
 transparence du calcul).
 
 ---

@@ -28,6 +28,22 @@ describe("calculerStatutPrediction", () => {
     expect(resultat.message).not.toMatch(/échéance/i);
   });
 
+  it("profil sans date anniversaire connue (mois restants à zéro) : rythmeRequis signale anniversaire_inconnu, jamais Infinity", () => {
+    const p = profil({ dateAnniversaire: "", situation: "premiere_admission" });
+    const resultat = calculerStatutPrediction(p, [], [], franceTravailConfig, "2026-06-01");
+    expect(resultat.rythmeRequis).toEqual({ atteignable: false, raison: "anniversaire_inconnu" });
+    expect(JSON.stringify(resultat)).not.toMatch(/Infinity/);
+  });
+
+  it("anniversaire connu et déjà dépassé sans les heures requises : rythmeRequis signale delai_expire, jamais Infinity", () => {
+    const p = profil({ dateAnniversaire: "2026-12-31" });
+    const contrats = [contrat({ date: "2026-02-01", nbCachets: 5 })]; // 60 h, largement sous le seuil
+    const resultat = calculerStatutPrediction(p, contrats, [], franceTravailConfig, "2027-01-15"); // après l'anniversaire
+    expect(resultat.niveau).toBe("bloque");
+    expect(resultat.rythmeRequis).toEqual({ atteignable: false, raison: "delai_expire" });
+    expect(JSON.stringify(resultat)).not.toMatch(/Infinity/);
+  });
+
   it("ne mute jamais les tableaux de contrats/périodes fournis (utilisable en simulation sans effet de bord)", () => {
     const p = profil({ dateAnniversaire: "2026-12-31" });
     const contrats = [contrat({ date: "2026-02-01", nbCachets: 20 })];
