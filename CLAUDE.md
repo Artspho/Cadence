@@ -119,10 +119,14 @@ src/
   — l'historique des exercices passés ignore `tranchesReadmission` et calcule toujours l'AJ brute
   avec les diviseurs standard (détail dans `docs/SPEC.md` §10).
 - 🔶 **Limite connue :** le garde-fou « situation mixte » n'a aucun test automatisé côté interface
-  (seul `detecterAlertes` est testé, cf. `engine/__tests__/alertes.test.ts`). Après toute grosse
-  modification d'UI touchant `App.tsx`, `Onboarding.tsx` ou `AProposLimites.tsx`, **re-vérifier à
-  la main** : cocher/décocher `activiteHorsAnnexe10` et confirmer qu'aucun chiffre n'apparaît sur
-  Dashboard/Historique/Simulateur tant que la case est cochée.
+  (seul `detecterAlertes` est testé, cf. `engine/__tests__/alertes.test.ts` — couvre `mixte` et
+  `inconnu`, pas le rendu React). Après toute grosse modification d'UI touchant `App.tsx`,
+  `Onboarding.tsx` ou `AProposLimites.tsx`, **re-vérifier à la main** : sélectionner tour à tour
+  les 3 choix (Non / Oui / Je ne sais pas, `regimeDeclare`) et confirmer qu'aucun chiffre
+  n'apparaît sur Dashboard/Historique/Simulateur tant que « Oui » ou « Je ne sais pas » est
+  sélectionné, et qu'il réapparaît normalement sur « Non ». Vérifié manuellement dans le
+  navigateur lors de l'extension à 3 états (2026-07-22) ; à refaire après toute future
+  modification de ces trois fichiers.
 - ✅ **`config.valeursDatees.smicHoraireBrut` renseigné** (12,31 €, arrêté du 22 mai 2026, en
   vigueur au 01/06/2026) — la formule réadmission allongée (point ci-dessus) est donc réellement
   active dès qu'un profil réadmission a une fenêtre étendue. `.pmssMensuel` reste à `null` (TODO

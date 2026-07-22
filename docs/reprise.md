@@ -8,7 +8,7 @@ Mémoire durable à consulter au démarrage : `CLAUDE.md`, `docs/SPEC.md`, `docs
 
 Deux devoirs sacrés : (1) ne jamais perdre les données ; (2) ne jamais afficher un chiffre faux (ni faux « feu vert » rassurant, ni faux « Bloqué », ni faux montant, ni fausse alerte, ni valeur sentinelle brute).
 
-État : les deux devoirs sacrés sont tenus, la bêta a son socle. 62 tests verts, tsc propre, git à jour (dernier commit `e517ac2`, correctif Infinity).
+État : les deux devoirs sacrés sont tenus, la bêta a son socle. 71 tests verts, tsc propre, git à jour (dernier commit `2a154ab`, garde-fou situation mixte 3 états).
 
 ## Fait dans les sessions récentes
 
@@ -32,10 +32,27 @@ sans être traitée. Tests dédiés ajoutés (prediction.test.ts, alertes.test.t
 explicitement l'absence de la chaîne « Infinity ». 62 tests verts, détail : SPEC §6.6,
 `CLAUDE.md` « État actuel », `validation.md` (section « Hors périmètre de validation externe »).
 
+## Fait (garde-fou situation mixte étendu à 3 états)
+
+`Profil.regimeDeclare: "annexe10_pur" | "mixte" | "inconnu"` remplace l'ancien booléen
+`activiteHorsAnnexe10` (gardé déprécié, lecture seule) comme source du garde-fou hors périmètre.
+Onboarding et « À propos » offrent désormais 3 choix (Non / Oui / Je ne sais pas) au lieu d'une
+case à cocher — la question ciblait déjà correctement technicien (A8) / emploi hors spectacle,
+jamais l'enseignement, aucun changement de copie nécessaire là-dessus. « inconnu » suit
+EXACTEMENT le même chemin que « mixte » (même alerte `situation_mixte`, même écran
+`AvertissementHorsPerimetre`) — vérifié par test ET manuellement dans le navigateur. Migration
+(devoir n°1) : `lib/profilHorsPerimetre.ts` (`profilHorsPerimetre()`/`regimeEffectif()`) lit
+`activiteHorsAnnexe10` en repli quand `regimeDeclare` est absent — aucun profil déjà enregistré
+ne change de comportement au prochain chargement (testé explicitement, non-régression
+obligatoire). 71 tests verts, détail : `CLAUDE.md` « État actuel », `docs/SPEC.md` §10.
+
 ## PROCHAINE ACTION
 
-Aucune urgence identifiée après ce correctif — voir « Ensuite (backlog) » ci-dessous pour la suite,
-sans ordre imposé.
+Plus rien en urgence côté garde-fous : le bug Infinity et l'extension situation mixte à 3 états
+sont posés. Priorité suivante : les deux items §11.A encore ouverts — pas de revalidation
+post-onboarding (corriger date/situation impossible sans éditer le JSON), puis transparence du
+calcul. Ensuite, sans urgence : barème CSG figé à « normal » (non bloquant), PWA. Détail complet
+de ces items et du reste : « Ensuite (backlog) » ci-dessous.
 
 ## Ensuite (backlog)
 
