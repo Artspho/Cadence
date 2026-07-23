@@ -92,7 +92,7 @@ src/
 - ✅ Design tokens (Tailwind + `index.css`) alignés sur la maquette.
 - ✅ `engine/` complet et testé : `periodeReference`, `decompteHeures`, `salaireReference`,
   `areBrute` (+ `calculerAJBrutePourFenetre`), `areNette`, `prediction`, `alertes`, `cycles`
-  — **80 tests Vitest**, tous verts (dont 7 sur `storage/`, 5 sur `config/`, 17 sur `lib/`).
+  — **85 tests Vitest**, tous verts (dont 7 sur `storage/`, 5 sur `config/`, 17 sur `lib/`).
 - ✅ `storage/`, `components/`, câblage `App.tsx` — bêta fonctionnelle de bout en bout
   (onboarding → tableau de bord → contrats → import PDF → historique → simulateur → à propos).
 - ✅ **Bug corrigé** : un profil neuf sans date anniversaire connue n'affiche plus jamais le
@@ -237,6 +237,19 @@ src/
   `ProjectionChart.tsx`, qui affiche désormais « date inconnue » dans ce cas. Le champ brut
   `joursRestants` reste une dette tracée pour tout futur consommateur direct (`docs/validation.md`,
   section « Dette tracée »). 80 tests verts, détail complet : `docs/reprise.md`.
+- ✅ **Seuil de réadmission gonflé corrigé** (bug remonté par un vrai testeur, pas trouvé en
+  interne) : un profil réadmission avec un historique de contrats trop court pour jamais rattraper
+  le seuil croissant de la boucle d'extension (`periodeReference.ts`) épuisait ses 24 tentatives
+  (`TRANCHES_MAX`) et affichait 1515 h (`507 + 24×42`) comme si c'était un vrai seuil ajusté — ex.
+  « 480 / 1515 h » au lieu de « 480 / 507 h ». `FenetreReference.seuilReadmission` est désormais un
+  type discriminé (`calculable: true/false`), construit à partir d'un booléen `trouve` explicite
+  posé au `break`, jamais déduit du compteur de tranches par relecture implicite. En échec :
+  `prediction.ts`/`areBrute.ts` retombent sur le seuil/la formule standard, `Dashboard.tsx` affiche
+  un bandeau honnête dédié, `alertes.ts` porte une nouvelle alerte `seuil_readmission_non_calculable`.
+  **Découverte en creusant** : le test existant pour ce scénario n'affirmait qu'une propriété vraie
+  aussi bien en cas de succès que d'échec — il exerçait déjà le bug sans jamais le remarquer,
+  dette méthodologique tracée dans `docs/validation.md`. 85 tests verts, détail complet :
+  `docs/reprise.md`.
 - ⬜ **Non traité (V2/V3) :** coordination européenne (périodes U1/PDU1) — même famille qu'Annexe 8/article 65, hors périmètre Annexe 10 pur. Aucune logique ni champ de données ne l'anticipe encore (détail dans `docs/SPEC.md` §10 et §11.C). Ne pas confondre avec le champ `territoire` du contrat, qui couvre un cas différent (cachet ponctuel joué en EEE/Suisse/UK mais déclaré en France).
 - 🔁 **Maintenance de la config** (récurrent, perso — hors app, pas de backend en bêta) : une fois
   par mois, vérifier à la source officielle SMIC (horaire / mensuel / journalier), PMSS, et les

@@ -8,7 +8,7 @@ Mémoire durable à consulter au démarrage : `CLAUDE.md`, `docs/SPEC.md`, `docs
 
 Deux devoirs sacrés : (1) ne jamais perdre les données ; (2) ne jamais afficher un chiffre faux (ni faux « feu vert » rassurant, ni faux « Bloqué », ni faux montant, ni fausse alerte, ni valeur sentinelle brute).
 
-État : les deux devoirs sacrés sont tenus, la bêta a son socle. 80 tests verts, tsc propre, git à jour (dernier lot : panneau de transparence du calcul + correctif « date inconnue » sur ProjectionChart, commit `505473a`).
+État : les deux devoirs sacrés sont tenus, la bêta a son socle. 85 tests verts, tsc propre, git à jour (dernier lot : correctif du seuil de réadmission gonflé, commit `4fba5b5`).
 
 ## Fait dans les sessions récentes
 
@@ -100,10 +100,52 @@ en backlog si un autre endroit y retombe un jour, pas urgent aujourd'hui.
 connu futur, inconnu, réellement dépassé) : les trois textes désormais cohérents avec leur badge.
 Commit `505473a`.
 
+## Fait (seuil de réadmission gonflé corrigé)
+
+Bug remonté par un testeur en conditions réelles (première utilisation en dehors de mes propres
+tests), pas trouvé en investiguant de mon côté. Profil réadmission avec un seul contrat récent
+(27/01/2026) et anniversaire au 17/01/2027 : le Dashboard affichait **« 480 / 1515 h »** au lieu de
+« 480 / 507 h ». `1515 = 507 + 24×42` : exactement le plafond de sécurité de terminaison
+(`TRANCHES_MAX = 24`) de la boucle d'extension de fenêtre en réadmission (`periodeReference.ts`),
+pas un vrai seuil ajusté.
+
+**Cause exacte** : la boucle recule la fenêtre de 30 j par tranche tant que le total d'heures
+trouvé n'atteint pas un seuil qui grimpe de 42 h à chaque tranche. Avec un seul contrat isolé (rien
+avant), le total ne grandit jamais en reculant la fenêtre, alors que le seuil grimpe sans fin — la
+boucle épuise ses 24 tentatives sans jamais revérifier la dernière fenêtre contre son propre seuil,
+et retourne 1515 comme si c'était un résultat. **Preuve que la distinction succès/échec est fiable
+par construction** : retracé ligne à ligne, un succès sort toujours via `break` avec un nombre de
+tranches ≤ 23 ; atteindre `tranches === TRANCHES_MAX` en sortie signifie donc **toujours et
+uniquement** un épuisement sans solution — jamais une vraie réussite tardive.
+
+**Découverte en creusant, indépendante du bug lui-même** : le test existant
+`periodeReference.test.ts` pour ce scénario (un seul petit contrat) n'affirmait que
+`tranchesReadmission > 0` — vrai aussi bien pour un succès que pour un épuisement à 24. **Ce test
+exerçait donc déjà le bug depuis le début, sans jamais le remarquer.** Un test vert ne garantissait
+pas qu'on testait la bonne chose — dette tracée dans `docs/validation.md` avec la leçon
+méthodologique (toujours vérifier *pourquoi* une boucle bornée par un plafond de tentatives s'est
+arrêtée, pas seulement *que* le résultat a l'air plausible).
+
+**Corrigé** : `FenetreReference.seuilReadmission` est un type discriminé
+(`{ calculable: true; tranchesReadmission; seuilHeuresAjuste } | { calculable: false; raison:
+"historique_insuffisant"; tranchesTentees }`), construit à partir d'un booléen `trouve` explicite
+posé au moment du `break` — jamais déduit du compteur de tranches par relecture implicite. En
+échec, la fenêtre retombe sur la base non étendue (pas la fenêtre poussée à 24 tranches sans
+validation), `prediction.ts`/`areBrute.ts` retombent sur le seuil/la formule standard, `Dashboard.tsx`
+affiche un bandeau honnête dédié, et `alertes.ts` porte une nouvelle alerte
+`seuil_readmission_non_calculable` (niveau attention, action suggérée). Test de non-régression
+ajouté pour un vrai succès d'extension (2 tranches, vérifié par calcul indépendant) et
+reproduction bout-en-bout du scénario exact rapporté (`prediction.test.ts`).
+
+85 tests verts, tsc propre. Vérifié manuellement dans le navigateur avec le profil exact rapporté
+(réadmission, anniversaire 17/01/2027, contrat unique du 27/01/2026) : affiche désormais
+« 480 / 507 h » et le bandeau + l'alerte honnêtes, plus jamais 1515. Commit `4fba5b5`.
+
 ## PROCHAINE ACTION
 
-Plus rien en urgence côté garde-fous, cohérence de profil, ni transparence du calcul — les items
-§11.A sont tous traités. Aucune priorité imposée pour la suite : à choisir parmi le backlog
+Plus rien en urgence côté garde-fous, cohérence de profil, transparence du calcul, ni le bug du
+seuil de réadmission gonflé — les items §11.A sont tous traités, et ce dernier bug (remonté par un
+vrai testeur) est refermé. Aucune priorité imposée pour la suite : à choisir parmi le backlog
 ci-dessous selon ce qui te semble le plus utile (candidats les moins coûteux : barème CSG figé,
 PWA ; le plus structurant côté partage : déploiement bêta). Détail complet : « Ensuite (backlog) ».
 
