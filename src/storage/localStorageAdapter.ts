@@ -67,10 +67,28 @@ const soldeIndemnisationDepartSchema = z.object({
   // .default(0) : un solde configuré avant l'ajout de ce champ (correctif franchise CP du
   // 2026-07-23) n'a pas cette clé du tout — import/rechargement ne doit pas échouer pour autant.
   quotaCPCarryOver: z.number().default(0),
-  // .default(null) : idem, un solde configuré avant le correctif AJ réelle du 2026-07-23 n'a pas
-  // cette clé — retombe sur l'AJ estimée (avec avertissement) comme avant ce correctif.
-  ajReelle: z.number().nullable().default(null),
+  // AJ nette notifiée par France Travail — peut couvrir plusieurs taux successifs sur une même
+  // période d'indemnisation (cf. types/index.ts). .default([]) : un solde configuré avant ce champ
+  // n'a pas cette clé du tout. Un ancien champ `ajReelle: number | null` (correctif du 2026-07-23,
+  // remplacé le 2026-07-24) est converti par `migrerAjReelleHistorique` avant validation, jamais
+  // lu ici directement.
+  ajReelleHistorique: z.array(z.object({ dateEffet: z.string(), valeur: z.number() })).default([]),
 });
+
+// Migration silencieuse (2026-07-24) : un solde de départ configuré avant le passage de
+// `ajReelle: number | null` à un historique de taux (`ajReelleHistorique`) n'a que l'ancien champ.
+// Convertit en une entrée unique à une date arbitrairement ancienne (couvre tout mois déjà
+// déclaré) — aucune perte pour un solde déjà configuré (devoir sacré n°1). `ajReelle: null` (jamais
+// renseignée) ne produit aucune entrée : `ajReelleHistorique` retombe sur son défaut `[]` normal.
+function migrerAjReelleHistorique(brut: unknown): unknown {
+  if (typeof brut !== "object" || brut === null) return brut;
+  const donnees = brut as Record<string, unknown>;
+  const solde = donnees.soldeIndemnisationDepart;
+  if (typeof solde !== "object" || solde === null || Array.isArray(solde)) return brut;
+  const s = solde as Record<string, unknown>;
+  if (typeof s.ajReelle !== "number" || s.ajReelleHistorique !== undefined) return brut;
+  return { ...donnees, soldeIndemnisationDepart: { ...s, ajReelleHistorique: [{ dateEffet: "2000-01-01", valeur: s.ajReelle }] } };
+}
 
 // profilSchema (forme + cohérence situation/date) vit désormais dans lib/coherenceProfil.ts —
 // unique définition, réutilisée ici ET par App.tsx (validerProfilPourEcriture), pour que l'import
@@ -87,11 +105,15 @@ const donneesAppSchema = z.object({
   soldeIndemnisationDepart: soldeIndemnisationDepartSchema.nullable().default(null),
 });
 
+function parserDonnees(brut: unknown) {
+  return donneesAppSchema.safeParse(migrerAjReelleHistorique(brut));
+}
+
 export async function chargerDonnees(): Promise<DonneesApp> {
   try {
     const brut = window.localStorage.getItem(CLE_STOCKAGE);
     if (!brut) return donneesVides;
-    const parse = donneesAppSchema.safeParse(JSON.parse(brut));
+    const parse = parserDonnees(JSON.parse(brut));
     if (!parse.success) {
       console.error("Données locales corrompues, réinitialisation.", parse.error);
       return donneesVides;
@@ -140,7 +162,7 @@ export function importerJSON(contenu: string): DonneesApp {
     );
   }
 
-  const parse = donneesAppSchema.safeParse(brut);
+  const parse = parserDonnees(brut);
   if (!parse.success) {
     throw new Error("Ce fichier n'a pas la structure attendue par Cadence.");
   }

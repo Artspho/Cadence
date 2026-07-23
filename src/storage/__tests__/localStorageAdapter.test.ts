@@ -11,7 +11,7 @@ describe("exporterJSON / importerJSON — round-trip", () => {
       contrats: [contrat({ date: "2026-06-01", nbCachets: 10 })],
       periodes: [periode({ type: "maternite", dateDebut: "2026-01-01", dateFin: "2026-02-01" })],
       declarationsMensuelles: [{ id: "1", mois: "2026-02", joursDeclares: 14, source: "lecture_releve" }],
-      soldeIndemnisationDepart: { date: "2026-02-01", delaiRestant: 5, franchiseCPRestante: 5, quotaCPCarryOver: 2, ajReelle: 55.02 },
+      soldeIndemnisationDepart: { date: "2026-02-01", delaiRestant: 5, franchiseCPRestante: 5, quotaCPCarryOver: 2, ajReelleHistorique: [{ dateEffet: "2026-01-18", valeur: 55.02 }] },
     };
 
     const exporte = exporterJSON(donnees, DATE_EXPORT_FIXE);
@@ -60,17 +60,43 @@ describe("exporterJSON / importerJSON — round-trip", () => {
     expect(reimporte.soldeIndemnisationDepart?.quotaCPCarryOver).toBe(0);
   });
 
-  it("importe sans perte un solde de départ configuré avant l'ajout de ajReelle (correctif AJ réelle)", () => {
+  it("importe sans perte un solde de départ configuré avant l'ajout de ajReelleHistorique (ni ajReelle, ni ajReelleHistorique)", () => {
     const exportAncien = JSON.stringify({
       schemaVersion: SCHEMA_VERSION_DONNEES,
       profil: null,
       contrats: [],
       periodes: [],
       declarationsMensuelles: [],
-      soldeIndemnisationDepart: { date: "2026-02-01", delaiRestant: 5, franchiseCPRestante: 5, quotaCPCarryOver: 2 }, // ajReelle absent
+      soldeIndemnisationDepart: { date: "2026-02-01", delaiRestant: 5, franchiseCPRestante: 5, quotaCPCarryOver: 2 }, // ni ajReelle, ni ajReelleHistorique
     });
     const reimporte = importerJSON(exportAncien);
-    expect(reimporte.soldeIndemnisationDepart?.ajReelle).toBeNull();
+    expect(reimporte.soldeIndemnisationDepart?.ajReelleHistorique).toEqual([]);
+  });
+
+  it("migration silencieuse : un solde avec l'ancien champ ajReelle (correctif du 2026-07-23) est converti en ajReelleHistorique", () => {
+    const exportAncien = JSON.stringify({
+      schemaVersion: SCHEMA_VERSION_DONNEES,
+      profil: null,
+      contrats: [],
+      periodes: [],
+      declarationsMensuelles: [],
+      soldeIndemnisationDepart: { date: "2026-02-01", delaiRestant: 5, franchiseCPRestante: 5, quotaCPCarryOver: 2, ajReelle: 55.02 },
+    });
+    const reimporte = importerJSON(exportAncien);
+    expect(reimporte.soldeIndemnisationDepart?.ajReelleHistorique).toEqual([{ dateEffet: "2000-01-01", valeur: 55.02 }]);
+  });
+
+  it("migration silencieuse : ajReelle null (jamais renseignée) ne produit aucune entrée", () => {
+    const exportAncien = JSON.stringify({
+      schemaVersion: SCHEMA_VERSION_DONNEES,
+      profil: null,
+      contrats: [],
+      periodes: [],
+      declarationsMensuelles: [],
+      soldeIndemnisationDepart: { date: "2026-02-01", delaiRestant: 5, franchiseCPRestante: 5, quotaCPCarryOver: 2, ajReelle: null },
+    });
+    const reimporte = importerJSON(exportAncien);
+    expect(reimporte.soldeIndemnisationDepart?.ajReelleHistorique).toEqual([]);
   });
 });
 
