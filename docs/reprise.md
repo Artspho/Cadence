@@ -220,15 +220,44 @@ actée** : l'installation sur un vrai téléphone n'a pas pu être testée depui
 dépend du déploiement bêta (backlog, toujours en attente). Détail complet : `CLAUDE.md`
 « État actuel ».
 
-## Fait (module indemnisation mensuelle, V2 — 3 phases terminées)
+## Fait (module indemnisation mensuelle, V2 — 3 phases terminées, jours indemnisés)
 
-Chantier terminé pour son périmètre actuel (jours réellement indemnisés mois par mois ; franchise
-salaires et plafond de cumul PMSS restent hors périmètre, volontairement). Phase 1 (config,
-`ead0c4f`), Phase 2 (moteur + tests, `engine/indemnisationMensuelle.ts`), Phase 3 (composant
-`RevenusMensuels.tsx`, nouvel onglet). 117 tests verts au total, `tsc -b` propre, vérifié dans le
-navigateur avec les 4 mois certifiés (fév=0, mars=17, avril=18, mai=29 — identique aux relevés
-réels). Détail complet dans « État actuel » de `CLAUDE.md`. L'investigation ci-dessous est
-conservée comme historique (trouvailles, sources, décisions prises).
+Phase 1 (config, `ead0c4f`), Phase 2 (moteur + tests, `engine/indemnisationMensuelle.ts`), Phase 3
+(composant `RevenusMensuels.tsx`, nouvel onglet) — terminées pour le périmètre "jours réellement
+indemnisés mois par mois". Détail complet dans « État actuel » de `CLAUDE.md`. L'investigation
+ci-dessous est conservée comme historique (trouvailles, sources, décisions prises).
+
+**Chantier toujours ouvert ensuite** (même module) : franchise salaires (formule maintenant
+certifiée, cf. section dédiée plus bas — en cours) et plafond de cumul PMSS (pas encore abordé).
+
+## Fait (2026-07-23 : SMIC mensuel/journalier certifiés, franchise CP corrigée)
+
+**SMIC** : `smicMensuelBrut`/`smicMensuelBrutHistorique` renseignés (✅, arrêté du 22 mai 2026 —
+1823,03 € au 01/01/2026 → 1867,02 € au 01/06/2026, mêmes sources que `smicHoraireBrut`).
+`smicJournalierBrut`/`smicJournalierBrutHistorique` dérivés de `smicHoraireBrut × 7` mais marqués
+🔶 **non certifiés** (à confirmer depuis une source officielle) — distincts de
+`cotisations.plancherEcretementJournalier` (62 €, déjà validé pour le CSG/CRDS, cf.
+`docs/validation.md`), les deux "SMIC journalier" ont potentiellement des usages différents.
+
+**Franchise CP, bug trouvé et corrigé** : la conclusion de Phase 1 ("pas de plafond mensuel
+constaté sur les relevés réels", `forfaitMensuelBas`/`Haut` commentés) était **fausse**. En
+creusant plus loin sur la répartition officielle (flyer France Travail confirmé), le 4j consommé
+en février 2026 s'explique entièrement par le report du forfait de janvier (2j non consommés,
+absorbés par le délai d'attente ce mois-là) + le forfait de février (2j) = 4j — pas par l'absence
+de plafond. `forfaitMensuelBas`/`Haut` réactivés + nouveau `seuilFranchiseTotaleJours: 24` (le
+seuil de palier n'existait qu'en commentaire avant, jamais en valeur de config exploitable).
+`SoldeIndemnisation.quotaCPCarryOver` (obligatoire, moteur) / `SoldeIndemnisationDepart.quotaCPCarryOver`
+(optionnel, défaut 0) modélisent le report d'un mois sur l'autre. Les 4 mois certifiés
+(fév=0/mars=17/avril=18/mai=29) restent identiques avec `quotaCPCarryOver: 2` en entrée — seul le
+mécanisme interne change, pas le résultat sur ce cas précis (vérifié aussi en navigateur sur un
+solde existant configuré AVANT ce champ : défaut à 0, résultat plus conservateur qu'avant, à
+raison). `RevenusMensuels.tsx` : 3e champ ajouté à l'écran de configuration du solde de départ,
+avec aide contextuelle pédagogique (« si le mois précédent était un mois blanc, mets 2 »).
+**Limite connue, non résolue** : le palier bas/haut (2j vs 3j) se base sur `franchiseCPRestante`
+courante faute de suivre le total ORIGINAL accordé à l'ouverture des droits — un profil dont le
+total dépasse 24j pourrait à tort redescendre au palier bas une fois consommé sous ce seuil ; non
+observable sur les cas certifiés actuels (restante ≤ 5j du début à la fin). 120 tests verts,
+`tsc -b` propre.
 
 **Demande initiale** : ajouter un module `engine/indemnisationMensuelle.ts` (montant ARE réellement
 versé mois par mois, pas juste l'AJ théorique) + composant `RevenusMensuels.tsx`. L'utilisateur a
