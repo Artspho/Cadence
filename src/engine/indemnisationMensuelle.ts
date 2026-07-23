@@ -53,9 +53,10 @@ function forfaitMensuelCP(franchiseCPRestante: number, config: FranceTravailConf
 }
 
 export function calculerMoisIndemnisation(soldeDepart: SoldeIndemnisation, entree: MoisIndemnisationEntree, config: FranceTravailConfig): MoisIndemnisationResultat {
-  // floor, PAS ceil — validé mot pour mot sur 3 mois réels indépendants (fév/avril/mai 2026,
-  // cf. docs/reprise.md) : floor(153×1,3/10)=19, floor(93×1,3/10)=12, floor(21×1,3/10)=2,
-  // exactement les jours non indemnisés des relevés France Travail réels.
+  // floor confirmé par relevés réels A10 (fév/mars/avril/mai 2026, cf. docs/reprise.md) — PAS
+  // ceil, contrairement à un premier essai de formule qui s'en écartait dès le premier mois testé.
+  // floor(153×1,3/10)=19, floor(105×1,3/10)=13, floor(93×1,3/10)=12, floor(21×1,3/10)=2 :
+  // exactement les jours non indemnisés des 4 relevés France Travail réels, aucun écart.
   const joursNonIndemnisables = Math.floor((entree.heuresDuMois * config.indemnisationMensuelle.coeffJoursNonIndemnisables) / config.indemnisationMensuelle.diviseurJoursTravaillesA10);
   const reliquatApresTravail = Math.max(0, entree.joursDuMois - joursNonIndemnisables);
 
