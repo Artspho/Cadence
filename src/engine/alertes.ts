@@ -36,6 +36,16 @@ export function detecterAlertes(profil: Profil, contrats: Contrat[], periodes: P
   const decompte = calculerDecompteHeures(contrats, periodes, profil, config, fenetre);
   const prediction = calculerStatutPrediction(profil, contrats, periodes, config, dateDuJour);
 
+  if (!prediction.seuilReadmission.calculable) {
+    alertes.push({
+      code: "seuil_readmission_non_calculable",
+      niveau: "attention",
+      titre: "Seuil de réadmission non calculable",
+      message: "Seuil de réadmission non calculable avec tes données actuelles.",
+      actionSuggeree: "Ajoute tes contrats antérieurs si tu en as, ou vérifie ta situation exacte auprès de France Travail.",
+    });
+  }
+
   if (prediction.niveau === "alerte" && prediction.rythmeRequis.atteignable) {
     alertes.push({
       code: "rythme_insuffisant",

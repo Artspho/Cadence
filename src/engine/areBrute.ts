@@ -66,7 +66,10 @@ export function calculerAJBrute(params: ParametresAJBrute): AJBruteResultat {
  */
 export function calculerAJBrutePourFenetre(fenetre: FenetreReference, decompteTotal: number, salaireRetenu: number, nht: number, config: FranceTravailConfig): AJBruteResultat {
   const smicHoraireBrut = config.valeursDatees.smicHoraireBrut;
-  const enPeriodeAllongee = fenetre.tranchesReadmission > 0 && decompteTotal > config.seuilHeures && smicHoraireBrut !== null;
+  // Si le seuil ajusté n'est pas calculable (historique de contrats insuffisant, cf.
+  // periodeReference.ts), on ne peut pas non plus valider NH pour la formule allongée : repli sur
+  // la formule standard, même logique défensive que le cas "SMIC non renseigné" ci-dessous.
+  const enPeriodeAllongee = fenetre.seuilReadmission.calculable && fenetre.seuilReadmission.tranchesReadmission > 0 && decompteTotal > config.seuilHeures && smicHoraireBrut !== null;
 
   return calculerAJBrute({
     salaireRetenu,

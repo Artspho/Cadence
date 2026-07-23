@@ -60,8 +60,20 @@ describe("calculerAJBrutePourFenetre", () => {
 
   it("confirme le scénario : fenêtre réellement étendue et NH > 507 h", () => {
     const { fenetre, decompte } = construireFenetreReadmissionEtendue();
-    expect(fenetre.tranchesReadmission).toBeGreaterThan(0);
+    expect(fenetre.seuilReadmission).toEqual({ calculable: true, tranchesReadmission: 2, seuilHeuresAjuste: 591 });
     expect(decompte.total).toBeGreaterThan(franceTravailConfig.seuilHeures);
+  });
+
+  it("seuil de réadmission non calculable : se rabat sur le calcul standard, jamais la formule allongée", () => {
+    // Fenêtre construite à la main (pas besoin de reproduire l'épuisement des 24 tranches ici,
+    // déjà couvert dans periodeReference.test.ts) : seule la défense de calculerAJBrutePourFenetre
+    // face à ce résultat nous intéresse.
+    const fenetreNonCalculable = { dateDebut: "2025-01-01", dateFin: "2026-12-31", joursAllongementMaladie: 0, seuilReadmission: { calculable: false as const, raison: "historique_insuffisant" as const, tranchesTentees: 24 } };
+    const configAvecSmic = { ...franceTravailConfig, valeursDatees: { ...franceTravailConfig.valeursDatees, smicHoraireBrut: 11.88 } };
+
+    const resultat = calculerAJBrutePourFenetre(fenetreNonCalculable, 600, 20000, 1000, configAvecSmic);
+    const standard = calculerAJBrute({ salaireRetenu: 20000, nht: 1000, config: configAvecSmic });
+    expect(resultat).toEqual(standard);
   });
 
   it("sans SMIC renseigné, se rabat sur le calcul standard sans planter", () => {

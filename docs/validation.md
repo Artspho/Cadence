@@ -157,6 +157,24 @@ résultat directement, cas #2 et #3 transformés en tests permanents (`areNette.
   discriminé, sur le modèle de `RythmeRequis` (cf. `docs/reprise.md`) — pas urgent tant qu'aucun
   autre cas ne s'est présenté.
 
+- **Un test vert ne garantit pas qu'on teste la bonne chose** — leçon tirée en corrigeant le bug du
+  seuil de réadmission gonflé (signalé par un testeur : réadmission + un seul contrat récent →
+  Cadence affichait « 480 / 1515 h » au lieu de « 480 / 507 h », `1515 = 507 + 24×42` étant le
+  plafond de sécurité de terminaison de `periodeReference.ts`, pas un vrai seuil). Le test
+  `periodeReference.test.ts` (« réadmission : étend la fenêtre... », avant correctif) utilisait un
+  scénario à un seul contrat isolé — **exactement le scénario du bug** — mais ne vérifiait que
+  `tranchesReadmission > 0`, une assertion vraie aussi bien pour une vraie réussite que pour un
+  épuisement des 24 tentatives sans solution. Le test passait donc au vert depuis le début, sans
+  jamais remarquer qu'il exerçait déjà le cas d'échec plutôt qu'un cas de succès. **Corrigé** :
+  `FenetreReference.seuilReadmission` est désormais un type discriminé
+  (`{ calculable: true; ... } | { calculable: false; raison: "historique_insuffisant"; ... }`),
+  et ce test a été réécrit pour affirmer explicitement `calculable: false` sur ce scénario, avec un
+  test séparé et vérifié indépendamment (calcul à la main, cf. commit) pour un vrai succès
+  d'extension (`tranchesReadmission: 2`). **Rappel méthodologique à garder** : pour un algorithme
+  borné par un plafond de tentatives (garde-fou de terminaison), toujours vérifier explicitement
+  *pourquoi* la boucle s'est arrêtée (succès vs épuisement), jamais seulement *que* la boucle s'est
+  arrêtée avec un résultat qui a l'air plausible.
+
 ### À valider
 
 - **Réadmission allongée (fenêtre > 365 j)** — tourne dans le code depuis le commit `fda6b8e`

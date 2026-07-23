@@ -58,6 +58,17 @@ export function Dashboard({ prediction, serie, fenetreDebut, dateCap, decompte, 
         <p className="text-sm text-muted mt-3">{prediction.message}</p>
       </div>
 
+      {!prediction.seuilReadmission.calculable && (
+        <div className="bg-amber/5 border border-amber/30 rounded-card px-5 py-4 text-sm">
+          <p className="text-ink font-medium">Réadmission : seuil ajusté non calculable</p>
+          <p className="text-muted mt-1">
+            Cadence n'a pas trouvé assez d'heures dans tes contrats saisis pour ajuster ton seuil de réadmission — il manque des contrats antérieurs, ou la date de ta précédente ouverture de
+            droits (que Cadence ne demande pas encore). Les chiffres ci-dessous sont basés sur le seuil standard ({prediction.seuilHeures} h), pas sur un seuil de réadmission ajusté.
+          </p>
+          <p className="text-xs text-faint mt-2">→ Ajoute tes contrats antérieurs si tu en as, ou vérifie ta situation exacte auprès de France Travail.</p>
+        </div>
+      )}
+
       <div className="grid md:grid-cols-3 gap-4">
         <div className="bg-surface border border-line rounded-card p-5">
           <p className="text-xs uppercase tracking-[.03em] text-muted mb-2">Allocation journalière estimée</p>

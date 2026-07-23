@@ -82,7 +82,8 @@ export type CodeAlerte =
   | "cumul_ens_formation" // approche des 338 h
   | "plafond_cachets_mois" // > 28 cachets sur un mois civil
   | "eligible_rattrapage" // 338–506 h : clause de rattrapage possible
-  | "situation_mixte"; // garde-fou hors périmètre Annexe 10 pur
+  | "situation_mixte" // garde-fou hors périmètre Annexe 10 pur
+  | "seuil_readmission_non_calculable"; // réadmission : historique de contrats insuffisant pour ajuster le seuil
 
 export interface Alerte {
   code: CodeAlerte;
@@ -121,12 +122,22 @@ export interface DecompteHeuresResultat {
   cachetsParMois: Record<string, number>; // clé "YYYY-MM" -> nb de cachets, pour l'alerte plafond
 }
 
+// Résultat de la recherche du seuil ajusté en réadmission (periodeReference.ts) : soit un
+// nombre de tranches et un seuil réellement trouvés (le total d'heures dans la fenêtre étendue
+// a atteint le seuil), soit l'algorithme a épuisé ses tentatives sans jamais y arriver. Dans ce
+// second cas, aucun seuil gonflé n'est présenté comme réel (devoir sacré n°2) : la cause la plus
+// probable est un historique de contrats saisi pas assez loin dans le passé, ou l'absence de la
+// date de la précédente ouverture de droits (qui bornerait correctement la recherche — ce champ
+// n'existe pas encore dans le modèle Profil, cf. periodeReference.ts).
+export type SeuilReadmission =
+  | { calculable: true; tranchesReadmission: number; seuilHeuresAjuste: number }
+  | { calculable: false; raison: "historique_insuffisant"; tranchesTentees: number };
+
 export interface FenetreReference {
   dateDebut: string;
   dateFin: string;
   joursAllongementMaladie: number; // jours ajoutés par les maladies inter-contrat
-  tranchesReadmission: number; // nb de tranches de 30 j au-delà du 365e (réadmission)
-  seuilHeuresAjuste: number; // 507 + 42 × tranchesReadmission
+  seuilReadmission: SeuilReadmission;
 }
 
 export interface SalaireReferenceResultat {
@@ -180,6 +191,10 @@ export interface StatutPrediction {
   // artifice de calcul, jamais une vraie échéance. Tout consommateur de `joursRestants` doit
   // vérifier ce booléen avant d'en tirer un texte du type "échéance atteinte" (devoir sacré n°2).
   anniversaireConnu: boolean;
+  // Reflète fenetre.seuilReadmission (periodeReference.ts) : quand `calculable` est faux,
+  // `seuilHeures` ci-dessus est retombé sur le seuil standard (507 h), pas un chiffre gonflé —
+  // tout consommateur qui veut afficher l'état honnête (bandeau, alerte dédiée) doit lire ce champ.
+  seuilReadmission: SeuilReadmission;
   rythmeMensuelActuel: number; // h/mois, moyenne depuis le début de la période de référence
   rythmeRequis: RythmeRequis; // h/mois requis pour atteindre le seuil avant l'anniversaire, ou raison si inatteignable
   dateFranchissementProjetee: string | null; // date projetée d'atteinte du seuil au rythme actuel

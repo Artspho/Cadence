@@ -19,7 +19,11 @@ export function calculerStatutPrediction(
   dateDuJour: string,
 ): StatutPrediction {
   const fenetre = calculerFenetreReference(profil, contrats, periodes, config, dateDuJour);
-  const seuilHeures = fenetre.seuilHeuresAjuste;
+  // Repli honnête : quand le seuil ajusté de réadmission n'est pas calculable (historique de
+  // contrats insuffisant, cf. periodeReference.ts), on ne présente jamais le plafond de sécurité
+  // de l'algorithme (ex. 1515 h) comme un vrai seuil — on retombe sur le seuil standard 507 h,
+  // et `seuilReadmission.calculable === false` porte l'information pour l'UI (bandeau, alerte).
+  const seuilHeures = fenetre.seuilReadmission.calculable ? fenetre.seuilReadmission.seuilHeuresAjuste : config.seuilHeures;
 
   // Sans date anniversaire connue (première admission sans historique),
   // periodeReference.ts referme la fenêtre sur "aujourd'hui" faute de mieux :
@@ -80,6 +84,7 @@ export function calculerStatutPrediction(
     dateAnniversaire: fenetre.dateFin,
     joursRestants,
     anniversaireConnu,
+    seuilReadmission: fenetre.seuilReadmission,
     rythmeMensuelActuel,
     rythmeRequis,
     dateFranchissementProjetee,

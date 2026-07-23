@@ -45,28 +45,42 @@ export function calculerFenetreReference(
   const dateDebutAllonge = ajouterJours(dateDebutBase, -joursAllongementMaladie);
 
   if (profil.situation !== "readmission") {
-    return { dateDebut: dateDebutAllonge, dateFin, joursAllongementMaladie, tranchesReadmission: 0, seuilHeuresAjuste: config.seuilHeures };
+    return { dateDebut: dateDebutAllonge, dateFin, joursAllongementMaladie, seuilReadmission: { calculable: true, tranchesReadmission: 0, seuilHeuresAjuste: config.seuilHeures } };
   }
 
   // Réadmission : on étend par tranches de 30 j tant que le seuil ajusté
-  // n'est pas atteint, borné par TRANCHES_MAX.
+  // n'est pas atteint, borné par TRANCHES_MAX. `trouve` est mis à true UNIQUEMENT au moment du
+  // `break` : si la boucle sort par épuisement du compteur, `trouve` reste false — la dernière
+  // fenêtre testée n'a jamais été validée contre son propre seuil (cf. periodeReference.test.ts,
+  // "dette tracée" dans validation.md). Ne jamais déduire "trouvé" de `tranches === TRANCHES_MAX`
+  // par relecture implicite : ce booléen explicite est la seule source de vérité.
   let tranches = 0;
   let dateDebutCourante = dateDebutAllonge;
   let seuilCourant = config.seuilHeures;
+  let trouve = false;
 
   while (tranches < TRANCHES_MAX) {
     const { total } = calculerDecompteHeures(contrats, periodes, profil, config, { dateDebut: dateDebutCourante, dateFin });
-    if (total >= seuilCourant) break;
+    if (total >= seuilCourant) {
+      trouve = true;
+      break;
+    }
     tranches += 1;
     seuilCourant = config.seuilHeures + tranches * config.readmission.affiliationMajoreeParPeriode;
     dateDebutCourante = ajouterJours(dateDebutCourante, -config.readmission.tranchePeriodeJours);
+  }
+
+  if (!trouve) {
+    // Épuisé sans solution : pas de seuil gonflé affiché comme réel (devoir sacré n°2). On
+    // retombe sur la fenêtre de base non étendue — étendre plus loin n'a rien trouvé de plus,
+    // donc rien ne justifie de garder une fenêtre poussée à 24 tranches sans validation.
+    return { dateDebut: dateDebutAllonge, dateFin, joursAllongementMaladie, seuilReadmission: { calculable: false, raison: "historique_insuffisant", tranchesTentees: TRANCHES_MAX } };
   }
 
   return {
     dateDebut: dateDebutCourante,
     dateFin,
     joursAllongementMaladie,
-    tranchesReadmission: tranches,
-    seuilHeuresAjuste: config.seuilHeures + tranches * config.readmission.affiliationMajoreeParPeriode,
+    seuilReadmission: { calculable: true, tranchesReadmission: tranches, seuilHeuresAjuste: seuilCourant },
   };
 }

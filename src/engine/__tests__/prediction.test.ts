@@ -50,6 +50,20 @@ describe("calculerStatutPrediction", () => {
     expect(resultat.anniversaireConnu).toBe(false);
   });
 
+  it("réadmission avec historique de contrats trop court : retombe sur le seuil standard 507 h, jamais le plafond de sécurité gonflé (bug réel signalé par un testeur)", () => {
+    // Scénario exact rapporté : réadmission, anniversaire 17/01/2027, un seul contrat ancien
+    // (27/01/2026, 480 h) — rien avant, donc l'algorithme d'extension de periodeReference.ts
+    // épuise ses 24 tentatives sans jamais trouver assez d'heures. Avant ce correctif, l'app
+    // affichait "480 / 1515 h" — 1515 étant le plafond de sécurité (507 + 24×42), pas un vrai seuil.
+    const p = profil({ dateAnniversaire: "2027-01-17", situation: "readmission" });
+    const contrats = [contrat({ date: "2026-01-27", nbCachets: 40 })]; // 480 h
+    const resultat = calculerStatutPrediction(p, contrats, [], franceTravailConfig, "2026-07-23");
+
+    expect(resultat.heuresActuelles).toBe(480);
+    expect(resultat.seuilHeures).toBe(507); // jamais 1515
+    expect(resultat.seuilReadmission).toEqual({ calculable: false, raison: "historique_insuffisant", tranchesTentees: 24 });
+  });
+
   it("ne mute jamais les tableaux de contrats/périodes fournis (utilisable en simulation sans effet de bord)", () => {
     const p = profil({ dateAnniversaire: "2026-12-31" });
     const contrats = [contrat({ date: "2026-02-01", nbCachets: 20 })];

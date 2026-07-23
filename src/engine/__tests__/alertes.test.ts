@@ -85,6 +85,25 @@ describe("detecterAlertes", () => {
     expect(alertesInconnu).toEqual(alertesMixte);
   });
 
+  it("signale seuil_readmission_non_calculable quand l'historique de contrats est trop court pour ajuster le seuil de réadmission", () => {
+    const p = profil({ dateAnniversaire: "2027-01-17", situation: "readmission" });
+    const contrats = [contrat({ date: "2026-01-27", nbCachets: 40 })]; // 480 h, rien avant
+    const alertes = detecterAlertes(p, contrats, [], franceTravailConfig, "2026-07-23");
+    expect(codes(alertes)).toContain("seuil_readmission_non_calculable");
+    const alerte = alertes.find((a) => a.code === "seuil_readmission_non_calculable")!;
+    expect(alerte.niveau).toBe("attention");
+    expect(alerte.actionSuggeree).toBeDefined();
+  });
+
+  it("pas d'alerte seuil_readmission_non_calculable en première admission, ni en réadmission quand le seuil est calculable", () => {
+    const pPremiereAdmission = profil({ dateAnniversaire: "2026-12-31", situation: "premiere_admission" });
+    expect(codes(detecterAlertes(pPremiereAdmission, [], [], franceTravailConfig, "2026-06-01"))).not.toContain("seuil_readmission_non_calculable");
+
+    const pReadmissionOk = profil({ dateAnniversaire: "2026-12-31", situation: "readmission" });
+    const contratsSuffisants = [contrat({ date: "2026-02-01", nbCachets: 50 })]; // 600 h, seuil de base déjà atteint
+    expect(codes(detecterAlertes(pReadmissionOk, contratsSuffisants, [], franceTravailConfig, "2026-06-01"))).not.toContain("seuil_readmission_non_calculable");
+  });
+
   it("anti-faux-positif : artiste-enseignant avec regimeDeclare 'annexe10_pur' explicite reste dans le périmètre (pas situation_mixte)", () => {
     const p = profil({ dateNaissance: "1990-01-01", dateAnniversaire: "2026-12-31", regimeDeclare: "annexe10_pur" });
     const contrats = [contrat({ date: "2026-06-01", type: "enseignement", typeRemuneration: "heures", nbHeures: 90, etablissementAgree: true, enRapportAvecMetier: true })];
