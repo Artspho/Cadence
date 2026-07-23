@@ -1,22 +1,22 @@
 import { describe, expect, it } from "vitest";
 import { franceTravailConfig } from "../../config/franceTravailConfig";
-import { calculerFranchiseSalaires, calculerMoisIndemnisation, calculerSerieDepuisDeclarations, calculerSerieIndemnisation } from "../indemnisationMensuelle";
-import type { DeclarationMensuelle, MoisIndemnisationEntree, SoldeIndemnisation, SoldeIndemnisationDepart } from "../../types";
-import { profil } from "./testUtils";
+import { calculerFranchiseSalaires, calculerMoisIndemnisation, calculerSerieDepuisContrats, calculerSerieIndemnisation } from "../indemnisationMensuelle";
+import type { Contrat, MoisIndemnisationEntree, SoldeIndemnisation, SoldeIndemnisationDepart } from "../../types";
+import { contrat, profil } from "./testUtils";
 
 describe("calculerMoisIndemnisation", () => {
-  it("jours non indemnisables = ceil(joursDéclarés × 1,3), avant tout calcul de place disponible", () => {
+  it("jours non indemnisables = floor(heures × 1,3 / 10), avant tout calcul de place disponible", () => {
     const solde: SoldeIndemnisation = { delaiRestant: 0, franchiseCPRestante: 0, quotaCPCarryOver: 0 };
-    const entree: MoisIndemnisationEntree = { moisLabel: "test", joursDuMois: 31, joursDeclares: 9 };
+    const entree: MoisIndemnisationEntree = { moisLabel: "test", joursDuMois: 31, heuresDuMois: 93 };
     const resultat = calculerMoisIndemnisation(solde, entree, franceTravailConfig);
-    expect(resultat.joursNonIndemnisables).toBe(12); // ceil(9 × 1.3) = ceil(11.7) = 12
+    expect(resultat.joursNonIndemnisables).toBe(12); // floor(93 × 1.3 / 10) = floor(12.09) = 12 (cas réel avril 2026)
   });
 
   it("consomme le délai d'attente puis la franchise CP, dans cet ordre, sur le seul reliquat restant", () => {
     // Quota volontairement large (non contraignant) : ce test isole l'ordre délai → CP, pas le
     // plafond mensuel lui-même (cf. tests dédiés plus bas).
     const solde: SoldeIndemnisation = { delaiRestant: 3, franchiseCPRestante: 10, quotaCPCarryOver: 100 };
-    const entree: MoisIndemnisationEntree = { moisLabel: "test", joursDuMois: 30, joursDeclares: 0 };
+    const entree: MoisIndemnisationEntree = { moisLabel: "test", joursDuMois: 30, heuresDuMois: 0 };
     const resultat = calculerMoisIndemnisation(solde, entree, franceTravailConfig);
     // 30 jours dispo, 0 non indemnisable, délai consomme 3, franchise CP consomme 10, reste 17 payés.
     expect(resultat.joursNonIndemnisables).toBe(0);
@@ -28,35 +28,35 @@ describe("calculerMoisIndemnisation", () => {
 
   it("le forfait mensuel plafonne la franchise CP même avec beaucoup de place et un solde important (corrigé le 2026-07-23)", () => {
     const solde: SoldeIndemnisation = { delaiRestant: 0, franchiseCPRestante: 20, quotaCPCarryOver: 0 };
-    const entree: MoisIndemnisationEntree = { moisLabel: "test", joursDuMois: 30, joursDeclares: 0 };
+    const entree: MoisIndemnisationEntree = { moisLabel: "test", joursDuMois: 30, heuresDuMois: 0 };
     const resultat = calculerMoisIndemnisation(solde, entree, franceTravailConfig);
     // Sans le forfait (ancien modèle, corrigé) : min(20, 30) = 20. Avec : plafonné au quota (0 report + 2 forfait).
     expect(resultat.franchiseCPConsommee).toBe(2);
   });
 
   it("le quota carry-over du mois précédent s'ajoute au forfait du mois suivant", () => {
-    // Mois 1 : aucune place disponible pour la franchise CP (tout absorbé par le non-indemnisable)
-    // — le forfait du mois (2j) n'est pas consommé, il se reporte intégralement.
-    const mois1 = calculerMoisIndemnisation({ delaiRestant: 0, franchiseCPRestante: 10, quotaCPCarryOver: 0 }, { moisLabel: "m1", joursDuMois: 28, joursDeclares: 28 }, franceTravailConfig);
+    // Mois 1 : aucune place disponible pour la franchise CP (tout absorbé par le non-indemnisable,
+    // 300 h -> floor(300*1.3/10)=39 >= 28 jours du mois).
+    const mois1 = calculerMoisIndemnisation({ delaiRestant: 0, franchiseCPRestante: 10, quotaCPCarryOver: 0 }, { moisLabel: "m1", joursDuMois: 28, heuresDuMois: 300 }, franceTravailConfig);
     expect(mois1.franchiseCPConsommee).toBe(0);
     expect(mois1.soldeFin.quotaCPCarryOver).toBe(2); // forfait 2j intégralement reporté, rien à consommer ce mois
 
     // Mois 2 : beaucoup de place disponible — sans le report, seul le forfait (2j) serait consommé.
     // Avec le report du mois 1, le quota disponible est 2 (carry) + 2 (forfait) = 4.
-    const mois2 = calculerMoisIndemnisation(mois1.soldeFin, { moisLabel: "m2", joursDuMois: 30, joursDeclares: 0 }, franceTravailConfig);
+    const mois2 = calculerMoisIndemnisation(mois1.soldeFin, { moisLabel: "m2", joursDuMois: 30, heuresDuMois: 0 }, franceTravailConfig);
     expect(mois2.franchiseCPConsommee).toBe(4);
   });
 
   it("franchise salaires : toujours non certifiée, jamais une formule devinée", () => {
     const solde: SoldeIndemnisation = { delaiRestant: 0, franchiseCPRestante: 0, quotaCPCarryOver: 0 };
-    const entree: MoisIndemnisationEntree = { moisLabel: "test", joursDuMois: 30, joursDeclares: 0 };
+    const entree: MoisIndemnisationEntree = { moisLabel: "test", joursDuMois: 30, heuresDuMois: 0 };
     const resultat = calculerMoisIndemnisation(solde, entree, franceTravailConfig);
     expect(resultat.franchiseSalaires).toEqual({ valeur: null, avertissement: "franchise_salaires_non_certifiee" });
   });
 
-  it("jamais de jours indemnisés négatifs même avec des jours déclarés disproportionnés au mois", () => {
+  it("jamais de jours indemnisés négatifs même avec des heures disproportionnées au mois", () => {
     const solde: SoldeIndemnisation = { delaiRestant: 0, franchiseCPRestante: 0, quotaCPCarryOver: 0 };
-    const entree: MoisIndemnisationEntree = { moisLabel: "test", joursDuMois: 28, joursDeclares: 31 };
+    const entree: MoisIndemnisationEntree = { moisLabel: "test", joursDuMois: 28, heuresDuMois: 300 };
     const resultat = calculerMoisIndemnisation(solde, entree, franceTravailConfig);
     expect(resultat.joursIndemnises).toBe(0);
     expect(resultat.delaiConsomme).toBe(0);
@@ -67,11 +67,13 @@ describe("calculerMoisIndemnisation", () => {
 describe("calculerSerieIndemnisation — cas certifiés sur relevés France Travail réels (fév-mai 2026, cf. docs/reprise.md)", () => {
   it("reproduit exactement les 4 mois certifiés à partir du solde d'ouverture du 01/02/2026 (quotaCPCarryOver = 2, janvier absorbé par le délai d'attente)", () => {
     const soldeDepart: SoldeIndemnisation = { delaiRestant: 5, franchiseCPRestante: 5, quotaCPCarryOver: 2 };
+    // Heures réelles (déclarations mensuelles France Travail, cachet = 12h) : fév 153h (21h+11
+    // cachets), mars 105h (21h+7 cachets), avril 93h (21h+6 cachets), mai 21h (0 cachet).
     const mois: MoisIndemnisationEntree[] = [
-      { moisLabel: "2026-02", joursDuMois: 28, joursDeclares: 14 },
-      { moisLabel: "2026-03", joursDuMois: 31, joursDeclares: 10 },
-      { moisLabel: "2026-04", joursDuMois: 30, joursDeclares: 9 },
-      { moisLabel: "2026-05", joursDuMois: 31, joursDeclares: 1 },
+      { moisLabel: "2026-02", joursDuMois: 28, heuresDuMois: 153 },
+      { moisLabel: "2026-03", joursDuMois: 31, heuresDuMois: 105 },
+      { moisLabel: "2026-04", joursDuMois: 30, heuresDuMois: 93 },
+      { moisLabel: "2026-05", joursDuMois: 31, heuresDuMois: 21 },
     ];
     const resultats = calculerSerieIndemnisation(soldeDepart, mois, franceTravailConfig);
 
@@ -86,35 +88,47 @@ describe("calculerSerieIndemnisation — cas certifiés sur relevés France Trav
   });
 });
 
-describe("calculerSerieDepuisDeclarations", () => {
+describe("calculerSerieDepuisContrats", () => {
   const soldeDepart: SoldeIndemnisationDepart = { date: "2026-02-01", delaiRestant: 5, franchiseCPRestante: 5, quotaCPCarryOver: 2, ajReelleHistorique: [] };
 
-  it("reproduit les 4 mois certifiés à partir de déclarations saisies dans le désordre", () => {
-    const declarations: DeclarationMensuelle[] = [
-      { id: "1", mois: "2026-04", joursDeclares: 9, source: "lecture_releve" },
-      { id: "2", mois: "2026-02", joursDeclares: 14, source: "lecture_releve" },
-      { id: "3", mois: "2026-05", joursDeclares: 1, source: "manuel" },
-      { id: "4", mois: "2026-03", joursDeclares: 10, source: "lecture_releve" },
-    ];
-    const resultats = calculerSerieDepuisDeclarations(soldeDepart, declarations, franceTravailConfig);
+  // Un contrat par mois, un seul jour, heures = le total réel du mois (cf. docs/reprise.md) — le
+  // découpage mensuel lui-même (contrat chevauchant deux mois) est testé dans decoupageMensuel.test.ts.
+  const contratsCertifies: Contrat[] = [
+    contrat({ dateDebut: "2026-02-10", date: "2026-02-10", typeRemuneration: "heures", nbHeures: 153, salaireBrut: 0 }),
+    contrat({ dateDebut: "2026-03-10", date: "2026-03-10", typeRemuneration: "heures", nbHeures: 105, salaireBrut: 0 }),
+    contrat({ dateDebut: "2026-04-10", date: "2026-04-10", typeRemuneration: "heures", nbHeures: 93, salaireBrut: 0 }),
+    contrat({ dateDebut: "2026-05-10", date: "2026-05-10", typeRemuneration: "heures", nbHeures: 21, salaireBrut: 0 }),
+  ];
+
+  it("reproduit les 4 mois certifiés à partir des vrais contrats, quel que soit leur ordre de saisie", () => {
+    const contratsDesordre = [contratsCertifies[2], contratsCertifies[0], contratsCertifies[3], contratsCertifies[1]];
+    const resultats = calculerSerieDepuisContrats(soldeDepart, contratsDesordre, "2026-05-31", franceTravailConfig);
     expect(resultats.map((r) => r.moisLabel)).toEqual(["2026-02", "2026-03", "2026-04", "2026-05"]);
     expect(resultats.map((r) => r.joursIndemnises)).toEqual([0, 17, 18, 29]);
   });
 
-  it("ignore les déclarations antérieures au mois du solde de départ (contexte, pas à recalculer)", () => {
-    const declarations: DeclarationMensuelle[] = [
-      { id: "0", mois: "2026-01", joursDeclares: 18, source: "lecture_releve" }, // "régularisé", hors périmètre du solde
-      { id: "1", mois: "2026-02", joursDeclares: 14, source: "lecture_releve" },
-    ];
-    const resultats = calculerSerieDepuisDeclarations(soldeDepart, declarations, franceTravailConfig);
+  it("un mois sans aucun contrat obtient 0 h (pas d'absence silencieuse)", () => {
+    // Seuls fév et avril ont un contrat ; mars et mai doivent quand même apparaître, à 0 h.
+    const resultats = calculerSerieDepuisContrats(soldeDepart, [contratsCertifies[0], contratsCertifies[2]], "2026-05-31", franceTravailConfig);
+    expect(resultats.map((r) => r.moisLabel)).toEqual(["2026-02", "2026-03", "2026-04", "2026-05"]);
+    expect(resultats[1].joursNonIndemnisables).toBe(0); // mars : 0 h -> 0 JNI
+  });
+
+  it("ignore les contrats antérieurs au mois du solde de départ (contexte, pas à recalculer)", () => {
+    const contratJanvier = contrat({ dateDebut: "2026-01-10", date: "2026-01-10", typeRemuneration: "heures", nbHeures: 200, salaireBrut: 0 }); // "régularisé", hors périmètre du solde
+    const resultats = calculerSerieDepuisContrats(soldeDepart, [contratJanvier, contratsCertifies[0]], "2026-02-28", franceTravailConfig);
     expect(resultats).toHaveLength(1);
     expect(resultats[0].moisLabel).toBe("2026-02");
   });
 
+  it("s'arrête au mois du dernier contrat, ou à aujourd'hui si plus tardif", () => {
+    const resultats = calculerSerieDepuisContrats(soldeDepart, [contratsCertifies[0]], "2026-04-15", franceTravailConfig);
+    expect(resultats.map((r) => r.moisLabel)).toEqual(["2026-02", "2026-03", "2026-04"]); // dateDuJour (avril) > dernier contrat (février)
+  });
+
   it("quotaCPCarryOver absent (solde configuré avant l'ajout du champ) : défaut 0, jamais une exception", () => {
     const soldeSansCarryOver: SoldeIndemnisationDepart = { date: "2026-02-01", delaiRestant: 5, franchiseCPRestante: 5, ajReelleHistorique: [] };
-    const declarations: DeclarationMensuelle[] = [{ id: "1", mois: "2026-02", joursDeclares: 14, source: "lecture_releve" }];
-    const resultats = calculerSerieDepuisDeclarations(soldeSansCarryOver, declarations, franceTravailConfig);
+    const resultats = calculerSerieDepuisContrats(soldeSansCarryOver, [contratsCertifies[0]], "2026-02-28", franceTravailConfig);
     // Sans le report de 2j (défaut 0) : quota = 0 + 2 (forfait) = 2, pas 4 — résultat différent du
     // cas certifié ci-dessus, volontairement : ce test documente le comportement par défaut, pas
     // une reproduction du cas réel.
@@ -122,8 +136,7 @@ describe("calculerSerieDepuisDeclarations", () => {
   });
 
   it("montantMensuel non calculable (aj_manquante) quand ajReelleHistorique est vide", () => {
-    const declarations: DeclarationMensuelle[] = [{ id: "1", mois: "2026-03", joursDeclares: 10, source: "lecture_releve" }];
-    const resultats = calculerSerieDepuisDeclarations(soldeDepart, declarations, franceTravailConfig);
+    const resultats = calculerSerieDepuisContrats(soldeDepart, [contratsCertifies[1]], "2026-03-31", franceTravailConfig);
     expect(resultats[0].montantMensuel).toEqual({ calculable: false, raison: "aj_manquante" });
   });
 
@@ -135,11 +148,8 @@ describe("calculerSerieDepuisDeclarations", () => {
         { dateEffet: "2026-01-18", valeur: 55.02 },
       ],
     };
-    const declarations: DeclarationMensuelle[] = [
-      { id: "1", mois: "2026-02", joursDeclares: 14, source: "lecture_releve" },
-      { id: "2", mois: "2026-03", joursDeclares: 10, source: "lecture_releve" }, // 17 jours indemnisés (cf. cas certifié), taux du 18/01/2026 applicable
-    ];
-    const resultats = calculerSerieDepuisDeclarations(soldeAvecHistorique, declarations, franceTravailConfig);
+    // 17 jours indemnisés en mars (cf. cas certifié), taux du 18/01/2026 applicable.
+    const resultats = calculerSerieDepuisContrats(soldeAvecHistorique, [contratsCertifies[0], contratsCertifies[1]], "2026-03-31", franceTravailConfig);
     expect(resultats[1].montantMensuel).toEqual({ calculable: true, montant: 17 * 55.02, ajUtilisee: 55.02 });
   });
 });

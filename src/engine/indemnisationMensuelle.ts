@@ -13,10 +13,11 @@
 // (lecture initiale erronée du 2026-07-23, corrigée : le 4j consommé en février 2026 s'explique
 // entièrement par le report du forfait de janvier, absorbé par le délai d'attente ce mois-là, pas
 // par l'absence de plafond).
-import type { DeclarationMensuelle, FranchiseSalairesResultat, MoisIndemnisationEntree, MoisIndemnisationResultat, MontantMensuelResultat, Profil, SoldeIndemnisation, SoldeIndemnisationDepart } from "../types";
+import type { Contrat, FranchiseSalairesResultat, MoisIndemnisationEntree, MoisIndemnisationResultat, MontantMensuelResultat, Profil, SoldeIndemnisation, SoldeIndemnisationDepart } from "../types";
 import type { FranceTravailConfig } from "../config/franceTravailConfig";
-import { joursDansMois, moisCle } from "./dateUtils";
+import { joursDansMois, moisCle, moisSuivant } from "./dateUtils";
 import { getAjReelleAt } from "./ajReelleUtils";
+import { repartirContratParMois } from "./decoupageMensuel";
 
 const FRANCHISE_SALAIRES_NON_CERTIFIEE: FranchiseSalairesResultat = {
   valeur: null,
@@ -52,7 +53,10 @@ function forfaitMensuelCP(franchiseCPRestante: number, config: FranceTravailConf
 }
 
 export function calculerMoisIndemnisation(soldeDepart: SoldeIndemnisation, entree: MoisIndemnisationEntree, config: FranceTravailConfig): MoisIndemnisationResultat {
-  const joursNonIndemnisables = Math.ceil(entree.joursDeclares * config.indemnisationMensuelle.coeffJoursNonIndemnisables);
+  // floor, PAS ceil — validé mot pour mot sur 3 mois réels indépendants (fév/avril/mai 2026,
+  // cf. docs/reprise.md) : floor(153×1,3/10)=19, floor(93×1,3/10)=12, floor(21×1,3/10)=2,
+  // exactement les jours non indemnisés des relevés France Travail réels.
+  const joursNonIndemnisables = Math.floor((entree.heuresDuMois * config.indemnisationMensuelle.coeffJoursNonIndemnisables) / config.indemnisationMensuelle.diviseurJoursTravaillesA10);
   const reliquatApresTravail = Math.max(0, entree.joursDuMois - joursNonIndemnisables);
 
   const delaiConsomme = Math.min(soldeDepart.delaiRestant, reliquatApresTravail);
@@ -92,22 +96,35 @@ export function calculerSerieIndemnisation(soldeDepart: SoldeIndemnisation, mois
 }
 
 /**
- * Traduit les déclarations mensuelles saisies par l'utilisateur en série calculable, à partir du
- * mois du solde de départ (inclus). Ignore silencieusement toute déclaration antérieure à ce
- * mois : ce ne sont pas des données à recalculer, seulement du contexte que l'utilisateur peut
- * avoir laissé dans l'historique (cf. docs/reprise.md — janvier "régularisé", non reconstituable).
- * Trie par mois croissant : l'ordre de saisie n'a pas à être l'ordre chronologique.
+ * Calcule la série mensuelle directement depuis les VRAIS contrats, à partir du mois du solde de
+ * départ (inclus) jusqu'au dernier mois couvert par un contrat ou aujourd'hui (le plus tardif des
+ * deux) — remplace la saisie manuelle de "jours déclarés" (cf. docs/reprise.md, 2026-07-24) :
+ * heuresDuMois est agrégée mois par mois via repartirContratParMois (engine/decoupageMensuel.ts),
+ * qui répartit chaque contrat sur les mois civils qu'il chevauche au prorata des jours.
+ * Un mois sans aucun contrat obtient 0 h (jours non indemnisables = 0, mois entièrement indemnisé
+ * une fois délai/franchise épuisés) — comportement honnête, pas une absence silencieuse.
  */
-export function calculerSerieDepuisDeclarations(soldeDepart: SoldeIndemnisationDepart, declarations: DeclarationMensuelle[], config: FranceTravailConfig): MoisIndemnisationResultat[] {
+export function calculerSerieDepuisContrats(soldeDepart: SoldeIndemnisationDepart, contrats: Contrat[], dateDuJour: string, config: FranceTravailConfig): MoisIndemnisationResultat[] {
   const moisDepart = moisCle(soldeDepart.date);
-  const mois: MoisIndemnisationEntree[] = declarations
-    .filter((d) => d.mois >= moisDepart)
-    .sort((a, b) => a.mois.localeCompare(b.mois))
-    .map((d) => ({ moisLabel: d.mois, joursDuMois: joursDansMois(d.mois), joursDeclares: d.joursDeclares }));
+
+  const heuresParMois = new Map<string, number>();
+  for (const contrat of contrats) {
+    for (const part of repartirContratParMois(contrat, config)) {
+      heuresParMois.set(part.moisCle, (heuresParMois.get(part.moisCle) ?? 0) + part.heures);
+    }
+  }
+
+  const moisTries = [...heuresParMois.keys(), moisCle(dateDuJour)].sort();
+  const moisFin = moisTries[moisTries.length - 1];
+
+  const mois: MoisIndemnisationEntree[] = [];
+  for (let curseur = moisDepart; curseur <= moisFin; curseur = moisSuivant(curseur)) {
+    mois.push({ moisLabel: curseur, joursDuMois: joursDansMois(curseur), heuresDuMois: heuresParMois.get(curseur) ?? 0 });
+  }
 
   const resultats = calculerSerieIndemnisation({ delaiRestant: soldeDepart.delaiRestant, franchiseCPRestante: soldeDepart.franchiseCPRestante, quotaCPCarryOver: soldeDepart.quotaCPCarryOver ?? 0 }, mois, config);
 
-  // moisLabel provient ici de `d.mois` (vrai "YYYY-MM" de déclaration), contrairement au moisLabel
+  // moisLabel provient ici d'un vrai "YYYY-MM" énuméré ci-dessus, contrairement au moisLabel
   // purement informatif de calculerMoisIndemnisation/calculerSerieIndemnisation — recalcul du
   // montant mensuel sûr uniquement à ce niveau.
   return resultats.map((resultat) => ({

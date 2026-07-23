@@ -266,7 +266,11 @@ export interface SoldeIndemnisation {
 export interface MoisIndemnisationEntree {
   moisLabel: string; // ex. "2026-02" — purement informatif (affichage, tests), aucun calcul de date dessus
   joursDuMois: number;
-  joursDeclares: number; // jours travaillés bruts saisis par l'utilisateur — PAS la colonne "non indem." du relevé (calculée, cf. joursNonIndemnisables)
+  // Heures effectivement travaillées ce mois-ci, tous contrats confondus — calculées depuis les
+  // contrats réels via repartirContratParMois (engine/decoupageMensuel.ts), plus une saisie
+  // manuelle de "jours déclarés" (remplacée le 2026-07-24, cf. docs/reprise.md : validé sur 3 mois
+  // réels indépendants que jours_non_indemnisables = floor(heures × 1,3 / 10) directement).
+  heuresDuMois: number;
 }
 
 // Franchise salaires (guide p.14, formule certifiée le 2026-07-23 — ARTCENA + flyer officiel
