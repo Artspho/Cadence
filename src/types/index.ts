@@ -207,6 +207,19 @@ export interface StatutPrediction {
   // artifice de calcul, jamais une vraie échéance. Tout consommateur de `joursRestants` doit
   // vérifier ce booléen avant d'en tirer un texte du type "échéance atteinte" (devoir sacré n°2).
   anniversaireConnu: boolean;
+  // Heures des contrats déjà signés mais datés après aujourd'hui (`dateCap`), dans la fenêtre de
+  // référence — 0 si aucun. Pas une projection : decompteHeures.ts/salaireReference.ts les comptent
+  // déjà dans le total "pleine fenêtre" (utilisé pour l'AJ affichée) ; ce champ rend explicite,
+  // côté prédiction/graphique, ce que ces deux modules savaient déjà silencieusement. Sert à
+  // distinguer "acquis" (heuresActuelles) / "confirmé à venir" (ce champ) / "projection au rythme"
+  // (dateFranchissementProjetee) — jamais à mélanger les trois (devoir sacré n°2).
+  heuresCertainesAVenir: number;
+  // Écart net à combler = seuilHeures - (heuresActuelles + heuresCertainesAVenir), jamais négatif.
+  // Distinct de `heuresRestantes` (qui ignore le certain à venir) : tout texte "il te manque X h" ou
+  // "vise X h/mois" doit lire CE champ, pas `heuresRestantes`, sous peine de deux chiffres
+  // contradictoires dans le même message (devoir sacré n°2 — bug trouvé en testant : l'alerte disait
+  // "il manque 507 h" à côté d'un "vise 90 h/mois" qui, lui, tenait déjà compte du certain).
+  heuresRestantesApresCertain: number;
   // Reflète fenetre.seuilReadmission (periodeReference.ts) : quand `calculable` est faux,
   // `seuilHeures` ci-dessus est retombé sur le seuil standard (507 h), pas un chiffre gonflé —
   // tout consommateur qui veut afficher l'état honnête (bandeau, alerte dédiée) doit lire ce champ.

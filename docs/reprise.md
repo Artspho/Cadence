@@ -144,6 +144,39 @@ donc n'affichent jamais ce CTA — vérifié dans le navigateur dans les deux ca
 au choix "Enseignement", bascule + retour via "Annuler" sans perte d'état, absence du CTA dans
 Import PDF et Simulateur. Détail complet : `CLAUDE.md` « État actuel ».
 
+## Fait (contrats à venir persistés, graphique 3 segments)
+
+Item 1 du backlog (SPEC §11.B) traité. Investigation d'abord (pas de code avant validation du
+plan) : un contrat déjà signé daté dans le futur était déjà possible et déjà compté dans
+`decompte`/`SR`/`NHT` (fenêtre complète), mais totalement ignoré par `prediction.ts` — d'où un
+« 0 / 507 h » au héros à côté d'une répartition qui comptait déjà ces heures, incohérence
+préexistante découverte en creusant, pas introduite cette session. 2 décisions tranchées par
+l'utilisateur avant de coder : (1) le niveau Sécurité/Alerte/Bloqué doit intégrer les heures
+certaines à venir, pas seulement le rythme passé ; (2) indice visuel léger dans `ContractForm.tsx`
+quand la date saisie est future. Aucun champ nouveau sur `Contrat` : « à venir » se déduit
+uniquement de `contrat.date > dateDuJour`, jamais stocké — zéro impact export/import JSON.
+`StatutPrediction` gagne `heuresCertainesAVenir` et `heuresRestantesApresCertain`.
+
+**Deux bugs trouvés en vérifiant dans le navigateur avec de vraies données** (le contrat récurrent
+enseignement du lot précédent, dernier mois pile sur la date anniversaire) : (1) faire reposer le
+dénominateur temps de `rythmeRequis`/`dateFranchissementProjetee` sur la fin du segment certain
+plutôt que sur le vrai calendrier restant (`joursRestants`) faisait tomber à tort en « délai trop
+court » alors que l'échéance réelle était encore à 161 jours — corrigé en gardant `joursRestants`
+comme dénominateur, seul le numérateur (heures) tient compte du certain. (2) une fois corrigé,
+l'alerte « rythme_insuffisant » disait encore « il manque 507 h » à côté d'un « vise 90 h/mois »
+déjà basé sur l'écart net (483 h) — deux chiffres contradictoires dans la même phrase ;
+`alertes.ts` et `construireMessage` lisent désormais `heuresRestantesApresCertain` de façon
+cohérente. `ProjectionChart.tsx` : segment teal « confirmé à venir » (marqueurs par contrat,
+légende textuelle obligatoire), pointillé qui repart de `dateCap` comme avant (jamais de la fin du
+segment certain, pour ne jamais risquer une ligne dessinée à l'envers). `ContractForm.tsx` :
+indice sous le champ date si future, masqué dans `Simulateur.tsx` (contrat jamais persisté,
+l'indice y serait littéralement faux). 15 tests ajoutés, 108 tests verts au total, `tsc -b`
+propre. `engine/decompteHeures.ts`, `salaireReference.ts`, `areBrute.ts`, `areNette.ts`,
+`periodeReference.ts`, `cycles.ts` intouchés. Vérifié dans le navigateur : graphique 3 segments
+avec les vraies données de contrat récurrent, cohérence des messages rétablie, contrat passé
+ajouté en plus → bascule correcte en Sécurité, aucune régression du cas sans contrat à venir.
+Détail complet : `CLAUDE.md` « État actuel ».
+
 ## PROCHAINE ACTION
 
 Plus rien en urgence. Aucune priorité imposée : le reste du backlog reste au choix selon ce qui te
@@ -177,9 +210,9 @@ semble le plus utile. Détail complet : « Ensuite (backlog) ».
 
 ### Idées consignées le 2026-07-23 (à cadrer plus tard, pas de plan pour l'instant)
 
-Items « date de précédente ouverture de droits », « renommer À propos en Mon profil » et
-« contrat récurrent pour l'enseignement » retirés de cette liste : faits (cf. sections « Fait »
-ci-dessus). Reste, inchangé :
+Items « date de précédente ouverture de droits », « renommer À propos en Mon profil », « contrat
+récurrent pour l'enseignement » et « contrats à venir persistés » retirés de cette liste : faits
+(cf. sections « Fait » ci-dessus). Reste, inchangé :
 
 1. **V2+ : analyse IA du contrat** (vérifier automatiquement CDD vs CDI déguisé, conformité du
    contrat). **Tension déjà documentée à rappeler explicitement le jour où cet item est repris** :
@@ -187,15 +220,14 @@ ci-dessus). Reste, inchangé :
    construction — nécessiterait un service externe (LLM ou autre), donc un consentement RGPD
    explicite à obtenir, pas un simple ajout technique. Change la nature de l'app sur ce point précis,
    à ne pas sous-estimer.
-2. **Contrats à venir persistés, ajustant directement le graphique de projection** — à distinguer du
-   `Simulateur.tsx` actuel qui fait un « et si » temporaire sans rien persister. À rapprocher de
-   l'item déjà présent au SPEC §11.B (« projection honnête basée sur les contrats déjà signés à
-   venir » + fourchette plutôt que fausse précision) : probablement la même idée à formaliser,
-   pas une fonctionnalité isolée à concevoir séparément — relire le §11.B en même temps que celui-ci
-   avant de cadrer un plan.
-3. **V3+ : légalité des contrats** (minimums légaux, contrats limites/border) — reliée à l'item 1
+2. **V3+ : légalité des contrats** (minimums légaux, contrats limites/border) — reliée à l'item 1
    (analyse IA). Même tension vie privée à rappeler : toute analyse automatisée de ce type
    soulève la même question de service externe + consentement RGPD explicite.
+
+**Idée non traitée, restée hors du lot « contrats à venir »** : afficher une **fourchette**
+(optimiste/pessimiste) plutôt qu'une seule ligne de projection pointillée — mentionné au SPEC
+§11.B, explicitement mis de côté lors du cadrage de ce lot pour ne pas élargir le périmètre (pas de
+méthode sourcée pour calculer les bornes d'une fourchette, décision produit à trancher séparément).
 
 **Petite dette non urgente repérée mais volontairement pas corrigée aujourd'hui** (hors périmètre
 du renommage validé) : deux commentaires de code (pas de texte utilisateur) mentionnent encore

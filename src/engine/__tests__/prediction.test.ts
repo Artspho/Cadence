@@ -84,4 +84,75 @@ describe("calculerStatutPrediction", () => {
     expect(apres.heuresActuelles).toBeGreaterThan(avant.heuresActuelles);
     expect(contrats).toHaveLength(1); // le tableau d'origine n'a pas été modifié
   });
+
+  describe("heuresCertainesAVenir (contrats à venir persistés, SPEC §11.B)", () => {
+    it("contrat déjà signé daté après aujourd'hui, dans la fenêtre : exclu de heuresActuelles, compté dans heuresCertainesAVenir", () => {
+      const p = profil({ dateAnniversaire: "2026-12-31" });
+      const contrats = [
+        contrat({ date: "2026-02-01", nbCachets: 10 }), // 120 h, passé
+        contrat({ date: "2026-09-01", nbCachets: 10 }), // 120 h, à venir (dateDuJour = 2026-06-01)
+      ];
+      const resultat = calculerStatutPrediction(p, contrats, [], franceTravailConfig, "2026-06-01");
+      expect(resultat.heuresActuelles).toBe(120);
+      expect(resultat.heuresCertainesAVenir).toBe(120);
+    });
+
+    it("contrat futur daté après l'anniversaire (hors fenêtre) : n'est compté nulle part", () => {
+      const p = profil({ dateAnniversaire: "2026-12-31" });
+      const contrats = [
+        contrat({ date: "2026-02-01", nbCachets: 10 }), // 120 h, passé
+        contrat({ date: "2027-03-01", nbCachets: 10 }), // après l'anniversaire, hors fenêtre
+      ];
+      const resultat = calculerStatutPrediction(p, contrats, [], franceTravailConfig, "2026-06-01");
+      expect(resultat.heuresActuelles).toBe(120);
+      expect(resultat.heuresCertainesAVenir).toBe(0);
+    });
+
+    it("heures acquises + heures certaines à venir atteignent le seuil : niveau sécurité même avec un rythme passé nul (correction du faux pessimisme)", () => {
+      const p = profil({ dateAnniversaire: "2026-12-31" });
+      const contrats = [contrat({ date: "2026-09-01", nbCachets: 45 })]; // 540 h, tout à venir, rien acquis avant
+      const resultat = calculerStatutPrediction(p, contrats, [], franceTravailConfig, "2026-06-01");
+      expect(resultat.heuresActuelles).toBe(0);
+      expect(resultat.heuresCertainesAVenir).toBe(540);
+      expect(resultat.niveau).toBe("securite");
+    });
+
+    it("anniversaire inconnu : heuresCertainesAVenir reste 0 même avec un contrat daté dans le futur (fenêtre fictive 'aujourd'hui' exclut tout ce qui est après)", () => {
+      const p = profil({ dateAnniversaire: "", situation: "premiere_admission" });
+      const contrats = [contrat({ date: "2026-09-01", nbCachets: 10 })]; // après dateDuJour (2026-06-01)
+      const resultat = calculerStatutPrediction(p, contrats, [], franceTravailConfig, "2026-06-01");
+      expect(resultat.heuresCertainesAVenir).toBe(0);
+    });
+
+    it("aucun contrat à venir : heuresCertainesAVenir vaut 0 (non-régression explicite)", () => {
+      const p = profil({ dateAnniversaire: "2026-12-31" });
+      const contrats = [contrat({ date: "2026-02-01", nbCachets: 10 })];
+      const resultat = calculerStatutPrediction(p, contrats, [], franceTravailConfig, "2026-06-01");
+      expect(resultat.heuresCertainesAVenir).toBe(0);
+    });
+
+    it("un contrat à venir daté exactement sur l'anniversaire ne fait jamais basculer rythmeRequis en 'delai_expire' (bug trouvé en testant dans le navigateur : le dénominateur temps doit rester le vrai calendrier restant, pas la fin du segment certain)", () => {
+      const p = profil({ dateAnniversaire: "2026-12-31" });
+      const contrats = [contrat({ date: "2026-12-31", nbCachets: 2 })]; // 24 h, dernier (et seul) contrat certain = pile la date anniversaire
+      const resultat = calculerStatutPrediction(p, contrats, [], franceTravailConfig, "2026-07-23");
+      expect(resultat.heuresCertainesAVenir).toBe(24);
+      expect(resultat.joursRestants).toBeGreaterThan(0); // l'échéance réelle est encore loin (161 j)
+      expect(resultat.rythmeRequis.atteignable).toBe(true); // jamais "delai_expire" ici : l'échéance n'est pas dépassée
+    });
+
+    it("les heures certaines à venir réduisent l'écart à couvrir par la projection : la date de franchissement projetée ne peut jamais être plus tardive qu'en les ignorant", () => {
+      const p = profil({ dateAnniversaire: "2026-12-31" });
+      const contratsSansCertain = [contrat({ date: "2026-02-01", nbCachets: 10 })]; // 120 h acquises, rien à venir
+      const contratsAvecCertain = [...contratsSansCertain, contrat({ date: "2026-08-01", nbCachets: 10 })]; // + 120 h certaines à venir
+
+      const sansCertain = calculerStatutPrediction(p, contratsSansCertain, [], franceTravailConfig, "2026-06-01");
+      const avecCertain = calculerStatutPrediction(p, contratsAvecCertain, [], franceTravailConfig, "2026-06-01");
+
+      expect(avecCertain.heuresCertainesAVenir).toBe(120);
+      expect(sansCertain.rythmeMensuelActuel).toBe(avecCertain.rythmeMensuelActuel); // même rythme passé (heuresActuelles identique)
+      expect(sansCertain.dateFranchissementProjetee).not.toBeNull();
+      expect(avecCertain.dateFranchissementProjetee).not.toBeNull();
+      expect(avecCertain.dateFranchissementProjetee! <= sansCertain.dateFranchissementProjetee!).toBe(true);
+    });
+  });
 });

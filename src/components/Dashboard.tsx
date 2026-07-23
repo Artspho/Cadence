@@ -7,6 +7,7 @@ import { DetailCalcul } from "./DetailCalcul";
 interface DashboardProps {
   prediction: StatutPrediction;
   serie: PointSerie[];
+  serieAVenir: PointSerie[];
   fenetreDebut: string;
   dateCap: string;
   decompte: DecompteHeuresResultat;
@@ -62,7 +63,7 @@ function bandeauSeuilReadmission(seuilReadmission: SeuilReadmission, seuilHeures
   }
 }
 
-export function Dashboard({ prediction, serie, fenetreDebut, dateCap, decompte, ajBrute, ajNette, sr, nht, sar }: DashboardProps) {
+export function Dashboard({ prediction, serie, serieAVenir, fenetreDebut, dateCap, decompte, ajBrute, ajNette, sr, nht, sar }: DashboardProps) {
   const bandeauReadmission = bandeauSeuilReadmission(prediction.seuilReadmission, prediction.seuilHeures);
   const r = decompte.repartition;
   const cachets = r.cachets;
@@ -78,8 +79,10 @@ export function Dashboard({ prediction, serie, fenetreDebut, dateCap, decompte, 
           fenetreFin={prediction.dateAnniversaire}
           dateCap={dateCap}
           serie={serie}
+          serieAVenir={serieAVenir}
           seuilHeures={prediction.seuilHeures}
           heuresActuelles={prediction.heuresActuelles}
+          heuresCertainesAVenir={prediction.heuresCertainesAVenir}
           niveau={prediction.niveau}
           dateFranchissementProjetee={prediction.dateFranchissementProjetee}
           rythmeMensuelActuel={prediction.rythmeMensuelActuel}

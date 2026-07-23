@@ -48,7 +48,7 @@ export function Simulateur({ profil, contrats, periodes, config, dateDuJour, dec
     <div className="grid md:grid-cols-2 gap-6">
       <div>
         <h2 className="font-display text-lg font-medium mb-3">Et si je signe ce contrat ?</h2>
-        <ContractForm profil={profil} config={config} decompteActuel={decompteActuel} onValider={setContratSimule} />
+        <ContractForm profil={profil} config={config} decompteActuel={decompteActuel} onValider={setContratSimule} previsualisationSeulement />
       </div>
 
       <div className="space-y-4">

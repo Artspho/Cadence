@@ -7,8 +7,10 @@ interface ProjectionChartProps {
   fenetreFin: string;
   dateCap: string;
   serie: PointSerie[];
+  serieAVenir: PointSerie[];
   seuilHeures: number;
   heuresActuelles: number;
+  heuresCertainesAVenir: number;
   niveau: NiveauStatut;
   dateFranchissementProjetee: string | null;
   rythmeMensuelActuel: number;
@@ -31,16 +33,30 @@ function formatDateCourte(iso: string): string {
   return `${parseInt(jour, 10)} ${labels[parseInt(mois, 10) - 1]}`;
 }
 
-export function ProjectionChart({ fenetreDebut, fenetreFin, dateCap, serie, seuilHeures, heuresActuelles, niveau, dateFranchissementProjetee, rythmeMensuelActuel, anniversaireConnu }: ProjectionChartProps) {
+const TEAL = "#57A9F0"; // segment "confirmé à venir" — même couleur que "heures scène" (charte §8.1)
+
+export function ProjectionChart({
+  fenetreDebut,
+  fenetreFin,
+  dateCap,
+  serie,
+  serieAVenir,
+  seuilHeures,
+  heuresActuelles,
+  heuresCertainesAVenir,
+  niveau,
+  dateFranchissementProjetee,
+  rythmeMensuelActuel,
+  anniversaireConnu,
+}: ProjectionChartProps) {
   const statut = LABELS_STATUT[niveau];
 
-  const { pathAcquis, pathAire, pathProjection, xToday, yToday, yLigneObjectif, xFranchissement, yFranchissement, ticksMois } = useMemo(() => {
+  const { pathAcquis, pathAire, pathCertain, marqueursCertain, pathProjection, xToday, yToday, yLigneObjectif, xFranchissement, yFranchissement, ticksMois } = useMemo(() => {
     const debutMs = new Date(fenetreDebut).getTime();
     const finMs = new Date(fenetreFin).getTime();
-    const capMs = new Date(dateCap).getTime();
     const dureeMs = Math.max(1, finMs - debutMs);
 
-    const maxHeuresSerie = serie.length > 0 ? Math.max(...serie.map((p) => p.heures)) : 0;
+    const maxHeuresSerie = Math.max(0, ...serie.map((p) => p.heures), ...serieAVenir.map((p) => p.heures));
     const maxY = Math.max(seuilHeures * 1.15, maxHeuresSerie * 1.15, 10);
 
     const x = (iso: string) => MARGE.gauche + ((new Date(iso).getTime() - debutMs) / dureeMs) * (LARGEUR - MARGE.gauche - MARGE.droite);
@@ -50,12 +66,30 @@ export function ProjectionChart({ fenetreDebut, fenetreFin, dateCap, serie, seui
     const pathAcquis = pointsAcquis.length > 0 ? `M ${pointsAcquis.join(" L ")}` : "";
     const pathAire = pointsAcquis.length > 0 ? `${pathAcquis} L ${x(dateCap)},${y(0)} L ${x(fenetreDebut)},${y(0)} Z` : "";
 
+    // Segment "confirmé à venir" : contrats déjà signés, pas une projection. `serieAVenir` commence
+    // toujours par (dateCap, heuresActuelles) pour se raccorder à la courbe acquise — un seul point
+    // (aucun contrat à venir) ne dessine rien.
+    const pathCertain = serieAVenir.length > 1 ? `M ${serieAVenir.map((p) => `${x(p.date)},${y(p.heures)}`).join(" L ")}` : "";
+    const marqueursCertain = serieAVenir.slice(1).map((p) => ({ x: x(p.date), y: y(p.heures) }));
+
+    // La projection pointillée repart de (dateCap, heuresActuelles) — comme dateFranchissementProjetee
+    // (prediction.ts), elle raisonne sur tout le calendrier restant, pas seulement l'après-certain :
+    // un contrat certain réduit l'écart à combler (heuresCertainesAVenir), pas le temps disponible
+    // pour signer AUTRE CHOSE. La faire repartir visuellement de la fin du segment certain risquerait
+    // de dessiner une ligne "à l'envers" si la date projetée tombe avant la date du dernier contrat
+    // certain (le rythme seul suffirait avant même que ce contrat n'ait lieu).
+    const capMs = new Date(dateCap).getTime();
+    const heuresAvecCertain = serieAVenir.length > 0 ? serieAVenir[serieAVenir.length - 1].heures : heuresActuelles;
+
     let pathProjection = "";
     let xFranchissement: number | null = null;
     let yFranchissement: number | null = null;
-    if (heuresActuelles < seuilHeures) {
+    if (heuresAvecCertain < seuilHeures) {
       const cibleDate = dateFranchissementProjetee && new Date(dateFranchissementProjetee).getTime() <= finMs ? dateFranchissementProjetee : fenetreFin;
-      const cibleHeures = dateFranchissementProjetee && new Date(dateFranchissementProjetee).getTime() <= finMs ? seuilHeures : heuresActuelles + (rythmeMensuelActuel * (finMs - capMs)) / (1000 * 60 * 60 * 24 * 30);
+      const cibleHeures =
+        dateFranchissementProjetee && new Date(dateFranchissementProjetee).getTime() <= finMs
+          ? seuilHeures
+          : heuresActuelles + (rythmeMensuelActuel * (finMs - capMs)) / (1000 * 60 * 60 * 24 * 30);
       pathProjection = `M ${x(dateCap)},${y(heuresActuelles)} L ${x(cibleDate)},${y(Math.min(cibleHeures, maxY))}`;
       if (dateFranchissementProjetee && new Date(dateFranchissementProjetee).getTime() <= finMs) {
         xFranchissement = x(dateFranchissementProjetee);
@@ -74,6 +108,8 @@ export function ProjectionChart({ fenetreDebut, fenetreFin, dateCap, serie, seui
     return {
       pathAcquis,
       pathAire,
+      pathCertain,
+      marqueursCertain,
       pathProjection,
       xToday: x(dateCap),
       yToday: y(heuresActuelles),
@@ -82,7 +118,7 @@ export function ProjectionChart({ fenetreDebut, fenetreFin, dateCap, serie, seui
       yFranchissement,
       ticksMois,
     };
-  }, [fenetreDebut, fenetreFin, dateCap, serie, seuilHeures, heuresActuelles, dateFranchissementProjetee, rythmeMensuelActuel]);
+  }, [fenetreDebut, fenetreFin, dateCap, serie, serieAVenir, seuilHeures, heuresActuelles, dateFranchissementProjetee, rythmeMensuelActuel]);
 
   const joursRestants = Math.max(0, Math.round((new Date(fenetreFin).getTime() - new Date(dateCap).getTime()) / (1000 * 60 * 60 * 24)));
 
@@ -99,7 +135,27 @@ export function ProjectionChart({ fenetreDebut, fenetreFin, dateCap, serie, seui
           <span className="font-display text-2xl md:text-3xl font-semibold tabular-nums tracking-tight">{Math.round(heuresActuelles)}</span>
           <span className="text-muted"> / {seuilHeures} h</span>
           <p className="text-xs text-muted">{!anniversaireConnu ? "date inconnue" : joursRestants > 0 ? `${joursRestants} jours restants` : "échéance atteinte"}</p>
+          {heuresCertainesAVenir > 0 && <p className="text-xs text-teal mt-0.5">+ {Math.round(heuresCertainesAVenir)} h déjà signées à venir</p>}
         </div>
+      </div>
+
+      <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted mb-3">
+        <span className="flex items-center gap-1.5">
+          <span className="w-3 h-0.5 rounded-full bg-mint inline-block" aria-hidden />
+          Acquis
+        </span>
+        {pathCertain && (
+          <span className="flex items-center gap-1.5">
+            <span className="w-3 h-0.5 rounded-full inline-block" style={{ backgroundColor: TEAL }} aria-hidden />
+            Confirmé à venir (contrats déjà signés)
+          </span>
+        )}
+        {pathProjection && (
+          <span className="flex items-center gap-1.5">
+            <span className="w-3 h-0.5 rounded-full border-t-2 border-dashed inline-block" style={{ borderColor: statut.classeCourbe }} aria-hidden />
+            Projection au rythme actuel
+          </span>
+        )}
       </div>
 
       <svg viewBox={`0 0 ${LARGEUR} ${HAUTEUR}`} className="w-full h-auto" role="img" aria-label="Projection des heures acquises vers l'objectif de 507 heures">
@@ -119,6 +175,12 @@ export function ProjectionChart({ fenetreDebut, fenetreFin, dateCap, serie, seui
         {/* aire + courbe acquise */}
         {pathAire && <path d={pathAire} fill="url(#aireMenthe)" />}
         {pathAcquis && <path d={pathAcquis} fill="none" stroke="#3FD69B" strokeWidth={2.5} strokeLinejoin="round" strokeLinecap="round" />}
+
+        {/* segment "confirmé à venir" : contrats déjà signés, pas une projection — trait plein distinct (teal), un marqueur par contrat */}
+        {pathCertain && <path d={pathCertain} fill="none" stroke={TEAL} strokeWidth={2.5} strokeLinejoin="round" strokeLinecap="round" />}
+        {marqueursCertain.map((m, i) => (
+          <circle key={i} cx={m.x} cy={m.y} r={3.5} fill={TEAL} stroke="#0A0C10" strokeWidth={1.5} />
+        ))}
 
         {/* projection pointillée */}
         {pathProjection && <path d={pathProjection} fill="none" stroke={statut.classeCourbe} strokeWidth={2} strokeDasharray="5 5" strokeLinecap="round" />}

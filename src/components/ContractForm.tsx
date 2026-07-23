@@ -14,6 +14,8 @@ interface ContractFormProps {
   /** Absent dans les contextes où un contrat récurrent n'a pas de sens (relecture d'un import PDF déjà extrait, simulation temporaire non persistée) : le CTA associé ne s'affiche alors pas. */
   onValiderRecurrent?: (contrats: Contrat[]) => void;
   onAnnuler?: () => void;
+  /** Simulateur.tsx uniquement : le contrat n'est jamais persisté ("et si"), donc l'indice "ce contrat sera affiché comme à venir" serait faux — masqué dans ce contexte. */
+  previsualisationSeulement?: boolean;
 }
 
 const TYPES_CONTRAT: { id: TypeContrat; label: string }[] = [
@@ -23,7 +25,7 @@ const TYPES_CONTRAT: { id: TypeContrat; label: string }[] = [
   { id: "ptp", label: "PTP" },
 ];
 
-export function ContractForm({ profil, config, decompteActuel, valeurInitiale, onValider, onValiderRecurrent, onAnnuler }: ContractFormProps) {
+export function ContractForm({ profil, config, decompteActuel, valeurInitiale, onValider, onValiderRecurrent, onAnnuler, previsualisationSeulement }: ContractFormProps) {
   const [formRecurrentOuvert, setFormRecurrentOuvert] = useState(false);
   const [type, setType] = useState<TypeContrat>(valeurInitiale?.type ?? "artiste");
   const [typeRemuneration, setTypeRemuneration] = useState<TypeRemuneration>(valeurInitiale?.typeRemuneration ?? "cachet");
@@ -160,6 +162,9 @@ export function ContractForm({ profil, config, decompteActuel, valeurInitiale, o
             Date de fin de contrat
           </label>
           <input id="date-fin" type="date" value={date} onChange={(e) => setDate(e.target.value)} required className="w-full bg-surface-2 border border-line rounded-lg px-3 py-2" />
+          {!previsualisationSeulement && date && date > new Date().toISOString().slice(0, 10) && (
+            <p className="text-xs text-muted mt-1">Ce contrat sera affiché comme « à venir · confirmé » dans ton graphique. S'il est annulé, supprime-le.</p>
+          )}
         </div>
       </div>
 

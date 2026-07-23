@@ -7,7 +7,7 @@ import { calculerDecompteHeures } from "./engine/decompteHeures";
 import { calculerSalaireReference } from "./engine/salaireReference";
 import { calculerAJBrutePourFenetre } from "./engine/areBrute";
 import { calculerAJNette, calculerSJM } from "./engine/areNette";
-import { calculerStatutPrediction, construireSerieAcquisition } from "./engine/prediction";
+import { calculerStatutPrediction, construireSerieAcquisition, construireSerieAVenir } from "./engine/prediction";
 import { detecterAlertes } from "./engine/alertes";
 import { decouperExercices } from "./engine/cycles";
 import { diffJours } from "./engine/dateUtils";
@@ -67,10 +67,11 @@ export default function App() {
     const prediction = calculerStatutPrediction(profil, contrats, periodes, config, dateDuJour);
     const dateCap = diffJours(dateDuJour, fenetre.dateFin) >= 0 ? dateDuJour : fenetre.dateFin;
     const serie = construireSerieAcquisition(profil, contrats, periodes, config, fenetre, dateCap);
+    const serieAVenir = construireSerieAVenir(profil, contrats, periodes, config, fenetre, dateCap);
     const alertes = detecterAlertes(profil, contrats, periodes, config, dateDuJour);
     const exercices = decouperExercices(profil, contrats, periodes, config, dateDuJour);
 
-    return { fenetre, decompte, ajBrute, ajNette, prediction, dateCap, serie, alertes, exercices, sr, nht, sar };
+    return { fenetre, decompte, ajBrute, ajNette, prediction, dateCap, serie, serieAVenir, alertes, exercices, sr, nht, sar };
   }, [donnees]);
 
   if (!donnees) {
@@ -211,6 +212,7 @@ export default function App() {
               <Dashboard
                 prediction={calculs.prediction}
                 serie={calculs.serie}
+                serieAVenir={calculs.serieAVenir}
                 fenetreDebut={calculs.fenetre.dateDebut}
                 dateCap={calculs.dateCap}
                 decompte={calculs.decompte}

@@ -39,27 +39,58 @@ export function calculerStatutPrediction(
   const heuresActuelles = decompteAJour.total;
   const heuresRestantes = Math.max(0, seuilHeures - heuresActuelles);
 
+  // Heures "certaines à venir" : contrats déjà signés, datés après dateCap, dans la fenêtre.
+  // decompteHeures.ts/salaireReference.ts les comptent déjà (ils tournent sur la fenêtre complète,
+  // sans notion de "aujourd'hui") — on rend ça explicite ici plutôt que de laisser le hero/graphique
+  // les ignorer silencieusement (l'incohérence qu'ils affichaient jusqu'ici : "0 / 507 h" au hero à
+  // côté d'une répartition qui comptait déjà ces heures). Pas une projection : un fait déjà dans les
+  // données. Math.max(0, ...) est un plancher défensif (jamais négatif), pas une approximation :
+  // dans un cas de bord où le plafond cumulé enseignement+formation se réarrange entre les deux
+  // fenêtres, il fait tendre vers "moins d'heures certaines affichées" plutôt que l'inverse —
+  // jamais de sur-affichage (devoir sacré n°2).
+  const decompteFenetreComplete = calculerDecompteHeures(contrats, periodes, profil, config, fenetre);
+  const heuresCertainesAVenir = Math.max(0, decompteFenetreComplete.total - heuresActuelles);
+  const heuresAvecCertain = heuresActuelles + heuresCertainesAVenir;
+
   const joursEcoules = Math.max(1, diffJours(fenetre.dateDebut, dateCap));
   const rythmeMensuelActuel = (heuresActuelles / joursEcoules) * JOURS_PAR_MOIS;
 
   const joursRestants = Math.max(0, diffJours(dateCap, fenetre.dateFin));
+
+  // rythmeRequis/dateFranchissementProjetee : le numérateur (heures) tient compte du certain à
+  // venir, mais le dénominateur temps reste `joursRestants` (dateCap → fin de fenêtre), PAS la fin
+  // du segment certain. Un contrat déjà signé réduit l'écart à combler, il ne consomme pas le
+  // calendrier restant — l'utilisateur peut encore signer un AUTRE contrat n'importe quel jour
+  // avant l'anniversaire, y compris après la date du dernier contrat déjà connu. (Bug trouvé en
+  // testant : baser le dénominateur sur la fin du segment certain fait tomber joursRestants à 0,
+  // et donc afficher à tort "delai_expire", dès qu'un contrat à venir tombe pile sur la date
+  // anniversaire — alors que l'échéance réelle, elle, n'est pas du tout dépassée.) Identique à
+  // heuresRestantes/joursRestants quand heuresCertainesAVenir === 0 : aucun contrat à venir ne
+  // change donc rien au comportement existant.
+  const heuresRestantesApresCertain = Math.max(0, seuilHeures - heuresAvecCertain);
+
   // Plus aucun Infinity ici : quand le délai est à zéro, on nomme la vraie cause (donnée
   // manquante vs échéance réellement dépassée) plutôt que de renvoyer une sentinelle brute.
   const rythmeRequis: RythmeRequis =
     joursRestants > 0
-      ? { atteignable: true, heuresParMois: (heuresRestantes / joursRestants) * JOURS_PAR_MOIS }
-      : heuresRestantes > 0
+      ? { atteignable: true, heuresParMois: (heuresRestantesApresCertain / joursRestants) * JOURS_PAR_MOIS }
+      : heuresRestantesApresCertain > 0
         ? { atteignable: false, raison: anniversaireConnu ? "delai_expire" : "anniversaire_inconnu" }
         : { atteignable: true, heuresParMois: 0 };
 
   let dateFranchissementProjetee: string | null = null;
-  if (heuresRestantes > 0 && rythmeMensuelActuel > 0) {
-    const joursNecessaires = Math.ceil(heuresRestantes / (rythmeMensuelActuel / JOURS_PAR_MOIS));
+  if (heuresRestantesApresCertain > 0 && rythmeMensuelActuel > 0) {
+    const joursNecessaires = Math.ceil(heuresRestantesApresCertain / (rythmeMensuelActuel / JOURS_PAR_MOIS));
     dateFranchissementProjetee = ajouterJours(dateCap, joursNecessaires);
   }
 
   let niveau: StatutPrediction["niveau"];
   if (heuresActuelles >= seuilHeures) {
+    niveau = "securite";
+  } else if (heuresAvecCertain >= seuilHeures) {
+    // Correction du faux pessimisme : des contrats déjà signés à venir peuvent suffire à eux seuls,
+    // même si le rythme passé est faible ou nul (ex. tout juste réadmis) — ce n'est pas une
+    // projection, ne pas attendre que la ligne pointillée "au rythme" le confirme.
     niveau = "securite";
   } else if (anniversaireConnu && joursRestants <= 0) {
     niveau = "bloque";
@@ -74,7 +105,7 @@ export function calculerStatutPrediction(
   const { seuilBas, seuilHaut } = config.readmission.clauseRattrapage;
   const eligibleRattrapage = niveau !== "securite" && heuresActuelles >= seuilBas && heuresActuelles <= seuilHaut;
 
-  const message = construireMessage(niveau, heuresActuelles, seuilHeures, dateFranchissementProjetee, joursRestants, anniversaireConnu);
+  const message = construireMessage(niveau, heuresActuelles, seuilHeures, dateFranchissementProjetee, joursRestants, anniversaireConnu, heuresRestantesApresCertain);
 
   return {
     niveau,
@@ -84,6 +115,8 @@ export function calculerStatutPrediction(
     dateAnniversaire: fenetre.dateFin,
     joursRestants,
     anniversaireConnu,
+    heuresCertainesAVenir,
+    heuresRestantesApresCertain,
     seuilReadmission: fenetre.seuilReadmission,
     rythmeMensuelActuel,
     rythmeRequis,
@@ -106,6 +139,7 @@ function construireMessage(
   dateFranchissement: string | null,
   joursRestants: number,
   anniversaireConnu: boolean,
+  heuresRestantesApresCertain: number,
 ): string {
   if (niveau === "securite") {
     if (heuresActuelles >= seuil) return "Tu as atteint tes 507 h sur cette période.";
@@ -116,10 +150,12 @@ function construireMessage(
     if (!anniversaireConnu) {
       return `Renseigne ta date anniversaire pour un suivi précis. Pour l'instant, tu as ${Math.round(heuresActuelles)} h sur ${seuil} h.`;
     }
-    return `Rythme insuffisant pour renouveler tes droits : il te manque ${Math.ceil(seuil - heuresActuelles)} h avant l'échéance.`;
+    // Écart net des heures déjà certaines à venir (contrats signés) — sinon ce message et le
+    // "vise environ X h/mois" de alertes.ts (basé sur ce même écart net) se contrediraient.
+    return `Rythme insuffisant pour renouveler tes droits : il te manque ${Math.ceil(heuresRestantesApresCertain)} h avant l'échéance.`;
   }
   if (joursRestants <= 0) return `Échéance atteinte sans les ${seuil} h requises.`;
-  return `Échéance proche (${joursRestants} j) et ${Math.ceil(seuil - heuresActuelles)} h manquantes : agis vite.`;
+  return `Échéance proche (${joursRestants} j) et ${Math.ceil(heuresRestantesApresCertain)} h manquantes : agis vite.`;
 }
 
 export interface PointSerie {
@@ -151,6 +187,35 @@ export function construireSerieAcquisition(
   if (points[points.length - 1].date !== dateCap) {
     const decompteFinal = calculerDecompteHeures(contrats, periodes, profil, config, { dateDebut: fenetre.dateDebut, dateFin: dateCap });
     points.push({ date: dateCap, heures: decompteFinal.total });
+  }
+  return points;
+}
+
+/**
+ * Série cumulative des heures "certaines à venir" : contrats déjà signés, datés après `dateCap`,
+ * dans la fenêtre de référence. Pas une projection — decompteHeures.ts les compte déjà dans le
+ * total "pleine fenêtre" (cf. heuresCertainesAVenir de StatutPrediction) ; cette série sert
+ * uniquement à positionner ce fait sur le graphique. Premier point = (dateCap, heures acquises à ce
+ * jour), pour se raccorder visuellement à la fin de `construireSerieAcquisition`. Aucun contrat à
+ * venir → un seul point (dateCap, heuresActuelles), le segment ne se dessine alors pas (longueur 1).
+ */
+export function construireSerieAVenir(
+  profil: Profil,
+  contrats: Contrat[],
+  periodes: PeriodeAssimilee[],
+  config: FranceTravailConfig,
+  fenetre: Fenetre,
+  dateCap: string,
+): PointSerie[] {
+  const decompteAJour = calculerDecompteHeures(contrats, periodes, profil, config, { dateDebut: fenetre.dateDebut, dateFin: dateCap });
+  const datesAVenir = Array.from(
+    new Set(contrats.filter((c) => diffJours(dateCap, c.date) > 0 && dansIntervalle(c.date, fenetre.dateDebut, fenetre.dateFin)).map((c) => c.date)),
+  ).sort();
+
+  const points: PointSerie[] = [{ date: dateCap, heures: decompteAJour.total }];
+  for (const date of datesAVenir) {
+    const decompte = calculerDecompteHeures(contrats, periodes, profil, config, { dateDebut: fenetre.dateDebut, dateFin: date });
+    points.push({ date, heures: decompte.total });
   }
   return points;
 }

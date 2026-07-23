@@ -78,7 +78,7 @@ export function detecterAlertes(profil: Profil, contrats: Contrat[], periodes: P
       code: "rythme_insuffisant",
       niveau: "attention",
       titre: "Rythme insuffisant",
-      message: `À ce rythme, tu n'atteindras pas ${prediction.seuilHeures} h avant le ${prediction.dateAnniversaire}. Il manque ${Math.ceil(prediction.heuresRestantes)} h.`,
+      message: `À ce rythme, tu n'atteindras pas ${prediction.seuilHeures} h avant le ${prediction.dateAnniversaire}. Il manque ${Math.ceil(prediction.heuresRestantesApresCertain)} h.`,
       actionSuggeree: `Vise environ ${Math.ceil(prediction.rythmeRequis.heuresParMois)} h/mois d'ici l'échéance pour rattraper le rythme.`,
     });
   }

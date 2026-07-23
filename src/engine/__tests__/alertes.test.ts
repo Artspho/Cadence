@@ -121,6 +121,13 @@ describe("detecterAlertes", () => {
     expect(codes(detecterAlertes(pReadmissionOk, contratsSuffisants, [], franceTravailConfig, "2026-06-01"))).not.toContain("seuil_readmission_non_calculable");
   });
 
+  it("rythme_insuffisant ne se déclenche plus si des contrats déjà signés à venir suffisent à eux seuls à atteindre le seuil", () => {
+    const p = profil({ dateAnniversaire: "2026-12-31" });
+    const contrats = [contrat({ date: "2026-09-01", nbCachets: 45 })]; // 540 h, tout à venir, rythme passé nul
+    const alertes = detecterAlertes(p, contrats, [], franceTravailConfig, "2026-06-01");
+    expect(codes(alertes)).not.toContain("rythme_insuffisant");
+  });
+
   it("anti-faux-positif : artiste-enseignant avec regimeDeclare 'annexe10_pur' explicite reste dans le périmètre (pas situation_mixte)", () => {
     const p = profil({ dateNaissance: "1990-01-01", dateAnniversaire: "2026-12-31", regimeDeclare: "annexe10_pur" });
     const contrats = [contrat({ date: "2026-06-01", type: "enseignement", typeRemuneration: "heures", nbHeures: 90, etablissementAgree: true, enRapportAvecMetier: true })];

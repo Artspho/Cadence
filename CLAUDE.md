@@ -312,6 +312,49 @@ src/
   `tsc -b` propre. Vérifié dans le navigateur : apparition du CTA au choix "Enseignement",
   bascule vers le formulaire récurrent puis retour via "Annuler" sans perte d'état du formulaire
   normal, absence du CTA dans Import PDF et Simulateur.
+- ✅ **Contrats à venir persistés, graphique 3 segments** (SPEC §11.B, item 1 du backlog) :
+  **découverte en investiguant, pas un simple ajout** — un contrat déjà signé daté dans le futur
+  était déjà possible (rien ne l'empêchait) et déjà compté dans `decompte`/`SR`/`NHT` (fenêtre
+  complète, `decompteHeures.ts`/`salaireReference.ts` inchangés, aucune règle réglementaire à
+  deviner ici), mais **totalement ignoré** par `prediction.ts` (plafonné à `dateCap` = aujourd'hui)
+  — d'où un vrai "0 / 507 h" au héros à côté d'une "Répartition des heures" qui comptait déjà ces
+  heures, incohérence silencieuse préexistante, pas introduite cette session. **Aucun champ
+  nouveau sur `Contrat`** : "à venir" se déduit uniquement de `contrat.date > dateDuJour` (jamais
+  stocké — un flag stocké deviendrait faux tout seul le jour où `dateDuJour` dépasse la date du
+  contrat), donc **zéro impact schéma Zod / export-import JSON**. `StatutPrediction` gagne deux
+  champs : `heuresCertainesAVenir` (contrats signés à venir dans la fenêtre, 0 si aucun) et
+  `heuresRestantesApresCertain` (écart net = seuil − acquis − certain, jamais négatif — tout texte
+  "il te manque X h"/"vise X h/mois" doit lire CE champ, jamais l'ancien `heuresRestantes` brut).
+  **Correction du faux pessimisme** : `niveau` passe désormais "Sécurité" dès que
+  `heuresActuelles + heuresCertainesAVenir >= seuil`, même si le rythme passé est nul (ex. tout
+  juste réadmis mais déjà un gros contrat signé) — avant ce lot, un tel profil restait à tort en
+  "Alerte" tant que la seule projection linéaire ne suffisait pas. `rythmeRequis`/
+  `dateFranchissementProjetee` gardent `joursRestants` (dateCap → fin de fenêtre) comme
+  dénominateur temps, **jamais** la fin du segment certain — **bug trouvé en testant dans le
+  navigateur avec de vraies données** (le contrat récurrent du lot précédent, dernier mois
+  2026-12-31, pile la date anniversaire) : baser le dénominateur sur la fin du segment certain
+  faisait tomber le temps restant à 0 et afficher à tort "délai trop court" alors que l'échéance
+  réelle était encore à 161 jours. Une fois corrigé, un second écart est apparu au même endroit :
+  l'alerte "rythme_insuffisant" disait "il manque 507 h" à côté d'un "vise 90 h/mois" déjà calculé
+  sur l'écart net (483 h) — deux chiffres contradictoires dans la même phrase ; `alertes.ts` et
+  `construireMessage` (prediction.ts) lisent désormais tous deux `heuresRestantesApresCertain`.
+  `ProjectionChart.tsx` : nouveau segment plein teal "confirmé à venir" (un marqueur par contrat,
+  distinct de la courbe acquise et du pointillé — légende textuelle obligatoire pour les trois,
+  jamais la couleur seule, §8.6) ; le pointillé repart de `dateCap` (comme avant, pas de la fin du
+  segment certain — écarte tout risque de ligne dessinée "à l'envers" si la date projetée tombait
+  avant un contrat déjà signé). Nouvelle fonction pure `construireSerieAVenir` (prediction.ts,
+  même famille que `construireSerieAcquisition`). `ContractForm.tsx` : indice discret sous le
+  champ date quand la date saisie est future (« sera affiché comme à venir · confirmé... »),
+  **masqué dans `Simulateur.tsx`** via un nouveau prop `previsualisationSeulement` — le contrat
+  simulé n'étant jamais persisté, l'indice y serait littéralement faux (devoir n°2), pas juste
+  hors-sujet. 15 tests dédiés ajoutés (`prediction.test.ts` : 9, `alertes.test.ts` : 1, plus les
+  révisions du test qui a révélé le bug du dénominateur) — 108 tests verts au total, `tsc -b`
+  propre. `engine/decompteHeures.ts`, `salaireReference.ts`, `areBrute.ts`, `areNette.ts`,
+  `periodeReference.ts`, `cycles.ts` **intouchés**, conformément au plan validé. Vérifié dans le
+  navigateur avec les vraies données de contrat récurrent du lot précédent : graphique 3 segments,
+  "+24 h déjà signées à venir", cohérence "il manque"/"vise" rétablie ; puis avec un contrat passé
+  ajouté en plus (360 h) : bascule correcte en "Sécurité", franchissement projeté cohérent avec le
+  rythme requis affiché, aucune régression du cas sans contrat à venir.
 - ⬜ **Non traité (V2/V3) :** coordination européenne (périodes U1/PDU1) — même famille qu'Annexe 8/article 65, hors périmètre Annexe 10 pur. Aucune logique ni champ de données ne l'anticipe encore (détail dans `docs/SPEC.md` §10 et §11.C). Ne pas confondre avec le champ `territoire` du contrat, qui couvre un cas différent (cachet ponctuel joué en EEE/Suisse/UK mais déclaré en France).
 - 🔁 **Maintenance de la config** (récurrent, perso — hors app, pas de backend en bêta) : une fois
   par mois, vérifier à la source officielle SMIC (horaire / mensuel / journalier), PMSS, et les
