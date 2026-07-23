@@ -48,7 +48,7 @@ export function detecterAlertes(profil: Profil, contrats: Contrat[], periodes: P
           niveau: "attention",
           titre: "Seuil de réadmission non calculable",
           message: "Seuil de réadmission non calculable avec tes données actuelles.",
-          actionSuggeree: "Ajoute tes contrats antérieurs si tu en as, ou vérifie ta situation exacte auprès de France Travail.",
+          actionSuggeree: "Ajoute tes contrats antérieurs si tu en as, ou renseigne ta précédente ouverture de droits dans « Mon profil ».",
         });
         break;
       case "hors_bornes":

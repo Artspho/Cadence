@@ -20,7 +20,7 @@ import { ImportBulletins } from "./components/ImportBulletins";
 import { AlertCenter } from "./components/AlertCenter";
 import { Historique } from "./components/Historique";
 import { Simulateur } from "./components/Simulateur";
-import { AProposLimites } from "./components/AProposLimites";
+import { MonProfil } from "./components/MonProfil";
 import { AvertissementHorsPerimetre } from "./components/AvertissementHorsPerimetre";
 import { ConfirmationImport } from "./components/ConfirmationImport";
 import { DashboardVide } from "./components/DashboardVide";
@@ -236,7 +236,7 @@ export default function App() {
             <Simulateur profil={profil} contrats={donnees.contrats} periodes={donnees.periodes} config={franceTravailConfig} dateDuJour={dateDuJour} decompteActuel={calculs.decompte} />
           ))}
 
-        {onglet === "apropos" && <AProposLimites dateDuJour={dateDuJour} profil={profil} onModifierProfil={modifierProfil} />}
+        {onglet === "profil" && <MonProfil dateDuJour={dateDuJour} profil={profil} onModifierProfil={modifierProfil} />}
       </main>
     </div>
   );

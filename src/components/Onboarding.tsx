@@ -149,7 +149,7 @@ export function Onboarding({ onTerminer }: OnboardingProps) {
             </button>
           </div>
           {regimeDeclare !== "annexe10_pur" && (
-            <p className="text-xs text-amber mt-2">Cadence ne pourra pas t'afficher d'estimation dans ce cas — tu pourras revenir sur cette réponse plus tard, dans « À propos ».</p>
+            <p className="text-xs text-amber mt-2">Cadence ne pourra pas t'afficher d'estimation dans ce cas — tu pourras revenir sur cette réponse plus tard, dans « Mon profil ».</p>
           )}
         </div>
 

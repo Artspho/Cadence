@@ -6,13 +6,13 @@ import { validerCoherenceProfil } from "../lib/coherenceProfil";
 import type { ResultatEcritureProfil } from "../lib/coherenceProfil";
 import type { Profil } from "../types";
 
-interface AProposLimitesProps {
+interface MonProfilProps {
   dateDuJour: string;
   profil: Profil;
   onModifierProfil: (profil: Profil) => ResultatEcritureProfil;
 }
 
-export function AProposLimites({ dateDuJour, profil, onModifierProfil }: AProposLimitesProps) {
+export function MonProfil({ dateDuJour, profil, onModifierProfil }: MonProfilProps) {
   const jours = joursDepuisMiseAJourConfig(new Date(dateDuJour));
   // estPerime compare franceTravailConfig.meta.valableJusquau (un fait déclaré, jamais un
   // seuil de durée deviné) à dateDuJour — même fonction que TopBar.tsx, une seule source de
@@ -67,11 +67,11 @@ export function AProposLimites({ dateDuJour, profil, onModifierProfil }: APropos
 
         <div className="bg-surface border border-line rounded-card p-5 space-y-5 mb-4">
           <div>
-            <label className="block text-xs uppercase tracking-[.03em] text-muted mb-2" htmlFor="apropos-date-naissance">
+            <label className="block text-xs uppercase tracking-[.03em] text-muted mb-2" htmlFor="profil-date-naissance">
               Date de naissance
             </label>
             <input
-              id="apropos-date-naissance"
+              id="profil-date-naissance"
               type="date"
               value={dateNaissance}
               onChange={(e) => {
@@ -137,11 +137,11 @@ export function AProposLimites({ dateDuJour, profil, onModifierProfil }: APropos
 
           {situation === "readmission" && (
             <div>
-              <label className="block text-xs uppercase tracking-[.03em] text-muted mb-2" htmlFor="apropos-date-anniversaire-precedente">
+              <label className="block text-xs uppercase tracking-[.03em] text-muted mb-2" htmlFor="profil-date-anniversaire-precedente">
                 Date de fin de ta période de droits précédente (optionnel)
               </label>
               <input
-                id="apropos-date-anniversaire-precedente"
+                id="profil-date-anniversaire-precedente"
                 type="date"
                 value={dateAnniversairePrecedente}
                 onChange={(e) => {
