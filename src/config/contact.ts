@@ -4,6 +4,11 @@
  * `null` tant que non renseigné, jamais un placeholder qui ressemble à une
  * vraie adresse. Le feedback ne s'affiche NULLE PART (TopBar, Mon profil) tant
  * que cette valeur est `null` — maintenant comme plus tard.
+ *
+ * Rappel de contexte (cf. `franceTravailConfig.meta.avertissement`) : ce lien ne sert qu'à
+ * recueillir un avis sur l'app elle-même. Cadence reste une estimation indicative qui ne se
+ * substitue jamais à une notification officielle de France Travail, et ne couvre que le régime
+ * Annexe 10 — pour une question sur ses droits, direction France Travail, pas ce mail.
  */
 export const EMAIL_FEEDBACK: string | null = "benoit.zahra@orange.fr";
 
