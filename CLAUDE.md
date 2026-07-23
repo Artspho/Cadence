@@ -265,8 +265,7 @@ src/
   `docs/reprise.md`.
 - ✅ **Contrat récurrent pour l'enseignement** (item 1 du backlog) : `lib/contratRecurrent.ts`
   (`genererContratsRecurrents`) matérialise, à la validation d'un seul formulaire
-  (`ContractFormRecurrent.tsx`, bouton dédié « + Contrat récurrent (enseignement) » dans l'onglet
-  Contrats, séparé de `ContractForm.tsx`), **un `Contrat` normal par mois** de la plage choisie
+  (`ContractFormRecurrent.tsx`), **un `Contrat` normal par mois** de la plage choisie
   (hors mois exclus, sélection par chips), daté du dernier jour du mois, `type: "enseignement"`
   et `typeRemuneration: "heures"` **fixés** (l'enseignement se paie en heures de cours, jamais en
   cachets — décision produit actée, pas un oubli). **Option architecturale retenue** (vs. une
@@ -292,6 +291,27 @@ src/
   série, suppression d'un seul mois (total recalculé), tentative de suppression de série annulée
   au niveau de la confirmation (donc pas testée jusqu'au bout en automatisé — à re-vérifier
   manuellement par l'utilisateur au moins une fois), Dashboard cohérent avec les heures générées.
+- ✅ **Point d'entrée du contrat récurrent revu** (juste après le lot ci-dessus, même session) :
+  le bouton isolé en haut de l'onglet Contrats est retiré — deux entrées pour la même action, une
+  générique et une contextuelle, faisaient du bruit sans apporter de valeur, d'autant que le
+  récurrent est de toute façon réservé à l'enseignement. `ContractForm.tsx` affiche désormais un
+  encart CTA (« Cours régulier sur l'année scolaire ? ») **dès que `type === "enseignement"` est
+  sélectionné**, avant même les champs Employeur/Date — pour intercepter l'utilisateur avant qu'il
+  n'investisse du temps dans le mauvais formulaire. Contrainte technique identifiée et respectée :
+  `ContractFormRecurrent.tsx` a son propre `<form>`, impossible de l'imbriquer dans celui de
+  `ContractForm.tsx` (HTML invalide) — `ContractForm.tsx` bascule donc entre deux rendus complets
+  via un state local `formRecurrentOuvert` (pas un accordéon au milieu du formulaire), et
+  réutilise le bouton « Annuler » déjà présent dans `ContractFormRecurrent.tsx` pour revenir en
+  arrière. Nouveau prop `onValiderRecurrent` sur `ContractForm.tsx`, **optionnel** à dessein :
+  `ImportBulletins.tsx` (relecture d'un contrat déjà extrait d'un PDF) et `Simulateur.tsx`
+  (simulation temporaire non persistée) réutilisent `ContractForm.tsx` sans ce prop, et n'affichent
+  donc jamais ce CTA — vérifié dans le navigateur dans les deux cas (aucun encart, aucune erreur
+  console même en sélectionnant "Enseignement"). `App.tsx` ne gère plus l'état d'ouverture du
+  formulaire récurrent, seulement la mutation des données (`ajouterContratsRecurrents`, inchangée).
+  100 tests verts (aucun nouveau test : changement purement UI, pas de nouvelle logique pure),
+  `tsc -b` propre. Vérifié dans le navigateur : apparition du CTA au choix "Enseignement",
+  bascule vers le formulaire récurrent puis retour via "Annuler" sans perte d'état du formulaire
+  normal, absence du CTA dans Import PDF et Simulateur.
 - ⬜ **Non traité (V2/V3) :** coordination européenne (périodes U1/PDU1) — même famille qu'Annexe 8/article 65, hors périmètre Annexe 10 pur. Aucune logique ni champ de données ne l'anticipe encore (détail dans `docs/SPEC.md` §10 et §11.C). Ne pas confondre avec le champ `territoire` du contrat, qui couvre un cas différent (cachet ponctuel joué en EEE/Suisse/UK mais déclaré en France).
 - 🔁 **Maintenance de la config** (récurrent, perso — hors app, pas de backend en bêta) : une fois
   par mois, vérifier à la source officielle SMIC (horaire / mensuel / journalier), PMSS, et les

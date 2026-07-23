@@ -122,6 +122,28 @@ confirmation — le garde-fou marche (rien supprimé tant que non confirmé), ma
 « confirmé » n'a pas pu être vérifié bout en bout en automatisé, **à tester manuellement au moins
 une fois**. Détail complet : `CLAUDE.md` « État actuel ».
 
+## Fait (point d'entrée du contrat récurrent revu, même session)
+
+Amélioration UI demandée juste après le lot ci-dessus : le bouton isolé en haut de l'onglet
+Contrats (« + Contrat récurrent (enseignement) ») était trop discret et déconnecté du formulaire
+de contrat normal. Décision 2 du lot précédent (formulaire séparé, `ContractFormRecurrent.tsx`)
+reste valable — ce qui change, c'est seulement **où** on déclenche son ouverture : retiré de
+`App.tsx` (bouton du haut, state `formRecurrentOuvert`), déplacé dans `ContractForm.tsx` sous
+forme d'un encart CTA affiché dès que `type === "enseignement"` est sélectionné, avant les champs
+Employeur/Date — pour intercepter l'utilisateur avant qu'il ne remplisse le mauvais formulaire.
+Bouton du haut purement retiré (pas gardé en complément) : deux entrées pour la même action,
+dont une seule a du sens contextuellement, c'était du bruit. Contrainte technique respectée :
+`ContractFormRecurrent.tsx` garde son propre `<form>` (ne peut pas s'imbriquer dans celui de
+`ContractForm.tsx`, HTML invalide) — bascule entre deux rendus complets via un state local
+`formRecurrentOuvert` dans `ContractForm.tsx`, pas un accordéon. Nouveau prop
+`onValiderRecurrent` sur `ContractForm.tsx`, **optionnel** : `ImportBulletins.tsx` et
+`Simulateur.tsx` réutilisent `ContractForm.tsx` sans ce prop (relecture d'un import PDF déjà
+extrait / simulation temporaire non persistée — le récurrent n'a de sens dans aucun des deux),
+donc n'affichent jamais ce CTA — vérifié dans le navigateur dans les deux cas. 100 tests verts
+(inchangé, aucune nouvelle logique pure), `tsc -b` propre. Vérifié dans le navigateur : CTA visible
+au choix "Enseignement", bascule + retour via "Annuler" sans perte d'état, absence du CTA dans
+Import PDF et Simulateur. Détail complet : `CLAUDE.md` « État actuel ».
+
 ## PROCHAINE ACTION
 
 Plus rien en urgence. Aucune priorité imposée : le reste du backlog reste au choix selon ce qui te

@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import type { Contrat, DecompteHeuresResultat, Profil, Territoire, TypeContrat, TypeRemuneration } from "../types";
 import type { FranceTravailConfig } from "../config/franceTravailConfig";
 import { heuresBrutesContrat } from "../engine/decompteHeures";
+import { ContractFormRecurrent } from "./ContractFormRecurrent";
 
 interface ContractFormProps {
   profil: Profil;
@@ -10,6 +11,8 @@ interface ContractFormProps {
   decompteActuel: DecompteHeuresResultat;
   valeurInitiale?: Partial<Contrat>;
   onValider: (contrat: Omit<Contrat, "id">) => void;
+  /** Absent dans les contextes où un contrat récurrent n'a pas de sens (relecture d'un import PDF déjà extrait, simulation temporaire non persistée) : le CTA associé ne s'affiche alors pas. */
+  onValiderRecurrent?: (contrats: Contrat[]) => void;
   onAnnuler?: () => void;
 }
 
@@ -20,7 +23,8 @@ const TYPES_CONTRAT: { id: TypeContrat; label: string }[] = [
   { id: "ptp", label: "PTP" },
 ];
 
-export function ContractForm({ profil, config, decompteActuel, valeurInitiale, onValider, onAnnuler }: ContractFormProps) {
+export function ContractForm({ profil, config, decompteActuel, valeurInitiale, onValider, onValiderRecurrent, onAnnuler }: ContractFormProps) {
+  const [formRecurrentOuvert, setFormRecurrentOuvert] = useState(false);
   const [type, setType] = useState<TypeContrat>(valeurInitiale?.type ?? "artiste");
   const [typeRemuneration, setTypeRemuneration] = useState<TypeRemuneration>(valeurInitiale?.typeRemuneration ?? "cachet");
   const [territoire, setTerritoire] = useState<Territoire>(valeurInitiale?.territoire ?? "france");
@@ -104,6 +108,21 @@ export function ContractForm({ profil, config, decompteActuel, valeurInitiale, o
     });
   }
 
+  // Le contrat récurrent (lib/contratRecurrent.ts) a son propre <form> : on ne peut pas l'imbriquer
+  // dans celui ci-dessous (HTML invalide, soumission imprévisible). On bascule donc entre deux
+  // rendus complets plutôt que d'ouvrir ContractFormRecurrent en accordéon au milieu du formulaire.
+  if (formRecurrentOuvert) {
+    return (
+      <ContractFormRecurrent
+        onValider={(contrats) => {
+          onValiderRecurrent?.(contrats);
+          setFormRecurrentOuvert(false);
+        }}
+        onAnnuler={() => setFormRecurrentOuvert(false)}
+      />
+    );
+  }
+
   return (
     <form onSubmit={soumettre} className="bg-surface border border-line rounded-card p-6 space-y-4">
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
@@ -118,6 +137,16 @@ export function ContractForm({ profil, config, decompteActuel, valeurInitiale, o
           </button>
         ))}
       </div>
+
+      {type === "enseignement" && onValiderRecurrent && (
+        <div className="rounded-lg bg-teal/10 px-4 py-3 space-y-2">
+          <p className="text-sm text-ink font-medium">Cours régulier sur l'année scolaire ?</p>
+          <p className="text-xs text-teal">Même employeur, mêmes heures chaque mois : génère tous les contrats en une fois plutôt que de les saisir un par un.</p>
+          <button type="button" onClick={() => setFormRecurrentOuvert(true)} className="text-sm bg-mint text-bg font-medium rounded-lg px-4 py-2">
+            Contrat récurrent →
+          </button>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-4">
         <div>
