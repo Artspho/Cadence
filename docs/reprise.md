@@ -8,7 +8,16 @@ Mémoire durable à consulter au démarrage : `CLAUDE.md`, `docs/SPEC.md`, `docs
 
 Deux devoirs sacrés : (1) ne jamais perdre les données ; (2) ne jamais afficher un chiffre faux (ni faux « feu vert » rassurant, ni faux « Bloqué », ni faux montant, ni fausse alerte, ni valeur sentinelle brute).
 
-État : les deux devoirs sacrés sont tenus, la bêta a son socle. 117 tests verts, tsc propre. Dernier lot committé : module indemnisation mensuelle V2 (jours réellement indemnisés mois par mois, onglet « Revenus mensuels » — cf. section « Fait » dédiée ci-dessous ; franchise salaires et plafond PMSS restent hors périmètre). Tous les items §11.A du SPEC sont désormais traités.
+État : les deux devoirs sacrés sont tenus, la bêta a son socle. 127 tests verts, tsc propre. Dernier lot committé : correctif AJ réelle (`f6cb937` — montants de « Revenus mensuels » calculés sur l'AJ prévisionnelle au lieu de l'AJ réelle notifiée, un faux chiffre pour un utilisateur déjà en cours d'indemnisation). Tous les items §11.A du SPEC sont désormais traités.
+
+**Tâche en cours, PAS committée, réponse utilisateur EN ATTENTE** : cf. section dédiée
+« Fait/En cours (2026-07-24 : franchise salaires — formule confirmée depuis le PDF officiel, un
+`27` en dur trouvé) » plus bas. J'ai proposé un correctif (remplacer le `27` codé en dur dans
+`calculerFranchiseSalaires` par `config.indemnisationMensuelle.seuilNonIndemnisationJours`, + mettre
+à jour le commentaire pour dire que la formule est confirmée mot pour mot depuis le PDF, pas juste
+"à confirmer") — **l'utilisateur n'a pas encore répondu oui/non**, la conversation a été
+interrompue pour changer de session. Reprendre en reposant la question (ou en proposant
+directement le diff), ne pas supposer un accord tacite.
 
 ## Fait dans les sessions récentes
 
@@ -312,6 +321,60 @@ profil, config)`.
 4. Une fois câblé : rejouer les 4 mois certifiés (aucune franchise salaires active dans ces
    données, donc pas de régression attendue) + chercher un cas réel avec franchise salaires > 0
    pour lever le TODO `totalNonVerifie`.
+
+## Fait (2026-07-24 : correctif AJ réelle committé, vérification PE en direct, PDF officiel lu en entier)
+
+**Correctif AJ réelle (`f6cb937`, committé)** : bug remonté par l'utilisateur — les montants de
+« Revenus mensuels » utilisaient l'AJ **prévisionnelle** (recalculée en direct depuis
+`calculerAJBrutePourFenetre`/`calculerAJNette` sur les contrats actuels), pas l'AJ **réelle**
+notifiée par France Travail (fixée à l'ouverture des droits, stable toute la période). Faux
+chiffre pour un utilisateur déjà en cours d'indemnisation. `SoldeIndemnisationDepart.ajReelle:
+number | null` ajouté (même pattern que `quotaCPCarryOver` — un champ, une valeur lue sur le
+document officiel, saisie une fois, défaut `null` rétro-compatible). Prioritaire sur l'AJ estimée
+quand renseignée ; avertissement visible sinon. Libellés (colonne « AJ relevé », légendes)
+corrigés en cours de route : l'AJ du relevé est **déjà nette** (après retraite complémentaire),
+pas brute — j'avais mal qualifié ça au premier jet, corrigé avant de committer. 127 tests verts.
+
+**Vérification en direct sur `simucalcul.pole-emploi-services.fr` (23/07/2026)** : rejoué le cas
+fictif #2 déjà validé (A10, 710 h, SR 14 579 €, pas Alsace-Moselle) — le simulateur donne
+aujourd'hui exactement les mêmes chiffres que `docs/validation.md` (A+B+C 65,59 €, retraite compl.
+1,91 €, CSG/CRDS 1,68 €, **net 62,00 €**). Rien n'a changé côté France Travail. Tests
+`areBrute.test.ts`/`areNette.test.ts` relancés en même temps (18 tests verts) pour confirmer que
+c'est bien le code de Cadence, pas juste la règle documentée, qui reproduit ce résultat aujourd'hui.
+
+**PDF officiel `GUIDE-INTERMITTENT.pdf` lu en entier (28 pages, fourni par l'utilisateur le
+2026-07-24)** — remplace l'ancienne extraction image (non fiable à 100 %) par le texte réel :
+- **Page 14 confirme mot pour mot** la formule franchise salaires déjà implémentée :
+  `[Salaires de la période de référence / SMIC mensuel] × [SJM / (3 × SMIC journalier)] − 27 jours`,
+  et confirme texto « SMIC mensuel et SMIC journalier : valeurs à la date de fin de la période de
+  référence » (= `profil.dateAnniversaire`, déjà notre mécanisme) et « Salaires de la période de
+  référence : total de vos rémunérations brutes non plafonnées sur la période visée, **quel que
+  soit le régime de l'activité** » (confirme `salairesHorsAnnexe10PRA`). La réserve
+  `totalNonVerifie` du code peut donc être reformulée : la **formule** est maintenant confirmée à
+  100 % depuis le texte source (plus une histoire d'extraction d'image incertaine) — seule
+  l'absence d'un **cas chiffré réel** avec franchise salaires active reste la réserve valable.
+- **Page 16-17 (« Quelle indemnisation mensuelle ? »)** décrit exactement le mécanisme déjà codé
+  dans `calculerMoisIndemnisation` (seuil de non-indemnisation 27j pour l'A10, jours de travail ×
+  1,3, ordre de déduction délai → franchise CP → franchise salaires). Vérifié à la main que le
+  « seuil de non-indemnisation » (27j, table page 16) est **mathématiquement impliqué** par la
+  formule `jours_travail × 1,3` déjà codée (27×1,3=35,1, toujours > à un mois de 28-31j) — pas
+  besoin d'un garde-fou séparé, confirmé, pas juste supposé.
+- **Un `27` en dur trouvé dans le code** : `calculerFranchiseSalaires` soustrait `27` codé en dur
+  dans la formule, alors que cette même valeur existe déjà comme constante nommée
+  (`config.indemnisationMensuelle.seuilNonIndemnisationJours`). Contredit la règle d'or "aucune
+  valeur réglementaire en dur dans le moteur" — deux occurrences du même nombre non reliées, risque
+  de divergence silencieuse si l'une change sans l'autre un jour.
+
+**Correctif proposé, PAS ENCORE APPLIQUÉ, réponse utilisateur en attente** :
+1. Remplacer le `27` en dur dans `calculerFranchiseSalaires` par
+   `config.indemnisationMensuelle.seuilNonIndemnisationJours`.
+2. Mettre à jour le commentaire JSDoc de la fonction et le TODO associé : la formule est confirmée
+   mot pour mot depuis le texte du PDF officiel (plus "à confirmer depuis une source officielle"),
+   seule l'absence de cas chiffré réel reste la réserve (`totalNonVerifie`).
+
+La conversation a été interrompue pour changer de session **avant que l'utilisateur ne réponde
+oui/non** à cette proposition — ne pas supposer un accord tacite, reposer la question ou proposer
+directement le diff au démarrage de la prochaine session.
 
 **Demande initiale** : ajouter un module `engine/indemnisationMensuelle.ts` (montant ARE réellement
 versé mois par mois, pas juste l'AJ théorique) + composant `RevenusMensuels.tsx`. L'utilisateur a
