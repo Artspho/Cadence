@@ -455,7 +455,24 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
   nouveaux dédiés au correctif, dont un qui aurait échoué avec l'ancien modèle), `tsc -b` propre,
   vérifié dans le navigateur : reproduction exacte des 4 mois certifiés avec le nouveau champ
   renseigné (2j), et non-régression sur un solde existant configuré avant ce champ (défaut 0,
-  résultat plus conservateur qu'avant à raison). Détail complet : `docs/reprise.md`.
+  résultat plus conservateur qu'avant à raison). **Franchise salaires (2026-07-23) : formule
+  certifiée (ARTCENA + flyer officiel FT) implémentée, TOTAL seul, PAS ENCORE câblée dans le
+  réducteur mensuel** — `calculerFranchiseSalaires(srContrats, sjm, profil, config)` calcule
+  `arrondi((SR_total/SMIC_mensuel) × (SJM/(3×SMIC_journalier)) − 27)`, jamais négative, SMIC lu à
+  `profil.dateAnniversaire` (date de fin de PRA) via l'historique. Nouveaux champs `Profil`
+  optionnels : `dureeDroitsMois` (12 standard / 6 clause de rattrapage, connue à l'ouverture,
+  jamais déduite de l'historique d'activité) et `salairesHorsAnnexe10PRA` (composante de SR_total
+  ; absent → estimation sur les seuls salaires A10, signalé via `sousEstimeeHorsA10`).
+  `FranchiseSalairesResultat` devient un type discriminé (`valeur: null` si données manquantes,
+  `valeur: number` avec `totalNonVerifie: true` toujours présent — le total n'a jamais été
+  confronté à un relevé réel montrant une franchise active). `calculerMoisIndemnisation` continue
+  volontairement de renvoyer `franchise_salaires_non_certifiee` : câbler la répartition mensuelle
+  (min(dureeDroitsMois, 8) mois + report, comme la franchise CP) est un **chantier séparé, scopé
+  mais pas commencé** — aucune UI non plus pour saisir `dureeDroitsMois`/`salairesHorsAnnexe10PRA`
+  sur le profil. 126 tests verts au total, `tsc -b` propre. **Bilan du chantier « indemnisation
+  mensuelle » à ce stade : terminé sauf la répartition mensuelle de la franchise salaires**
+  (chantier suivant identifié et scopé, aucun faux chiffre affiché en attendant). Détail complet :
+  `docs/reprise.md`.
 - ⬜ **Non traité (V2/V3) :** coordination européenne (périodes U1/PDU1) — même famille qu'Annexe 8/article 65, hors périmètre Annexe 10 pur. Aucune logique ni champ de données ne l'anticipe encore (détail dans `docs/SPEC.md` §10 et §11.C). Ne pas confondre avec le champ `territoire` du contrat, qui couvre un cas différent (cachet ponctuel joué en EEE/Suisse/UK mais déclaré en France).
 - 🔁 **Maintenance de la config** (récurrent, perso — hors app, pas de backend en bêta) : une fois
   par mois, vérifier à la source officielle SMIC (horaire / mensuel / journalier), PMSS, et les
@@ -470,14 +487,15 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
   actuellement datée « 2026.06 » (alignée sur la revalorisation SMIC du 1er juin 2026) — prochaine
   échéance connue : la revalorisation SMIC/PMSS du 1er janvier suivant.
 
-**Prochaines pistes** : le module indemnisation mensuelle (ci-dessus) est terminé pour son
-périmètre actuel (jours indemnisés, pas franchise salaires/PMSS). Plus aucun ❌ confirmé dans la
-liste, la cohérence de profil est tenue par construction, et tous les items §11.A sont désormais
-traités (transparence du calcul comprise). Aucune priorité imposée pour la suite — à choisir dans
-le backlog selon ce qui semble le plus utile. Sinon, sans urgence : les deux limites connues 🔶
-ci-dessus, le `rythme_hors_limite` différé (backlog `docs/reprise.md`/`docs/validation.md`),
-l'installation réelle sur un vrai téléphone (PWA techniquement prête, dépend du déploiement bêta),
-alignement visuel fin sur `docs/maquette_dashboard.html`.
+**Prochaines pistes** : chantier ouvert identifié = câbler la répartition mensuelle de la
+franchise salaires (min(dureeDroitsMois, 8) mois + report, comme la franchise CP — formule du
+TOTAL déjà implémentée et testée, cf. 🚧/✅ ci-dessus) + UI pour `dureeDroitsMois`/
+`salairesHorsAnnexe10PRA` sur le profil. Plus aucun ❌ confirmé par ailleurs dans la liste, la
+cohérence de profil est tenue par construction, et tous les items §11.A sont désormais traités
+(transparence du calcul comprise). Sinon, sans urgence : les deux limites connues 🔶 ci-dessus, le
+`rythme_hors_limite` différé (backlog `docs/reprise.md`/`docs/validation.md`), l'installation
+réelle sur un vrai téléphone (PWA techniquement prête, dépend du déploiement bêta), alignement
+visuel fin sur `docs/maquette_dashboard.html`.
 
 ---
 
