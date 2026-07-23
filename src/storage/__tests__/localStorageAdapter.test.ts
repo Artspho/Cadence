@@ -10,6 +10,8 @@ describe("exporterJSON / importerJSON — round-trip", () => {
       profil: profil({ dateAnniversaire: "2026-12-31" }),
       contrats: [contrat({ date: "2026-06-01", nbCachets: 10 })],
       periodes: [periode({ type: "maternite", dateDebut: "2026-01-01", dateFin: "2026-02-01" })],
+      declarationsMensuelles: [{ id: "1", mois: "2026-02", joursDeclares: 14, source: "lecture_releve" }],
+      soldeIndemnisationDepart: { date: "2026-02-01", delaiRestant: 5, franchiseCPRestante: 5 },
     };
 
     const exporte = exporterJSON(donnees, DATE_EXPORT_FIXE);
@@ -19,7 +21,7 @@ describe("exporterJSON / importerJSON — round-trip", () => {
   });
 
   it("round-trip sur l'état vide (tout premier utilisateur de la bêta) : ne lève pas, redonne le même état", () => {
-    const donneesVides: DonneesApp = { profil: null, contrats: [], periodes: [] };
+    const donneesVides: DonneesApp = { profil: null, contrats: [], periodes: [], declarationsMensuelles: [], soldeIndemnisationDepart: null };
 
     const exporte = exporterJSON(donneesVides, DATE_EXPORT_FIXE);
     expect(() => importerJSON(exporte)).not.toThrow();
@@ -27,9 +29,22 @@ describe("exporterJSON / importerJSON — round-trip", () => {
   });
 
   it("le fichier exporté porte un schemaVersion et un horodatage d'export", () => {
-    const exporte = JSON.parse(exporterJSON({ profil: null, contrats: [], periodes: [] }, DATE_EXPORT_FIXE));
+    const exporte = JSON.parse(exporterJSON({ profil: null, contrats: [], periodes: [], declarationsMensuelles: [], soldeIndemnisationDepart: null }, DATE_EXPORT_FIXE));
     expect(exporte.schemaVersion).toBe(SCHEMA_VERSION_DONNEES);
     expect(exporte.exporteLe).toBe(DATE_EXPORT_FIXE.toISOString());
+  });
+
+  it("importe sans perte un export antérieur au module indemnisation mensuelle (champs absents, pas juste vides)", () => {
+    const exportAncien = JSON.stringify({
+      schemaVersion: SCHEMA_VERSION_DONNEES,
+      profil: profil({ dateAnniversaire: "2026-12-31" }),
+      contrats: [],
+      periodes: [],
+      // declarationsMensuelles / soldeIndemnisationDepart : absents, comme un vrai export d'avant ce module.
+    });
+    const reimporte = importerJSON(exportAncien);
+    expect(reimporte.declarationsMensuelles).toEqual([]);
+    expect(reimporte.soldeIndemnisationDepart).toBeNull();
   });
 });
 

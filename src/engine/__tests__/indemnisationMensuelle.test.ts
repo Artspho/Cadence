@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { franceTravailConfig } from "../../config/franceTravailConfig";
-import { calculerMoisIndemnisation, calculerSerieIndemnisation } from "../indemnisationMensuelle";
-import type { MoisIndemnisationEntree, SoldeIndemnisation } from "../../types";
+import { calculerMoisIndemnisation, calculerSerieDepuisDeclarations, calculerSerieIndemnisation } from "../indemnisationMensuelle";
+import type { DeclarationMensuelle, MoisIndemnisationEntree, SoldeIndemnisation, SoldeIndemnisationDepart } from "../../types";
 
 describe("calculerMoisIndemnisation", () => {
   it("jours non indemnisables = ceil(joursDéclarés × 1,3), avant tout calcul de place disponible", () => {
@@ -66,5 +66,31 @@ describe("calculerSerieIndemnisation — cas certifiés sur relevés France Trav
     expect(resultats[2].franchiseCPConsommee).toBe(0);
     expect(resultats[3].franchiseCPConsommee).toBe(0);
     expect(resultats[3].soldeFin).toEqual({ delaiRestant: 0, franchiseCPRestante: 0 });
+  });
+});
+
+describe("calculerSerieDepuisDeclarations", () => {
+  const soldeDepart: SoldeIndemnisationDepart = { date: "2026-02-01", delaiRestant: 5, franchiseCPRestante: 5 };
+
+  it("reproduit les 4 mois certifiés à partir de déclarations saisies dans le désordre", () => {
+    const declarations: DeclarationMensuelle[] = [
+      { id: "1", mois: "2026-04", joursDeclares: 9, source: "lecture_releve" },
+      { id: "2", mois: "2026-02", joursDeclares: 14, source: "lecture_releve" },
+      { id: "3", mois: "2026-05", joursDeclares: 1, source: "manuel" },
+      { id: "4", mois: "2026-03", joursDeclares: 10, source: "lecture_releve" },
+    ];
+    const resultats = calculerSerieDepuisDeclarations(soldeDepart, declarations, franceTravailConfig);
+    expect(resultats.map((r) => r.moisLabel)).toEqual(["2026-02", "2026-03", "2026-04", "2026-05"]);
+    expect(resultats.map((r) => r.joursIndemnises)).toEqual([0, 17, 18, 29]);
+  });
+
+  it("ignore les déclarations antérieures au mois du solde de départ (contexte, pas à recalculer)", () => {
+    const declarations: DeclarationMensuelle[] = [
+      { id: "0", mois: "2026-01", joursDeclares: 18, source: "lecture_releve" }, // "régularisé", hors périmètre du solde
+      { id: "1", mois: "2026-02", joursDeclares: 14, source: "lecture_releve" },
+    ];
+    const resultats = calculerSerieDepuisDeclarations(soldeDepart, declarations, franceTravailConfig);
+    expect(resultats).toHaveLength(1);
+    expect(resultats[0].moisLabel).toBe("2026-02");
   });
 });

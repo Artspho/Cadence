@@ -8,8 +8,9 @@
 // paiement du reliquat. Chaque poste ne mord que sur ce que le précédent a laissé, jamais de
 // plafond mensuel forfaitaire sur la franchise CP (cf. franceTravailConfig.ts, forfaitMensuelBas/
 // Haut commentés — contredits par ces mêmes relevés).
-import type { FranchiseSalairesResultat, MoisIndemnisationEntree, MoisIndemnisationResultat, SoldeIndemnisation } from "../types";
+import type { DeclarationMensuelle, FranchiseSalairesResultat, MoisIndemnisationEntree, MoisIndemnisationResultat, SoldeIndemnisation, SoldeIndemnisationDepart } from "../types";
 import type { FranceTravailConfig } from "../config/franceTravailConfig";
+import { joursDansMois, moisCle } from "./dateUtils";
 
 const FRANCHISE_SALAIRES_NON_CERTIFIEE: FranchiseSalairesResultat = {
   valeur: null,
@@ -50,4 +51,21 @@ export function calculerSerieIndemnisation(soldeDepart: SoldeIndemnisation, mois
     solde = resultat.soldeFin;
   }
   return resultats;
+}
+
+/**
+ * Traduit les déclarations mensuelles saisies par l'utilisateur en série calculable, à partir du
+ * mois du solde de départ (inclus). Ignore silencieusement toute déclaration antérieure à ce
+ * mois : ce ne sont pas des données à recalculer, seulement du contexte que l'utilisateur peut
+ * avoir laissé dans l'historique (cf. docs/reprise.md — janvier "régularisé", non reconstituable).
+ * Trie par mois croissant : l'ordre de saisie n'a pas à être l'ordre chronologique.
+ */
+export function calculerSerieDepuisDeclarations(soldeDepart: SoldeIndemnisationDepart, declarations: DeclarationMensuelle[], config: FranceTravailConfig): MoisIndemnisationResultat[] {
+  const moisDepart = moisCle(soldeDepart.date);
+  const mois: MoisIndemnisationEntree[] = declarations
+    .filter((d) => d.mois >= moisDepart)
+    .sort((a, b) => a.mois.localeCompare(b.mois))
+    .map((d) => ({ moisLabel: d.mois, joursDuMois: joursDansMois(d.mois), joursDeclares: d.joursDeclares }));
+
+  return calculerSerieIndemnisation({ delaiRestant: soldeDepart.delaiRestant, franchiseCPRestante: soldeDepart.franchiseCPRestante }, mois, config);
 }

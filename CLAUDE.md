@@ -81,7 +81,7 @@ src/
                                    # ContractFormRecurrent, ContractList, ImportBulletins,
                                    # AlertCenter, Historique, Simulateur, TopBar, Onboarding,
                                    # MonProfil, AvertissementHorsPerimetre,
-                                   # ConfirmationImport, DashboardVide
+                                   # ConfirmationImport, DashboardVide, RevenusMensuels
   lib/contratRecurrent.ts         # genererContratsRecurrents() — contrat récurrent enseignement
     __tests__/
   App.tsx  main.tsx  index.css
@@ -393,31 +393,49 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
   (Android/iOS) n'a pas pu être testée depuis cet environnement — dépend du déploiement bêta
   (backlog), toujours en attente ; ce lot rend l'app installable selon les critères
   Lighthouse/Chrome, la confirmation finale sur un vrai appareil reste à faire une fois déployée.
-- 🚧 **Module indemnisation mensuelle (V2), EN COURS — Phase 1+2 faites, Phase 3 (composant) pas
-  commencée** : `engine/indemnisationMensuelle.ts` (`calculerMoisIndemnisation`,
-  `calculerSerieIndemnisation`) calcule, mois par mois, le nombre de **jours réellement
-  indemnisés** — pas juste l'AJ théorique — à partir d'un **solde de départ** connu
-  (`SoldeIndemnisation`, `{ delaiRestant, franchiseCPRestante }`) saisi à une date choisie, jamais
-  reconstruit depuis la réadmission (décision actée : un mois de régularisation en cours de
-  transition de droits n'a pas de décomposition standard reconstituable, toute tentative
-  produirait un solde faux en cascade — cf. `docs/reprise.md`). Ordre de consommation confirmé par
-  le guide officiel ET par des relevés réels certifiés (fév-mai 2026) : jours non indemnisables
-  (`Math.ceil(joursDéclarés × 1.3)`, PREMIÈRE opération) → délai d'attente → franchise congés
-  payés (**pas de plafond mensuel** — contredit `forfaitMensuelBas`/`Haut` de
-  `franceTravailConfig.ts`, désormais commentés dans la config plutôt que supprimés, avec la
-  source de la contradiction) → paiement du reliquat. Franchise salaires : toujours
-  `{ valeur: null, avertissement: "franchise_salaires_non_certifiee" }` — formule officielle (guide
-  p.14, 4 variables incluant le SMIC) non vérifiable à 100 % depuis l'extraction PDF, aucun relevé
-  réel fourni ne la montre active pour trancher (devoir n°2 : jamais un chiffre deviné).
-  `smicHoraireBrutHistorique: {dateEffet, valeur}[]` ajouté à la config, séparé de
-  `smicHoraireBrut` qui reste inchangé — **zéro modification dans `areBrute.ts`**. 6 tests dédiés
-  ajoutés (`indemnisationMensuelle.test.ts`), dont la reproduction exacte des 4 mois certifiés
-  (fév=0, mars=17, avril=18, mai=29 jours indemnisés) à partir du solde d'ouverture du 01/02/2026
-  (`delaiRestant: 5, franchiseCPRestante: 5`). 114 tests verts au total, `tsc -b` propre. **Reste
-  à faire avant que ce lot soit terminé** : Phase 3, `RevenusMensuels.tsx` — décider d'abord
-  comment l'utilisateur saisit `joursDeclares` par mois (nouveau champ manuel type "journal
-  mensuel", distinct des `Contrat` existants qui trackent des heures/cachets, pas des jours
-  calendaires) et le solde de départ initial. Détail complet : `docs/reprise.md`.
+- ✅ **Module indemnisation mensuelle (V2), 3 phases terminées** : `engine/indemnisationMensuelle.ts`
+  (`calculerMoisIndemnisation`, `calculerSerieIndemnisation`, `calculerSerieDepuisDeclarations`)
+  calcule, mois par mois, le nombre de **jours réellement indemnisés** — pas juste l'AJ théorique
+  — à partir d'un **solde de départ** connu (`SoldeIndemnisationDepart`, `{ date, delaiRestant,
+  franchiseCPRestante }`) saisi une seule fois par l'utilisateur, jamais reconstruit depuis la
+  réadmission (décision actée : un mois de régularisation en cours de transition de droits n'a pas
+  de décomposition standard reconstituable, toute tentative produirait un solde faux en cascade —
+  cf. `docs/reprise.md`). Ordre de consommation confirmé par le guide officiel ET par des relevés
+  réels certifiés (fév-mai 2026) : jours non indemnisables (`Math.ceil(joursDéclarés × 1.3)`,
+  PREMIÈRE opération) → délai d'attente → franchise congés payés (**pas de plafond mensuel** —
+  contredit `forfaitMensuelBas`/`Haut` de `franceTravailConfig.ts`, désormais commentés dans la
+  config plutôt que supprimés, avec la source de la contradiction) → paiement du reliquat.
+  Franchise salaires : toujours `{ valeur: null, avertissement: "franchise_salaires_non_certifiee" }`
+  — formule officielle (guide p.14, 4 variables incluant le SMIC) non vérifiable à 100 % depuis
+  l'extraction PDF, aucun relevé réel fourni ne la montre active pour trancher (devoir n°2 :
+  jamais un chiffre deviné). `smicHoraireBrutHistorique: {dateEffet, valeur}[]` ajouté à la
+  config, séparé de `smicHoraireBrut` qui reste inchangé — **zéro modification dans `areBrute.ts`**.
+  **Phase 3** : `RevenusMensuels.tsx` (nouvel onglet TopBar), gardé derrière le même garde-fou
+  « situation mixte » que Dashboard/Historique/Simulateur (`profilHorsPerimetre`, vérifié dans le
+  navigateur : bascule Oui/Non préserve les données). `DeclarationMensuelle { id, mois,
+  joursDeclares, source: "manuel" | "lecture_releve" }` — saisie manuelle mois par mois, **jamais
+  déduite des `Contrat`** (heures/cachets par contrat ≠ jours calendaires par mois civil) ; ajouter
+  une déclaration pour un mois déjà saisi la remplace (permet de corriger une estimation
+  provisoire une fois le vrai relevé reçu), badge « provisoire » affiché pour `source: "manuel"`
+  (devoir n°2 : ne jamais présenter une estimation avec la même certitude qu'une donnée
+  confirmée). Écran de configuration du solde de départ **pédagogique, jamais bloquant** : les
+  deux champs numériques défaultent à 0 (cas le plus courant une fois les franchises épuisées),
+  seule la date est structurellement nécessaire. `DonneesApp` étendu (`declarationsMensuelles`,
+  `soldeIndemnisationDepart`) avec des défauts Zod (`.default([])`/`.default(null)`) — un export
+  JSON antérieur à ce module s'importe toujours sans perte (devoir sacré n°1, testé explicitement :
+  `localStorageAdapter.test.ts`). Montant € optionnel par mois (`joursIndemnises × AJ nette
+  actuelle`), affiché avec une légende explicite qu'il ne reflète pas d'éventuels changements de
+  salaire de référence sur les mois passés — pas une nouvelle formule réglementaire, une simple
+  multiplication d'un chiffre déjà affiché ailleurs (Dashboard). `MonProfil.tsx` (« Périmètre du
+  MVP ») mis à jour en cohérence : ne dit plus que le module est hors MVP, précise ce qui est
+  couvert (jours indemnisés) et ce qui ne l'est pas (franchise salaires, plafond PMSS). 8 tests
+  dédiés au moteur (`indemnisationMensuelle.test.ts`, dont la reproduction exacte des 4 mois
+  certifiés fév=0/mars=17/avril=18/mai=29 à partir du solde d'ouverture du 01/02/2026), 117 tests
+  verts au total, `tsc -b` propre. Vérifié dans le navigateur avec les 4 mois certifiés : tableau
+  identique aux relevés réels, ajout/suppression de mois, badge provisoire, garde-fou situation
+  mixte, aucune erreur console. **Limite actée, pas un oubli** : pas d'écran pour corriger le
+  solde de départ une fois configuré (uniquement l'export/import JSON permettrait de le faire à la
+  main pour l'instant) — à ajouter si un besoin réel se présente. Détail complet : `docs/reprise.md`.
 - ⬜ **Non traité (V2/V3) :** coordination européenne (périodes U1/PDU1) — même famille qu'Annexe 8/article 65, hors périmètre Annexe 10 pur. Aucune logique ni champ de données ne l'anticipe encore (détail dans `docs/SPEC.md` §10 et §11.C). Ne pas confondre avec le champ `territoire` du contrat, qui couvre un cas différent (cachet ponctuel joué en EEE/Suisse/UK mais déclaré en France).
 - 🔁 **Maintenance de la config** (récurrent, perso — hors app, pas de backend en bêta) : une fois
   par mois, vérifier à la source officielle SMIC (horaire / mensuel / journalier), PMSS, et les
@@ -432,10 +450,11 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
   actuellement datée « 2026.06 » (alignée sur la revalorisation SMIC du 1er juin 2026) — prochaine
   échéance connue : la revalorisation SMIC/PMSS du 1er janvier suivant.
 
-**Prochaines pistes** : chantier ouvert prioritaire = terminer la Phase 3 du module indemnisation
-mensuelle (`RevenusMensuels.tsx`, cf. 🚧 ci-dessus). Plus aucun ❌ confirmé par ailleurs dans la
+**Prochaines pistes** : le module indemnisation mensuelle (ci-dessus) est terminé pour son
+périmètre actuel (jours indemnisés, pas franchise salaires/PMSS). Plus aucun ❌ confirmé dans la
 liste, la cohérence de profil est tenue par construction, et tous les items §11.A sont désormais
-traités (transparence du calcul comprise). Sinon, sans urgence : les deux limites connues 🔶
+traités (transparence du calcul comprise). Aucune priorité imposée pour la suite — à choisir dans
+le backlog selon ce qui semble le plus utile. Sinon, sans urgence : les deux limites connues 🔶
 ci-dessus, le `rythme_hors_limite` différé (backlog `docs/reprise.md`/`docs/validation.md`),
 l'installation réelle sur un vrai téléphone (PWA techniquement prête, dépend du déploiement bêta),
 alignement visuel fin sur `docs/maquette_dashboard.html`.

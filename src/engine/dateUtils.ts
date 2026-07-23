@@ -1,7 +1,7 @@
 // Utilitaires de dates communs au moteur. Aucune valeur réglementaire ici :
 // uniquement de l'arithmétique de calendrier, réutilisée par plusieurs
 // modules (periodeReference, decompteHeures, cycles, prediction).
-import { addDays, differenceInCalendarDays, differenceInYears, format, parseISO } from "date-fns";
+import { addDays, differenceInCalendarDays, differenceInYears, format, getDaysInMonth, parseISO } from "date-fns";
 
 export function toDate(iso: string): Date {
   return parseISO(iso);
@@ -28,6 +28,11 @@ export function ageAuJour(dateNaissanceISO: string, dateReferenceISO: string): n
 /** Clé "YYYY-MM" d'une date ISO, pour grouper des contrats par mois civil. */
 export function moisCle(iso: string): string {
   return format(toDate(iso), "yyyy-MM");
+}
+
+/** Nombre de jours du mois civil désigné par une clé "YYYY-MM". */
+export function joursDansMois(mois: string): number {
+  return getDaysInMonth(parseISO(`${mois}-01`));
 }
 
 export function clamp(valeur: number, min: number, max: number): number {

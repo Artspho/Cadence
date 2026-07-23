@@ -256,6 +256,29 @@ export interface FranchiseSalairesResultat {
   avertissement: "franchise_salaires_non_certifiee";
 }
 
+// Saisie mois par mois par l'utilisateur, après réception de son relevé France Travail — jamais
+// déduite des `Contrat` (qui trackent des heures/cachets par contrat, pas des jours calendaires
+// déclarés sur un mois civil). `source` distingue une valeur recopiée d'un relevé déjà reçu
+// ("lecture_releve") d'une estimation provisoire saisie avant réception ("manuel") — affichage à
+// nuancer en conséquence (devoir n°2 : ne jamais présenter une estimation avec la même certitude
+// qu'une donnée confirmée).
+export interface DeclarationMensuelle {
+  id: string;
+  mois: string; // "YYYY-MM" — le mois du relevé France Travail concerné
+  joursDeclares: number;
+  source: "manuel" | "lecture_releve";
+}
+
+// Solde d'ouverture saisi une seule fois par l'utilisateur, à une date de relevé de son choix —
+// jamais reconstruit par Cadence depuis la réadmission (cf. engine/indemnisationMensuelle.ts,
+// docs/reprise.md). `null` tant que l'utilisateur n'a pas encore configuré le module : ne bloque
+// jamais l'accès pour autant, l'écran de configuration propose de partir de 0 par défaut.
+export interface SoldeIndemnisationDepart {
+  date: string; // ISO — date du relevé de référence pris comme point de départ
+  delaiRestant: number;
+  franchiseCPRestante: number;
+}
+
 export interface MoisIndemnisationResultat {
   moisLabel: string;
   joursNonIndemnisables: number; // Math.ceil(joursDeclares × coeffJoursNonIndemnisables), première opération du réducteur

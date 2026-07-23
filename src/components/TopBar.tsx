@@ -1,7 +1,7 @@
 import { estPerime, franceTravailConfig } from "../config/franceTravailConfig";
 import { EMAIL_FEEDBACK, construireLienFeedback } from "../config/contact";
 
-export type Onglet = "dashboard" | "profil" | "contrats" | "import" | "historique" | "simulateur";
+export type Onglet = "dashboard" | "profil" | "contrats" | "import" | "historique" | "simulateur" | "revenus";
 
 interface TopBarProps {
   ongletActif: Onglet;
@@ -17,6 +17,7 @@ const ONGLETS: { id: Onglet; label: string }[] = [
   { id: "import", label: "Import PDF" },
   { id: "historique", label: "Historique" },
   { id: "simulateur", label: "Simulateur" },
+  { id: "revenus", label: "Revenus mensuels" },
 ];
 
 export function TopBar({ ongletActif, onChangerOnglet, periodeLabel, dateDuJour }: TopBarProps) {

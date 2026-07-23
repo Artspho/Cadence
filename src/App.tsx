@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { Contrat, Profil } from "./types";
+import type { Contrat, DeclarationMensuelle, Profil, SoldeIndemnisationDepart } from "./types";
 import { franceTravailConfig } from "./config/franceTravailConfig";
-import { chargerDonnees, creerContrat, exporterJSON, importerJSON, sauvegarderDonnees, type DonneesApp } from "./storage/localStorageAdapter";
+import { chargerDonnees, creerContrat, creerDeclarationMensuelle, exporterJSON, importerJSON, sauvegarderDonnees, type DonneesApp } from "./storage/localStorageAdapter";
 import { calculerFenetreReference } from "./engine/periodeReference";
 import { calculerDecompteHeures } from "./engine/decompteHeures";
 import { calculerSalaireReference } from "./engine/salaireReference";
@@ -24,6 +24,7 @@ import { MonProfil } from "./components/MonProfil";
 import { AvertissementHorsPerimetre } from "./components/AvertissementHorsPerimetre";
 import { ConfirmationImport } from "./components/ConfirmationImport";
 import { DashboardVide } from "./components/DashboardVide";
+import { RevenusMensuels } from "./components/RevenusMensuels";
 import { dashboardEstVide } from "./lib/dashboardVide";
 import { profilHorsPerimetre } from "./lib/profilHorsPerimetre";
 import { validerProfilPourEcriture } from "./lib/coherenceProfil";
@@ -98,6 +99,20 @@ export default function App() {
 
   function supprimerSerie(recurrenceId: string) {
     setDonnees((d) => (d ? { ...d, contrats: d.contrats.filter((c) => c.recurrenceId !== recurrenceId) } : d));
+  }
+
+  function configurerSoldeIndemnisation(solde: SoldeIndemnisationDepart) {
+    setDonnees((d) => (d ? { ...d, soldeIndemnisationDepart: solde } : d));
+  }
+
+  // Une déclaration par mois : en ajouter une pour un mois déjà saisi remplace l'ancienne
+  // (permet de corriger une estimation provisoire une fois le vrai relevé reçu).
+  function ajouterDeclarationMensuelle(partiel: Omit<DeclarationMensuelle, "id">) {
+    setDonnees((d) => (d ? { ...d, declarationsMensuelles: [...d.declarationsMensuelles.filter((decl) => decl.mois !== partiel.mois), creerDeclarationMensuelle(partiel)] } : d));
+  }
+
+  function supprimerDeclarationMensuelle(id: string) {
+    setDonnees((d) => (d ? { ...d, declarationsMensuelles: d.declarationsMensuelles.filter((decl) => decl.id !== id) } : d));
   }
 
   // Rempart devoir n°1 : forme (Zod) puis cohérence (situation/date), jamais l'un sans l'autre.
@@ -244,6 +259,23 @@ export default function App() {
             <AvertissementHorsPerimetre />
           ) : (
             <Simulateur profil={profil} contrats={donnees.contrats} periodes={donnees.periodes} config={franceTravailConfig} dateDuJour={dateDuJour} decompteActuel={calculs.decompte} />
+          ))}
+
+        {onglet === "revenus" &&
+          calculs &&
+          (profilHorsPerimetre(profil) ? (
+            <AvertissementHorsPerimetre />
+          ) : (
+            <RevenusMensuels
+              soldeDepart={donnees.soldeIndemnisationDepart}
+              declarations={donnees.declarationsMensuelles}
+              config={franceTravailConfig}
+              ajNetteParJour={calculs.ajNette.net}
+              onConfigurerSolde={configurerSoldeIndemnisation}
+              onAjouterDeclaration={ajouterDeclarationMensuelle}
+              onSupprimerDeclaration={supprimerDeclarationMensuelle}
+              dateDuJour={dateDuJour}
+            />
           ))}
 
         {onglet === "profil" && <MonProfil dateDuJour={dateDuJour} profil={profil} onModifierProfil={modifierProfil} />}

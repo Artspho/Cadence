@@ -3,7 +3,7 @@
 // toucher aux composants : ceux-ci n'appellent jamais localStorage
 // directement, seulement les fonctions exportées ici.
 import { z } from "zod";
-import type { Contrat, PeriodeAssimilee, Profil } from "../types";
+import type { Contrat, DeclarationMensuelle, PeriodeAssimilee, Profil, SoldeIndemnisationDepart } from "../types";
 import { profilSchema } from "../lib/coherenceProfil";
 
 const CLE_STOCKAGE = "cadence:v1:donnees";
@@ -21,9 +21,11 @@ export interface DonneesApp {
   profil: Profil | null;
   contrats: Contrat[];
   periodes: PeriodeAssimilee[];
+  declarationsMensuelles: DeclarationMensuelle[];
+  soldeIndemnisationDepart: SoldeIndemnisationDepart | null;
 }
 
-const donneesVides: DonneesApp = { profil: null, contrats: [], periodes: [] };
+const donneesVides: DonneesApp = { profil: null, contrats: [], periodes: [], declarationsMensuelles: [], soldeIndemnisationDepart: null };
 
 // Validation à la frontière (import JSON, lecture localStorage) : un
 // utilisateur peut importer un fichier corrompu ou modifié à la main.
@@ -51,6 +53,19 @@ const periodeSchema = z.object({
   dateFin: z.string(),
 });
 
+const declarationMensuelleSchema = z.object({
+  id: z.string(),
+  mois: z.string(),
+  joursDeclares: z.number(),
+  source: z.enum(["manuel", "lecture_releve"]),
+});
+
+const soldeIndemnisationDepartSchema = z.object({
+  date: z.string(),
+  delaiRestant: z.number(),
+  franchiseCPRestante: z.number(),
+});
+
 // profilSchema (forme + cohérence situation/date) vit désormais dans lib/coherenceProfil.ts —
 // unique définition, réutilisée ici ET par App.tsx (validerProfilPourEcriture), pour que l'import
 // JSON et l'édition en mémoire referment exactement la même porte (cf. lib/coherenceProfil.ts).
@@ -59,6 +74,11 @@ const donneesAppSchema = z.object({
   profil: profilSchema.nullable(),
   contrats: z.array(contratSchema),
   periodes: z.array(periodeSchema),
+  // .default(...) : un export antérieur au module indemnisation mensuelle n'a pas ces deux champs
+  // du tout — pas une migration de schemaVersion, juste une donnée absente qui redevient l'état
+  // vide (devoir sacré n°1 : un ancien export doit toujours pouvoir se réimporter sans perte).
+  declarationsMensuelles: z.array(declarationMensuelleSchema).default([]),
+  soldeIndemnisationDepart: soldeIndemnisationDepartSchema.nullable().default(null),
 });
 
 export async function chargerDonnees(): Promise<DonneesApp> {
@@ -126,5 +146,9 @@ export function creerContrat(partiel: Omit<Contrat, "id">): Contrat {
 }
 
 export function creerPeriode(partiel: Omit<PeriodeAssimilee, "id">): PeriodeAssimilee {
+  return { id: crypto.randomUUID(), ...partiel };
+}
+
+export function creerDeclarationMensuelle(partiel: Omit<DeclarationMensuelle, "id">): DeclarationMensuelle {
   return { id: crypto.randomUUID(), ...partiel };
 }
