@@ -8,7 +8,7 @@ Mémoire durable à consulter au démarrage : `CLAUDE.md`, `docs/SPEC.md`, `docs
 
 Deux devoirs sacrés : (1) ne jamais perdre les données ; (2) ne jamais afficher un chiffre faux (ni faux « feu vert » rassurant, ni faux « Bloqué », ni faux montant, ni fausse alerte, ni valeur sentinelle brute).
 
-État : les deux devoirs sacrés sont tenus, la bêta a son socle. 91 tests verts, tsc propre, git à jour (dernier lot : `dateAnniversairePrecedente` + `SeuilReadmission` à 3 variants, commit `4d22218`).
+État : les deux devoirs sacrés sont tenus, la bêta a son socle. 91 tests verts, tsc propre, git à jour (dernier lot : renommage « À propos » → « Mon profil » + remontée dans la nav, commits `3da9ff6`/`841d9a1`).
 
 ## Fait dans les sessions récentes
 
@@ -80,11 +80,28 @@ complet du Dashboard après confirmation d'une date anniversaire). 79 tests vert
 
 Commits : `505473a`, `4fba5b5`, `4d22218`.
 
+## Fait (renommage « À propos » → « Mon profil »)
+
+Item backlog traité. `TopBar.tsx` : libellé et valeur interne du type `Onglet` (`"apropos"` →
+`"profil"`, jamais persisté — aucune migration de données) renommés, remonté en 2e position (juste
+après le Tableau de bord, avant Contrats/Import/Historique/Simulateur) — c'est là que se renseigne
+`dateAnniversairePrecedente` en réadmission, ça doit rester facile à trouver. `AProposLimites.tsx`
+renommé en `MonProfil.tsx` (composant, interface, id DOM internes `apropos-*` → `profil-*`) ; le
+`<h2>Ton profil</h2>` interne, lui, reste inchangé (adresse à l'utilisateur, toujours correcte).
+Deux références croisées alignées : `Onboarding.tsx` (indice regimeDeclare mixte) et `alertes.ts`
+(message `historique_insuffisant`, qui disait déjà « Mon profil » par anticipation avant même que
+l'onglet soit renommé — corrigé au passage, plus une incohérence). **Petit accroc en committant** :
+un `git add` sur un chemin invalide a fait échouer la commande sans le signaler assez tôt, le
+premier commit (`3da9ff6`) n'a capturé que le renommage de fichier sans le contenu — corrigé
+immédiatement par un second commit (`841d9a1`) avec le vrai contenu, signalé tel quel plutôt que
+masqué. 91 tests verts (aucun test ne référençait l'ancien libellé), tsc propre. Vérifié dans le
+navigateur : ordre et libellé corrects, contenu de l'écran inchangé, alerte et indice Onboarding
+disent bien « Mon profil ».
+
 ## PROCHAINE ACTION
 
-Renommer « À propos » en « Mon profil » et le remonter en premier plan de la navigation (backlog
-existant, changement UI simple à faible risque). Aucune autre priorité imposée : le reste du
-backlog reste au choix selon ce qui te semble le plus utile. Détail complet : « Ensuite (backlog) ».
+Plus rien en urgence. Aucune priorité imposée : le reste du backlog reste au choix selon ce qui te
+semble le plus utile. Détail complet : « Ensuite (backlog) ».
 
 ## Ensuite (backlog)
 
@@ -114,8 +131,8 @@ backlog reste au choix selon ce qui te semble le plus utile. Détail complet : �
 
 ### Idées consignées le 2026-07-23 (à cadrer plus tard, pas de plan pour l'instant)
 
-Item « date de précédente ouverture de droits » retiré de cette liste : fait (cf. « Fait dans la
-session précédente » ci-dessus). Reste, inchangé :
+Items « date de précédente ouverture de droits » et « renommer À propos en Mon profil » retirés de
+cette liste : faits (cf. sections « Fait » ci-dessus). Reste, inchangé :
 
 1. **Contrat récurrent pour l'enseignement** : saisie d'un CDD régulier (même employeur, heures
    similaires chaque mois) en une fois, avec exclusion de certains mois (vacances, etc.), plutôt que
@@ -131,18 +148,20 @@ session précédente » ci-dessus). Reste, inchangé :
    construction — nécessiterait un service externe (LLM ou autre), donc un consentement RGPD
    explicite à obtenir, pas un simple ajout technique. Change la nature de l'app sur ce point précis,
    à ne pas sous-estimer.
-3. **Renommer « À propos » en « Mon profil »**, remonté au premier plan de la navigation (pas une
-   section secondaire). Changement UI simple, faible risque — mais vérifier au passage que rien
-   d'autre ne référence le libellé « À propos » (liens internes, tests) avant de renommer. **← prochain**
-4. **Contrats à venir persistés, ajustant directement le graphique de projection** — à distinguer du
+3. **Contrats à venir persistés, ajustant directement le graphique de projection** — à distinguer du
    `Simulateur.tsx` actuel qui fait un « et si » temporaire sans rien persister. À rapprocher de
    l'item déjà présent au SPEC §11.B (« projection honnête basée sur les contrats déjà signés à
    venir » + fourchette plutôt que fausse précision) : probablement la même idée à formaliser,
    pas une fonctionnalité isolée à concevoir séparément — relire le §11.B en même temps que celui-ci
    avant de cadrer un plan.
-5. **V3+ : légalité des contrats** (minimums légaux, contrats limites/border) — reliée à l'item 2
+4. **V3+ : légalité des contrats** (minimums légaux, contrats limites/border) — reliée à l'item 2
    (analyse IA). Même tension vie privée à rappeler : toute analyse automatisée de ce type
    soulève la même question de service externe + consentement RGPD explicite.
+
+**Petite dette non urgente repérée mais volontairement pas corrigée aujourd'hui** (hors périmètre
+du renommage validé) : deux commentaires de code (pas de texte utilisateur) mentionnent encore
+« À propos » — `src/config/contact.ts:5` et `src/lib/profilHorsPerimetre.ts:6`. Cosmétique, à
+nettoyer à l'occasion d'une prochaine retouche de ces fichiers.
 
 ## Méthode à conserver
 

@@ -79,7 +79,7 @@ src/
   components/                     # Dashboard, ProjectionChart, ContractForm,
                                    # ContractList, ImportBulletins, AlertCenter,
                                    # Historique, Simulateur, TopBar, Onboarding,
-                                   # AProposLimites, AvertissementHorsPerimetre,
+                                   # MonProfil, AvertissementHorsPerimetre,
                                    # ConfirmationImport, DashboardVide
   App.tsx  main.tsx  index.css
 ```
@@ -96,7 +96,7 @@ src/
   `alertes`, `cycles` — **91 tests Vitest**, tous verts (dont 7 sur `storage/`, 5 sur `config/`,
   19 sur `lib/`).
 - ✅ `storage/`, `components/`, câblage `App.tsx` — bêta fonctionnelle de bout en bout
-  (onboarding → tableau de bord → contrats → import PDF → historique → simulateur → à propos).
+  (onboarding → tableau de bord → mon profil → contrats → import PDF → historique → simulateur).
 - ✅ **Bug corrigé** : un profil neuf sans date anniversaire connue n'affiche plus jamais le
   statut « bloqué » à 0 h — court-circuit dans `prediction.ts`, testé explicitement.
 - ✅ **Réadmission allongée branchée** : `calculerAJBrutePourFenetre` décide seule standard vs
@@ -107,7 +107,7 @@ src/
   **déprécié** en lecture seule — jamais réécrit par l'UI). Question posée à l'onboarding (avant
   tout premier affichage d'un chiffre, ciblée technicien A8 / emploi hors spectacle — **jamais**
   l'enseignement, qui reste cœur de cible A10 pur) + section « Ton profil » modifiable dans
-  l'onglet À propos, désormais 3 choix (Non / Oui / Je ne sais pas) au lieu d'une case à cocher.
+  l'onglet Mon profil, désormais 3 choix (Non / Oui / Je ne sais pas) au lieu d'une case à cocher.
   « inconnu » (je-ne-sais-pas) suit **exactement** le même chemin que « mixte » (conservateur, au
   moindre doute → France Travail) : même alerte `situation_mixte` exclusive dans `detecterAlertes`
   (via le prédicat pur `profilHorsPerimetre()`, `lib/profilHorsPerimetre.ts` — seul import
@@ -123,15 +123,15 @@ src/
 - 🔶 **Limite connue :** le garde-fou « situation mixte » n'a aucun test automatisé côté interface
   (seul `detecterAlertes` est testé, cf. `engine/__tests__/alertes.test.ts` — couvre `mixte` et
   `inconnu`, pas le rendu React). Après toute grosse modification d'UI touchant `App.tsx`,
-  `Onboarding.tsx` ou `AProposLimites.tsx`, **re-vérifier à la main** : sélectionner tour à tour
+  `Onboarding.tsx` ou `MonProfil.tsx`, **re-vérifier à la main** : sélectionner tour à tour
   les 3 choix (Non / Oui / Je ne sais pas, `regimeDeclare`) et confirmer qu'aucun chiffre
   n'apparaît sur Dashboard/Historique/Simulateur tant que « Oui » ou « Je ne sais pas » est
   sélectionné, et qu'il réapparaît normalement sur « Non ». Vérifié manuellement dans le
   navigateur lors de l'extension à 3 états (2026-07-22) ; à refaire après toute future
   modification de ces trois fichiers.
 - ✅ **Revalidation post-onboarding** (SPEC §11.A) : date de naissance, situation et date
-  anniversaire sont désormais modifiables après coup, dans « À propos » → « Ton profil »
-  (`AProposLimites.tsx`), plus besoin d'éditer le JSON à la main. Prudence ciblée comme prévu :
+  anniversaire sont désormais modifiables après coup, dans « Mon profil » → « Ton profil »
+  (`MonProfil.tsx`), plus besoin d'éditer le JSON à la main. Prudence ciblée comme prévu :
   date de naissance libre, sans cérémonie ; situation modifiable librement mais le formulaire
   reste cohérent ; date anniversaire modifiable avec une note explicite + une confirmation en
   deux clics (« Enregistrer » → « Confirmer le changement ») avant toute écriture, pas de
@@ -178,19 +178,19 @@ src/
   (date ISO nullable, laissée à `null` — aucune échéance officielle connue à ce jour, même
   discipline que `valeursDatees`) comparée à la date du jour par la fonction pure `estPerime`
   (date injectée, jamais `new Date()` interne). `TopBar.tsx` (visible en permanence) et
-  `AProposLimites.tsx` (détaillé) lisent tous les deux `estPerime` — une seule source de vérité,
-  icône + mot quand périmé (jamais la couleur seule, §8.6). **Corrigé au passage** : `AProposLimites.tsx`
+  `MonProfil.tsx` (détaillé) lisent tous les deux `estPerime` — une seule source de vérité,
+  icône + mot quand périmé (jamais la couleur seule, §8.6). **Corrigé au passage** : `MonProfil.tsx`
   contenait depuis plusieurs sessions un seuil `SEUIL_PEREMPTION_JOURS = 365` codé en dur — un
   seuil réglementaire deviné, jamais corrigé jusqu'ici. Supprimé, remplacé par `estPerime`.
 - ✅ **Bouton de feedback** (§11.A) : `config/contact.ts` — `EMAIL_FEEDBACK` (`null` tant que non
   renseigné, jamais un placeholder ; renseigné à `benoit.zahra@orange.fr`) + `construireLienFeedback(email)`,
   fonction pure sans accès à `donnees`/`profil`/`contrats` (sujet et gabarit de corps fixes,
   aucune donnée utilisateur ne peut structurellement s'y glisser). Deux points d'accès —
-  `TopBar.tsx` (toujours visible, adresse en texte de lien) et `AProposLimites.tsx` (bouton +
+  `TopBar.tsx` (toujours visible, adresse en texte de lien) et `MonProfil.tsx` (bouton +
   adresse en texte lisible en dessous) — **aucun** des deux ne s'affiche si `EMAIL_FEEDBACK` est
   `null` (pas de lien mort, pas de "null" visible), vérifié dans le navigateur dans les deux états.
   **Remplace** l'ancien lien `mailto:?subject=...` sans destination ni gabarit qui traînait dans
-  `AProposLimites.tsx` depuis plusieurs sessions, pas un ajout en parallèle.
+  `MonProfil.tsx` depuis plusieurs sessions, pas un ajout en parallèle.
 - ✅ **État vide du Dashboard** (§11.A) : `lib/dashboardVide.ts` — `dashboardEstVide(contrats)` se
   déclenche sur l'**absence de contrat** (`contrats.length === 0`), jamais sur "0 h comptée au
   montant" (un profil 100 % enseignement a des contrats mais 0 h au montant ARE — testé
@@ -251,6 +251,15 @@ src/
   **Découverte en creusant** : le test existant pour ce scénario n'affirmait qu'une propriété vraie
   aussi bien en cas de succès que d'échec — il exerçait déjà le bug sans jamais le remarquer,
   dette méthodologique tracée dans `docs/validation.md`. 85 tests verts, détail complet :
+  `docs/reprise.md`.
+- ✅ **Onglet « À propos » renommé « Mon profil »**, remonté en 2e position (juste après le
+  Tableau de bord, avant Contrats/Import/Historique/Simulateur) — c'est là que se renseigne
+  `dateAnniversairePrecedente` en réadmission, ça doit rester facile à trouver.
+  `MonProfil.tsx` (ex-`AProposLimites.tsx`) ; valeur interne du type `Onglet` (`"apropos"` →
+  `"profil"`) jamais persistée, aucune migration. Le `<h2>Ton profil</h2>` interne reste
+  inchangé (adresse à l'utilisateur, toujours correcte). Références croisées alignées dans
+  `Onboarding.tsx` et `alertes.ts` (ce dernier disait déjà « Mon profil » par anticipation avant
+  même que l'onglet soit renommé — corrigé au passage). 91 tests verts, détail complet :
   `docs/reprise.md`.
 - ⬜ **Non traité (V2/V3) :** coordination européenne (périodes U1/PDU1) — même famille qu'Annexe 8/article 65, hors périmètre Annexe 10 pur. Aucune logique ni champ de données ne l'anticipe encore (détail dans `docs/SPEC.md` §10 et §11.C). Ne pas confondre avec le champ `territoire` du contrat, qui couvre un cas différent (cachet ponctuel joué en EEE/Suisse/UK mais déclaré en France).
 - 🔁 **Maintenance de la config** (récurrent, perso — hors app, pas de backend en bêta) : une fois
