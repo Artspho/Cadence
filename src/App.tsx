@@ -271,7 +271,6 @@ export default function App() {
               soldeDepart={donnees.soldeIndemnisationDepart}
               declarations={donnees.declarationsMensuelles}
               config={franceTravailConfig}
-              ajNetteParJour={calculs.ajNette.net}
               onConfigurerSolde={configurerSoldeIndemnisation}
               onAjouterDeclaration={ajouterDeclarationMensuelle}
               onSupprimerDeclaration={supprimerDeclarationMensuelle}

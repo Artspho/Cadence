@@ -8,14 +8,13 @@ interface RevenusMensuelsProps {
   soldeDepart: SoldeIndemnisationDepart | null;
   declarations: DeclarationMensuelle[];
   config: FranceTravailConfig;
-  ajNetteParJour: number | null;
   onConfigurerSolde: (solde: SoldeIndemnisationDepart) => void;
   onAjouterDeclaration: (partiel: Omit<DeclarationMensuelle, "id">) => void;
   onSupprimerDeclaration: (id: string) => void;
   dateDuJour: string;
 }
 
-export function RevenusMensuels({ profil, soldeDepart, declarations, config, ajNetteParJour, onConfigurerSolde, onAjouterDeclaration, onSupprimerDeclaration, dateDuJour }: RevenusMensuelsProps) {
+export function RevenusMensuels({ profil, soldeDepart, declarations, config, onConfigurerSolde, onAjouterDeclaration, onSupprimerDeclaration, dateDuJour }: RevenusMensuelsProps) {
   // Première admission = pas encore indemnisé, en train de viser les 507 h d'ouverture — ce
   // module (montants mensuels déjà versés) n'a aucun sens dans ce contexte, cf. docs/reprise.md.
   if (profil.situation === "premiere_admission") {
@@ -29,8 +28,9 @@ export function RevenusMensuels({ profil, soldeDepart, declarations, config, ajN
   return (
     <div className="space-y-6 max-w-[900px]">
       <SoldeRecap solde={soldeDepart} />
+      <GestionAjReelle solde={soldeDepart} onConfigurer={onConfigurerSolde} />
       <FormulaireDeclaration onAjouter={onAjouterDeclaration} />
-      <TableauResultats soldeDepart={soldeDepart} declarations={declarations} config={config} ajNetteParJour={ajNetteParJour} onSupprimer={onSupprimerDeclaration} />
+      <TableauResultats soldeDepart={soldeDepart} declarations={declarations} config={config} onSupprimer={onSupprimerDeclaration} />
     </div>
   );
 }
@@ -48,7 +48,6 @@ function ConfigurationSolde({ dateDuJour, onConfigurer }: { dateDuJour: string; 
   const [delaiRestant, setDelaiRestant] = useState(0);
   const [franchiseCPRestante, setFranchiseCPRestante] = useState(0);
   const [quotaCPCarryOver, setQuotaCPCarryOver] = useState(0);
-  const [ajReelleInput, setAjReelleInput] = useState("");
 
   return (
     <div className="max-w-[640px] bg-surface border border-line rounded-card p-6 space-y-5">
@@ -125,24 +124,8 @@ function ConfigurationSolde({ dateDuJour, onConfigurer }: { dateDuJour: string; 
         </p>
       </div>
 
-      <div>
-        <label className="block text-xs uppercase tracking-[.03em] text-muted mb-2" htmlFor="ri-aj-reelle">
-          Ton AJ réelle (optionnel)
-        </label>
-        <input
-          id="ri-aj-reelle"
-          type="number"
-          min={0}
-          step="0.01"
-          value={ajReelleInput}
-          onChange={(e) => setAjReelleInput(e.target.value)}
-          className="w-full bg-surface-2 border border-line rounded-lg px-3 py-2 text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-mint"
-        />
-        <p className="text-xs text-faint mt-1">Ton allocation journalière nette indiquée sur ton relevé France Travail ou ta notification d'ouverture de droits.</p>
-      </div>
-
       <button
-        onClick={() => onConfigurer({ date, delaiRestant, franchiseCPRestante, quotaCPCarryOver, ajReelle: ajReelleInput.trim() === "" ? null : Number(ajReelleInput) })}
+        onClick={() => onConfigurer({ date, delaiRestant, franchiseCPRestante, quotaCPCarryOver, ajReelleHistorique: [] })}
         className="w-full bg-mint text-bg font-medium rounded-lg py-2 transition-opacity"
       >
         Commencer le suivi
@@ -166,9 +149,99 @@ function SoldeRecap({ solde }: { solde: SoldeIndemnisationDepart }) {
       <span>
         Report de forfait congés payés : <span className="text-ink">{solde.quotaCPCarryOver ?? 0} j</span>
       </span>
-      <span>
-        AJ réelle : <span className="text-ink">{solde.ajReelle !== null ? `${solde.ajReelle.toFixed(2)} €` : "non renseignée (estimation utilisée)"}</span>
-      </span>
+    </div>
+  );
+}
+
+// Historique des taux d'AJ nette successifs (un utilisateur peut connaître plusieurs taux sur une
+// même période d'indemnisation, cf. types/index.ts). Aucun repli sur une AJ estimée : sans entrée
+// couvrant un mois donné, TableauResultats affiche honnêtement l'absence de montant pour ce mois.
+function GestionAjReelle({ solde, onConfigurer }: { solde: SoldeIndemnisationDepart; onConfigurer: (solde: SoldeIndemnisationDepart) => void }) {
+  const historique = solde.ajReelleHistorique ?? [];
+  const [dateEffet, setDateEffet] = useState("");
+  const [valeur, setValeur] = useState("");
+
+  function ajouter() {
+    if (!dateEffet || valeur.trim() === "") return;
+    const nouveau = [...historique, { dateEffet, valeur: Number(valeur) }].sort((a, b) => a.dateEffet.localeCompare(b.dateEffet));
+    onConfigurer({ ...solde, ajReelleHistorique: nouveau });
+    setDateEffet("");
+    setValeur("");
+  }
+
+  function supprimer(index: number) {
+    onConfigurer({ ...solde, ajReelleHistorique: historique.filter((_, i) => i !== index) });
+  }
+
+  return (
+    <div className="bg-surface border border-line rounded-card p-5 space-y-4">
+      <div>
+        <h3 className="font-display text-base font-medium">Allocation journalière réelle</h3>
+        <p className="text-xs text-faint mt-1">Ton allocation journalière nette indiquée sur ton relevé France Travail ou ta notification d'ouverture de droits.</p>
+      </div>
+
+      {historique.length === 0 ? (
+        <p className="text-sm text-muted">Aucune AJ renseignée</p>
+      ) : (
+        <table className="w-full text-sm">
+          <thead className="text-xs uppercase tracking-[.03em] text-muted border-b border-line">
+            <tr>
+              <th className="text-left py-2">Date d'effet</th>
+              <th className="text-right py-2">AJ nette (€)</th>
+              <th className="py-2" />
+            </tr>
+          </thead>
+          <tbody>
+            {historique.map((h, i) => (
+              <tr key={`${h.dateEffet}-${i}`} className="border-b border-line last:border-0">
+                <td className="py-2">{h.dateEffet}</td>
+                <td className="text-right py-2">{h.valeur.toFixed(2)}</td>
+                <td className="text-right py-2">
+                  <button onClick={() => supprimer(i)} className="text-xs text-muted hover:text-red transition-colors">
+                    Supprimer
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+
+      <div className="grid grid-cols-[1fr_1fr_auto] gap-3 items-end">
+        <div>
+          <label className="block text-xs uppercase tracking-[.03em] text-muted mb-2" htmlFor="ri-aj-date-effet">
+            Date d'effet
+          </label>
+          <input
+            id="ri-aj-date-effet"
+            type="date"
+            value={dateEffet}
+            onChange={(e) => setDateEffet(e.target.value)}
+            className="w-full bg-surface-2 border border-line rounded-lg px-3 py-2 text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-mint"
+          />
+        </div>
+        <div>
+          <label className="block text-xs uppercase tracking-[.03em] text-muted mb-2" htmlFor="ri-aj-valeur">
+            AJ nette (€)
+          </label>
+          <input
+            id="ri-aj-valeur"
+            type="number"
+            min={0}
+            step="0.01"
+            value={valeur}
+            onChange={(e) => setValeur(e.target.value)}
+            className="w-full bg-surface-2 border border-line rounded-lg px-3 py-2 text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-mint"
+          />
+        </div>
+        <button
+          onClick={ajouter}
+          disabled={!dateEffet || valeur.trim() === ""}
+          className="bg-mint text-bg font-medium rounded-lg px-4 py-2 disabled:opacity-40 disabled:cursor-not-allowed transition-opacity whitespace-nowrap"
+        >
+          + Ajouter une période
+        </button>
+      </div>
     </div>
   );
 }
@@ -245,13 +318,11 @@ function TableauResultats({
   soldeDepart,
   declarations,
   config,
-  ajNetteParJour,
   onSupprimer,
 }: {
   soldeDepart: SoldeIndemnisationDepart;
   declarations: DeclarationMensuelle[];
   config: FranceTravailConfig;
-  ajNetteParJour: number | null;
   onSupprimer: (id: string) => void;
 }) {
   const resultats = useMemo(() => calculerSerieDepuisDeclarations(soldeDepart, declarations, config), [soldeDepart, declarations, config]);
@@ -261,11 +332,17 @@ function TableauResultats({
     return <p className="text-sm text-muted bg-surface border border-line rounded-card p-6 text-center">Aucun mois saisi pour l'instant — ajoute ton premier mois ci-dessus.</p>;
   }
 
-  // AJ réelle (bug corrigé le 2026-07-23) prioritaire sur l'AJ estimée depuis les contrats — un
-  // utilisateur déjà en cours d'indemnisation a une AJ réelle notifiée, potentiellement différente
-  // de l'estimation (devoir sacré n°2 : ne jamais présenter l'estimée comme si elle était exacte).
-  const ajUtilisee = soldeDepart.ajReelle ?? ajNetteParJour;
-  const ajEstEstimee = soldeDepart.ajReelle === null;
+  // Aucune AJ réelle renseignée du tout : pas de repli sur une estimation (devoir n°2), la
+  // simulation entière est bloquée plutôt que d'afficher un chiffre deviné.
+  if ((soldeDepart.ajReelleHistorique ?? []).length === 0) {
+    return (
+      <div className="bg-amber/10 border border-amber/30 rounded-card p-4 text-sm text-amber">
+        Renseigne l'allocation journalière indiquée sur ta notification France Travail pour activer cette simulation. Sans cette donnée, Cadence ne peut pas calculer tes montants mensuels.
+      </div>
+    );
+  }
+
+  const desMoisSansAj = resultats.some((r) => !r.montantMensuel.calculable);
 
   return (
     <div className="bg-surface border border-line rounded-card overflow-hidden">
@@ -279,7 +356,7 @@ function TableauResultats({
               <th className="text-right px-4 py-3">Délai</th>
               <th className="text-right px-4 py-3">Franchise CP</th>
               <th className="text-right px-4 py-3">Jours indemnisés</th>
-              {ajUtilisee !== null && <th className="text-right px-4 py-3">{ajEstEstimee ? "≈ Montant net" : "≈ Montant (AJ relevé)"}</th>}
+              <th className="text-right px-4 py-3">≈ Montant (AJ relevé)</th>
               <th className="px-4 py-3" />
             </tr>
           </thead>
@@ -297,7 +374,7 @@ function TableauResultats({
                   <td className="text-right px-4 py-3 text-muted">{r.delaiConsomme}</td>
                   <td className="text-right px-4 py-3 text-muted">{r.franchiseCPConsommee}</td>
                   <td className="text-right px-4 py-3 font-medium">{r.joursIndemnises}</td>
-                  {ajUtilisee !== null && <td className="text-right px-4 py-3 font-medium">{(r.joursIndemnises * ajUtilisee).toFixed(2)} €</td>}
+                  <td className="text-right px-4 py-3 font-medium">{r.montantMensuel.calculable ? `${r.montantMensuel.montant.toFixed(2)} €` : "—"}</td>
                   <td className="px-4 py-3 text-right">
                     {declaration && (
                       <button onClick={() => onSupprimer(declaration.id)} className="text-xs text-muted hover:text-red transition-colors">
@@ -312,12 +389,8 @@ function TableauResultats({
         </table>
       </div>
       <div className="px-4 py-3 border-t border-line text-xs space-y-1">
-        {ajUtilisee !== null && ajEstEstimee && (
-          <p className="text-amber">
-            Montant calculé sur AJ estimée ({ajUtilisee.toFixed(2)} €/jour, depuis tes contrats) — saisis ton AJ réelle depuis ta notification France Travail pour un résultat exact.
-          </p>
-        )}
-        {ajUtilisee !== null && !ajEstEstimee && <p className="text-faint">Montant calculé sur l'AJ indiquée sur ton relevé France Travail ({ajUtilisee.toFixed(2)} €/jour).</p>}
+        <p className="text-faint">Montant calculé sur l'AJ indiquée sur ton relevé France Travail.</p>
+        {desMoisSansAj && <p className="text-amber">Certains mois n'ont pas de taux d'AJ connu pour leur période (« — ») — ajoute une période dont la date d'effet les couvre.</p>}
         <p className="text-faint">Franchise salaires non calculée par Cadence pour l'instant (formule non certifiée sur une source fiable) — vérifie ce point directement sur ton relevé France Travail.</p>
       </div>
     </div>
