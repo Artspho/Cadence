@@ -97,11 +97,15 @@ export const franceTravailConfig = {
       tauxAcquisition: 2.5,
       base: 24, // ✅ (jours travaillés × 2,5) / 24
       plafondJours: 30, // ✅
-      // forfaitMensuelBas: 2,  // non utilisé en pratique, contredit par relevés réels
-      // forfaitMensuelHaut: 3, // fév-mai 2026 (docs/reprise.md) : pas de plafond mensuel
-      //                        // constaté, la franchise CP se consomme intégralement selon
-      //                        // la place disponible chaque mois. À recertifier si franchise
-      //                        // > 24 j observée.
+      // ✅ Réactivés (2026-07-23) : la lecture initiale de Phase 1 ("pas de plafond mensuel
+      // constaté sur les relevés réels") était fausse — le 4j consommé en février 2026 s'explique
+      // entièrement par le report du forfait de janvier (2j non consommés, absorbés par le délai
+      // d'attente ce mois-là) + le forfait de février (2j) = 4j, pas par l'absence de plafond.
+      // Modèle correct : quota mensuel = report du mois précédent + forfait, cf.
+      // engine/indemnisationMensuelle.ts (SoldeIndemnisation.quotaCPCarryOver), docs/reprise.md.
+      forfaitMensuelBas: 2, // ✅ si franchise totale ≤ seuilFranchiseTotaleJours
+      forfaitMensuelHaut: 3, // ✅ si franchise totale > seuilFranchiseTotaleJours
+      seuilFranchiseTotaleJours: 24, // ✅ palier bas/haut du forfait mensuel
     },
     franchiseSalaires: {
       repartitionMoisMax: 8, // ✅ répartie sur 8 mois max
@@ -227,6 +231,9 @@ export const franceTravailConfigSchema = z.object({
       tauxAcquisition: z.number(),
       base: z.number(),
       plafondJours: z.number(),
+      forfaitMensuelBas: z.number(),
+      forfaitMensuelHaut: z.number(),
+      seuilFranchiseTotaleJours: z.number(),
     }),
     franchiseSalaires: z.object({
       repartitionMoisMax: z.number(),

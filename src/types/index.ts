@@ -239,6 +239,12 @@ export interface StatutPrediction {
 export interface SoldeIndemnisation {
   delaiRestant: number; // jours de délai d'attente encore consommables
   franchiseCPRestante: number; // jours de franchise congés payés encore consommables
+  // Report du forfait mensuel de franchise CP non consommé le mois précédent (2j ou 3j selon le
+  // palier, cf. franceTravailConfig.differesEtFranchises.franchiseCongesPayes). Sans ce report,
+  // un mois avec beaucoup de place disponible consommerait à tort plus que le quota mensuel
+  // autorisé — corrigé le 2026-07-23 après une lecture initiale erronée des relevés réels
+  // (cf. docs/reprise.md) qui avait fait conclure, à tort, à l'absence de tout plafond mensuel.
+  quotaCPCarryOver: number;
 }
 
 export interface MoisIndemnisationEntree {
@@ -277,6 +283,10 @@ export interface SoldeIndemnisationDepart {
   date: string; // ISO — date du relevé de référence pris comme point de départ
   delaiRestant: number;
   franchiseCPRestante: number;
+  // Optionnel pour ne pas casser un solde déjà configuré avant l'ajout de ce champ (défaut 0,
+  // cf. calculerSerieDepuisDeclarations) — hypothèse prudente, jamais un faux feu vert : un
+  // défaut à 0 sous-estime au pire le quota de départ, il ne le surestime jamais.
+  quotaCPCarryOver?: number;
 }
 
 export interface MoisIndemnisationResultat {

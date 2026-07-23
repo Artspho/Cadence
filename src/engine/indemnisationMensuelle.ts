@@ -5,9 +5,14 @@
 //
 // Ordre de consommation, confirmé par le guide France Travail (p.12-17) et par les relevés réels
 // certifiés (fév-mai 2026) : jours non indemnisables → délai d'attente → franchise congés payés →
-// paiement du reliquat. Chaque poste ne mord que sur ce que le précédent a laissé, jamais de
-// plafond mensuel forfaitaire sur la franchise CP (cf. franceTravailConfig.ts, forfaitMensuelBas/
-// Haut commentés — contredits par ces mêmes relevés).
+// paiement du reliquat. Chaque poste ne mord que sur ce que le précédent a laissé.
+//
+// Franchise CP : plafonnée par un forfait mensuel (2j ou 3j selon le palier, cf.
+// franceTravailConfig.ts) qui se reporte d'un mois sur l'autre s'il n'est pas intégralement
+// consommé (SoldeIndemnisation.quotaCPCarryOver) — PAS "consommer tout ce qui est disponible"
+// (lecture initiale erronée du 2026-07-23, corrigée : le 4j consommé en février 2026 s'explique
+// entièrement par le report du forfait de janvier, absorbé par le délai d'attente ce mois-là, pas
+// par l'absence de plafond).
 import type { DeclarationMensuelle, FranchiseSalairesResultat, MoisIndemnisationEntree, MoisIndemnisationResultat, SoldeIndemnisation, SoldeIndemnisationDepart } from "../types";
 import type { FranceTravailConfig } from "../config/franceTravailConfig";
 import { joursDansMois, moisCle } from "./dateUtils";
@@ -17,6 +22,17 @@ const FRANCHISE_SALAIRES_NON_CERTIFIEE: FranchiseSalairesResultat = {
   avertissement: "franchise_salaires_non_certifiee",
 };
 
+// Palier bas/haut du forfait mensuel de franchise CP. Basé sur `franchiseCPRestante` (seule
+// grandeur suivie par ce module) faute de suivre le total ORIGINAL accordé à l'ouverture des
+// droits — une hypothèse simplificatrice : si le total initial dépassait le seuil (palier haut,
+// 3j/mois) puis redescendait en-dessous à force d'être consommé, ce calcul redescendrait à tort
+// au palier bas en cours de route. Non observable sur les cas certifiés actuels (restante ≤ 5j
+// du début à la fin) — à corriger si un profil avec une franchise totale > seuil se présente.
+function forfaitMensuelCP(franchiseCPRestante: number, config: FranceTravailConfig): number {
+  const { forfaitMensuelBas, forfaitMensuelHaut, seuilFranchiseTotaleJours } = config.differesEtFranchises.franchiseCongesPayes;
+  return franchiseCPRestante <= seuilFranchiseTotaleJours ? forfaitMensuelBas : forfaitMensuelHaut;
+}
+
 export function calculerMoisIndemnisation(soldeDepart: SoldeIndemnisation, entree: MoisIndemnisationEntree, config: FranceTravailConfig): MoisIndemnisationResultat {
   const joursNonIndemnisables = Math.ceil(entree.joursDeclares * config.indemnisationMensuelle.coeffJoursNonIndemnisables);
   const reliquatApresTravail = Math.max(0, entree.joursDuMois - joursNonIndemnisables);
@@ -24,7 +40,9 @@ export function calculerMoisIndemnisation(soldeDepart: SoldeIndemnisation, entre
   const delaiConsomme = Math.min(soldeDepart.delaiRestant, reliquatApresTravail);
   const reliquatApresDelai = reliquatApresTravail - delaiConsomme;
 
-  const franchiseCPConsommee = Math.min(soldeDepart.franchiseCPRestante, reliquatApresDelai);
+  const forfaitMensuel = forfaitMensuelCP(soldeDepart.franchiseCPRestante, config);
+  const quotaDisponible = soldeDepart.quotaCPCarryOver + forfaitMensuel;
+  const franchiseCPConsommee = Math.min(quotaDisponible, soldeDepart.franchiseCPRestante, reliquatApresDelai);
   const joursIndemnises = reliquatApresDelai - franchiseCPConsommee;
 
   return {
@@ -36,6 +54,7 @@ export function calculerMoisIndemnisation(soldeDepart: SoldeIndemnisation, entre
     soldeFin: {
       delaiRestant: soldeDepart.delaiRestant - delaiConsomme,
       franchiseCPRestante: soldeDepart.franchiseCPRestante - franchiseCPConsommee,
+      quotaCPCarryOver: quotaDisponible - franchiseCPConsommee,
     },
     franchiseSalaires: FRANCHISE_SALAIRES_NON_CERTIFIEE,
   };
@@ -67,5 +86,5 @@ export function calculerSerieDepuisDeclarations(soldeDepart: SoldeIndemnisationD
     .sort((a, b) => a.mois.localeCompare(b.mois))
     .map((d) => ({ moisLabel: d.mois, joursDuMois: joursDansMois(d.mois), joursDeclares: d.joursDeclares }));
 
-  return calculerSerieIndemnisation({ delaiRestant: soldeDepart.delaiRestant, franchiseCPRestante: soldeDepart.franchiseCPRestante }, mois, config);
+  return calculerSerieIndemnisation({ delaiRestant: soldeDepart.delaiRestant, franchiseCPRestante: soldeDepart.franchiseCPRestante, quotaCPCarryOver: soldeDepart.quotaCPCarryOver ?? 0 }, mois, config);
 }
