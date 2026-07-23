@@ -8,7 +8,7 @@ Mémoire durable à consulter au démarrage : `CLAUDE.md`, `docs/SPEC.md`, `docs
 
 Deux devoirs sacrés : (1) ne jamais perdre les données ; (2) ne jamais afficher un chiffre faux (ni faux « feu vert » rassurant, ni faux « Bloqué », ni faux montant, ni fausse alerte, ni valeur sentinelle brute).
 
-État : les deux devoirs sacrés sont tenus, la bêta a son socle. 100 tests verts, tsc propre. Dernier lot codé (pas encore committé au moment d'écrire cette ligne) : contrat récurrent pour l'enseignement (cf. section « Fait » dédiée ci-dessous).
+État : les deux devoirs sacrés sont tenus, la bêta a son socle. 108 tests verts, tsc propre. Dernier lot committé : PWA installable (service worker, icônes, manifest — cf. section « Fait » dédiée ci-dessous). Tous les items §11.A du SPEC sont désormais traités.
 
 ## Fait dans les sessions récentes
 
@@ -177,6 +177,49 @@ avec les vraies données de contrat récurrent, cohérence des messages rétabli
 ajouté en plus → bascule correcte en Sécurité, aucune régression du cas sans contrat à venir.
 Détail complet : `CLAUDE.md` « État actuel ».
 
+## Fait (dette mineure : commentaires "À propos" → "Mon profil")
+
+Les deux derniers commentaires de code (pas de texte utilisateur) qui mentionnaient encore
+« À propos » — `src/config/contact.ts:5` et `src/lib/profilHorsPerimetre.ts:6` — sont corrigés.
+`tsc -b` propre, aucun fichier `engine/` touché, aucun test nécessaire (changement de commentaire
+uniquement). Commit dédié séparé du lot PWA qui suit, comme demandé.
+
+## Fait (PWA installable)
+
+Dernier item §11.A du SPEC traité. Investigation d'abord (rien touché avant validation du plan) :
+un `public/manifest.webmanifest` existait déjà (lié dans `index.html`, `background_color`/
+`display`/`start_url` déjà corrects) mais avec `icons: []` vide (bloquant pour l'installabilité) et
+`theme_color` pas encore corrigé ; aucun service worker ; aucune icône ni favicon nulle part.
+3 décisions tranchées par l'utilisateur avant de coder : (1) mise à jour du service worker
+automatique (`registerType: "autoUpdate"` + `skipWaiting`/`clientsClaim`), pas de bandeau de
+confirmation — pertinent ici : un correctif de calcul doit atteindre l'utilisateur vite, pas
+rester bloqué derrière un cache périmé (devoir n°2) ; (2) `name: "Cadence · Suivi intermittent"`,
+`short_name: "Cadence"` ; (3) `<meta name="theme-color">` de `index.html` reste sombre (#0A0C10),
+seul le `theme_color` du **manifest** passe au mint (#3FD69B) — les deux valeurs ont un rôle
+différent (navigation web normale vs écran de démarrage une fois l'app installée), volontairement
+découplées.
+
+**Obstacle d'environnement rencontré et contourné proprement** : la voie recommandée
+(`@vite-pwa/assets-generator`, qui dépend de `sharp`) est inutilisable sur cette machine — `sharp`
+n'a aucun binaire natif pour win32-arm64, et son repli WASM plante sous Node 24
+(`TypeError` dans `libvipsVersion`, y compris après plusieurs tentatives de réinstallation ciblée).
+Plutôt que de s'acharner sur une dépendance native/WASM fragile, `scripts/generate-pwa-icons.mjs`
+rastérise le motif à la main (carré arrondi + dégradé mint→teal, identique au logo de `TopBar.tsx`)
+avec seulement `zlib`/`fs` de Node — zéro dépendance externe, reproductible sur n'importe quelle
+plateforme (`npm run generate-pwa-icons`). `@vite-pwa/assets-generator` et son `sharp` cassé ont
+été désinstallés après usage ; seul `vite-plugin-pwa` (aucune dépendance native) reste en
+devDependency permanente. `public/manifest.webmanifest` écrit à la main supprimé : le manifest vit
+désormais uniquement dans `vite.config.ts` (même logique que `franceTravailConfig.ts`, une seule
+source de vérité). Bug mineur trouvé en vérifiant : le plugin met `lang: "en"` par défaut,
+corrigé en `"fr"` (toute l'app est en français). `tsc -b` propre, 108 tests verts (aucune logique
+moteur touchée). **Vérifié dans le navigateur avec une preuve forte, pas une simulation** : après
+`npm run build` + `npm run preview`, manifest et service worker actif confirmés, contenu du cache
+confirmé complet — puis le **processus du serveur a été tué** (pas juste "Offline" dans les
+DevTools) et la page rechargée : l'app s'affiche intégralement, aucune erreur console. **Limite
+actée** : l'installation sur un vrai téléphone n'a pas pu être testée depuis cet environnement —
+dépend du déploiement bêta (backlog, toujours en attente). Détail complet : `CLAUDE.md`
+« État actuel ».
+
 ## PROCHAINE ACTION
 
 Plus rien en urgence. Aucune priorité imposée : le reste du backlog reste au choix selon ce qui te
@@ -197,11 +240,13 @@ semble le plus utile. Détail complet : « Ensuite (backlog) ».
   reproduit ailleurs, consigné dans `validation.md` (« Dette tracée »).
 - Réadmission allongée jamais confrontée à source externe (le simulateur officiel ne modélise pas l'allongement → attendre une vraie notif de testeur, consigné validation.md).
 - Barème CSG figé à « normal » en dur dans l'onboarding (sous-estime le net pour barème réduit, non bloquant).
-- PWA.
 - Maintenance config mensuelle (déjà notée CLAUDE.md).
 - **Déploiement bêta** : l'app ne tourne qu'en `npm run dev` — rien à partager tant qu'elle n'est
   pas déployée. C'est une SPA statique (Vite + localStorage, pas de backend) → `build` dist/ +
   hébergeur statique gratuit (Netlify / Vercel / Cloudflare Pages) → URL partageable. Lot à cadrer.
+  **Devient aussi le prérequis pour tester l'installation PWA sur un vrai téléphone** (PWA
+  techniquement prête, cf. section « Fait » ci-dessus — la confirmation finale attend ce
+  déploiement).
 - **Note testeurs (devoir n°1)** : données en `localStorage`, propres à chaque navigateur/appareil ;
   vidage de cache = perte. Dire aux testeurs d'exporter leur JSON régulièrement (= leur sauvegarde
   ET le retour d'usage qui te revient). Prévoir aussi, avant d'élargir au-delà du cercle d'amis, une
@@ -228,11 +273,6 @@ récurrent pour l'enseignement » et « contrats à venir persistés » retirés
 (optimiste/pessimiste) plutôt qu'une seule ligne de projection pointillée — mentionné au SPEC
 §11.B, explicitement mis de côté lors du cadrage de ce lot pour ne pas élargir le périmètre (pas de
 méthode sourcée pour calculer les bornes d'une fourchette, décision produit à trancher séparément).
-
-**Petite dette non urgente repérée mais volontairement pas corrigée aujourd'hui** (hors périmètre
-du renommage validé) : deux commentaires de code (pas de texte utilisateur) mentionnent encore
-« À propos » — `src/config/contact.ts:5` et `src/lib/profilHorsPerimetre.ts:6`. Cosmétique, à
-nettoyer à l'occasion d'une prochaine retouche de ces fichiers.
 
 ## Méthode à conserver
 

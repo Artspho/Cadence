@@ -84,6 +84,10 @@ src/
   lib/contratRecurrent.ts         # genererContratsRecurrents() — contrat récurrent enseignement
     __tests__/
   App.tsx  main.tsx  index.css
+
+scripts/generate-pwa-icons.mjs    # génère public/pwa-*.png, maskable-*, apple-touch-icon, favicon
+                                   # (dégradé mint→teal de TopBar.tsx) — zéro dépendance externe
+vite.config.ts                    # + VitePWA (manifest, service worker, cf. État actuel)
 ```
 
 ## État actuel
@@ -355,6 +359,39 @@ src/
   "+24 h déjà signées à venir", cohérence "il manque"/"vise" rétablie ; puis avec un contrat passé
   ajouté en plus (360 h) : bascule correcte en "Sécurité", franchissement projeté cohérent avec le
   rythme requis affiché, aucune régression du cas sans contrat à venir.
+- ✅ **PWA installable** (dernier item §11.A) : `vite-plugin-pwa` (stratégie `generateSW`,
+  `registerType: "autoUpdate"` + `skipWaiting`/`clientsClaim` — mise à jour silencieuse, jamais
+  bloquée par un cache périmé, cf. devoir n°2 : un correctif de calcul doit atteindre l'utilisateur
+  vite) génère le service worker et précache tout le bundle buildé (17 entrées, ~700 Kio) + une
+  règle `runtimeCaching` dédiée pour Google Fonts (hors du bundle Vite, sinon repli silencieux sur
+  la police système hors-ligne). Manifest défini **uniquement** dans `vite.config.ts` (même
+  logique que `franceTravailConfig.ts` : une seule source de vérité) — `public/manifest.webmanifest`
+  écrit à la main **supprimé**. `background_color: "#0A0C10"`, `theme_color: "#3FD69B"` (seulement
+  au niveau du manifest — l'écran de démarrage/multitâche une fois l'app **installée** — le
+  `<meta name="theme-color">` de `index.html`, lui, reste sombre pendant la navigation web
+  normale, décision volontaire pour ne pas trancher avec la charte « sombre, premium, calme »).
+  `name`: « Cadence · Suivi intermittent », `short_name`: « Cadence », `lang: "fr"` (absent par
+  défaut du plugin, oubli corrigé en vérifiant — toute l'app est en français). **Icônes générées
+  sans dépendance externe** (`scripts/generate-pwa-icons.mjs`, seulement `zlib`/`fs` de Node) :
+  `sharp` (utilisé par `@vite-pwa/assets-generator`, la voie "officielle") n'a **aucun binaire natif
+  pour win32-arm64**, et son build WASM de repli plante sous Node 24 sur cette machine
+  (`TypeError` dans `libvipsVersion`) — après avoir épuisé les contournements côté dépendances, le
+  motif (carré arrondi, dégradé mint→teal, identique au logo de `TopBar.tsx`) s'est révélé assez
+  simple pour être rastérisé à la main (supersampling 3×3, encodeur PNG minimal, ICO fait main pour
+  le favicon) : plus robuste ici qu'une dépendance native/WASM fragile, et reproductible sur
+  n'importe quelle plateforme (`npm run generate-pwa-icons`). `index.html` : ajout
+  `<link rel="apple-touch-icon">` (iOS ne lit jamais le manifest pour son icône d'écran d'accueil)
+  et `<link rel="icon">` (absent jusqu'ici, favicon par défaut/cassé) ; `<link rel="manifest">`
+  manuel retiré (auto-injecté par le plugin). `tsc -b` propre, 108 tests verts (aucune logique
+  moteur touchée). **Vérifié dans le navigateur, preuve forte plutôt qu'une simulation** : après
+  `npm run build` + `npm run preview`, manifest et service worker actif confirmés via
+  `navigator.serviceWorker`, contenu du cache (`caches.keys()`) confirmé complet (JS/CSS/HTML/
+  icônes/manifest + une police déjà mise en cache) — puis le **processus du serveur preview a été
+  tué** (pas juste un bouton "Offline" des DevTools) et la page rechargée : l'app s'affiche
+  intégralement, aucune erreur console. **Limite actée** : l'installation réelle sur un téléphone
+  (Android/iOS) n'a pas pu être testée depuis cet environnement — dépend du déploiement bêta
+  (backlog), toujours en attente ; ce lot rend l'app installable selon les critères
+  Lighthouse/Chrome, la confirmation finale sur un vrai appareil reste à faire une fois déployée.
 - ⬜ **Non traité (V2/V3) :** coordination européenne (périodes U1/PDU1) — même famille qu'Annexe 8/article 65, hors périmètre Annexe 10 pur. Aucune logique ni champ de données ne l'anticipe encore (détail dans `docs/SPEC.md` §10 et §11.C). Ne pas confondre avec le champ `territoire` du contrat, qui couvre un cas différent (cachet ponctuel joué en EEE/Suisse/UK mais déclaré en France).
 - 🔁 **Maintenance de la config** (récurrent, perso — hors app, pas de backend en bêta) : une fois
   par mois, vérifier à la source officielle SMIC (horaire / mensuel / journalier), PMSS, et les
@@ -373,8 +410,9 @@ src/
 par construction, et tous les items §11.A sont désormais traités (transparence du calcul comprise).
 Aucune priorité imposée pour la suite — à choisir dans le backlog selon ce qui semble le plus utile.
 Sinon, sans urgence : les deux limites connues 🔶 ci-dessus, le `rythme_hors_limite` différé
-(backlog `docs/reprise.md`/`docs/validation.md`), PWA réellement installable, alignement visuel
-fin sur `docs/maquette_dashboard.html`.
+(backlog `docs/reprise.md`/`docs/validation.md`), l'installation réelle sur un vrai téléphone (PWA
+techniquement prête, dépend du déploiement bêta), alignement visuel fin sur
+`docs/maquette_dashboard.html`.
 
 ---
 
