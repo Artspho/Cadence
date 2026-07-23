@@ -1,7 +1,7 @@
 // Utilitaires de dates communs au moteur. Aucune valeur réglementaire ici :
 // uniquement de l'arithmétique de calendrier, réutilisée par plusieurs
 // modules (periodeReference, decompteHeures, cycles, prediction).
-import { addDays, differenceInCalendarDays, differenceInYears, format, getDaysInMonth, parseISO } from "date-fns";
+import { addDays, addMonths, differenceInCalendarDays, differenceInYears, eachMonthOfInterval, endOfMonth, format, getDaysInMonth, parseISO, startOfMonth } from "date-fns";
 
 export function toDate(iso: string): Date {
   return parseISO(iso);
@@ -51,4 +51,20 @@ export function joursChevauchement(aDebut: string, aFin: string, bDebut: string,
   const fin = Math.min(toDate(aFin).getTime(), toDate(bFin).getTime());
   if (fin < debut) return 0;
   return Math.round((fin - debut) / (1000 * 60 * 60 * 24)) + 1;
+}
+
+/** Liste des mois civils ("YYYY-MM") couverts par [dateDebut, dateFin], bornes incluses. */
+export function moisEntre(dateDebut: string, dateFin: string): string[] {
+  return eachMonthOfInterval({ start: toDate(dateDebut), end: toDate(dateFin) }).map((d) => format(d, "yyyy-MM"));
+}
+
+/** Premier et dernier jour ISO du mois civil désigné par une clé "YYYY-MM". */
+export function bornesDuMois(mois: string): { debut: string; fin: string } {
+  const premierJour = parseISO(`${mois}-01`);
+  return { debut: toISO(startOfMonth(premierJour)), fin: toISO(endOfMonth(premierJour)) };
+}
+
+/** Clé "YYYY-MM" du mois civil suivant celui désigné par `mois`. */
+export function moisSuivant(mois: string): string {
+  return format(addMonths(parseISO(`${mois}-01`), 1), "yyyy-MM");
 }
