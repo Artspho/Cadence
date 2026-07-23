@@ -471,8 +471,26 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
   mais pas commencé** — aucune UI non plus pour saisir `dureeDroitsMois`/`salairesHorsAnnexe10PRA`
   sur le profil. 126 tests verts au total, `tsc -b` propre. **Bilan du chantier « indemnisation
   mensuelle » à ce stade : terminé sauf la répartition mensuelle de la franchise salaires**
-  (chantier suivant identifié et scopé, aucun faux chiffre affiché en attendant). Détail complet :
-  `docs/reprise.md`.
+  (chantier suivant identifié et scopé, aucun faux chiffre affiché en attendant).
+  **Mise à jour 2026-07-24, PDF officiel lu en entier** : la formule (page 14) est confirmée mot
+  pour mot depuis le texte source (plus une extraction d'image incertaine) — seule l'absence d'un
+  cas chiffré réel avec franchise salaires active reste une réserve valable (`totalNonVerifie`).
+  **Bug trouvé, PAS ENCORE corrigé (réponse utilisateur en attente)** : le `27` de la formule est
+  codé en dur dans `calculerFranchiseSalaires` au lieu de réutiliser la constante existante
+  `config.indemnisationMensuelle.seuilNonIndemnisationJours` — deux occurrences du même nombre non
+  reliées, contredit la règle d'or "aucune valeur réglementaire en dur dans le moteur". Détail
+  complet : `docs/reprise.md`.
+- ✅ **Correctif AJ réelle (2026-07-24, `f6cb937`)** : les montants de « Revenus mensuels »
+  utilisaient l'AJ **prévisionnelle** (recalculée depuis les contrats actuels via
+  `calculerAJBrutePourFenetre`/`calculerAJNette`), pas l'AJ **réelle** notifiée par France Travail
+  (fixée à l'ouverture des droits, stable toute la période) — faux chiffre pour un utilisateur déjà
+  en cours d'indemnisation (bug remonté par l'utilisateur). `SoldeIndemnisationDepart.ajReelle:
+  number | null` ajouté (même pattern que `quotaCPCarryOver`), prioritaire sur l'estimation quand
+  renseignée, avertissement visible sinon. Vérifié en direct sur `simucalcul.pole-emploi-services.fr`
+  le 23/07/2026 (rejoué le cas fictif #2 déjà validé, résultat identique — 62,00 € net — rien n'a
+  changé côté France Travail) + tests `areBrute`/`areNette` relancés (18 tests) pour confirmer que
+  c'est le code, pas juste la règle documentée, qui reproduit ce résultat. 127 tests verts au
+  total, `tsc -b` propre. Détail complet : `docs/reprise.md`.
 - ⬜ **Non traité (V2/V3) :** coordination européenne (périodes U1/PDU1) — même famille qu'Annexe 8/article 65, hors périmètre Annexe 10 pur. Aucune logique ni champ de données ne l'anticipe encore (détail dans `docs/SPEC.md` §10 et §11.C). Ne pas confondre avec le champ `territoire` du contrat, qui couvre un cas différent (cachet ponctuel joué en EEE/Suisse/UK mais déclaré en France).
 - 🔁 **Maintenance de la config** (récurrent, perso — hors app, pas de backend en bêta) : une fois
   par mois, vérifier à la source officielle SMIC (horaire / mensuel / journalier), PMSS, et les
