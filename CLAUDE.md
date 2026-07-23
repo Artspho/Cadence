@@ -402,9 +402,9 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
   de décomposition standard reconstituable, toute tentative produirait un solde faux en cascade —
   cf. `docs/reprise.md`). Ordre de consommation confirmé par le guide officiel ET par des relevés
   réels certifiés (fév-mai 2026) : jours non indemnisables (`Math.ceil(joursDéclarés × 1.3)`,
-  PREMIÈRE opération) → délai d'attente → franchise congés payés (**pas de plafond mensuel** —
-  contredit `forfaitMensuelBas`/`Haut` de `franceTravailConfig.ts`, désormais commentés dans la
-  config plutôt que supprimés, avec la source de la contradiction) → paiement du reliquat.
+  PREMIÈRE opération) → délai d'attente → franchise congés payés (**plafonnée par un forfait
+  mensuel avec report**, cf. correctif du 2026-07-23 ci-dessous — PAS "consommer tout ce qui est
+  disponible", conclusion initialement erronée) → paiement du reliquat.
   Franchise salaires : toujours `{ valeur: null, avertissement: "franchise_salaires_non_certifiee" }`
   — formule officielle (guide p.14, 4 variables incluant le SMIC) non vérifiable à 100 % depuis
   l'extraction PDF, aucun relevé réel fourni ne la montre active pour trancher (devoir n°2 :
@@ -435,7 +435,27 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
   identique aux relevés réels, ajout/suppression de mois, badge provisoire, garde-fou situation
   mixte, aucune erreur console. **Limite actée, pas un oubli** : pas d'écran pour corriger le
   solde de départ une fois configuré (uniquement l'export/import JSON permettrait de le faire à la
-  main pour l'instant) — à ajouter si un besoin réel se présente. Détail complet : `docs/reprise.md`.
+  main pour l'instant) — à ajouter si un besoin réel se présente. **Correctif du 2026-07-23,
+  franchise CP** : la conclusion initiale ("pas de plafond mensuel constaté sur les relevés
+  réels") était fausse — le 4j consommé en février 2026 s'explique entièrement par le report du
+  forfait de janvier (2j non consommés, absorbés par le délai d'attente ce mois-là) + le forfait
+  de février (2j), pas par l'absence de plafond. `forfaitMensuelBas`/`Haut` réactivés dans
+  `franceTravailConfig.ts` (+ nouveau `seuilFranchiseTotaleJours: 24`, qui n'existait qu'en
+  commentaire avant). `SoldeIndemnisation.quotaCPCarryOver` (obligatoire, moteur) /
+  `SoldeIndemnisationDepart.quotaCPCarryOver` (optionnel, défaut 0 — un solde déjà configuré avant
+  ce champ continue de fonctionner, testé explicitement) suivent le report d'un mois sur l'autre.
+  `RevenusMensuels.tsx` : 3e champ dans l'écran de configuration du solde de départ (« Report de
+  forfait congés payés du mois précédent », défaut 0, aide contextuelle « si tu viens d'ouvrir tes
+  droits ce mois-ci et que le mois précédent était un mois blanc, mets 2 » — un chiffre lisible
+  sur la notification d'ouverture de droits, pas une valeur technique cachée). **Limite connue,
+  non résolue** : le palier bas/haut (2j vs 3j) se base sur `franchiseCPRestante` courante faute
+  de suivre le total ORIGINAL accordé à l'ouverture des droits — un profil dont le total dépasse
+  24j pourrait à tort redescendre au palier bas une fois consommé sous ce seuil ; non observable
+  sur les cas certifiés actuels (restante ≤ 5j du début à la fin). 120 tests verts au total (3
+  nouveaux dédiés au correctif, dont un qui aurait échoué avec l'ancien modèle), `tsc -b` propre,
+  vérifié dans le navigateur : reproduction exacte des 4 mois certifiés avec le nouveau champ
+  renseigné (2j), et non-régression sur un solde existant configuré avant ce champ (défaut 0,
+  résultat plus conservateur qu'avant à raison). Détail complet : `docs/reprise.md`.
 - ⬜ **Non traité (V2/V3) :** coordination européenne (périodes U1/PDU1) — même famille qu'Annexe 8/article 65, hors périmètre Annexe 10 pur. Aucune logique ni champ de données ne l'anticipe encore (détail dans `docs/SPEC.md` §10 et §11.C). Ne pas confondre avec le champ `territoire` du contrat, qui couvre un cas différent (cachet ponctuel joué en EEE/Suisse/UK mais déclaré en France).
 - 🔁 **Maintenance de la config** (récurrent, perso — hors app, pas de backend en bêta) : une fois
   par mois, vérifier à la source officielle SMIC (horaire / mensuel / journalier), PMSS, et les

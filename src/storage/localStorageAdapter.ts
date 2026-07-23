@@ -64,6 +64,9 @@ const soldeIndemnisationDepartSchema = z.object({
   date: z.string(),
   delaiRestant: z.number(),
   franchiseCPRestante: z.number(),
+  // .default(0) : un solde configuré avant l'ajout de ce champ (correctif franchise CP du
+  // 2026-07-23) n'a pas cette clé du tout — import/rechargement ne doit pas échouer pour autant.
+  quotaCPCarryOver: z.number().default(0),
 });
 
 // profilSchema (forme + cohérence situation/date) vit désormais dans lib/coherenceProfil.ts —

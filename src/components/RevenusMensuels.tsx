@@ -32,6 +32,7 @@ function ConfigurationSolde({ dateDuJour, onConfigurer }: { dateDuJour: string; 
   const [date, setDate] = useState(dateDuJour);
   const [delaiRestant, setDelaiRestant] = useState(0);
   const [franchiseCPRestante, setFranchiseCPRestante] = useState(0);
+  const [quotaCPCarryOver, setQuotaCPCarryOver] = useState(0);
 
   return (
     <div className="max-w-[640px] bg-surface border border-line rounded-card p-6 space-y-5">
@@ -90,7 +91,25 @@ function ConfigurationSolde({ dateDuJour, onConfigurer }: { dateDuJour: string; 
         confirmer tes franchises restantes.
       </p>
 
-      <button onClick={() => onConfigurer({ date, delaiRestant, franchiseCPRestante })} className="w-full bg-mint text-bg font-medium rounded-lg py-2 transition-opacity">
+      <div>
+        <label className="block text-xs uppercase tracking-[.03em] text-muted mb-2" htmlFor="ri-quota-carry-over">
+          Report de forfait congés payés du mois précédent
+        </label>
+        <input
+          id="ri-quota-carry-over"
+          type="number"
+          min={0}
+          value={quotaCPCarryOver}
+          onChange={(e) => setQuotaCPCarryOver(Math.max(0, Number(e.target.value)))}
+          className="w-full bg-surface-2 border border-line rounded-lg px-3 py-2 text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-mint"
+        />
+        <p className="text-xs text-faint mt-1">
+          Si tu viens d'ouvrir tes droits ce mois-ci et que le mois précédent était un mois blanc (délai d'attente), mets 2. Ce chiffre figure sur ta notification d'ouverture de droits — pas
+          besoin de le deviner, laisse 0 si tu ne sais pas.
+        </p>
+      </div>
+
+      <button onClick={() => onConfigurer({ date, delaiRestant, franchiseCPRestante, quotaCPCarryOver })} className="w-full bg-mint text-bg font-medium rounded-lg py-2 transition-opacity">
         Commencer le suivi
       </button>
     </div>
@@ -108,6 +127,9 @@ function SoldeRecap({ solde }: { solde: SoldeIndemnisationDepart }) {
       </span>
       <span>
         Franchise congés payés restante à cette date : <span className="text-ink">{solde.franchiseCPRestante} j</span>
+      </span>
+      <span>
+        Report de forfait congés payés : <span className="text-ink">{solde.quotaCPCarryOver ?? 0} j</span>
       </span>
     </div>
   );
