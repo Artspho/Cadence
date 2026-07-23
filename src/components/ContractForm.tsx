@@ -30,6 +30,7 @@ export function ContractForm({ profil, config, decompteActuel, valeurInitiale, o
   const [type, setType] = useState<TypeContrat>(valeurInitiale?.type ?? "artiste");
   const [typeRemuneration, setTypeRemuneration] = useState<TypeRemuneration>(valeurInitiale?.typeRemuneration ?? "cachet");
   const [territoire, setTerritoire] = useState<Territoire>(valeurInitiale?.territoire ?? "france");
+  const [dateDebut, setDateDebut] = useState(valeurInitiale?.dateDebut ?? valeurInitiale?.date ?? "");
   const [date, setDate] = useState(valeurInitiale?.date ?? "");
   const [employeur, setEmployeur] = useState(valeurInitiale?.employeur ?? "");
   const [salaireBrut, setSalaireBrut] = useState(valeurInitiale?.salaireBrut?.toString() ?? "");
@@ -39,11 +40,22 @@ export function ContractForm({ profil, config, decompteActuel, valeurInitiale, o
   const [etablissementAgree, setEtablissementAgree] = useState(valeurInitiale?.etablissementAgree ?? false);
   const [enRapportAvecMetier, setEnRapportAvecMetier] = useState(valeurInitiale?.enRapportAvecMetier ?? false);
 
+  // Pré-rempli à la même date que `date` (contrat d'un seul jour, cas le plus courant) tant que
+  // l'utilisateur n'a pas explicitement modifié `dateDebut` — cf. changerDateFin ci-dessous.
+  const dateFinEffective = date || new Date().toISOString().slice(0, 10);
+  const dateDebutInvalide = Boolean(dateDebut) && dateDebut > dateFinEffective;
+
+  function changerDateFin(nouvelleDate: string) {
+    if (dateDebut === date || dateDebut === "") {
+      setDateDebut(nouvelleDate);
+    }
+    setDate(nouvelleDate);
+  }
+
   const brouillon: Contrat = {
     id: "brouillon",
-    // TODO (étape E) : champ dateDebut dédié — provisoire, identique à `date`.
-    dateDebut: date || new Date().toISOString().slice(0, 10),
-    date: date || new Date().toISOString().slice(0, 10),
+    dateDebut: dateDebut || dateFinEffective,
+    date: dateFinEffective,
     type,
     typeRemuneration,
     territoire,
@@ -96,10 +108,9 @@ export function ContractForm({ profil, config, decompteActuel, valeurInitiale, o
 
   function soumettre(e: React.FormEvent) {
     e.preventDefault();
+    if (dateDebutInvalide) return;
     onValider({
-      // TODO (étape E du chantier découpage mensuel) : champ dateDebut dédié dans le formulaire.
-      // Provisoire : contrat traité comme un seul jour, comportement identique à avant ce champ.
-      dateDebut: brouillon.date,
+      dateDebut: dateDebut || brouillon.date,
       date: brouillon.date,
       type,
       typeRemuneration,
@@ -155,23 +166,31 @@ export function ContractForm({ profil, config, decompteActuel, valeurInitiale, o
         </div>
       )}
 
+      <div>
+        <label className="block text-xs uppercase tracking-[.03em] text-muted mb-1" htmlFor="employeur">
+          Employeur
+        </label>
+        <input id="employeur" value={employeur} onChange={(e) => setEmployeur(e.target.value)} required className="w-full bg-surface-2 border border-line rounded-lg px-3 py-2" />
+      </div>
+
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-xs uppercase tracking-[.03em] text-muted mb-1" htmlFor="employeur">
-            Employeur
+          <label className="block text-xs uppercase tracking-[.03em] text-muted mb-1" htmlFor="date-debut">
+            Date de début
           </label>
-          <input id="employeur" value={employeur} onChange={(e) => setEmployeur(e.target.value)} required className="w-full bg-surface-2 border border-line rounded-lg px-3 py-2" />
+          <input id="date-debut" type="date" value={dateDebut} onChange={(e) => setDateDebut(e.target.value)} required className="w-full bg-surface-2 border border-line rounded-lg px-3 py-2" />
         </div>
         <div>
           <label className="block text-xs uppercase tracking-[.03em] text-muted mb-1" htmlFor="date-fin">
-            Date de fin de contrat
+            Date de fin
           </label>
-          <input id="date-fin" type="date" value={date} onChange={(e) => setDate(e.target.value)} required className="w-full bg-surface-2 border border-line rounded-lg px-3 py-2" />
+          <input id="date-fin" type="date" value={date} onChange={(e) => changerDateFin(e.target.value)} required className="w-full bg-surface-2 border border-line rounded-lg px-3 py-2" />
           {!previsualisationSeulement && date && date > new Date().toISOString().slice(0, 10) && (
             <p className="text-xs text-muted mt-1">Ce contrat sera affiché comme « à venir · confirmé » dans ton graphique. S'il est annulé, supprime-le.</p>
           )}
         </div>
       </div>
+      {dateDebutInvalide && <p className="text-xs rounded-lg px-3 py-2 bg-amber/10 text-amber">La date de début doit être avant ou égale à la date de fin.</p>}
 
       <div>
         <span className="block text-xs uppercase tracking-[.03em] text-muted mb-1">Territoire</span>
@@ -243,7 +262,7 @@ export function ContractForm({ profil, config, decompteActuel, valeurInitiale, o
       {alerteCachets && <p className="text-xs rounded-lg px-3 py-2 bg-amber/10 text-amber">{alerteCachets}</p>}
 
       <div className="flex gap-2 pt-2">
-        <button type="submit" className="flex-1 bg-mint text-bg font-medium rounded-lg py-2.5">
+        <button type="submit" disabled={dateDebutInvalide} className="flex-1 bg-mint text-bg font-medium rounded-lg py-2.5 disabled:opacity-40 disabled:cursor-not-allowed">
           Enregistrer le contrat
         </button>
         {onAnnuler && (
