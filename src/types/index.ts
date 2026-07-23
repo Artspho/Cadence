@@ -230,3 +230,38 @@ export interface StatutPrediction {
   eligibleRattrapage: boolean; // 338–506 h : clause de rattrapage potentiellement mobilisable
   message: string; // phrase courte, orientée utilisateur (cf. charte §8.7)
 }
+
+// ── Module indemnisation mensuelle (V2) ─────────────────────────────
+// Reprend d'un solde de départ à une date connue (relevé France Travail réel), jamais reconstruit
+// depuis la réadmission : un mois de régularisation (transition de droits en cours de mois) n'a pas
+// de décomposition standard reconstituable, toute tentative produirait un solde faux en cascade —
+// cf. docs/reprise.md.
+export interface SoldeIndemnisation {
+  delaiRestant: number; // jours de délai d'attente encore consommables
+  franchiseCPRestante: number; // jours de franchise congés payés encore consommables
+}
+
+export interface MoisIndemnisationEntree {
+  moisLabel: string; // ex. "2026-02" — purement informatif (affichage, tests), aucun calcul de date dessus
+  joursDuMois: number;
+  joursDeclares: number; // jours travaillés bruts saisis par l'utilisateur — PAS la colonne "non indem." du relevé (calculée, cf. joursNonIndemnisables)
+}
+
+// Franchise salaires : toujours cette valeur, jamais une formule devinée — la formule officielle
+// (guide p.14, 4 variables incluant le SMIC) n'a pas pu être vérifiée à 100 % depuis l'extraction
+// PDF, et aucun relevé réel fourni ne montre de franchise salaires active pour la confronter
+// (devoir sacré n°2 : jamais un chiffre faux). À rouvrir si un relevé réel en montre une active.
+export interface FranchiseSalairesResultat {
+  valeur: null;
+  avertissement: "franchise_salaires_non_certifiee";
+}
+
+export interface MoisIndemnisationResultat {
+  moisLabel: string;
+  joursNonIndemnisables: number; // Math.ceil(joursDeclares × coeffJoursNonIndemnisables), première opération du réducteur
+  delaiConsomme: number;
+  franchiseCPConsommee: number;
+  joursIndemnises: number; // reliquat du mois après non-indemnisable, délai, franchise CP
+  soldeFin: SoldeIndemnisation; // à réinjecter comme soldeDepart du mois suivant
+  franchiseSalaires: FranchiseSalairesResultat;
+}

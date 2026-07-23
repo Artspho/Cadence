@@ -70,6 +70,7 @@ src/
   engine/                         # PUR + testé
     periodeReference.ts  decompteHeures.ts  salaireReference.ts
     areBrute.ts  areNette.ts  prediction.ts  alertes.ts  cycles.ts
+    indemnisationMensuelle.ts      # jours indemnisés/mois, solde de départ (V2, en cours)
     __tests__/
   lib/extractionBulletin.ts       # import PDF (V2)
   lib/dashboardVide.ts            # dashboardEstVide(contrats) — présence, jamais 0h au montant
@@ -392,6 +393,31 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
   (Android/iOS) n'a pas pu être testée depuis cet environnement — dépend du déploiement bêta
   (backlog), toujours en attente ; ce lot rend l'app installable selon les critères
   Lighthouse/Chrome, la confirmation finale sur un vrai appareil reste à faire une fois déployée.
+- 🚧 **Module indemnisation mensuelle (V2), EN COURS — Phase 1+2 faites, Phase 3 (composant) pas
+  commencée** : `engine/indemnisationMensuelle.ts` (`calculerMoisIndemnisation`,
+  `calculerSerieIndemnisation`) calcule, mois par mois, le nombre de **jours réellement
+  indemnisés** — pas juste l'AJ théorique — à partir d'un **solde de départ** connu
+  (`SoldeIndemnisation`, `{ delaiRestant, franchiseCPRestante }`) saisi à une date choisie, jamais
+  reconstruit depuis la réadmission (décision actée : un mois de régularisation en cours de
+  transition de droits n'a pas de décomposition standard reconstituable, toute tentative
+  produirait un solde faux en cascade — cf. `docs/reprise.md`). Ordre de consommation confirmé par
+  le guide officiel ET par des relevés réels certifiés (fév-mai 2026) : jours non indemnisables
+  (`Math.ceil(joursDéclarés × 1.3)`, PREMIÈRE opération) → délai d'attente → franchise congés
+  payés (**pas de plafond mensuel** — contredit `forfaitMensuelBas`/`Haut` de
+  `franceTravailConfig.ts`, désormais commentés dans la config plutôt que supprimés, avec la
+  source de la contradiction) → paiement du reliquat. Franchise salaires : toujours
+  `{ valeur: null, avertissement: "franchise_salaires_non_certifiee" }` — formule officielle (guide
+  p.14, 4 variables incluant le SMIC) non vérifiable à 100 % depuis l'extraction PDF, aucun relevé
+  réel fourni ne la montre active pour trancher (devoir n°2 : jamais un chiffre deviné).
+  `smicHoraireBrutHistorique: {dateEffet, valeur}[]` ajouté à la config, séparé de
+  `smicHoraireBrut` qui reste inchangé — **zéro modification dans `areBrute.ts`**. 6 tests dédiés
+  ajoutés (`indemnisationMensuelle.test.ts`), dont la reproduction exacte des 4 mois certifiés
+  (fév=0, mars=17, avril=18, mai=29 jours indemnisés) à partir du solde d'ouverture du 01/02/2026
+  (`delaiRestant: 5, franchiseCPRestante: 5`). 114 tests verts au total, `tsc -b` propre. **Reste
+  à faire avant que ce lot soit terminé** : Phase 3, `RevenusMensuels.tsx` — décider d'abord
+  comment l'utilisateur saisit `joursDeclares` par mois (nouveau champ manuel type "journal
+  mensuel", distinct des `Contrat` existants qui trackent des heures/cachets, pas des jours
+  calendaires) et le solde de départ initial. Détail complet : `docs/reprise.md`.
 - ⬜ **Non traité (V2/V3) :** coordination européenne (périodes U1/PDU1) — même famille qu'Annexe 8/article 65, hors périmètre Annexe 10 pur. Aucune logique ni champ de données ne l'anticipe encore (détail dans `docs/SPEC.md` §10 et §11.C). Ne pas confondre avec le champ `territoire` du contrat, qui couvre un cas différent (cachet ponctuel joué en EEE/Suisse/UK mais déclaré en France).
 - 🔁 **Maintenance de la config** (récurrent, perso — hors app, pas de backend en bêta) : une fois
   par mois, vérifier à la source officielle SMIC (horaire / mensuel / journalier), PMSS, et les
@@ -406,13 +432,13 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
   actuellement datée « 2026.06 » (alignée sur la revalorisation SMIC du 1er juin 2026) — prochaine
   échéance connue : la revalorisation SMIC/PMSS du 1er janvier suivant.
 
-**Prochaines pistes** : plus aucun ❌ confirmé dans la liste, la cohérence de profil est tenue
-par construction, et tous les items §11.A sont désormais traités (transparence du calcul comprise).
-Aucune priorité imposée pour la suite — à choisir dans le backlog selon ce qui semble le plus utile.
-Sinon, sans urgence : les deux limites connues 🔶 ci-dessus, le `rythme_hors_limite` différé
-(backlog `docs/reprise.md`/`docs/validation.md`), l'installation réelle sur un vrai téléphone (PWA
-techniquement prête, dépend du déploiement bêta), alignement visuel fin sur
-`docs/maquette_dashboard.html`.
+**Prochaines pistes** : chantier ouvert prioritaire = terminer la Phase 3 du module indemnisation
+mensuelle (`RevenusMensuels.tsx`, cf. 🚧 ci-dessus). Plus aucun ❌ confirmé par ailleurs dans la
+liste, la cohérence de profil est tenue par construction, et tous les items §11.A sont désormais
+traités (transparence du calcul comprise). Sinon, sans urgence : les deux limites connues 🔶
+ci-dessus, le `rythme_hors_limite` différé (backlog `docs/reprise.md`/`docs/validation.md`),
+l'installation réelle sur un vrai téléphone (PWA techniquement prête, dépend du déploiement bêta),
+alignement visuel fin sur `docs/maquette_dashboard.html`.
 
 ---
 
