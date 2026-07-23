@@ -304,6 +304,12 @@ export interface SoldeIndemnisationDepart {
   // cf. calculerSerieDepuisDeclarations) — hypothèse prudente, jamais un faux feu vert : un
   // défaut à 0 sous-estime au pire le quota de départ, il ne le surestime jamais.
   quotaCPCarryOver?: number;
+  // AJ brute réelle, lue sur la notification France Travail — bug corrigé le 2026-07-23 : les
+  // montants affichés utilisaient l'AJ PRÉVISIONNELLE (estimée depuis les contrats), un faux
+  // chiffre pour un utilisateur déjà en cours d'indemnisation (l'AJ réelle notifiée peut différer
+  // de l'estimation). `null` tant que non renseignée : le composant retombe sur l'AJ estimée avec
+  // un avertissement visible (jamais un chiffre présenté à tort comme exact).
+  ajReelle: number | null;
 }
 
 export interface MoisIndemnisationResultat {

@@ -67,6 +67,9 @@ const soldeIndemnisationDepartSchema = z.object({
   // .default(0) : un solde configuré avant l'ajout de ce champ (correctif franchise CP du
   // 2026-07-23) n'a pas cette clé du tout — import/rechargement ne doit pas échouer pour autant.
   quotaCPCarryOver: z.number().default(0),
+  // .default(null) : idem, un solde configuré avant le correctif AJ réelle du 2026-07-23 n'a pas
+  // cette clé — retombe sur l'AJ estimée (avec avertissement) comme avant ce correctif.
+  ajReelle: z.number().nullable().default(null),
 });
 
 // profilSchema (forme + cohérence situation/date) vit désormais dans lib/coherenceProfil.ts —

@@ -11,7 +11,7 @@ describe("exporterJSON / importerJSON — round-trip", () => {
       contrats: [contrat({ date: "2026-06-01", nbCachets: 10 })],
       periodes: [periode({ type: "maternite", dateDebut: "2026-01-01", dateFin: "2026-02-01" })],
       declarationsMensuelles: [{ id: "1", mois: "2026-02", joursDeclares: 14, source: "lecture_releve" }],
-      soldeIndemnisationDepart: { date: "2026-02-01", delaiRestant: 5, franchiseCPRestante: 5, quotaCPCarryOver: 2 },
+      soldeIndemnisationDepart: { date: "2026-02-01", delaiRestant: 5, franchiseCPRestante: 5, quotaCPCarryOver: 2, ajReelle: 55.02 },
     };
 
     const exporte = exporterJSON(donnees, DATE_EXPORT_FIXE);
@@ -58,6 +58,19 @@ describe("exporterJSON / importerJSON — round-trip", () => {
     });
     const reimporte = importerJSON(exportAncien);
     expect(reimporte.soldeIndemnisationDepart?.quotaCPCarryOver).toBe(0);
+  });
+
+  it("importe sans perte un solde de départ configuré avant l'ajout de ajReelle (correctif AJ réelle)", () => {
+    const exportAncien = JSON.stringify({
+      schemaVersion: SCHEMA_VERSION_DONNEES,
+      profil: null,
+      contrats: [],
+      periodes: [],
+      declarationsMensuelles: [],
+      soldeIndemnisationDepart: { date: "2026-02-01", delaiRestant: 5, franchiseCPRestante: 5, quotaCPCarryOver: 2 }, // ajReelle absent
+    });
+    const reimporte = importerJSON(exportAncien);
+    expect(reimporte.soldeIndemnisationDepart?.ajReelle).toBeNull();
   });
 });
 

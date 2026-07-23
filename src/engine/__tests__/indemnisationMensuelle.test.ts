@@ -87,7 +87,7 @@ describe("calculerSerieIndemnisation — cas certifiés sur relevés France Trav
 });
 
 describe("calculerSerieDepuisDeclarations", () => {
-  const soldeDepart: SoldeIndemnisationDepart = { date: "2026-02-01", delaiRestant: 5, franchiseCPRestante: 5, quotaCPCarryOver: 2 };
+  const soldeDepart: SoldeIndemnisationDepart = { date: "2026-02-01", delaiRestant: 5, franchiseCPRestante: 5, quotaCPCarryOver: 2, ajReelle: null };
 
   it("reproduit les 4 mois certifiés à partir de déclarations saisies dans le désordre", () => {
     const declarations: DeclarationMensuelle[] = [
@@ -112,7 +112,7 @@ describe("calculerSerieDepuisDeclarations", () => {
   });
 
   it("quotaCPCarryOver absent (solde configuré avant l'ajout du champ) : défaut 0, jamais une exception", () => {
-    const soldeSansCarryOver: SoldeIndemnisationDepart = { date: "2026-02-01", delaiRestant: 5, franchiseCPRestante: 5 };
+    const soldeSansCarryOver: SoldeIndemnisationDepart = { date: "2026-02-01", delaiRestant: 5, franchiseCPRestante: 5, ajReelle: null };
     const declarations: DeclarationMensuelle[] = [{ id: "1", mois: "2026-02", joursDeclares: 14, source: "lecture_releve" }];
     const resultats = calculerSerieDepuisDeclarations(soldeSansCarryOver, declarations, franceTravailConfig);
     // Sans le report de 2j (défaut 0) : quota = 0 + 2 (forfait) = 2, pas 4 — résultat différent du

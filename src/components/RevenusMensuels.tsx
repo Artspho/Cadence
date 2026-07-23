@@ -33,6 +33,7 @@ function ConfigurationSolde({ dateDuJour, onConfigurer }: { dateDuJour: string; 
   const [delaiRestant, setDelaiRestant] = useState(0);
   const [franchiseCPRestante, setFranchiseCPRestante] = useState(0);
   const [quotaCPCarryOver, setQuotaCPCarryOver] = useState(0);
+  const [ajReelleInput, setAjReelleInput] = useState("");
 
   return (
     <div className="max-w-[640px] bg-surface border border-line rounded-card p-6 space-y-5">
@@ -109,7 +110,29 @@ function ConfigurationSolde({ dateDuJour, onConfigurer }: { dateDuJour: string; 
         </p>
       </div>
 
-      <button onClick={() => onConfigurer({ date, delaiRestant, franchiseCPRestante, quotaCPCarryOver })} className="w-full bg-mint text-bg font-medium rounded-lg py-2 transition-opacity">
+      <div>
+        <label className="block text-xs uppercase tracking-[.03em] text-muted mb-2" htmlFor="ri-aj-reelle">
+          Ton AJ réelle (optionnel)
+        </label>
+        <input
+          id="ri-aj-reelle"
+          type="number"
+          min={0}
+          step="0.01"
+          value={ajReelleInput}
+          onChange={(e) => setAjReelleInput(e.target.value)}
+          className="w-full bg-surface-2 border border-line rounded-lg px-3 py-2 text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-mint"
+        />
+        <p className="text-xs text-faint mt-1">
+          Ton allocation journalière indiquée sur ton relevé France Travail ou ta notification d'ouverture de droits. Ce taux est fixé à chaque réadmission et reste le même pendant toute ta
+          période d'indemnisation. Pour toi : 55,02 € depuis le 18/01/2026.
+        </p>
+      </div>
+
+      <button
+        onClick={() => onConfigurer({ date, delaiRestant, franchiseCPRestante, quotaCPCarryOver, ajReelle: ajReelleInput.trim() === "" ? null : Number(ajReelleInput) })}
+        className="w-full bg-mint text-bg font-medium rounded-lg py-2 transition-opacity"
+      >
         Commencer le suivi
       </button>
     </div>
@@ -130,6 +153,9 @@ function SoldeRecap({ solde }: { solde: SoldeIndemnisationDepart }) {
       </span>
       <span>
         Report de forfait congés payés : <span className="text-ink">{solde.quotaCPCarryOver ?? 0} j</span>
+      </span>
+      <span>
+        AJ réelle : <span className="text-ink">{solde.ajReelle !== null ? `${solde.ajReelle.toFixed(2)} €` : "non renseignée (estimation utilisée)"}</span>
       </span>
     </div>
   );
@@ -223,6 +249,12 @@ function TableauResultats({
     return <p className="text-sm text-muted bg-surface border border-line rounded-card p-6 text-center">Aucun mois saisi pour l'instant — ajoute ton premier mois ci-dessus.</p>;
   }
 
+  // AJ réelle (bug corrigé le 2026-07-23) prioritaire sur l'AJ estimée depuis les contrats — un
+  // utilisateur déjà en cours d'indemnisation a une AJ réelle notifiée, potentiellement différente
+  // de l'estimation (devoir sacré n°2 : ne jamais présenter l'estimée comme si elle était exacte).
+  const ajUtilisee = soldeDepart.ajReelle ?? ajNetteParJour;
+  const ajEstEstimee = soldeDepart.ajReelle === null;
+
   return (
     <div className="bg-surface border border-line rounded-card overflow-hidden">
       <div className="overflow-x-auto">
@@ -235,7 +267,7 @@ function TableauResultats({
               <th className="text-right px-4 py-3">Délai</th>
               <th className="text-right px-4 py-3">Franchise CP</th>
               <th className="text-right px-4 py-3">Jours indemnisés</th>
-              {ajNetteParJour !== null && <th className="text-right px-4 py-3">≈ Montant net</th>}
+              {ajUtilisee !== null && <th className="text-right px-4 py-3">{ajEstEstimee ? "≈ Montant net" : "≈ Montant (AJ relevé)"}</th>}
               <th className="px-4 py-3" />
             </tr>
           </thead>
@@ -253,7 +285,7 @@ function TableauResultats({
                   <td className="text-right px-4 py-3 text-muted">{r.delaiConsomme}</td>
                   <td className="text-right px-4 py-3 text-muted">{r.franchiseCPConsommee}</td>
                   <td className="text-right px-4 py-3 font-medium">{r.joursIndemnises}</td>
-                  {ajNetteParJour !== null && <td className="text-right px-4 py-3 font-medium">{(r.joursIndemnises * ajNetteParJour).toFixed(2)} €</td>}
+                  {ajUtilisee !== null && <td className="text-right px-4 py-3 font-medium">{(r.joursIndemnises * ajUtilisee).toFixed(2)} €</td>}
                   <td className="px-4 py-3 text-right">
                     {declaration && (
                       <button onClick={() => onSupprimer(declaration.id)} className="text-xs text-muted hover:text-red transition-colors">
@@ -267,11 +299,14 @@ function TableauResultats({
           </tbody>
         </table>
       </div>
-      <div className="px-4 py-3 border-t border-line text-xs text-faint space-y-1">
-        {ajNetteParJour !== null && (
-          <p>Montants estimés au tarif AJ nette actuel ({ajNetteParJour.toFixed(2)} €/jour) — ne reflètent pas d'éventuels changements de salaire de référence sur les mois passés.</p>
+      <div className="px-4 py-3 border-t border-line text-xs space-y-1">
+        {ajUtilisee !== null && ajEstEstimee && (
+          <p className="text-amber">
+            Montant calculé sur AJ estimée ({ajUtilisee.toFixed(2)} €/jour, depuis tes contrats) — saisis ton AJ réelle depuis ta notification France Travail pour un résultat exact.
+          </p>
         )}
-        <p>Franchise salaires non calculée par Cadence pour l'instant (formule non certifiée sur une source fiable) — vérifie ce point directement sur ton relevé France Travail.</p>
+        {ajUtilisee !== null && !ajEstEstimee && <p className="text-faint">Montant calculé sur l'AJ indiquée sur ton relevé France Travail ({ajUtilisee.toFixed(2)} €/jour).</p>}
+        <p className="text-faint">Franchise salaires non calculée par Cadence pour l'instant (formule non certifiée sur une source fiable) — vérifie ce point directement sur ton relevé France Travail.</p>
       </div>
     </div>
   );
