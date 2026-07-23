@@ -475,11 +475,12 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
   **Mise à jour 2026-07-24, PDF officiel lu en entier** : la formule (page 14) est confirmée mot
   pour mot depuis le texte source (plus une extraction d'image incertaine) — seule l'absence d'un
   cas chiffré réel avec franchise salaires active reste une réserve valable (`totalNonVerifie`).
-  **Bug trouvé, PAS ENCORE corrigé (réponse utilisateur en attente)** : le `27` de la formule est
-  codé en dur dans `calculerFranchiseSalaires` au lieu de réutiliser la constante existante
+  **Bug corrigé (2026-07-24)** : le `27` de la formule était codé en dur dans
+  `calculerFranchiseSalaires` au lieu de réutiliser la constante existante
   `config.indemnisationMensuelle.seuilNonIndemnisationJours` — deux occurrences du même nombre non
-  reliées, contredit la règle d'or "aucune valeur réglementaire en dur dans le moteur". Détail
-  complet : `docs/reprise.md`.
+  reliées, contredisait la règle d'or "aucune valeur réglementaire en dur dans le moteur".
+  Remplacé, JSDoc mis à jour en conséquence. 127 tests verts, `tsc -b` propre. Détail complet :
+  `docs/reprise.md`.
 - ✅ **Correctif AJ réelle (2026-07-24, `f6cb937`)** : les montants de « Revenus mensuels »
   utilisaient l'AJ **prévisionnelle** (recalculée depuis les contrats actuels via
   `calculerAJBrutePourFenetre`/`calculerAJNette`), pas l'AJ **réelle** notifiée par France Travail

@@ -10,14 +10,10 @@ Deux devoirs sacrés : (1) ne jamais perdre les données ; (2) ne jamais affiche
 
 État : les deux devoirs sacrés sont tenus, la bêta a son socle. 127 tests verts, tsc propre. Dernier lot committé : correctif AJ réelle (`f6cb937` — montants de « Revenus mensuels » calculés sur l'AJ prévisionnelle au lieu de l'AJ réelle notifiée, un faux chiffre pour un utilisateur déjà en cours d'indemnisation). Tous les items §11.A du SPEC sont désormais traités.
 
-**Tâche en cours, PAS committée, réponse utilisateur EN ATTENTE** : cf. section dédiée
-« Fait/En cours (2026-07-24 : franchise salaires — formule confirmée depuis le PDF officiel, un
-`27` en dur trouvé) » plus bas. J'ai proposé un correctif (remplacer le `27` codé en dur dans
-`calculerFranchiseSalaires` par `config.indemnisationMensuelle.seuilNonIndemnisationJours`, + mettre
-à jour le commentaire pour dire que la formule est confirmée mot pour mot depuis le PDF, pas juste
-"à confirmer") — **l'utilisateur n'a pas encore répondu oui/non**, la conversation a été
-interrompue pour changer de session. Reprendre en reposant la question (ou en proposant
-directement le diff), ne pas supposer un accord tacite.
+État : les deux devoirs sacrés sont tenus. Dernier correctif committé : cf. section dédiée
+« Fait (2026-07-24 : correctif AJ réelle committé, vérification PE en direct, PDF officiel lu en
+entier) » plus bas, complétée par le correctif du `27` en dur (même date, voir juste après cette
+section pour le détail).
 
 ## Fait dans les sessions récentes
 
@@ -365,16 +361,18 @@ c'est bien le code de Cadence, pas juste la règle documentée, qui reproduit ce
   valeur réglementaire en dur dans le moteur" — deux occurrences du même nombre non reliées, risque
   de divergence silencieuse si l'une change sans l'autre un jour.
 
-**Correctif proposé, PAS ENCORE APPLIQUÉ, réponse utilisateur en attente** :
-1. Remplacer le `27` en dur dans `calculerFranchiseSalaires` par
-   `config.indemnisationMensuelle.seuilNonIndemnisationJours`.
-2. Mettre à jour le commentaire JSDoc de la fonction et le TODO associé : la formule est confirmée
-   mot pour mot depuis le texte du PDF officiel (plus "à confirmer depuis une source officielle"),
+**Correctif appliqué (2026-07-24), validé par l'utilisateur avant d'agir** :
+1. `27` en dur dans `calculerFranchiseSalaires` remplacé par
+   `config.indemnisationMensuelle.seuilNonIndemnisationJours` (`engine/indemnisationMensuelle.ts`).
+2. Commentaire JSDoc de la fonction et TODO associé réécrits : la formule est confirmée mot pour
+   mot depuis le texte du PDF officiel (page 14, plus "à confirmer depuis une source officielle"),
    seule l'absence de cas chiffré réel reste la réserve (`totalNonVerifie`).
 
-La conversation a été interrompue pour changer de session **avant que l'utilisateur ne réponde
-oui/non** à cette proposition — ne pas supposer un accord tacite, reposer la question ou proposer
-directement le diff au démarrage de la prochaine session.
+127 tests verts (inchangé, aucune logique modifiée — seule la source de la constante change),
+`tsc -b` propre. Pas de vérification navigateur nécessaire : `calculerFranchiseSalaires` n'est
+toujours pas câblée dans `calculerMoisIndemnisation` (rien de nouveau visible à l'écran, cf.
+« Chantier suivant » plus haut). Pas encore committé — à committer séparément du reste (changement
+isolé, un seul fichier moteur touché).
 
 **Demande initiale** : ajouter un module `engine/indemnisationMensuelle.ts` (montant ARE réellement
 versé mois par mois, pas juste l'AJ théorique) + composant `RevenusMensuels.tsx`. L'utilisateur a

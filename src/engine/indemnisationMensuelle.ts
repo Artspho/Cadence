@@ -97,14 +97,19 @@ function valeurALaDate(dateISO: string, historique: { dateEffet: string; valeur:
 }
 
 /**
- * Franchise salaires (guide France Travail p.14, formule certifiée le 2026-07-23 — ARTCENA +
- * flyer officiel) : `arrondi( (SR_total / SMIC_mensuel) × (SJM / (3 × SMIC_journalier)) − 27 )`,
- * jamais négative. SMIC lu à la date de fin de PRA (`Profil.dateAnniversaire`), pas la valeur
- * courante — une PRA close avant la dernière revalorisation doit lire l'ancienne valeur.
+ * Franchise salaires : `arrondi( (SR_total / SMIC_mensuel) × (SJM / (3 × SMIC_journalier)) −
+ * seuilNonIndemnisationJours )`, jamais négative. Formule confirmée mot pour mot depuis le texte
+ * du guide officiel France Travail (`GUIDE-INTERMITTENT.pdf`, page 14, lu en entier le
+ * 2026-07-24) — plus une extraction d'image incertaine. SMIC lu à la date de fin de PRA
+ * (`Profil.dateAnniversaire`), pas la valeur courante — confirmé texto page 14 (« valeurs à la
+ * date de fin de la période de référence »), une PRA close avant la dernière revalorisation doit
+ * lire l'ancienne valeur.
  *
- * TODO : SR_total devrait inclure tous salaires PRA non plafonnés y compris hors A10 — champ
- * `Profil.salairesHorsAnnexe10PRA` prévu mais optionnel en bêta. Vérifier sur un relevé réel avec
- * franchise salaires > 0 avant de retirer l'avertissement `sousEstimeeHorsA10`.
+ * TODO : SR_total devrait inclure tous salaires PRA non plafonnés y compris hors A10 (confirmé
+ * texto page 14 : « quel que soit le régime de l'activité ») — champ
+ * `Profil.salairesHorsAnnexe10PRA` prévu mais optionnel en bêta. Seule réserve restante :
+ * vérifier sur un relevé réel avec franchise salaires > 0 avant de retirer l'avertissement
+ * `sousEstimeeHorsA10` (aucun relevé fourni à ce jour ne montre cette franchise active).
  *
  * PAS ENCORE câblée sur la consommation mensuelle (répartition sur `min(dureeDroitsMois,
  * repartitionMoisMax)` mois + report, cf. franchise CP) : cette fonction calcule seulement le
@@ -124,7 +129,7 @@ export function calculerFranchiseSalaires(srContrats: number, sjm: number, profi
   }
 
   const srTotal = srContrats + (profil.salairesHorsAnnexe10PRA ?? 0);
-  const brut = Math.round((srTotal / smicMensuel) * (sjm / (3 * smicJournalier)) - 27);
+  const brut = Math.round((srTotal / smicMensuel) * (sjm / (3 * smicJournalier)) - config.indemnisationMensuelle.seuilNonIndemnisationJours);
 
   return { valeur: Math.max(0, brut), totalNonVerifie: true, sousEstimeeHorsA10: profil.salairesHorsAnnexe10PRA == null };
 }
