@@ -8,11 +8,12 @@ Mémoire durable à consulter au démarrage : `CLAUDE.md`, `docs/SPEC.md`, `docs
 
 Deux devoirs sacrés : (1) ne jamais perdre les données ; (2) ne jamais afficher un chiffre faux (ni faux « feu vert » rassurant, ni faux « Bloqué », ni faux montant, ni fausse alerte, ni valeur sentinelle brute).
 
-État : les deux devoirs sacrés sont tenus, la bêta a son socle. 136 tests verts, `tsc -b` propre.
-Dernier chantier committé : `ajReelleHistorique` (remplace l'ancien `ajReelle: number | null` par
-un historique de taux successifs, cf. section dédiée « Fait (2026-07-24 : chantier
-ajReelleHistorique — plusieurs taux d'AJ réelle successifs) » plus bas). Tous les items §11.A du
-SPEC sont désormais traités.
+État : les deux devoirs sacrés sont tenus, la bêta a son socle. 145 tests verts, `tsc -b` propre.
+Dernier chantier committé : découpage mensuel des contrats — `Contrat.dateDebut`, répartition
+prorata (`repartirContratParMois`), JNI calculé automatiquement depuis les vrais contrats
+(`floor(heures × 1,3 / 10)`), `DeclarationMensuelle` supprimée (cf. section dédiée « Fait
+(2026-07-24 : chantier découpage mensuel des contrats — JNI depuis les vrais contrats) » plus bas).
+Tous les items §11.A du SPEC sont désormais traités.
 
 ## Fait dans les sessions récentes
 
@@ -553,6 +554,77 @@ le plan final**, cette décision change l'architecture du module.
 - SMIC : https://www.info.gouv.fr/actualite/le-smic-revalorise-le-1er-juin-2026
 - PMSS : https://www.legifrance.gouv.fr/jorf/id/JORFTEXT000053143451
 - Guide officiel complet : https://www.francetravail.fr/files/live/sites/PE/files/fichiers-en-telechargement/fichiers-en-telechargement---dem/GUIDE-INTERMITTENT.pdf
+
+## Fait (2026-07-24 : chantier découpage mensuel des contrats — JNI depuis les vrais contrats)
+
+**Origine à retenir, pas anodine** : ce chantier a démarré sur *trois points présentés comme
+« actés en session précédente »* (découpage des contrats par mois civil, formule JNI
+`ceil(heuresDuMois × 1,3 / 10)`, suppression de `joursDeclares`). Vérification faite avant tout
+code : **aucun des trois ne correspondait au code réel**, et deux contredisaient directement des
+décisions déjà prises et documentées ici (la convention « jours déclarés bruts » avait été validée
+contre 3 relevés France Travail réels indépendants). Signalé explicitement plutôt que codé en
+confiance — la suite a confirmé que la prudence était justifiée : la formule proposée
+(`ceil`, en repassant par un `joursDeclares` recalculé) était fausse, mais l'idée sous-jacente
+(calculer automatiquement depuis les contrats) était juste une fois la vraie formule retrouvée.
+
+**Recherche de la vraie règle** : recherche web (voir sources ci-dessous) — pour l'Annexe 10, JNI
+se calcule **directement depuis les heures du mois**, pas depuis un décompte de jours intermédiaire :
+`floor(heures_du_mois × 1,3 / 10)` (floor, pas ceil — exemple du guide : « 60h → 7,8 → arrondi à 7 »).
+
+**Validation empirique décisive, sur les vrais documents de l'utilisateur** (relevés de situation
+France Travail + déclarations mensuelles d'activité fév/avril/mai 2026, un contrat GUSO réel) :
+- Le contrat GUSO isolé (20-26/04, 7 jours travaillés déclarés, 6 cachets = 72h) a d'abord servi à
+  falsifier la première formule testée (`ceil(heures/10)` en intermédiaire) : `ceil(72/10)=8 ≠ 7`
+  jours réels — écart déjà présent sur un seul contrat, avant même le mois complet.
+- La vraie formule (`floor(heures_totales_du_mois × 1,3 / 10)`), appliquée directement aux heures
+  agrégées de chaque mois (déclarations mensuelles d'activité, cachet confirmé = 12h), matche
+  **exactement** les 4 mois réels : fév 153h→19 JNI, mars 105h→13 JNI (confirmé par l'utilisateur
+  après coup), avril 93h→12 JNI, mai 21h→2 JNI — zéro écart sur les 4 mois indépendants.
+
+**Décision actée avant de coder** : le champ `dateDebut`/répartition par mois reste scopé au module
+indemnisation mensuelle uniquement — `decompteHeures.ts` (décompte 507h, `docs/validation.md`) n'est
+**pas** touché, ce chantier ne le nécessite pas et il s'agit d'un compteur volontairement distinct
+(règle d'or « deux compteurs, jamais mélangés »). Le mois d'un contrat n'est plus assigné en bloc à
+son mois de fin : `dateDebut` (nouveau champ obligatoire sur `Contrat`) permet de répartir heures et
+salaire au prorata des jours calendaires quand un contrat chevauche deux mois civils.
+
+**6 étapes, un commit par étape, diff montré avant chaque commit** :
+- **A** (`edd1690`) — `Contrat.dateDebut: string` ajouté ; migration silencieuse à la lecture
+  (`migrerContratsDateDebut`, repli sur `date` = contrat d'un seul jour) ; sites de construction mis
+  à jour (`testUtils.ts`, `lib/contratRecurrent.ts`).
+- **B** (`06aac77`) — `engine/decoupageMensuel.ts` (`repartirContratParMois`) : répartit heures et
+  salaire au prorata des jours, réutilise `heuresBrutesContrat` (aucune logique dupliquée), dernier
+  mois = reliquat exact (jamais de perte par arrondi). Pas de plafond mensuel appliqué (28
+  cachets/mois = 336h) : aucun des 4 mois certifiés (max 153h) ne l'approche, rien ne confirme qu'il
+  s'applique au calcul JNI — omission délibérée, documentée dans le code. 5 tests dédiés.
+- **C** (`7b08069`) — `MoisIndemnisationEntree.joursDeclares` → `heuresDuMois` ; formule JNI
+  corrigée (`floor`, pas `ceil`) ; `calculerSerieDepuisDeclarations` remplacée par
+  `calculerSerieDepuisContrats` (agrège `repartirContratParMois` de tous les contrats par mois,
+  plage = [mois du solde de départ .. dernier mois avec contrat OU aujourd'hui, le plus tardif] —
+  un mois sans contrat obtient 0h, jamais une absence silencieuse). 20 tests, rejouent les 4 mois
+  certifiés avec les vraies heures.
+- **D** (`c842406`) — `DeclarationMensuelle` supprimée entièrement (types, storage, `App.tsx`,
+  `RevenusMensuels.tsx`) : formulaire "Ajouter un mois" et badge "provisoire" retirés (n'ont plus de
+  sens, la liste des mois est automatique) ; colonne "Jours déclarés" → "Heures travaillées"
+  (nouveau champ passe-plat `MoisIndemnisationResultat.heuresDuMois`) ; un ancien export JSON avec
+  `declarationsMensuelles` continue de s'importer sans erreur (Zod ignore les clés inconnues).
+- **E** (`987152b`) — `ContractForm.tsx` : champ "Date de début" ajouté avant "Date de fin"
+  (renommée), pré-rempli à la même date tant que non modifié explicitement, validation
+  `dateDebut ≤ dateFin` (bouton désactivé + message sinon).
+- **F** (`b315842`) — commentaire de la formule JNI complété avec les 4 mois validés (mars obtenu
+  après coup) et la vraie source (vérification empirique, pas juste une règle citée).
+
+145 tests verts au total, `tsc -b` propre à chaque étape. **Vérifié dans le navigateur** à l'étape D
+avec 7 contrats réels (fév-mai 2026) : les 4 mois certifiés matchent exactement en bout en bout
+(UI comprise, pas seulement les tests unitaires), extension automatique aux mois sans contrat
+(juin/juillet, 0h, franchise épuisée) confirmée. Étape E vérifiée aussi : pré-remplissage,
+divergence après édition, blocage de soumission sur date de début postérieure à la date de fin.
+
+**Sources consultées pour la règle JNI** :
+- https://www.fichou-avocat.fr/post/intermittent-du-spectacle-nombre-dheures
+- https://www.francetravail.fr/files/live/sites/PE/files/fichiers-en-telechargement/fichiers-en-telechargement---dem/GUIDE-INTERMITTENT.pdf
+- https://www.unedic.org/storage/uploads/2023/07/24/Dossier20de20synthC3A8se20Intermittents20du20spectacle_uid_64be8b31b1a34.pdf
+- https://www.etreintermittent.com/comprendre-et-calculer-le-taux-dindemnisation-dun-intermittent-du-spectacle/
 
 ## Ensuite (backlog)
 

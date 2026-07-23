@@ -70,7 +70,9 @@ src/
   engine/                         # PUR + testé
     periodeReference.ts  decompteHeures.ts  salaireReference.ts
     areBrute.ts  areNette.ts  prediction.ts  alertes.ts  cycles.ts
-    indemnisationMensuelle.ts      # jours indemnisés/mois, solde de départ (V2, en cours)
+    indemnisationMensuelle.ts      # jours indemnisés/mois depuis les vrais contrats (V2)
+    decoupageMensuel.ts            # repartirContratParMois() — prorata jours calendaires
+    ajReelleUtils.ts                # getAjReelleAt() — taux d'AJ réelle applicable à une date
     __tests__/
   lib/extractionBulletin.ts       # import PDF (V2)
   lib/dashboardVide.ts            # dashboardEstVide(contrats) — présence, jamais 0h au montant
@@ -499,15 +501,38 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
   déplacé vers `Profil`, décision actée avec l'utilisateur : évite le circuit des 3 portes de
   cohérence sans bénéfice fonctionnel pour la bêta). `engine/ajReelleUtils.ts` (`getAjReelleAt`)
   cherche le taux applicable à une date ; nouveau type discriminé `MontantMensuelResultat` +
-  champ `MoisIndemnisationResultat.montantMensuel`, calculé uniquement dans
-  `calculerSerieDepuisDeclarations` (le `moisLabel` de `calculerMoisIndemnisation`/
-  `calculerSerieIndemnisation` reste purement informatif, jamais une vraie date). `RevenusMensuels.tsx` :
+  champ `MoisIndemnisationResultat.montantMensuel`, calculé uniquement dans la fonction de série
+  du module (le `moisLabel` de `calculerMoisIndemnisation`/`calculerSerieIndemnisation` reste
+  purement informatif, jamais une vraie date). `RevenusMensuels.tsx` :
   éditeur de périodes AJ (date d'effet/valeur/suppression), plus de repli sur une AJ estimée
   (devoir n°2) — encart ambre si aucune période connue, `—` mois par mois si hors couverture.
   Migration silencieuse de l'ancien champ `ajReelle` dans `localStorageAdapter.ts`, appliquée à la
   fois au chargement localStorage et à l'import JSON. Au passage : `RevenusMensuels.tsx` masqué en
   première admission (module sans objet avant l'ouverture des droits). 136 tests verts, `tsc -b`
   propre, vérifié dans le navigateur à chaque étape. Détail complet : `docs/reprise.md`.
+- ✅ **Chantier découpage mensuel des contrats (2026-07-24)** : `Contrat.dateDebut: string` ajouté
+  (migration silencieuse : repli sur `date` si absent, contrat traité comme un seul jour) ;
+  `engine/decoupageMensuel.ts` (`repartirContratParMois`) répartit heures et salaire d'un contrat
+  au prorata des jours calendaires quand il chevauche deux mois civils (réutilise
+  `heuresBrutesContrat`, aucune logique dupliquée). **Formule JNI corrigée** :
+  `Math.floor(heuresDuMois × coeffJoursNonIndemnisables / diviseurJoursTravaillesA10)` — floor, pas
+  ceil, calculée directement sur les heures du mois (donne enfin un usage à
+  `diviseurJoursTravaillesA10`, vestige inutilisé jusqu'ici) — validée mot pour mot sur 4 mois
+  réels indépendants (fév/mars/avril/mai 2026, zéro écart). `calculerSerieDepuisContrats` remplace
+  `calculerSerieDepuisDeclarations` : agrège `repartirContratParMois` de tous les contrats par
+  mois, plage = [mois du solde de départ .. dernier mois avec contrat ou aujourd'hui]. **`Declaration
+  Mensuelle` supprimée entièrement** (types, storage, UI) — la saisie manuelle des jours déclarés
+  est remplacée par un calcul automatique depuis les vrais contrats ; `RevenusMensuels.tsx` : plus
+  de formulaire "Ajouter un mois" ni de badge "provisoire", colonne "Heures travaillées" affichée à
+  la place. `ContractForm.tsx` : champ "Date de début" ajouté (pré-rempli à la date de fin tant que
+  non modifié, validation `dateDebut ≤ dateFin`). **Origine notable** : ce chantier a démarré sur
+  trois points présentés comme actés en session précédente qui se sont révélés faux à la
+  vérification (dont la formule JNI elle-même, `ceil` au lieu de `floor`) — la vraie formule a été
+  retrouvée par recherche web puis validée empiriquement sur les documents réels de l'utilisateur
+  (relevés France Travail, un contrat GUSO) avant d'être câblée. `decompteHeures.ts` (507h)
+  volontairement non touché — compteur distinct, hors périmètre. 145 tests verts, `tsc -b` propre,
+  vérifié dans le navigateur (7 contrats réels, 4 mois certifiés exacts en bout en bout). Détail
+  complet : `docs/reprise.md`.
 - ⬜ **Non traité (V2/V3) :** coordination européenne (périodes U1/PDU1) — même famille qu'Annexe 8/article 65, hors périmètre Annexe 10 pur. Aucune logique ni champ de données ne l'anticipe encore (détail dans `docs/SPEC.md` §10 et §11.C). Ne pas confondre avec le champ `territoire` du contrat, qui couvre un cas différent (cachet ponctuel joué en EEE/Suisse/UK mais déclaré en France).
 - 🔁 **Maintenance de la config** (récurrent, perso — hors app, pas de backend en bêta) : une fois
   par mois, vérifier à la source officielle SMIC (horaire / mensuel / journalier), PMSS, et les
