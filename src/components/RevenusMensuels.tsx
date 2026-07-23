@@ -1,9 +1,10 @@
 import { useMemo, useState } from "react";
-import type { DeclarationMensuelle, SoldeIndemnisationDepart } from "../types";
+import type { DeclarationMensuelle, Profil, SoldeIndemnisationDepart } from "../types";
 import type { FranceTravailConfig } from "../config/franceTravailConfig";
 import { calculerSerieDepuisDeclarations } from "../engine/indemnisationMensuelle";
 
 interface RevenusMensuelsProps {
+  profil: Profil;
   soldeDepart: SoldeIndemnisationDepart | null;
   declarations: DeclarationMensuelle[];
   config: FranceTravailConfig;
@@ -14,7 +15,13 @@ interface RevenusMensuelsProps {
   dateDuJour: string;
 }
 
-export function RevenusMensuels({ soldeDepart, declarations, config, ajNetteParJour, onConfigurerSolde, onAjouterDeclaration, onSupprimerDeclaration, dateDuJour }: RevenusMensuelsProps) {
+export function RevenusMensuels({ profil, soldeDepart, declarations, config, ajNetteParJour, onConfigurerSolde, onAjouterDeclaration, onSupprimerDeclaration, dateDuJour }: RevenusMensuelsProps) {
+  // Première admission = pas encore indemnisé, en train de viser les 507 h d'ouverture — ce
+  // module (montants mensuels déjà versés) n'a aucun sens dans ce contexte, cf. docs/reprise.md.
+  if (profil.situation === "premiere_admission") {
+    return <PremiereAdmissionInfo />;
+  }
+
   if (!soldeDepart) {
     return <ConfigurationSolde dateDuJour={dateDuJour} onConfigurer={onConfigurerSolde} />;
   }
@@ -24,6 +31,14 @@ export function RevenusMensuels({ soldeDepart, declarations, config, ajNetteParJ
       <SoldeRecap solde={soldeDepart} />
       <FormulaireDeclaration onAjouter={onAjouterDeclaration} />
       <TableauResultats soldeDepart={soldeDepart} declarations={declarations} config={config} ajNetteParJour={ajNetteParJour} onSupprimer={onSupprimerDeclaration} />
+    </div>
+  );
+}
+
+function PremiereAdmissionInfo() {
+  return (
+    <div className="max-w-[640px] bg-surface border border-line rounded-card p-6 text-sm text-muted">
+      La simulation mensuelle sera disponible une fois tes droits ouverts. Pour l'instant, concentre-toi sur l'onglet Projection pour suivre tes heures.
     </div>
   );
 }

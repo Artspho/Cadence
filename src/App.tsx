@@ -267,6 +267,7 @@ export default function App() {
             <AvertissementHorsPerimetre />
           ) : (
             <RevenusMensuels
+              profil={profil}
               soldeDepart={donnees.soldeIndemnisationDepart}
               declarations={donnees.declarationsMensuelles}
               config={franceTravailConfig}
