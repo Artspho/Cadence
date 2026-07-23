@@ -8,7 +8,7 @@ Mémoire durable à consulter au démarrage : `CLAUDE.md`, `docs/SPEC.md`, `docs
 
 Deux devoirs sacrés : (1) ne jamais perdre les données ; (2) ne jamais afficher un chiffre faux (ni faux « feu vert » rassurant, ni faux « Bloqué », ni faux montant, ni fausse alerte, ni valeur sentinelle brute).
 
-État : les deux devoirs sacrés sont tenus, la bêta a son socle. 108 tests verts, tsc propre. Dernier lot committé : PWA installable (service worker, icônes, manifest — cf. section « Fait » dédiée ci-dessous). Tous les items §11.A du SPEC sont désormais traités.
+État : les deux devoirs sacrés sont tenus, la bêta a son socle. 117 tests verts, tsc propre. Dernier lot committé : module indemnisation mensuelle V2 (jours réellement indemnisés mois par mois, onglet « Revenus mensuels » — cf. section « Fait » dédiée ci-dessous ; franchise salaires et plafond PMSS restent hors périmètre). Tous les items §11.A du SPEC sont désormais traités.
 
 ## Fait dans les sessions récentes
 
@@ -220,15 +220,15 @@ actée** : l'installation sur un vrai téléphone n'a pas pu être testée depui
 dépend du déploiement bêta (backlog, toujours en attente). Détail complet : `CLAUDE.md`
 « État actuel ».
 
-## Tâche en cours, PAS terminée : module indemnisation mensuelle
+## Fait (module indemnisation mensuelle, V2 — 3 phases terminées)
 
-Chantier ouvert (V2 du SPEC). **Phase 1 (config) et Phase 2 (moteur + tests) faites et
-committées** (`ead0c4f` pour la Phase 1 ; Phase 2 = `engine/indemnisationMensuelle.ts` +
-`indemnisationMensuelle.test.ts`, 114 tests verts au total, `tsc -b` propre — à committer
-séparément si pas encore fait). **Reste à faire : Phase 3 (composant `RevenusMensuels.tsx`)**,
-pas commencée — décider d'abord le modèle de saisie de `joursDeclares` par mois avant de coder.
-Détail complet dans « État actuel » de `CLAUDE.md`. L'investigation ci-dessous est conservée
-comme historique (trouvailles, sources, décisions prises) — ne pas la refaire.
+Chantier terminé pour son périmètre actuel (jours réellement indemnisés mois par mois ; franchise
+salaires et plafond de cumul PMSS restent hors périmètre, volontairement). Phase 1 (config,
+`ead0c4f`), Phase 2 (moteur + tests, `engine/indemnisationMensuelle.ts`), Phase 3 (composant
+`RevenusMensuels.tsx`, nouvel onglet). 117 tests verts au total, `tsc -b` propre, vérifié dans le
+navigateur avec les 4 mois certifiés (fév=0, mars=17, avril=18, mai=29 — identique aux relevés
+réels). Détail complet dans « État actuel » de `CLAUDE.md`. L'investigation ci-dessous est
+conservée comme historique (trouvailles, sources, décisions prises).
 
 **Demande initiale** : ajouter un module `engine/indemnisationMensuelle.ts` (montant ARE réellement
 versé mois par mois, pas juste l'AJ théorique) + composant `RevenusMensuels.tsx`. L'utilisateur a
