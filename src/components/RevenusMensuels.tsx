@@ -123,10 +123,7 @@ function ConfigurationSolde({ dateDuJour, onConfigurer }: { dateDuJour: string; 
           onChange={(e) => setAjReelleInput(e.target.value)}
           className="w-full bg-surface-2 border border-line rounded-lg px-3 py-2 text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-mint"
         />
-        <p className="text-xs text-faint mt-1">
-          Ton allocation journalière indiquée sur ton relevé France Travail ou ta notification d'ouverture de droits. Ce taux est fixé à chaque réadmission et reste le même pendant toute ta
-          période d'indemnisation. Pour toi : 55,02 € depuis le 18/01/2026.
-        </p>
+        <p className="text-xs text-faint mt-1">Ton allocation journalière nette indiquée sur ton relevé France Travail ou ta notification d'ouverture de droits.</p>
       </div>
 
       <button
