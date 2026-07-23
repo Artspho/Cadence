@@ -220,10 +220,137 @@ actée** : l'installation sur un vrai téléphone n'a pas pu être testée depui
 dépend du déploiement bêta (backlog, toujours en attente). Détail complet : `CLAUDE.md`
 « État actuel ».
 
-## PROCHAINE ACTION
+## Tâche en cours, PAS terminée : module indemnisation mensuelle
 
-Plus rien en urgence. Aucune priorité imposée : le reste du backlog reste au choix selon ce qui te
-semble le plus utile. Détail complet : « Ensuite (backlog) ».
+Chantier ouvert (V2 du SPEC). **Phase 1 (config) et Phase 2 (moteur + tests) faites et
+committées** (`ead0c4f` pour la Phase 1 ; Phase 2 = `engine/indemnisationMensuelle.ts` +
+`indemnisationMensuelle.test.ts`, 114 tests verts au total, `tsc -b` propre — à committer
+séparément si pas encore fait). **Reste à faire : Phase 3 (composant `RevenusMensuels.tsx`)**,
+pas commencée — décider d'abord le modèle de saisie de `joursDeclares` par mois avant de coder.
+Détail complet dans « État actuel » de `CLAUDE.md`. L'investigation ci-dessous est conservée
+comme historique (trouvailles, sources, décisions prises) — ne pas la refaire.
+
+**Demande initiale** : ajouter un module `engine/indemnisationMensuelle.ts` (montant ARE réellement
+versé mois par mois, pas juste l'AJ théorique) + composant `RevenusMensuels.tsx`. L'utilisateur a
+fourni des valeurs SMIC/PMSS « certifiées sur relevés réels » et une formule de franchise salaires,
+avec un plan complet en 4 phases (config → moteur+tests → composant), et demandé de résoudre un
+écart avant de coder : un cas de test (mars 2026) donnait 13 AJ calculées contre 17 AJ sur le vrai
+relevé.
+
+**Investigation faite (réponses aux 2 questions posées)** :
+1. `engine/indemnisationMensuelle.ts` n'existe pas encore. Fichiers actuels : `alertes.ts`,
+   `areBrute.ts`, `areNette.ts`, `cycles.ts`, `dateUtils.ts`, `decompteHeures.ts`,
+   `periodeReference.ts`, `prediction.ts`, `salaireReference.ts`.
+2. `valeursDatees.smicHoraireBrut` déjà renseigné (12,31, un seul nombre) ; `smicMensuelBrut`,
+   `smicJournalierBrut`, `pmssMensuel` toujours `null`.
+
+**Trouvailles importantes, toutes à revalider au démarrage de la prochaine conversation** :
+
+- **Conflit structurel Phase 1** : `areBrute.ts:68` lit `config.valeursDatees.smicHoraireBrut`
+  comme un **nombre simple** (réadmission allongée, `params.nh * params.smicHoraireBrut`, déjà
+  testé dans `areBrute.test.ts`). Le remplacer par un tableau daté `{dateEffet, valeur}[]` (proposé
+  en Phase 1) casserait ce calcul silencieusement (`NaN`) — incompatible avec la contrainte
+  « zéro modification dans `areBrute.ts` ». **Réconciliation proposée, pas encore validée par
+  l'utilisateur** : garder `smicHoraireBrut: number | null` inchangé (valeur courante, ce
+  qu'`areBrute.ts` attend) + ajouter un champ séparé `smicHoraireBrutHistorique:
+  {dateEffet, valeur}[]` réservé au nouveau module.
+- **Valeurs SMIC/PMSS vérifiées par recherche web, confirmées exactes** (Légifrance, info.gouv.fr) :
+  SMIC horaire 12,02 €(01/01/2026)→12,31 €(01/06/2026), mensuel 1823,03 €→1867,02 €, PMSS 4005 €
+  (arrêté 22/12/2025). Ces trois-là peuvent passer ✅ sans réserve.
+- **Guide officiel France Travail retrouvé et lu directement** (`GUIDE-INTERMITTENT.pdf`,
+  francetravail.fr — même source déjà citée dans `franceTravailConfig.ts`), pages 12 à 17. Confirme
+  mot pour mot l'ordre de consommation (jours non indemnisables → délai d'attente → franchise CP →
+  franchise salaires, chacune seulement sur le reliquat des précédentes, avec report du forfait non
+  utilisé au mois suivant) — l'algorithme de la Fonction 3 proposée est donc **validé par la
+  source**, pas à réinventer.
+- **Cas Mars très probablement résolu** : avec 10 jours travaillés (pas 13, vraisemblablement une
+  erreur de transcription/calcul heures÷10), l'algorithme confirmé donne exactement 17 AJ
+  (`31 − ceil(10×1.3) − 1 franchise CP = 31 − 13 − 1 = 17`) — collision parfaite avec le relevé.
+- **Nouvel écart trouvé, PAS résolu** : la transition février→mars du profil donné (franchise CP
+  4j→1j en un seul mois) est mathématiquement impossible avec le forfait confirmé de 2j/mois
+  (total ≤ 24j) — une chute de 3j en un mois demanderait un forfait de 3j/mois, donc un total
+  initial > 24j, différent des 5j annoncés. Il manque soit les chiffres réels de janvier (mois
+  d'avant, jamais donné), soit une correction des valeurs de résiduel de fév/mars.
+  → **Résolu (2026-07-23), voir section ci-dessous** : il n'y a pas de forfait mensuel plafonné,
+  la franchise CP se consomme intégralement selon la place disponible chaque mois.
+- **Alerte sérieuse sur la formule franchise salaires** : le guide (p.14) montre une formule à
+  **4 variables** — `arrondi( (SR / SMIC_mensuel) × (SJM / (3 × SMIC_journalier)) − 27 )` — alors
+  que la formule proposée par l'utilisateur (`floor(SR / (3 × SJM) − 27)`) n'utilise que SR et SJM,
+  sans aucun terme SMIC. L'exemple « certifié par élimination » donné (résultat 0) ne permet PAS de
+  distinguer les deux formules : les deux donnent 0 sur ce cas (résultat très négatif dans les deux
+  cas). Recommandation : utiliser la formule du guide, mais l'extraction du PDF (texte depuis une
+  image de formule) n'est pas fiable à 100 % pour l'agencement exact des deux fractions — à
+  relire directement sur le PDF avant de la coder comme ✅.
+  → **Résolu (2026-07-23)** : pas de formule implémentée pour l'instant, voir ci-dessous.
+
+**Réponses reçues de l'utilisateur (2026-07-23), à partir de relevés France Travail réels
+« certifiés »** :
+
+1. **Convention de saisie confirmée** : l'utilisateur saisit les **jours déclarés bruts** ; le
+   moteur calcule seul `joursNonIndemnisables = ceil(joursDéclarés × 1.3)` — colonne "non indem.
+   travail" du relevé. Confirmé sur 3 mois indépendants : mars (10j déclarés → ceil(13)=13 ✓),
+   avril (9j → ceil(11.7)=12 ✓), mai (1j → ceil(1.3)=2 ✓).
+2. **Cas de test février corrigé** : les jours déclarés réels sont **14** (pas 19 — 19 est la
+   valeur déjà calculée `ceil(14×1.3)=19`, une confusion valeur-brute / valeur-calculée dans le
+   lot de données précédent, pas un vrai écart).
+3. **Franchise CP : pas de plafond mensuel forfaitaire.** Contrairement à la lecture initiale du
+   guide (`forfaitMensuelBas: 2` / `forfaitMensuelHaut: 3` dans `franceTravailConfig.ts`, qui
+   suggérait un quota consommé par mois), les relevés réels montrent une consommation **sans
+   plafond mensuel** : `franchiseCPConsommée = min(franchiseCPRestante, joursDisponiblesAprèsDifféré)`
+   — on consomme tout ce qui reste de franchise CP tant qu'il y a de la place dans le mois après
+   jours non indemnisables + délai d'attente. Confirmé : février consomme 4j (tout ce qu'il
+   restait), mars consomme 1j (le reste, franchise épuisée ensuite). **Résout l'écart précédent**
+   sans qu'il manque de données : le "forfait mensuel" du config ne gouverne pas le rythme de
+   consommation constaté sur ces relevés — `franceTravailConfig.ts` (`forfaitMensuelBas/Haut`) est
+   probablement soit un plafond différent (pas encore identifié), soit à ignorer pour cette
+   fonction — **à trancher explicitement dans le plan**, pas à coder tel quel sans vérifier son
+   usage réel.
+4. **Franchise salaires : pas de calcul pour l'instant.** Aucun relevé fourni ne montre de
+   franchise salaires active. Décision : retourner systématiquement
+   `{ valeur: null, avertissement: "franchise_salaires_non_certifiee" }` plutôt que d'implémenter
+   une formule non vérifiée à 100 % sur la source (devoir n°2 : jamais un chiffre faux). Referme
+   la question de la page 14 sans qu'il soit nécessaire de trancher l'agencement exact des deux
+   fractions maintenant — **à rouvrir explicitement le jour où un relevé réel montre une franchise
+   salaires active**.
+5. **`smicHoraireBrut` : réconciliation validée** — champ courant `smicHoraireBrut: 12.31`
+   inchangé, nouveau champ séparé `smicHoraireBrutHistorique` à côté. **Zéro modification dans
+   `areBrute.ts`.**
+
+**Cas de tests fournis (jours déclarés bruts, valeurs certifiées sur relevés réels)** :
+
+| Mois | Jours mois | Jours déclarés | Non indem. (`ceil(×1.3)`) | Différé | Franchise CP consommée | AJ payées |
+|------|-----------|----------------|---------------------------|---------|-------------------------|-----------|
+| Février 2026 | 28 | 14 | 19 | 5 | 4 (tout le restant) | 0 |
+| Mars 2026 | 31 | 10 | 13 | 0 | 1 (le reste, franchise épuisée) | 17 |
+| Avril 2026 | 30 | 9 | 12 | 0 | 0 (franchise épuisée) | 18 |
+| Mai 2026 | 31 | 1 | 2 | 0 | 0 (franchise épuisée) | 29 |
+
+Vérification arithmétique faite (mois − non indem − différé − CP = AJ) : les 4 lignes bouclent
+exactement. ✅
+
+**Donnée contextuelle fournie, PAS un cas de test standard** : réadmission le 18/01/2026 (AJ passe
+de 54,55 €/SJR 133,53 € à 55,02 €/SJR 129,99 €). Janvier 2026 (31j, 18j non indem. « régularisé »,
+0 franchise, 0 différé → 13 AJ) est explicitement qualifié de **régularisé** par l'utilisateur —
+pas un mois qui suit l'algorithme standard (transition de droits en cours de mois), donc **à ne
+pas utiliser comme cas de test de l'algorithme normal**.
+
+**Point resté ouvert, pas encore posé à l'utilisateur avant cette session** : le tableau ci-dessus
+donne « différé 5j » pour février mais 0 pour janvier, alors que le délai d'attente réglementaire
+est de 7j (une fois par période de 12 mois). Si le délai se consomme progressivement comme la
+franchise CP (report du reliquat au mois suivant, cf. guide p.12-17), il manque 2j quelque part
+entre le 18/01 et le début février — probablement absorbés dans la « régularisation » de janvier,
+cohérent avec le fait que janvier n'est justement pas un mois standard. **Conséquence pour le
+plan** : le module doit-il (a) reconstruire tout l'historique depuis la réadmission pour calculer
+lui-même les soldes de délai/franchise CP à une date donnée, ou (b) partir d'un solde d'ouverture
+donné (délai restant, franchise CP restante) à une date de départ choisie, sans chercher à
+reconstruire les mois antérieurs irréguliers ? Le jeu de données fourni (Fév-Mai) suggère (b) —
+février démarre déjà avec délai=5 restant, pas 7 — **à confirmer avec l'utilisateur avant d'écrire
+le plan final**, cette décision change l'architecture du module.
+
+**Sources consultées cette session** (à recréer si besoin) :
+- SMIC : https://www.info.gouv.fr/actualite/le-smic-revalorise-le-1er-juin-2026
+- PMSS : https://www.legifrance.gouv.fr/jorf/id/JORFTEXT000053143451
+- Guide officiel complet : https://www.francetravail.fr/files/live/sites/PE/files/fichiers-en-telechargement/fichiers-en-telechargement---dem/GUIDE-INTERMITTENT.pdf
 
 ## Ensuite (backlog)
 
