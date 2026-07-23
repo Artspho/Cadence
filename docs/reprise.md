@@ -8,7 +8,7 @@ Mémoire durable à consulter au démarrage : `CLAUDE.md`, `docs/SPEC.md`, `docs
 
 Deux devoirs sacrés : (1) ne jamais perdre les données ; (2) ne jamais afficher un chiffre faux (ni faux « feu vert » rassurant, ni faux « Bloqué », ni faux montant, ni fausse alerte, ni valeur sentinelle brute).
 
-État : les deux devoirs sacrés sont tenus, la bêta a son socle. 85 tests verts, tsc propre, git à jour (dernier lot : correctif du seuil de réadmission gonflé, commit `4fba5b5`).
+État : les deux devoirs sacrés sont tenus, la bêta a son socle. 91 tests verts, tsc propre, git à jour (dernier lot : `dateAnniversairePrecedente` + `SeuilReadmission` à 3 variants, commit `4d22218`).
 
 ## Fait dans les sessions récentes
 
@@ -66,88 +66,25 @@ Vérifié manuellement dans le navigateur (refus Onboarding, refus édition mêm
 complet du Dashboard après confirmation d'une date anniversaire). 79 tests verts, détail :
 `CLAUDE.md` « État actuel », `docs/SPEC.md` §10, `docs/validation.md`.
 
-## Fait (transparence du calcul + correctif « date inconnue »)
+## Fait dans la session précédente
 
-Dernier item §11.A ouvert, traité en deux temps.
+- Panneau de transparence du calcul (`DetailCalcul.tsx`) — détail A+B+C, heures comptées vs écartées.
+- Correctif "date inconnue" vs "échéance atteinte" (anniversaire non renseigné).
+- Bug critique corrigé : seuil de réadmission à 1515h (plafond technique qui fuitait à l'écran). Type discriminé `SeuilReadmission` ajouté, repli honnête sur `historique_insuffisant` + alerte dédiée + bandeau Dashboard.
+- Champ `dateAnniversairePrecedente?: string` ajouté au modèle `Profil` (optionnel, ISO, visible uniquement si `situation === "readmission"`).
+- `SeuilReadmission` étendu avec un 3e variant `hors_bornes` — distinct de `historique_insuffisant` (cause différente, message différent, action suggérée différente incluant la mention clause de rattrapage 338–506h).
+- `periodeReference.ts` : borne réelle utilisée quand le champ est renseigné ; `TRANCHES_MAX` reste garde-fou absolu uniquement ; TODO inclusif/exclusif laissé en commentaire.
+- Bug TypeScript trouvé et corrigé en cours de route : narrowing sur union `calculable: false` à plusieurs variantes — les assertions d'exhaustivité testent désormais la valeur entière, pas `.raison` isolée.
+- 91/91 tests verts — 6 nouveaux tests ajoutés.
+- Vérifié bout en bout dans le navigateur : champ apparaît/disparaît selon la situation, saisie dans "Mon profil" → sauvegarde → Dashboard bascule immédiatement de `historique_insuffisant` à `hors_bornes` avec le bon message.
 
-**Panneau de transparence** (`components/DetailCalcul.tsx`) : accessible depuis le Dashboard via
-un `<details>` natif (**replié par défaut**, ouvert seulement au clic — jamais affiché en
-permanence). Montre le décompte des heures par catégorie (dont enseignement/formation retenus vs
-écartés au-delà du plafond), SR/NHT/SAR, l'AJ brute = A+B+C avec plancher/plafond appliqué ou non,
-et le détail des cotisations jusqu'à l'AJ nette. **Zéro fichier `engine/` touché** : investigation
-préalable a confirmé que `decompteHeures.ts`, `areBrute.ts`, `salaireReference.ts` et `areNette.ts`
-exposaient déjà tout ce détail dans leurs types de retour — `App.tsx` calculait déjà `sr`/`nht`/`sar`
-mais ne les faisait pas transiter jusqu'au Dashboard. Contenu vérifié manuellement contre le premier
-cas de `areBrute.test.ts` (SR 20 000 €, NHT 1000 h → A+B+C = 68,78 €) : concordance exacte.
-
-**Piège trouvé en testant le panneau sur un profil anniversaire inconnu, indépendant du panneau
-lui-même** : `ProjectionChart.tsx` affichait « échéance atteinte » à côté d'un badge « Alerte »
-honnête. Cause : le composant recalculait son propre « jours restants » à partir de
-`fenetreFin`/`dateCap` sans savoir que `periodeReference.ts` referme la fenêtre sur une date
-sentinelle (« aujourd'hui ») quand l'anniversaire est inconnu — un artifice de calcul déjà nommé
-ailleurs (bug Infinity ci-dessus), mais qui n'avait pas été audité dans ce composant précis.
-`niveau`/`message`/`rythmeRequis` restaient corrects (protégés par `anniversaireConnu` en
-interne à `prediction.ts`) : bug d'affichage confiné à cette seule phrase, pas une confusion dans
-le calcul du statut. **Corrigé (Option A, ciblée)** : nouveau champ `StatutPrediction.anniversaireConnu`
-exposé (aucune logique changée dans `prediction.ts`), transmis à `ProjectionChart.tsx`, qui affiche
-désormais « date inconnue » dans ce cas. Test dédié ajouté (`prediction.test.ts`). **Dette tracée**
-dans `docs/validation.md` (nouvelle section « Dette tracée ») : le champ brut
-`StatutPrediction.joursRestants` reste fragile pour tout futur consommateur qui le lirait
-directement sans vérifier `anniversaireConnu` — Option B (type discriminé façon `RythmeRequis`)
-en backlog si un autre endroit y retombe un jour, pas urgent aujourd'hui.
-
-80 tests verts, tsc propre. Vérifié manuellement dans le navigateur sur 3 profils (anniversaire
-connu futur, inconnu, réellement dépassé) : les trois textes désormais cohérents avec leur badge.
-Commit `505473a`.
-
-## Fait (seuil de réadmission gonflé corrigé)
-
-Bug remonté par un testeur en conditions réelles (première utilisation en dehors de mes propres
-tests), pas trouvé en investiguant de mon côté. Profil réadmission avec un seul contrat récent
-(27/01/2026) et anniversaire au 17/01/2027 : le Dashboard affichait **« 480 / 1515 h »** au lieu de
-« 480 / 507 h ». `1515 = 507 + 24×42` : exactement le plafond de sécurité de terminaison
-(`TRANCHES_MAX = 24`) de la boucle d'extension de fenêtre en réadmission (`periodeReference.ts`),
-pas un vrai seuil ajusté.
-
-**Cause exacte** : la boucle recule la fenêtre de 30 j par tranche tant que le total d'heures
-trouvé n'atteint pas un seuil qui grimpe de 42 h à chaque tranche. Avec un seul contrat isolé (rien
-avant), le total ne grandit jamais en reculant la fenêtre, alors que le seuil grimpe sans fin — la
-boucle épuise ses 24 tentatives sans jamais revérifier la dernière fenêtre contre son propre seuil,
-et retourne 1515 comme si c'était un résultat. **Preuve que la distinction succès/échec est fiable
-par construction** : retracé ligne à ligne, un succès sort toujours via `break` avec un nombre de
-tranches ≤ 23 ; atteindre `tranches === TRANCHES_MAX` en sortie signifie donc **toujours et
-uniquement** un épuisement sans solution — jamais une vraie réussite tardive.
-
-**Découverte en creusant, indépendante du bug lui-même** : le test existant
-`periodeReference.test.ts` pour ce scénario (un seul petit contrat) n'affirmait que
-`tranchesReadmission > 0` — vrai aussi bien pour un succès que pour un épuisement à 24. **Ce test
-exerçait donc déjà le bug depuis le début, sans jamais le remarquer.** Un test vert ne garantissait
-pas qu'on testait la bonne chose — dette tracée dans `docs/validation.md` avec la leçon
-méthodologique (toujours vérifier *pourquoi* une boucle bornée par un plafond de tentatives s'est
-arrêtée, pas seulement *que* le résultat a l'air plausible).
-
-**Corrigé** : `FenetreReference.seuilReadmission` est un type discriminé
-(`{ calculable: true; tranchesReadmission; seuilHeuresAjuste } | { calculable: false; raison:
-"historique_insuffisant"; tranchesTentees }`), construit à partir d'un booléen `trouve` explicite
-posé au moment du `break` — jamais déduit du compteur de tranches par relecture implicite. En
-échec, la fenêtre retombe sur la base non étendue (pas la fenêtre poussée à 24 tranches sans
-validation), `prediction.ts`/`areBrute.ts` retombent sur le seuil/la formule standard, `Dashboard.tsx`
-affiche un bandeau honnête dédié, et `alertes.ts` porte une nouvelle alerte
-`seuil_readmission_non_calculable` (niveau attention, action suggérée). Test de non-régression
-ajouté pour un vrai succès d'extension (2 tranches, vérifié par calcul indépendant) et
-reproduction bout-en-bout du scénario exact rapporté (`prediction.test.ts`).
-
-85 tests verts, tsc propre. Vérifié manuellement dans le navigateur avec le profil exact rapporté
-(réadmission, anniversaire 17/01/2027, contrat unique du 27/01/2026) : affiche désormais
-« 480 / 507 h » et le bandeau + l'alerte honnêtes, plus jamais 1515. Commit `4fba5b5`.
+Commits : `505473a`, `4fba5b5`, `4d22218`.
 
 ## PROCHAINE ACTION
 
-Plus rien en urgence côté garde-fous, cohérence de profil, transparence du calcul, ni le bug du
-seuil de réadmission gonflé — les items §11.A sont tous traités, et ce dernier bug (remonté par un
-vrai testeur) est refermé. Aucune priorité imposée pour la suite : à choisir parmi le backlog
-ci-dessous selon ce qui te semble le plus utile (candidats les moins coûteux : barème CSG figé,
-PWA ; le plus structurant côté partage : déploiement bêta). Détail complet : « Ensuite (backlog) ».
+Renommer « À propos » en « Mon profil » et le remonter en premier plan de la navigation (backlog
+existant, changement UI simple à faible risque). Aucune autre priorité imposée : le reste du
+backlog reste au choix selon ce qui te semble le plus utile. Détail complet : « Ensuite (backlog) ».
 
 ## Ensuite (backlog)
 
@@ -177,14 +114,10 @@ PWA ; le plus structurant côté partage : déploiement bêta). Détail complet 
 
 ### Idées consignées le 2026-07-23 (à cadrer plus tard, pas de plan pour l'instant)
 
-1. **Date de précédente ouverture de droits** sur `Profil` (déjà discuté cette session, cf. correctif
-   du seuil de réadmission gonflé ci-dessus) : bornerait correctement l'allongement de fenêtre en
-   réadmission au lieu du repli « non calculable » actuel. Impact : modèle de données (nouveau champ
-   `Profil`), migration (comme `regimeDeclare`/`activiteHorsAnnexe10` avant), UI Onboarding + « À
-   propos »/« Mon profil », et `periodeReference.ts` (borne réelle de la boucle d'extension au lieu
-   du plafond arbitraire `TRANCHES_MAX`). Touche `engine/` — plan détaillé et validation requis avant
-   tout code, comme d'habitude.
-2. **Contrat récurrent pour l'enseignement** : saisie d'un CDD régulier (même employeur, heures
+Item « date de précédente ouverture de droits » retiré de cette liste : fait (cf. « Fait dans la
+session précédente » ci-dessus). Reste, inchangé :
+
+1. **Contrat récurrent pour l'enseignement** : saisie d'un CDD régulier (même employeur, heures
    similaires chaque mois) en une fois, avec exclusion de certains mois (vacances, etc.), plutôt que
    mois par mois. Impact que je vois : modèle `Contrat` (soit un nouveau type de contrat « récurrent »
    avec règle de génération, soit une génération de contrats individuels à la saisie — deux
@@ -192,22 +125,22 @@ PWA ; le plus structurant côté partage : déploiement bêta). Détail complet 
    suppose aujourd'hui des contrats individuels datés). Risque principal : la logique
    d'exclusion de mois est une nouvelle branche métier à spécifier précisément avant de toucher
    `engine/`.
-3. **V2+ : analyse IA du contrat** (vérifier automatiquement CDD vs CDI déguisé, conformité du
+2. **V2+ : analyse IA du contrat** (vérifier automatiquement CDD vs CDI déguisé, conformité du
    contrat). **Tension déjà documentée à rappeler explicitement le jour où cet item est repris** :
    le principe « 100 % local, aucune donnée envoyée » (SPEC, import PDF) serait rompu par
    construction — nécessiterait un service externe (LLM ou autre), donc un consentement RGPD
    explicite à obtenir, pas un simple ajout technique. Change la nature de l'app sur ce point précis,
    à ne pas sous-estimer.
-4. **Renommer « À propos » en « Mon profil »**, remonté au premier plan de la navigation (pas une
+3. **Renommer « À propos » en « Mon profil »**, remonté au premier plan de la navigation (pas une
    section secondaire). Changement UI simple, faible risque — mais vérifier au passage que rien
-   d'autre ne référence le libellé « À propos » (liens internes, tests) avant de renommer.
-5. **Contrats à venir persistés, ajustant directement le graphique de projection** — à distinguer du
+   d'autre ne référence le libellé « À propos » (liens internes, tests) avant de renommer. **← prochain**
+4. **Contrats à venir persistés, ajustant directement le graphique de projection** — à distinguer du
    `Simulateur.tsx` actuel qui fait un « et si » temporaire sans rien persister. À rapprocher de
    l'item déjà présent au SPEC §11.B (« projection honnête basée sur les contrats déjà signés à
    venir » + fourchette plutôt que fausse précision) : probablement la même idée à formaliser,
    pas une fonctionnalité isolée à concevoir séparément — relire le §11.B en même temps que celui-ci
    avant de cadrer un plan.
-6. **V3+ : légalité des contrats** (minimums légaux, contrats limites/border) — reliée à l'item 3
+5. **V3+ : légalité des contrats** (minimums légaux, contrats limites/border) — reliée à l'item 2
    (analyse IA). Même tension vie privée à rappeler : toute analyse automatisée de ce type
    soulève la même question de service externe + consentement RGPD explicite.
 

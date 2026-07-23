@@ -90,9 +90,11 @@ src/
 - ✅ `config/franceTravailConfig.ts` (valeurs sourcées + validation Zod).
 - ✅ `types/index.ts` (modèle complet, incl. `Profil.activiteHorsAnnexe10`).
 - ✅ Design tokens (Tailwind + `index.css`) alignés sur la maquette.
-- ✅ `engine/` complet et testé : `periodeReference`, `decompteHeures`, `salaireReference`,
-  `areBrute` (+ `calculerAJBrutePourFenetre`), `areNette`, `prediction`, `alertes`, `cycles`
-  — **85 tests Vitest**, tous verts (dont 7 sur `storage/`, 5 sur `config/`, 17 sur `lib/`).
+- ✅ `engine/` complet et testé : `periodeReference` (`SeuilReadmission`, type discriminé à 3
+  variants : `calculable: true`, `historique_insuffisant`, `hors_bornes`), `decompteHeures`,
+  `salaireReference`, `areBrute` (+ `calculerAJBrutePourFenetre`), `areNette`, `prediction`,
+  `alertes`, `cycles` — **91 tests Vitest**, tous verts (dont 7 sur `storage/`, 5 sur `config/`,
+  19 sur `lib/`).
 - ✅ `storage/`, `components/`, câblage `App.tsx` — bêta fonctionnelle de bout en bout
   (onboarding → tableau de bord → contrats → import PDF → historique → simulateur → à propos).
 - ✅ **Bug corrigé** : un profil neuf sans date anniversaire connue n'affiche plus jamais le
