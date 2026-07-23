@@ -227,8 +227,14 @@ Phase 1 (config, `ead0c4f`), Phase 2 (moteur + tests, `engine/indemnisationMensu
 indemnisés mois par mois". Détail complet dans « État actuel » de `CLAUDE.md`. L'investigation
 ci-dessous est conservée comme historique (trouvailles, sources, décisions prises).
 
-**Chantier toujours ouvert ensuite** (même module) : franchise salaires (formule maintenant
-certifiée, cf. section dédiée plus bas — en cours) et plafond de cumul PMSS (pas encore abordé).
+**Bilan à ce stade (2026-07-23, fin de session)** : chantier « indemnisation mensuelle » terminé
+sauf un point précis — la répartition mensuelle de la franchise salaires (formule du TOTAL déjà
+implémentée et certifiée, cf. section dédiée plus bas, mais **pas câblée** dans
+`calculerMoisIndemnisation`, qui continue de renvoyer honnêtement `franchise_salaires_non_certifiee`
+— aucun faux chiffre affiché en attendant). Plafond de cumul PMSS : pas encore abordé, hors
+périmètre de cette session. **Prochaine session : reprendre directement le câblage mensuel de la
+franchise salaires** (cf. "Chantier suivant, pas commencé" en fin de section dédiée ci-dessous),
+pas repartir de zéro.
 
 ## Fait (2026-07-23 : SMIC mensuel/journalier certifiés, franchise CP corrigée)
 
@@ -258,6 +264,54 @@ courante faute de suivre le total ORIGINAL accordé à l'ouverture des droits �
 total dépasse 24j pourrait à tort redescendre au palier bas une fois consommé sous ce seuil ; non
 observable sur les cas certifiés actuels (restante ≤ 5j du début à la fin). 120 tests verts,
 `tsc -b` propre.
+
+## Fait (2026-07-23 : franchise salaires — formule certifiée implémentée, TOTAL seul)
+
+Formule certifiée par l'utilisateur (sources ARTCENA + flyer officiel France Travail) :
+`arrondi( (SR_total / SMIC_mensuel) × (SJM / (3 × SMIC_journalier)) − 27 )`, jamais négative (0 si
+résultat ≤ 0). `engine/indemnisationMensuelle.ts` : `calculerFranchiseSalaires(srContrats, sjm,
+profil, config)`.
+
+**Règles appliquées** :
+- SMIC (mensuel + journalier) lu à la date de fin de PRA = `profil.dateAnniversaire`, via
+  `smicMensuelBrutHistorique`/`smicJournalierBrutHistorique` (recherche de la valeur historique la
+  plus récente ≤ la date cible) — jamais la valeur courante.
+- SR_total = SR des contrats Annexe 10 (`sr`, déjà calculé ailleurs dans le moteur) +
+  `Profil.salairesHorsAnnexe10PRA` (nouveau champ optionnel, `number | null`). Absent → SR_total =
+  A10 seul, `FranchiseSalairesResultat.sousEstimeeHorsA10 = true` (avertissement non bloquant, pas
+  un chiffre deviné).
+- `Profil.dureeDroitsMois?: 12 | 6` ajouté (12 = standard, 6 = clause de rattrapage) — connue à
+  l'ouverture des droits, **lue depuis le profil**, jamais déduite de l'historique d'activité.
+  Servira à la répartition mensuelle (`min(dureeDroitsMois, repartitionMoisMax)` mois), **pas
+  encore utilisée** dans le calcul du TOTAL lui-même (qui n'en a pas besoin).
+- TODO explicite dans le code (Option A actée par l'utilisateur) : *"SR_total devrait inclure tous
+  salaires PRA non plafonnés y compris hors A10 — champ `salairesHorsAnnexe10PRA` prévu mais
+  optionnel en bêta. Vérifier sur un relevé réel avec franchise salaires > 0 avant de retirer cet
+  avertissement."* `FranchiseSalairesResultat.totalNonVerifie` est **toujours `true`** pour
+  l'instant : le TOTAL n'a jamais été confronté à un relevé réel montrant une franchise salaires
+  active (seule la répartition mensuelle officielle a des exemples chiffrés dans le flyer, pas le
+  calcul du total lui-même).
+
+6 tests dédiés (`indemnisationMensuelle.test.ts`), 126 tests verts au total, `tsc -b` propre.
+
+**Chantier suivant, pas commencé — reprendre directement à la prochaine session** :
+1. **Câbler la répartition mensuelle** dans `calculerMoisIndemnisation`/`calculerSerieIndemnisation` :
+   `forfait mensuel = ceil(total / min(dureeDroitsMois, repartitionMoisMax))`, non-consommé
+   reporté au mois suivant — même mécanique que `quotaCPCarryOver`/`forfaitMensuelCP` pour la
+   franchise CP (report + plafond mensuel), mais avec un total ET un dénominateur de répartition
+   différents. Implique très probablement un nouveau couple d'état dans `SoldeIndemnisation`/
+   `SoldeIndemnisationDepart` (ex. `franchiseSalairesRestante` + `quotaSalairesCarryOver`), sur le
+   modèle de `franchiseCPRestante`/`quotaCPCarryOver`.
+2. **Décider comment le solde de départ de franchise salaires est saisi** : valeur déjà connue
+   (lue sur le relevé, comme `franchiseCPRestante`) plutôt que recalculée depuis SR_total à chaque
+   fois ? Ou le TOTAL calculé une fois par `calculerFranchiseSalaires` sert-il de point de départ
+   la première fois, puis le restant est suivi comme un solde classique ensuite ? Pas tranché.
+3. **UI à ajouter** : aucun écran ne permet encore de saisir `Profil.dureeDroitsMois` ni
+   `Profil.salairesHorsAnnexe10PRA` (probablement dans `MonProfil.tsx`, à côté des autres champs de
+   profil) — ces deux champs sont pour l'instant uniquement accessibles via import JSON manuel.
+4. Une fois câblé : rejouer les 4 mois certifiés (aucune franchise salaires active dans ces
+   données, donc pas de régression attendue) + chercher un cas réel avec franchise salaires > 0
+   pour lever le TODO `totalNonVerifie`.
 
 **Demande initiale** : ajouter un module `engine/indemnisationMensuelle.ts` (montant ARE réellement
 versé mois par mois, pas juste l'AJ théorique) + composant `RevenusMensuels.tsx`. L'utilisateur a
