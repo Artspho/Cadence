@@ -97,8 +97,11 @@ export const franceTravailConfig = {
       tauxAcquisition: 2.5,
       base: 24, // ✅ (jours travaillés × 2,5) / 24
       plafondJours: 30, // ✅
-      forfaitMensuelBas: 2, // ✅ si franchise totale ≤ 24 j
-      forfaitMensuelHaut: 3, // ✅ si franchise totale > 24 j
+      // forfaitMensuelBas: 2,  // non utilisé en pratique, contredit par relevés réels
+      // forfaitMensuelHaut: 3, // fév-mai 2026 (docs/reprise.md) : pas de plafond mensuel
+      //                        // constaté, la franchise CP se consomme intégralement selon
+      //                        // la place disponible chaque mois. À recertifier si franchise
+      //                        // > 24 j observée.
     },
     franchiseSalaires: {
       repartitionMoisMax: 8, // ✅ répartie sur 8 mois max
@@ -122,6 +125,13 @@ export const franceTravailConfig = {
     smicMensuelBrut: null as number | null, // 🔶 TODO (franchise salaires)
     smicJournalierBrut: null as number | null, // 🔶 TODO (franchise salaires)
     pmssMensuel: null as number | null, // 🔶 TODO (plafond de cumul)
+    // Historique daté, réservé au module indemnisation mensuelle (V2) — distinct de
+    // smicHoraireBrut ci-dessus (valeur courante unique, lue telle quelle par areBrute.ts
+    // pour la réadmission allongée ; ne PAS y toucher, cf. docs/reprise.md).
+    smicHoraireBrutHistorique: [
+      { dateEffet: "2026-01-01", valeur: 12.02 }, // ✅ info.gouv.fr
+      { dateEffet: "2026-06-01", valeur: 12.31 }, // ✅ arrêté du 22 mai 2026
+    ] as { dateEffet: string; valeur: number }[],
   },
 } as const;
 
@@ -203,8 +213,6 @@ export const franceTravailConfigSchema = z.object({
       tauxAcquisition: z.number(),
       base: z.number(),
       plafondJours: z.number(),
-      forfaitMensuelBas: z.number(),
-      forfaitMensuelHaut: z.number(),
     }),
     franchiseSalaires: z.object({
       repartitionMoisMax: z.number(),
@@ -222,6 +230,7 @@ export const franceTravailConfigSchema = z.object({
     smicMensuelBrut: nullableNumber,
     smicJournalierBrut: nullableNumber,
     pmssMensuel: nullableNumber,
+    smicHoraireBrutHistorique: z.array(z.object({ dateEffet: z.string(), valeur: z.number() })),
   }),
 });
 
