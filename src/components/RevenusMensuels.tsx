@@ -38,7 +38,7 @@ export function RevenusMensuels({ profil, soldeDepart, declarations, config, ajN
 function PremiereAdmissionInfo() {
   return (
     <div className="max-w-[640px] bg-surface border border-line rounded-card p-6 text-sm text-muted">
-      La simulation mensuelle sera disponible une fois tes droits ouverts. Pour l'instant, concentre-toi sur l'onglet Projection pour suivre tes heures.
+      La simulation mensuelle sera disponible une fois tes droits ouverts. Pour l'instant, concentre-toi sur l'onglet Tableau de bord pour suivre tes heures.
     </div>
   );
 }
