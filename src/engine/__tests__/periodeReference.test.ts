@@ -57,11 +57,44 @@ describe("calculerFenetreReference", () => {
     // épuise ses 24 tentatives sans jamais pouvoir réussir. AVANT ce correctif, ce même scénario
     // (au format réduit ci-dessus) passait le test précédent sans que personne ne remarque qu'il
     // s'agissait déjà du cas d'échec, pas d'un vrai succès (cf. docs/validation.md, dette tracée).
+    // Pas de dateAnniversairePrecedente ici : c'est précisément le cas "historique_insuffisant",
+    // à distinguer de "hors_bornes" ci-dessous (bound connue) dans les tests suivants.
     const contrats = [contrat({ date: "2026-01-27", typeRemuneration: "heures", nbHeures: 50 })];
     const fenetre = calculerFenetreReference(p, contrats, [], franceTravailConfig, "2026-07-23");
     expect(fenetre.seuilReadmission).toEqual({ calculable: false, raison: "historique_insuffisant", tranchesTentees: 24 });
     // Repli sur la fenêtre de base non étendue, pas la fenêtre poussée à 24 tranches sans validation.
     const fenetreNonReadmission = calculerFenetreReference({ ...p, situation: "premiere_admission" }, contrats, [], franceTravailConfig, "2026-07-23");
     expect(fenetre.dateDebut).toBe(fenetreNonReadmission.dateDebut);
+  });
+
+  describe("réadmission avec dateAnniversairePrecedente (bornage réel de la recherche)", () => {
+    it("une borne lointaine ne change rien à un succès d'extension déjà validé (non-régression)", () => {
+      const p = profil({ dateAnniversaire: "2026-12-31", situation: "readmission", dateAnniversairePrecedente: "2020-01-01" });
+      const contrats = [
+        contrat({ date: "2026-06-01", nbCachets: 25 }), // 300 h, dans la fenêtre de base
+        contrat({ date: "2025-11-15", nbCachets: 30 }), // 360 h, compté seulement une fois étendue
+      ];
+      const fenetre = calculerFenetreReference(p, contrats, [], franceTravailConfig, "2026-06-01");
+      expect(fenetre.seuilReadmission).toEqual({ calculable: true, tranchesReadmission: 2, seuilHeuresAjuste: 591 });
+    });
+
+    it("borne atteinte sans jamais trouver assez d'heures : calculable false, raison hors_bornes (résultat réglementaire, pas un manque de données)", () => {
+      // Borne choisie pile sur la limite d'une tranche (2025-12-02) et aucun contrat : la
+      // recherche s'arrête exactement à la borne, jamais avant (TRANCHES_MAX ne joue aucun rôle
+      // ici, calculé indépendamment et vérifié par simulation avant d'écrire ce test).
+      const p = profil({ dateAnniversaire: "2026-12-31", situation: "readmission", dateAnniversairePrecedente: "2025-12-02" });
+      const fenetre = calculerFenetreReference(p, [], [], franceTravailConfig, "2026-06-01");
+      expect(fenetre.seuilReadmission).toEqual({ calculable: false, raison: "hors_bornes", tranchesTentees: 1, dateAnniversairePrecedente: "2025-12-02" });
+      expect(fenetre.dateDebut).toBe("2025-12-02"); // fenêtre gardée jusqu'à la borne, contrairement à historique_insuffisant
+    });
+
+    it("non-double-comptage : un contrat antérieur à la borne n'est jamais compté, même s'il suffirait à faire réussir la recherche", () => {
+      const p = profil({ dateAnniversaire: "2026-12-31", situation: "readmission", dateAnniversairePrecedente: "2025-12-02" });
+      // 600 h, largement de quoi réussir à n'importe quel seuil de la boucle — mais datées AVANT
+      // la borne : si le moteur les comptait, ce test échouerait avec calculable:true.
+      const contrats = [contrat({ date: "2025-06-01", nbCachets: 50 })];
+      const fenetre = calculerFenetreReference(p, contrats, [], franceTravailConfig, "2026-06-01");
+      expect(fenetre.seuilReadmission).toEqual({ calculable: false, raison: "hors_bornes", tranchesTentees: 1, dateAnniversairePrecedente: "2025-12-02" });
+    });
   });
 });

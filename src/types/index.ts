@@ -59,6 +59,13 @@ export interface Profil {
   // "mixte" = présence de technicien (Annexe 8) ou d'un emploi hors spectacle au régime général.
   // "inconnu" ("je ne sais pas") traité comme hors périmètre par prudence (au moindre doute → FT).
   regimeDeclare?: "annexe10_pur" | "mixte" | "inconnu";
+  // Réadmission uniquement (non applicable en première admission, pas juste "inconnue" — d'où un
+  // champ optionnel plutôt qu'une chaîne vide comme `dateAnniversaire`). Date de fin de la période
+  // de droits précédente : borne la recherche d'heures en réadmission (periodeReference.ts) pour ne
+  // jamais recompter des heures déjà utilisées pour justifier les droits précédents. Absent =
+  // comportement inchangé (garde-fou TRANCHES_MAX, cf. SeuilReadmission "historique_insuffisant") ;
+  // aucune migration requise pour les profils déjà enregistrés (champ optionnel).
+  dateAnniversairePrecedente?: string;
 }
 
 // ── Historique : un exercice = un cycle de 12 mois entre deux dates anniversaire ──
@@ -124,14 +131,18 @@ export interface DecompteHeuresResultat {
 
 // Résultat de la recherche du seuil ajusté en réadmission (periodeReference.ts) : soit un
 // nombre de tranches et un seuil réellement trouvés (le total d'heures dans la fenêtre étendue
-// a atteint le seuil), soit l'algorithme a épuisé ses tentatives sans jamais y arriver. Dans ce
-// second cas, aucun seuil gonflé n'est présenté comme réel (devoir sacré n°2) : la cause la plus
-// probable est un historique de contrats saisi pas assez loin dans le passé, ou l'absence de la
-// date de la précédente ouverture de droits (qui bornerait correctement la recherche — ce champ
-// n'existe pas encore dans le modèle Profil, cf. periodeReference.ts).
+// a atteint le seuil), soit l'algorithme n'y arrive jamais — mais pour deux raisons bien
+// différentes, jamais confondues (devoir sacré n°2 : aucun seuil gonflé n'est présenté comme réel) :
+// - "historique_insuffisant" : pas de `dateAnniversairePrecedente` connue (ou une borne si lointaine
+//   que le garde-fou absolu TRANCHES_MAX coupe la recherche avant de l'atteindre) — manque de
+//   données côté Cadence, pas une conclusion sur l'éligibilité.
+// - "hors_bornes" : `dateAnniversairePrecedente` connue et respectée jusqu'au bout, la recherche a
+//   été menée intégralement et n'a simplement pas trouvé assez d'heures — un vrai résultat
+//   réglementaire (non éligible à l'allongement), pas un manque de données.
 export type SeuilReadmission =
   | { calculable: true; tranchesReadmission: number; seuilHeuresAjuste: number }
-  | { calculable: false; raison: "historique_insuffisant"; tranchesTentees: number };
+  | { calculable: false; raison: "historique_insuffisant"; tranchesTentees: number }
+  | { calculable: false; raison: "hors_bornes"; tranchesTentees: number; dateAnniversairePrecedente: string };
 
 export interface FenetreReference {
   dateDebut: string;

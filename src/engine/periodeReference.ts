@@ -48,16 +48,25 @@ export function calculerFenetreReference(
     return { dateDebut: dateDebutAllonge, dateFin, joursAllongementMaladie, seuilReadmission: { calculable: true, tranchesReadmission: 0, seuilHeuresAjuste: config.seuilHeures } };
   }
 
-  // Réadmission : on étend par tranches de 30 j tant que le seuil ajusté
-  // n'est pas atteint, borné par TRANCHES_MAX. `trouve` est mis à true UNIQUEMENT au moment du
-  // `break` : si la boucle sort par épuisement du compteur, `trouve` reste false — la dernière
-  // fenêtre testée n'a jamais été validée contre son propre seuil (cf. periodeReference.test.ts,
-  // "dette tracée" dans validation.md). Ne jamais déduire "trouvé" de `tranches === TRANCHES_MAX`
-  // par relecture implicite : ce booléen explicite est la seule source de vérité.
+  // Date de fin de la précédente période de droits (Profil.dateAnniversairePrecedente,
+  // optionnelle, réadmission uniquement) : quand elle est connue, elle devient la vraie borne de
+  // recherche — ne jamais recompter des heures déjà utilisées pour justifier les droits
+  // précédents. TRANCHES_MAX reste un garde-fou de sécurité absolu (ex. borne saisie par erreur
+  // très lointaine), mais ne devrait plus jamais être le facteur limitant réel dès que la borne
+  // est renseignée.
+  const bourne = profil.dateAnniversairePrecedente && profil.dateAnniversairePrecedente.length > 0 ? profil.dateAnniversairePrecedente : null;
+
+  // Réadmission : on étend par tranches de 30 j tant que le seuil ajusté n'est pas atteint. `trouve`
+  // est mis à true UNIQUEMENT au moment du `break` de succès ; `borneAtteinte` UNIQUEMENT au moment
+  // du `break` par la borne réelle. Si aucun des deux n'est mis à true, la sortie ne peut venir que
+  // de l'épuisement de TRANCHES_MAX (cf. periodeReference.test.ts, "dette tracée" dans
+  // validation.md : ne jamais déduire une issue du compteur de tranches par relecture implicite,
+  // toujours un booléen explicite posé au point de sortie).
   let tranches = 0;
   let dateDebutCourante = dateDebutAllonge;
   let seuilCourant = config.seuilHeures;
   let trouve = false;
+  let borneAtteinte = false;
 
   while (tranches < TRANCHES_MAX) {
     const { total } = calculerDecompteHeures(contrats, periodes, profil, config, { dateDebut: dateDebutCourante, dateFin });
@@ -65,22 +74,45 @@ export function calculerFenetreReference(
       trouve = true;
       break;
     }
+    const dateDebutSuivante = ajouterJours(dateDebutCourante, -config.readmission.tranchePeriodeJours);
+    // TODO: vérifier si la borne est inclusive ou exclusive — source: guide FT mars 2026.
+    // Traité ici comme inclusive : la fenêtre peut descendre jusqu'à dateAnniversairePrecedente
+    // (égalité autorisée), jamais en-deçà (dateDebutSuivante strictement antérieure = refusée).
+    if (bourne !== null && dateDebutSuivante < bourne) {
+      borneAtteinte = true;
+      break;
+    }
     tranches += 1;
     seuilCourant = config.seuilHeures + tranches * config.readmission.affiliationMajoreeParPeriode;
-    dateDebutCourante = ajouterJours(dateDebutCourante, -config.readmission.tranchePeriodeJours);
+    dateDebutCourante = dateDebutSuivante;
   }
 
-  if (!trouve) {
-    // Épuisé sans solution : pas de seuil gonflé affiché comme réel (devoir sacré n°2). On
-    // retombe sur la fenêtre de base non étendue — étendre plus loin n'a rien trouvé de plus,
-    // donc rien ne justifie de garder une fenêtre poussée à 24 tranches sans validation.
-    return { dateDebut: dateDebutAllonge, dateFin, joursAllongementMaladie, seuilReadmission: { calculable: false, raison: "historique_insuffisant", tranchesTentees: TRANCHES_MAX } };
+  if (trouve) {
+    return {
+      dateDebut: dateDebutCourante,
+      dateFin,
+      joursAllongementMaladie,
+      seuilReadmission: { calculable: true, tranchesReadmission: tranches, seuilHeuresAjuste: seuilCourant },
+    };
   }
 
-  return {
-    dateDebut: dateDebutCourante,
-    dateFin,
-    joursAllongementMaladie,
-    seuilReadmission: { calculable: true, tranchesReadmission: tranches, seuilHeuresAjuste: seuilCourant },
-  };
+  if (borneAtteinte && bourne !== null) {
+    // Recherche menée intégralement jusqu'à la vraie borne, sans succès : un vrai résultat
+    // réglementaire (non éligible à l'allongement), pas un manque de données côté Cadence — on
+    // garde la fenêtre pleinement étendue (contrairement au cas historique_insuffisant ci-dessous)
+    // car elle reflète la recherche complète et honnête, pas une extension arbitraire non validée.
+    return {
+      dateDebut: dateDebutCourante,
+      dateFin,
+      joursAllongementMaladie,
+      seuilReadmission: { calculable: false, raison: "hors_bornes", tranchesTentees: tranches, dateAnniversairePrecedente: bourne },
+    };
+  }
+
+  // Épuisé sans solution et sans borne réelle atteinte (pas de dateAnniversairePrecedente connue,
+  // ou une borne si lointaine que le garde-fou absolu TRANCHES_MAX a coupé la recherche avant de
+  // l'atteindre) : pas de seuil gonflé affiché comme réel (devoir sacré n°2). Repli sur la fenêtre
+  // de base non étendue — étendre plus loin n'a rien trouvé de plus (ou n'a pas pu être vérifié
+  // jusqu'au bout), donc rien ne justifie de garder une fenêtre poussée sans validation.
+  return { dateDebut: dateDebutAllonge, dateFin, joursAllongementMaladie, seuilReadmission: { calculable: false, raison: "historique_insuffisant", tranchesTentees: TRANCHES_MAX } };
 }

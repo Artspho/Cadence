@@ -48,4 +48,18 @@ describe("validerProfilPourEcriture", () => {
     const resultat = validerProfilPourEcriture({ situation: "premiere_admission" });
     expect(resultat.ok).toBe(false);
   });
+
+  it("réadmission avec dateAnniversairePrecedente renseignée : accepté", () => {
+    const candidat = profil({ situation: "readmission", dateAnniversaire: "2026-12-31", dateAnniversairePrecedente: "2024-06-01" });
+    const resultat = validerProfilPourEcriture(candidat);
+    expect(resultat.ok).toBe(true);
+    if (resultat.ok) expect(resultat.profil.dateAnniversairePrecedente).toBe("2024-06-01");
+  });
+
+  it("réadmission SANS dateAnniversairePrecedente : toujours accepté (champ optionnel, non-régression)", () => {
+    const candidat = profil({ situation: "readmission", dateAnniversaire: "2026-12-31" });
+    const resultat = validerProfilPourEcriture(candidat);
+    expect(resultat.ok).toBe(true);
+    if (resultat.ok) expect(resultat.profil.dateAnniversairePrecedente).toBeUndefined();
+  });
 });

@@ -17,6 +17,7 @@ export function Onboarding({ onTerminer }: OnboardingProps) {
   const [dateAnniversaire, setDateAnniversaire] = useState("");
   const [alsaceMoselle, setAlsaceMoselle] = useState(false);
   const [regimeDeclare, setRegimeDeclare] = useState<Profil["regimeDeclare"]>("annexe10_pur");
+  const [dateAnniversairePrecedente, setDateAnniversairePrecedente] = useState("");
 
   const dateAnniversaireCandidate = dateAnniversaireConnue ? dateAnniversaire : "";
   const coherence = validerCoherenceProfil({ dateNaissance, situation, dateAnniversaire: dateAnniversaireCandidate });
@@ -30,6 +31,7 @@ export function Onboarding({ onTerminer }: OnboardingProps) {
       alsaceMoselle,
       baremeCSG: "normal",
       regimeDeclare,
+      ...(situation === "readmission" && dateAnniversairePrecedente ? { dateAnniversairePrecedente } : {}),
     });
   }
 
@@ -95,6 +97,26 @@ export function Onboarding({ onTerminer }: OnboardingProps) {
               <p className="text-xs text-red">{coherence.raison}</p>
             ))}
         </div>
+
+        {situation === "readmission" && (
+          <div>
+            <label className="block text-xs uppercase tracking-[.03em] text-muted mb-2" htmlFor="date-anniversaire-precedente">
+              Date de fin de ta période de droits précédente (optionnel)
+            </label>
+            <input
+              id="date-anniversaire-precedente"
+              type="date"
+              value={dateAnniversairePrecedente}
+              onChange={(e) => setDateAnniversairePrecedente(e.target.value)}
+              className="w-full bg-surface-2 border border-line rounded-lg px-3 py-2 text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-mint"
+            />
+            <p className="text-xs text-faint mt-1">
+              Si tu as déjà eu des droits Annexe 10 ouverts avant cette période, indique la date à laquelle ils se sont terminés — elle figure sur ta précédente notification France Travail.
+              Cadence s'en sert pour borner correctement la recherche d'heures si tu dois remonter loin. Si tu ne l'as pas sous la main, laisse vide : Cadence te le signalera dans le tableau de
+              bord.
+            </p>
+          </div>
+        )}
 
         <label className="flex items-center gap-2 text-sm text-muted">
           <input type="checkbox" checked={alsaceMoselle} onChange={(e) => setAlsaceMoselle(e.target.checked)} />

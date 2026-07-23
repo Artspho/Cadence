@@ -37,13 +37,40 @@ export function detecterAlertes(profil: Profil, contrats: Contrat[], periodes: P
   const prediction = calculerStatutPrediction(profil, contrats, periodes, config, dateDuJour);
 
   if (!prediction.seuilReadmission.calculable) {
-    alertes.push({
-      code: "seuil_readmission_non_calculable",
-      niveau: "attention",
-      titre: "Seuil de réadmission non calculable",
-      message: "Seuil de réadmission non calculable avec tes données actuelles.",
-      actionSuggeree: "Ajoute tes contrats antérieurs si tu en as, ou vérifie ta situation exacte auprès de France Travail.",
-    });
+    // Deux raisons distinctes, jamais confondues (devoir n°2) : "historique_insuffisant" = manque
+    // de données côté Cadence (pas de dateAnniversairePrecedente, ou garde-fou de sécurité atteint
+    // avant une borne trop lointaine) ; "hors_bornes" = recherche complète jusqu'à la vraie borne,
+    // un vrai résultat réglementaire (non éligible à l'allongement), pas un manque de données.
+    switch (prediction.seuilReadmission.raison) {
+      case "historique_insuffisant":
+        alertes.push({
+          code: "seuil_readmission_non_calculable",
+          niveau: "attention",
+          titre: "Seuil de réadmission non calculable",
+          message: "Seuil de réadmission non calculable avec tes données actuelles.",
+          actionSuggeree: "Ajoute tes contrats antérieurs si tu en as, ou vérifie ta situation exacte auprès de France Travail.",
+        });
+        break;
+      case "hors_bornes":
+        alertes.push({
+          code: "seuil_readmission_non_calculable",
+          niveau: "attention",
+          titre: "Seuil de réadmission non atteint",
+          message: "Même en remontant jusqu'à ton ancienne ouverture de droits, le total d'heures retrouvé n'atteint pas le seuil.",
+          actionSuggeree: "Si tu as entre 338 et 506 h, la clause de rattrapage peut s'appliquer — contacte France Travail pour confirmer.",
+        });
+        break;
+      default: {
+        // Exhaustivité forcée par le compilateur (comme libelleRythmeRequis dans Dashboard.tsx) :
+        // jamais de `return` ici, ce switch est imbriqué dans une fonction qui construit encore
+        // d'autres alertes après ce bloc — un `return` tronquerait le reste de `detecterAlertes`.
+        // Assertion sur la valeur entière, pas seulement `.raison` (narrowing du switch limité à
+        // la sous-propriété sur une union à plusieurs variantes `calculable:false` — vérifié
+        // empiriquement, cf. commit).
+        const _exhaustif: never = prediction.seuilReadmission;
+        void _exhaustif;
+      }
+    }
   }
 
   if (prediction.niveau === "alerte" && prediction.rythmeRequis.atteignable) {

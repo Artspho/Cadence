@@ -1,4 +1,4 @@
-import type { AJBruteResultat, AJNetteResultat, DecompteHeuresResultat, RythmeRequis, StatutPrediction } from "../types";
+import type { AJBruteResultat, AJNetteResultat, DecompteHeuresResultat, RythmeRequis, SeuilReadmission, StatutPrediction } from "../types";
 import type { PointSerie } from "../engine/prediction";
 import { franceTravailConfig } from "../config/franceTravailConfig";
 import { ProjectionChart } from "./ProjectionChart";
@@ -33,7 +33,37 @@ function libelleRythmeRequis(rythmeRequis: RythmeRequis, seuilHeures: number): s
   }
 }
 
+// Exhaustif par construction, même principe que libelleRythmeRequis ci-dessus : les deux raisons
+// de SeuilReadmission "calculable: false" ne sont jamais confondues (devoir n°2) — l'une est un
+// manque de données côté Cadence, l'autre un vrai résultat réglementaire (non éligible).
+function bandeauSeuilReadmission(seuilReadmission: SeuilReadmission, seuilHeures: number): { titre: string; corps: string; action: string } | null {
+  if (seuilReadmission.calculable) return null;
+  switch (seuilReadmission.raison) {
+    case "historique_insuffisant":
+      return {
+        titre: "Réadmission : seuil ajusté non calculable",
+        corps: `Cadence n'a pas trouvé assez d'heures dans tes contrats saisis pour ajuster ton seuil de réadmission — il manque des contrats antérieurs, ou la date de ta précédente ouverture de droits. Les chiffres ci-dessous sont basés sur le seuil standard (${seuilHeures} h), pas sur un seuil de réadmission ajusté.`,
+        action: "Ajoute tes contrats antérieurs si tu en as, ou renseigne ta précédente ouverture de droits dans « Mon profil ».",
+      };
+    case "hors_bornes":
+      return {
+        titre: "Réadmission : seuil non atteint",
+        corps: `Même en remontant jusqu'à ton ancienne ouverture de droits, le total d'heures retrouvé n'atteint pas le seuil. Les chiffres ci-dessous sont basés sur le seuil standard (${seuilHeures} h), pas sur un seuil de réadmission ajusté.`,
+        action: "Si tu as entre 338 et 506 h, la clause de rattrapage peut s'appliquer — contacte France Travail pour confirmer.",
+      };
+    default: {
+      // Assertion sur la valeur entière, pas seulement `.raison` : sur une union à plusieurs
+      // variantes `calculable:false`, le switch narrowe correctement `seuilReadmission` ici, mais
+      // pas `.raison` pris isolément (vérifié empiriquement — cf. commit, contrairement au cas
+      // RythmeRequis ci-dessus qui n'a qu'une seule variante `atteignable:false`).
+      const _exhaustif: never = seuilReadmission;
+      return _exhaustif;
+    }
+  }
+}
+
 export function Dashboard({ prediction, serie, fenetreDebut, dateCap, decompte, ajBrute, ajNette, sr, nht, sar }: DashboardProps) {
+  const bandeauReadmission = bandeauSeuilReadmission(prediction.seuilReadmission, prediction.seuilHeures);
   const r = decompte.repartition;
   const cachets = r.cachets;
   const scene = r.heuresScene + r.eee + r.ptp + r.assimilees;
@@ -58,14 +88,11 @@ export function Dashboard({ prediction, serie, fenetreDebut, dateCap, decompte, 
         <p className="text-sm text-muted mt-3">{prediction.message}</p>
       </div>
 
-      {!prediction.seuilReadmission.calculable && (
+      {bandeauReadmission && (
         <div className="bg-amber/5 border border-amber/30 rounded-card px-5 py-4 text-sm">
-          <p className="text-ink font-medium">Réadmission : seuil ajusté non calculable</p>
-          <p className="text-muted mt-1">
-            Cadence n'a pas trouvé assez d'heures dans tes contrats saisis pour ajuster ton seuil de réadmission — il manque des contrats antérieurs, ou la date de ta précédente ouverture de
-            droits (que Cadence ne demande pas encore). Les chiffres ci-dessous sont basés sur le seuil standard ({prediction.seuilHeures} h), pas sur un seuil de réadmission ajusté.
-          </p>
-          <p className="text-xs text-faint mt-2">→ Ajoute tes contrats antérieurs si tu en as, ou vérifie ta situation exacte auprès de France Travail.</p>
+          <p className="text-ink font-medium">{bandeauReadmission.titre}</p>
+          <p className="text-muted mt-1">{bandeauReadmission.corps}</p>
+          <p className="text-xs text-faint mt-2">→ {bandeauReadmission.action}</p>
         </div>
       )}
 

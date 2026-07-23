@@ -24,6 +24,7 @@ export function AProposLimites({ dateDuJour, profil, onModifierProfil }: APropos
   const [situation, setSituation] = useState<Profil["situation"]>(profil.situation);
   const [dateAnniversaireConnue, setDateAnniversaireConnue] = useState(Boolean(profil.dateAnniversaire));
   const [dateAnniversaire, setDateAnniversaire] = useState(profil.dateAnniversaire);
+  const [dateAnniversairePrecedente, setDateAnniversairePrecedente] = useState(profil.dateAnniversairePrecedente ?? "");
   const [confirmationRequise, setConfirmationRequise] = useState(false);
   const [erreurEcriture, setErreurEcriture] = useState<string | null>(null);
 
@@ -44,7 +45,13 @@ export function AProposLimites({ dateDuJour, profil, onModifierProfil }: APropos
       setConfirmationRequise(true);
       return;
     }
-    const resultat = onModifierProfil({ ...profil, dateNaissance, situation, dateAnniversaire: dateAnniversaireCandidate });
+    const resultat = onModifierProfil({
+      ...profil,
+      dateNaissance,
+      situation,
+      dateAnniversaire: dateAnniversaireCandidate,
+      dateAnniversairePrecedente: situation === "readmission" && dateAnniversairePrecedente ? dateAnniversairePrecedente : undefined,
+    });
     if (!resultat.ok) {
       setErreurEcriture(resultat.erreur);
       return;
@@ -127,6 +134,29 @@ export function AProposLimites({ dateDuJour, profil, onModifierProfil }: APropos
               <p className="text-xs text-amber mt-2">Modifier ta date anniversaire recalcule toute ta fenêtre de référence et ton statut.</p>
             )}
           </div>
+
+          {situation === "readmission" && (
+            <div>
+              <label className="block text-xs uppercase tracking-[.03em] text-muted mb-2" htmlFor="apropos-date-anniversaire-precedente">
+                Date de fin de ta période de droits précédente (optionnel)
+              </label>
+              <input
+                id="apropos-date-anniversaire-precedente"
+                type="date"
+                value={dateAnniversairePrecedente}
+                onChange={(e) => {
+                  setDateAnniversairePrecedente(e.target.value);
+                  reinitialiserConfirmation();
+                }}
+                className="w-full bg-surface-2 border border-line rounded-lg px-3 py-2 text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-mint"
+              />
+              <p className="text-xs text-faint mt-1">
+                Si tu as déjà eu des droits Annexe 10 ouverts avant cette période, indique la date à laquelle ils se sont terminés — elle figure sur ta précédente notification France Travail.
+                Cadence s'en sert pour borner correctement la recherche d'heures si tu dois remonter loin. Si tu ne l'as pas sous la main, laisse vide : Cadence te le signalera dans le tableau de
+                bord.
+              </p>
+            </div>
+          )}
 
           {!coherence.coherent && <p className="text-xs text-red">{coherence.raison}</p>}
           {erreurEcriture && <p className="text-xs text-red">{erreurEcriture}</p>}

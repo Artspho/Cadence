@@ -95,6 +95,23 @@ describe("detecterAlertes", () => {
     expect(alerte.actionSuggeree).toBeDefined();
   });
 
+  it("signale seuil_readmission_non_calculable avec un message DISTINCT quand la borne réelle est atteinte sans succès (hors_bornes, pas historique_insuffisant)", () => {
+    const p = profil({ dateAnniversaire: "2026-12-31", situation: "readmission", dateAnniversairePrecedente: "2025-12-02" });
+    const alertes = detecterAlertes(p, [], [], franceTravailConfig, "2026-06-01");
+    const alerte = alertes.find((a) => a.code === "seuil_readmission_non_calculable")!;
+    expect(alerte).toBeDefined();
+    expect(alerte.niveau).toBe("attention");
+    expect(alerte.message).toMatch(/ancienne ouverture de droits/i);
+    expect(alerte.actionSuggeree).toMatch(/rattrapage/i);
+
+    // Message bien différent du cas historique_insuffisant (pas de bound connue) : jamais le
+    // même texte pour deux causes différentes (devoir n°2).
+    const pSansBorne = profil({ dateAnniversaire: "2027-01-17", situation: "readmission" });
+    const contratsSansBorne = [contrat({ date: "2026-01-27", nbCachets: 40 })];
+    const alerteSansBorne = detecterAlertes(pSansBorne, contratsSansBorne, [], franceTravailConfig, "2026-07-23").find((a) => a.code === "seuil_readmission_non_calculable")!;
+    expect(alerteSansBorne.message).not.toBe(alerte.message);
+  });
+
   it("pas d'alerte seuil_readmission_non_calculable en première admission, ni en réadmission quand le seuil est calculable", () => {
     const pPremiereAdmission = profil({ dateAnniversaire: "2026-12-31", situation: "premiere_admission" });
     expect(codes(detecterAlertes(pPremiereAdmission, [], [], franceTravailConfig, "2026-06-01"))).not.toContain("seuil_readmission_non_calculable");
