@@ -13,14 +13,32 @@
 // (lecture initiale erronée du 2026-07-23, corrigée : le 4j consommé en février 2026 s'explique
 // entièrement par le report du forfait de janvier, absorbé par le délai d'attente ce mois-là, pas
 // par l'absence de plafond).
-import type { DeclarationMensuelle, FranchiseSalairesResultat, MoisIndemnisationEntree, MoisIndemnisationResultat, Profil, SoldeIndemnisation, SoldeIndemnisationDepart } from "../types";
+import type { DeclarationMensuelle, FranchiseSalairesResultat, MoisIndemnisationEntree, MoisIndemnisationResultat, MontantMensuelResultat, Profil, SoldeIndemnisation, SoldeIndemnisationDepart } from "../types";
 import type { FranceTravailConfig } from "../config/franceTravailConfig";
 import { joursDansMois, moisCle } from "./dateUtils";
+import { getAjReelleAt } from "./ajReelleUtils";
 
 const FRANCHISE_SALAIRES_NON_CERTIFIEE: FranchiseSalairesResultat = {
   valeur: null,
   avertissement: "franchise_salaires_non_certifiee",
 };
+
+// Placeholder : `calculerMoisIndemnisation`/`calculerSerieIndemnisation` n'ont pas connaissance de
+// l'historique d'AJ réelle (leur `moisLabel` est purement informatif, jamais une vraie date, cf.
+// `MoisIndemnisationEntree`) — seul `calculerSerieDepuisDeclarations`, qui manipule de vrais mois
+// "YYYY-MM", recalcule ce champ correctement (même mécanique que `franchiseSalaires` ci-dessus).
+const MONTANT_MENSUEL_INDISPONIBLE: MontantMensuelResultat = { calculable: false, raison: "aj_manquante" };
+
+// Montant réellement versé pour un mois donné = joursIndemnises × AJ réelle applicable ce mois-là.
+// `debutDuMoisISO` doit être une vraie date ISO (ex. "2026-03-01") — jamais un `moisLabel` non
+// vérifié, cf. avertissement ci-dessus.
+function calculerMontantMensuel(joursIndemnises: number, debutDuMoisISO: string, ajReelleHistorique: { dateEffet: string; valeur: number }[] | undefined): MontantMensuelResultat {
+  const ajUtilisee = getAjReelleAt(ajReelleHistorique, debutDuMoisISO);
+  if (ajUtilisee === null) {
+    return { calculable: false, raison: "aj_manquante" };
+  }
+  return { calculable: true, montant: Math.round(joursIndemnises * ajUtilisee * 100) / 100, ajUtilisee };
+}
 
 // Palier bas/haut du forfait mensuel de franchise CP. Basé sur `franchiseCPRestante` (seule
 // grandeur suivie par ce module) faute de suivre le total ORIGINAL accordé à l'ouverture des
@@ -57,6 +75,7 @@ export function calculerMoisIndemnisation(soldeDepart: SoldeIndemnisation, entre
       quotaCPCarryOver: quotaDisponible - franchiseCPConsommee,
     },
     franchiseSalaires: FRANCHISE_SALAIRES_NON_CERTIFIEE,
+    montantMensuel: MONTANT_MENSUEL_INDISPONIBLE,
   };
 }
 
@@ -86,7 +105,15 @@ export function calculerSerieDepuisDeclarations(soldeDepart: SoldeIndemnisationD
     .sort((a, b) => a.mois.localeCompare(b.mois))
     .map((d) => ({ moisLabel: d.mois, joursDuMois: joursDansMois(d.mois), joursDeclares: d.joursDeclares }));
 
-  return calculerSerieIndemnisation({ delaiRestant: soldeDepart.delaiRestant, franchiseCPRestante: soldeDepart.franchiseCPRestante, quotaCPCarryOver: soldeDepart.quotaCPCarryOver ?? 0 }, mois, config);
+  const resultats = calculerSerieIndemnisation({ delaiRestant: soldeDepart.delaiRestant, franchiseCPRestante: soldeDepart.franchiseCPRestante, quotaCPCarryOver: soldeDepart.quotaCPCarryOver ?? 0 }, mois, config);
+
+  // moisLabel provient ici de `d.mois` (vrai "YYYY-MM" de déclaration), contrairement au moisLabel
+  // purement informatif de calculerMoisIndemnisation/calculerSerieIndemnisation — recalcul du
+  // montant mensuel sûr uniquement à ce niveau.
+  return resultats.map((resultat) => ({
+    ...resultat,
+    montantMensuel: calculerMontantMensuel(resultat.joursIndemnises, `${resultat.moisLabel}-01`, soldeDepart.ajReelleHistorique),
+  }));
 }
 
 // Cherche la valeur historique la plus récente dont la date d'effet est ≤ la date cible — null si

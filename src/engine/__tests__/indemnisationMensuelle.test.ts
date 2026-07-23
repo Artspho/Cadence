@@ -87,7 +87,7 @@ describe("calculerSerieIndemnisation — cas certifiés sur relevés France Trav
 });
 
 describe("calculerSerieDepuisDeclarations", () => {
-  const soldeDepart: SoldeIndemnisationDepart = { date: "2026-02-01", delaiRestant: 5, franchiseCPRestante: 5, quotaCPCarryOver: 2, ajReelle: null };
+  const soldeDepart: SoldeIndemnisationDepart = { date: "2026-02-01", delaiRestant: 5, franchiseCPRestante: 5, quotaCPCarryOver: 2, ajReelleHistorique: [] };
 
   it("reproduit les 4 mois certifiés à partir de déclarations saisies dans le désordre", () => {
     const declarations: DeclarationMensuelle[] = [
@@ -112,13 +112,35 @@ describe("calculerSerieDepuisDeclarations", () => {
   });
 
   it("quotaCPCarryOver absent (solde configuré avant l'ajout du champ) : défaut 0, jamais une exception", () => {
-    const soldeSansCarryOver: SoldeIndemnisationDepart = { date: "2026-02-01", delaiRestant: 5, franchiseCPRestante: 5, ajReelle: null };
+    const soldeSansCarryOver: SoldeIndemnisationDepart = { date: "2026-02-01", delaiRestant: 5, franchiseCPRestante: 5, ajReelleHistorique: [] };
     const declarations: DeclarationMensuelle[] = [{ id: "1", mois: "2026-02", joursDeclares: 14, source: "lecture_releve" }];
     const resultats = calculerSerieDepuisDeclarations(soldeSansCarryOver, declarations, franceTravailConfig);
     // Sans le report de 2j (défaut 0) : quota = 0 + 2 (forfait) = 2, pas 4 — résultat différent du
     // cas certifié ci-dessus, volontairement : ce test documente le comportement par défaut, pas
     // une reproduction du cas réel.
     expect(resultats[0].franchiseCPConsommee).toBe(2);
+  });
+
+  it("montantMensuel non calculable (aj_manquante) quand ajReelleHistorique est vide", () => {
+    const declarations: DeclarationMensuelle[] = [{ id: "1", mois: "2026-03", joursDeclares: 10, source: "lecture_releve" }];
+    const resultats = calculerSerieDepuisDeclarations(soldeDepart, declarations, franceTravailConfig);
+    expect(resultats[0].montantMensuel).toEqual({ calculable: false, raison: "aj_manquante" });
+  });
+
+  it("montantMensuel calculé à partir de l'AJ applicable à chaque mois (deux taux successifs)", () => {
+    const soldeAvecHistorique: SoldeIndemnisationDepart = {
+      ...soldeDepart,
+      ajReelleHistorique: [
+        { dateEffet: "2025-03-24", valeur: 54.55 },
+        { dateEffet: "2026-01-18", valeur: 55.02 },
+      ],
+    };
+    const declarations: DeclarationMensuelle[] = [
+      { id: "1", mois: "2026-02", joursDeclares: 14, source: "lecture_releve" },
+      { id: "2", mois: "2026-03", joursDeclares: 10, source: "lecture_releve" }, // 17 jours indemnisés (cf. cas certifié), taux du 18/01/2026 applicable
+    ];
+    const resultats = calculerSerieDepuisDeclarations(soldeAvecHistorique, declarations, franceTravailConfig);
+    expect(resultats[1].montantMensuel).toEqual({ calculable: true, montant: 17 * 55.02, ajUtilisee: 55.02 });
   });
 });
 

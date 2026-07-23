@@ -317,6 +317,13 @@ export interface SoldeIndemnisationDepart {
   ajReelleHistorique?: { dateEffet: string; valeur: number }[];
 }
 
+// Montant réellement versé pour un mois = joursIndemnises × AJ réelle applicable à ce mois-là
+// (`getAjReelleAt`, cf. engine/ajReelleUtils.ts — plusieurs taux successifs possibles sur une
+// même période d'indemnisation). `calculable: false` couvre à la fois une AJ jamais renseignée et
+// un mois antérieur à toute entrée connue de l'historique — dans les deux cas Cadence ne peut pas
+// recalculer l'AJ réelle elle-même (devoir n°2 : jamais un montant sur la base d'une AJ devinée).
+export type MontantMensuelResultat = { calculable: false; raison: "aj_manquante" } | { calculable: true; montant: number; ajUtilisee: number };
+
 export interface MoisIndemnisationResultat {
   moisLabel: string;
   joursNonIndemnisables: number; // Math.ceil(joursDeclares × coeffJoursNonIndemnisables), première opération du réducteur
@@ -325,4 +332,5 @@ export interface MoisIndemnisationResultat {
   joursIndemnises: number; // reliquat du mois après non-indemnisable, délai, franchise CP
   soldeFin: SoldeIndemnisation; // à réinjecter comme soldeDepart du mois suivant
   franchiseSalaires: FranchiseSalairesResultat;
+  montantMensuel: MontantMensuelResultat;
 }
