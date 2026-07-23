@@ -175,6 +175,42 @@ PWA ; le plus structurant côté partage : déploiement bêta). Détail complet 
   courte page « à propos » (ce que l'app fait / ne fait pas / données restent chez l'utilisateur) —
   mentions légales absentes, limite déjà notée au SPEC §10 (« Cadre légal léger »).
 
+### Idées consignées le 2026-07-23 (à cadrer plus tard, pas de plan pour l'instant)
+
+1. **Date de précédente ouverture de droits** sur `Profil` (déjà discuté cette session, cf. correctif
+   du seuil de réadmission gonflé ci-dessus) : bornerait correctement l'allongement de fenêtre en
+   réadmission au lieu du repli « non calculable » actuel. Impact : modèle de données (nouveau champ
+   `Profil`), migration (comme `regimeDeclare`/`activiteHorsAnnexe10` avant), UI Onboarding + « À
+   propos »/« Mon profil », et `periodeReference.ts` (borne réelle de la boucle d'extension au lieu
+   du plafond arbitraire `TRANCHES_MAX`). Touche `engine/` — plan détaillé et validation requis avant
+   tout code, comme d'habitude.
+2. **Contrat récurrent pour l'enseignement** : saisie d'un CDD régulier (même employeur, heures
+   similaires chaque mois) en une fois, avec exclusion de certains mois (vacances, etc.), plutôt que
+   mois par mois. Impact que je vois : modèle `Contrat` (soit un nouveau type de contrat « récurrent »
+   avec règle de génération, soit une génération de contrats individuels à la saisie — deux
+   approches aux implications différentes sur `decompteHeures.ts` et sur l'historique/`cycles.ts` qui
+   suppose aujourd'hui des contrats individuels datés). Risque principal : la logique
+   d'exclusion de mois est une nouvelle branche métier à spécifier précisément avant de toucher
+   `engine/`.
+3. **V2+ : analyse IA du contrat** (vérifier automatiquement CDD vs CDI déguisé, conformité du
+   contrat). **Tension déjà documentée à rappeler explicitement le jour où cet item est repris** :
+   le principe « 100 % local, aucune donnée envoyée » (SPEC, import PDF) serait rompu par
+   construction — nécessiterait un service externe (LLM ou autre), donc un consentement RGPD
+   explicite à obtenir, pas un simple ajout technique. Change la nature de l'app sur ce point précis,
+   à ne pas sous-estimer.
+4. **Renommer « À propos » en « Mon profil »**, remonté au premier plan de la navigation (pas une
+   section secondaire). Changement UI simple, faible risque — mais vérifier au passage que rien
+   d'autre ne référence le libellé « À propos » (liens internes, tests) avant de renommer.
+5. **Contrats à venir persistés, ajustant directement le graphique de projection** — à distinguer du
+   `Simulateur.tsx` actuel qui fait un « et si » temporaire sans rien persister. À rapprocher de
+   l'item déjà présent au SPEC §11.B (« projection honnête basée sur les contrats déjà signés à
+   venir » + fourchette plutôt que fausse précision) : probablement la même idée à formaliser,
+   pas une fonctionnalité isolée à concevoir séparément — relire le §11.B en même temps que celui-ci
+   avant de cadrer un plan.
+6. **V3+ : légalité des contrats** (minimums légaux, contrats limites/border) — reliée à l'item 3
+   (analyse IA). Même tension vie privée à rappeler : toute analyse automatisée de ce type
+   soulève la même question de service externe + consentement RGPD explicite.
+
 ## Méthode à conserver
 
 Un module à la fois ; faire expliquer le plan avant de coder, je valide, puis il code ; après chaque étape, TOUS les tests (total, zéro rouge) ; git status avant chaque commit ; commit dédié par étape ; maj « État actuel » de CLAUDE.md.
