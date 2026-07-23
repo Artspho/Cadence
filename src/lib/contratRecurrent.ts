@@ -39,6 +39,7 @@ export function genererContratsRecurrents(params: ParametresContratRecurrent, ge
     if (!exclus.has(cle)) {
       contrats.push({
         id: genererId(),
+        dateDebut: format(curseur, "yyyy-MM-dd"), // premier jour du mois — engagement mensuel complet
         date: format(endOfMonth(curseur), "yyyy-MM-dd"),
         type: "enseignement",
         typeRemuneration: "heures",

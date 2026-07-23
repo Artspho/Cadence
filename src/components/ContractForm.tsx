@@ -41,6 +41,8 @@ export function ContractForm({ profil, config, decompteActuel, valeurInitiale, o
 
   const brouillon: Contrat = {
     id: "brouillon",
+    // TODO (étape E) : champ dateDebut dédié — provisoire, identique à `date`.
+    dateDebut: date || new Date().toISOString().slice(0, 10),
     date: date || new Date().toISOString().slice(0, 10),
     type,
     typeRemuneration,
@@ -95,6 +97,9 @@ export function ContractForm({ profil, config, decompteActuel, valeurInitiale, o
   function soumettre(e: React.FormEvent) {
     e.preventDefault();
     onValider({
+      // TODO (étape E du chantier découpage mensuel) : champ dateDebut dédié dans le formulaire.
+      // Provisoire : contrat traité comme un seul jour, comportement identique à avant ce champ.
+      dateDebut: brouillon.date,
       date: brouillon.date,
       type,
       typeRemuneration,

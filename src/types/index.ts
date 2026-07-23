@@ -14,7 +14,12 @@ export type Territoire = "france" | "eee_suisse_uk"; // EEE : 6 h/jour (artistes
 
 export interface Contrat {
   id: string;
-  date: string; // ISO (date de fin de contrat)
+  // Plage couverte par le contrat — nécessaire pour répartir heures/salaire au prorata des jours
+  // calendaires quand le contrat chevauche deux mois civils (cf. engine/decoupageMensuel.ts).
+  // Migration silencieuse à la lecture pour un contrat enregistré avant l'ajout de ce champ :
+  // dateDebut = date (contrat traité comme un contrat d'un seul jour), cf. localStorageAdapter.ts.
+  dateDebut: string; // ISO (premier jour du contrat)
+  date: string; // ISO (date de fin de contrat, inchangé)
   type: TypeContrat;
   typeRemuneration: TypeRemuneration;
   territoire: Territoire;

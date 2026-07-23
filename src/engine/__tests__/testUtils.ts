@@ -10,6 +10,7 @@ function idUnique(prefixe: string): string {
 export function contrat(partiel: Partial<Contrat> & Pick<Contrat, "date">): Contrat {
   return {
     id: idUnique("contrat"),
+    dateDebut: partiel.date, // contrat d'un seul jour par défaut, sauf surcharge explicite
     type: "artiste",
     typeRemuneration: "cachet",
     territoire: "france",

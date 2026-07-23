@@ -31,6 +31,9 @@ const donneesVides: DonneesApp = { profil: null, contrats: [], periodes: [], dec
 // utilisateur peut importer un fichier corrompu ou modifié à la main.
 const contratSchema = z.object({
   id: z.string(),
+  // Toujours une chaîne après migrerContratsDateDebut() (repli sur `date` si absente à la
+  // lecture) — jamais optionnelle ici, pour matcher exactement Contrat.dateDebut: string.
+  dateDebut: z.string(),
   date: z.string(),
   type: z.enum(["artiste", "enseignement", "formation", "ptp"]),
   typeRemuneration: z.enum(["cachet", "heures"]),
@@ -90,6 +93,23 @@ function migrerAjReelleHistorique(brut: unknown): unknown {
   return { ...donnees, soldeIndemnisationDepart: { ...s, ajReelleHistorique: [{ dateEffet: "2000-01-01", valeur: s.ajReelle }] } };
 }
 
+// Migration silencieuse (2026-07-24) : un contrat enregistré avant l'ajout de `dateDebut`
+// (découpage mensuel, cf. engine/decoupageMensuel.ts) n'a que `date`. Repli sur `date` comme
+// `dateDebut` — traite le contrat comme couvrant un seul jour, comportement identique à avant
+// ce champ (aucune régression, aucune perte, devoir sacré n°1).
+function migrerContratsDateDebut(brut: unknown): unknown {
+  if (typeof brut !== "object" || brut === null) return brut;
+  const donnees = brut as Record<string, unknown>;
+  if (!Array.isArray(donnees.contrats)) return brut;
+  const contrats = donnees.contrats.map((c) => {
+    if (typeof c !== "object" || c === null) return c;
+    const contrat = c as Record<string, unknown>;
+    if (contrat.dateDebut !== undefined) return contrat;
+    return { ...contrat, dateDebut: contrat.date };
+  });
+  return { ...donnees, contrats };
+}
+
 // profilSchema (forme + cohérence situation/date) vit désormais dans lib/coherenceProfil.ts —
 // unique définition, réutilisée ici ET par App.tsx (validerProfilPourEcriture), pour que l'import
 // JSON et l'édition en mémoire referment exactement la même porte (cf. lib/coherenceProfil.ts).
@@ -106,7 +126,7 @@ const donneesAppSchema = z.object({
 });
 
 function parserDonnees(brut: unknown) {
-  return donneesAppSchema.safeParse(migrerAjReelleHistorique(brut));
+  return donneesAppSchema.safeParse(migrerContratsDateDebut(migrerAjReelleHistorique(brut)));
 }
 
 export async function chargerDonnees(): Promise<DonneesApp> {
