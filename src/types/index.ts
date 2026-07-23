@@ -288,19 +288,6 @@ export type FranchiseSalairesResultat =
   | { valeur: null; avertissement: "franchise_salaires_non_certifiee" }
   | { valeur: number; totalNonVerifie: true; sousEstimeeHorsA10: boolean };
 
-// Saisie mois par mois par l'utilisateur, après réception de son relevé France Travail — jamais
-// déduite des `Contrat` (qui trackent des heures/cachets par contrat, pas des jours calendaires
-// déclarés sur un mois civil). `source` distingue une valeur recopiée d'un relevé déjà reçu
-// ("lecture_releve") d'une estimation provisoire saisie avant réception ("manuel") — affichage à
-// nuancer en conséquence (devoir n°2 : ne jamais présenter une estimation avec la même certitude
-// qu'une donnée confirmée).
-export interface DeclarationMensuelle {
-  id: string;
-  mois: string; // "YYYY-MM" — le mois du relevé France Travail concerné
-  joursDeclares: number;
-  source: "manuel" | "lecture_releve";
-}
-
 // Solde d'ouverture saisi une seule fois par l'utilisateur, à une date de relevé de son choix —
 // jamais reconstruit par Cadence depuis la réadmission (cf. engine/indemnisationMensuelle.ts,
 // docs/reprise.md). `null` tant que l'utilisateur n'a pas encore configuré le module : ne bloque
@@ -310,7 +297,7 @@ export interface SoldeIndemnisationDepart {
   delaiRestant: number;
   franchiseCPRestante: number;
   // Optionnel pour ne pas casser un solde déjà configuré avant l'ajout de ce champ (défaut 0,
-  // cf. calculerSerieDepuisDeclarations) — hypothèse prudente, jamais un faux feu vert : un
+  // cf. calculerSerieDepuisContrats) — hypothèse prudente, jamais un faux feu vert : un
   // défaut à 0 sous-estime au pire le quota de départ, il ne le surestime jamais.
   quotaCPCarryOver?: number;
   // AJ nette notifiée par France Travail pour la réadmission en cours. Indépendant de la date de
@@ -335,7 +322,8 @@ export type MontantMensuelResultat = { calculable: false; raison: "aj_manquante"
 
 export interface MoisIndemnisationResultat {
   moisLabel: string;
-  joursNonIndemnisables: number; // Math.ceil(joursDeclares × coeffJoursNonIndemnisables), première opération du réducteur
+  heuresDuMois: number; // repasse l'entrée (calculée depuis les contrats) pour affichage, cf. RevenusMensuels.tsx
+  joursNonIndemnisables: number; // Math.floor(heuresDuMois × coeffJoursNonIndemnisables / diviseurJoursTravaillesA10), première opération du réducteur
   delaiConsomme: number;
   franchiseCPConsommee: number;
   joursIndemnises: number; // reliquat du mois après non-indemnisable, délai, franchise CP

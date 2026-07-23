@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { Contrat, DeclarationMensuelle, Profil, SoldeIndemnisationDepart } from "./types";
+import type { Contrat, Profil, SoldeIndemnisationDepart } from "./types";
 import { franceTravailConfig } from "./config/franceTravailConfig";
-import { chargerDonnees, creerContrat, creerDeclarationMensuelle, exporterJSON, importerJSON, sauvegarderDonnees, type DonneesApp } from "./storage/localStorageAdapter";
+import { chargerDonnees, creerContrat, exporterJSON, importerJSON, sauvegarderDonnees, type DonneesApp } from "./storage/localStorageAdapter";
 import { calculerFenetreReference } from "./engine/periodeReference";
 import { calculerDecompteHeures } from "./engine/decompteHeures";
 import { calculerSalaireReference } from "./engine/salaireReference";
@@ -105,15 +105,6 @@ export default function App() {
     setDonnees((d) => (d ? { ...d, soldeIndemnisationDepart: solde } : d));
   }
 
-  // Une déclaration par mois : en ajouter une pour un mois déjà saisi remplace l'ancienne
-  // (permet de corriger une estimation provisoire une fois le vrai relevé reçu).
-  function ajouterDeclarationMensuelle(partiel: Omit<DeclarationMensuelle, "id">) {
-    setDonnees((d) => (d ? { ...d, declarationsMensuelles: [...d.declarationsMensuelles.filter((decl) => decl.mois !== partiel.mois), creerDeclarationMensuelle(partiel)] } : d));
-  }
-
-  function supprimerDeclarationMensuelle(id: string) {
-    setDonnees((d) => (d ? { ...d, declarationsMensuelles: d.declarationsMensuelles.filter((decl) => decl.id !== id) } : d));
-  }
 
   // Rempart devoir n°1 : forme (Zod) puis cohérence (situation/date), jamais l'un sans l'autre.
   // Pas de fichier de sauvegarde téléchargé ici (contrairement à l'import, qui remplace TOUT) —
@@ -269,11 +260,9 @@ export default function App() {
             <RevenusMensuels
               profil={profil}
               soldeDepart={donnees.soldeIndemnisationDepart}
-              declarations={donnees.declarationsMensuelles}
+              contrats={donnees.contrats}
               config={franceTravailConfig}
               onConfigurerSolde={configurerSoldeIndemnisation}
-              onAjouterDeclaration={ajouterDeclarationMensuelle}
-              onSupprimerDeclaration={supprimerDeclarationMensuelle}
               dateDuJour={dateDuJour}
             />
           ))}

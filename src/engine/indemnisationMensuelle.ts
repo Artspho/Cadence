@@ -26,7 +26,7 @@ const FRANCHISE_SALAIRES_NON_CERTIFIEE: FranchiseSalairesResultat = {
 
 // Placeholder : `calculerMoisIndemnisation`/`calculerSerieIndemnisation` n'ont pas connaissance de
 // l'historique d'AJ réelle (leur `moisLabel` est purement informatif, jamais une vraie date, cf.
-// `MoisIndemnisationEntree`) — seul `calculerSerieDepuisDeclarations`, qui manipule de vrais mois
+// `MoisIndemnisationEntree`) — seul `calculerSerieDepuisContrats`, qui manipule de vrais mois
 // "YYYY-MM", recalcule ce champ correctement (même mécanique que `franchiseSalaires` ci-dessus).
 const MONTANT_MENSUEL_INDISPONIBLE: MontantMensuelResultat = { calculable: false, raison: "aj_manquante" };
 
@@ -69,6 +69,7 @@ export function calculerMoisIndemnisation(soldeDepart: SoldeIndemnisation, entre
 
   return {
     moisLabel: entree.moisLabel,
+    heuresDuMois: entree.heuresDuMois,
     joursNonIndemnisables,
     delaiConsomme,
     franchiseCPConsommee,

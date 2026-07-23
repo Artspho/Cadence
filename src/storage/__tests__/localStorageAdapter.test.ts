@@ -10,7 +10,6 @@ describe("exporterJSON / importerJSON — round-trip", () => {
       profil: profil({ dateAnniversaire: "2026-12-31" }),
       contrats: [contrat({ date: "2026-06-01", nbCachets: 10 })],
       periodes: [periode({ type: "maternite", dateDebut: "2026-01-01", dateFin: "2026-02-01" })],
-      declarationsMensuelles: [{ id: "1", mois: "2026-02", joursDeclares: 14, source: "lecture_releve" }],
       soldeIndemnisationDepart: { date: "2026-02-01", delaiRestant: 5, franchiseCPRestante: 5, quotaCPCarryOver: 2, ajReelleHistorique: [{ dateEffet: "2026-01-18", valeur: 55.02 }] },
     };
 
@@ -21,7 +20,7 @@ describe("exporterJSON / importerJSON — round-trip", () => {
   });
 
   it("round-trip sur l'état vide (tout premier utilisateur de la bêta) : ne lève pas, redonne le même état", () => {
-    const donneesVides: DonneesApp = { profil: null, contrats: [], periodes: [], declarationsMensuelles: [], soldeIndemnisationDepart: null };
+    const donneesVides: DonneesApp = { profil: null, contrats: [], periodes: [], soldeIndemnisationDepart: null };
 
     const exporte = exporterJSON(donneesVides, DATE_EXPORT_FIXE);
     expect(() => importerJSON(exporte)).not.toThrow();
@@ -29,22 +28,46 @@ describe("exporterJSON / importerJSON — round-trip", () => {
   });
 
   it("le fichier exporté porte un schemaVersion et un horodatage d'export", () => {
-    const exporte = JSON.parse(exporterJSON({ profil: null, contrats: [], periodes: [], declarationsMensuelles: [], soldeIndemnisationDepart: null }, DATE_EXPORT_FIXE));
+    const exporte = JSON.parse(exporterJSON({ profil: null, contrats: [], periodes: [], soldeIndemnisationDepart: null }, DATE_EXPORT_FIXE));
     expect(exporte.schemaVersion).toBe(SCHEMA_VERSION_DONNEES);
     expect(exporte.exporteLe).toBe(DATE_EXPORT_FIXE.toISOString());
   });
 
-  it("importe sans perte un export antérieur au module indemnisation mensuelle (champs absents, pas juste vides)", () => {
+  it("importe sans perte un export antérieur au module indemnisation mensuelle (champ soldeIndemnisationDepart absent, pas juste vide)", () => {
     const exportAncien = JSON.stringify({
       schemaVersion: SCHEMA_VERSION_DONNEES,
       profil: profil({ dateAnniversaire: "2026-12-31" }),
       contrats: [],
       periodes: [],
-      // declarationsMensuelles / soldeIndemnisationDepart : absents, comme un vrai export d'avant ce module.
+      // soldeIndemnisationDepart : absent, comme un vrai export d'avant ce module.
     });
     const reimporte = importerJSON(exportAncien);
-    expect(reimporte.declarationsMensuelles).toEqual([]);
     expect(reimporte.soldeIndemnisationDepart).toBeNull();
+  });
+
+  it("importe sans perte un export qui contient encore declarationsMensuelles (champ retiré le 2026-07-24, saisie manuelle remplacée par un calcul automatique depuis les contrats)", () => {
+    const exportAncien = JSON.stringify({
+      schemaVersion: SCHEMA_VERSION_DONNEES,
+      profil: null,
+      contrats: [],
+      periodes: [],
+      declarationsMensuelles: [{ id: "1", mois: "2026-02", joursDeclares: 14, source: "lecture_releve" }],
+      soldeIndemnisationDepart: null,
+    });
+    const reimporte = importerJSON(exportAncien);
+    expect(reimporte).not.toHaveProperty("declarationsMensuelles");
+  });
+
+  it("importe sans perte un contrat enregistré avant l'ajout de dateDebut (découpage mensuel)", () => {
+    const exportAncien = JSON.stringify({
+      schemaVersion: SCHEMA_VERSION_DONNEES,
+      profil: null,
+      contrats: [{ id: "c1", date: "2026-06-15", type: "artiste", typeRemuneration: "cachet", territoire: "france", nbCachets: 5, salaireBrut: 500, employeur: "Test" }], // dateDebut absent
+      periodes: [],
+      soldeIndemnisationDepart: null,
+    });
+    const reimporte = importerJSON(exportAncien);
+    expect(reimporte.contrats[0].dateDebut).toBe("2026-06-15"); // repli sur `date` — contrat traité comme un seul jour
   });
 
   it("importe sans perte un solde de départ configuré avant l'ajout de quotaCPCarryOver (correctif franchise CP)", () => {
@@ -53,7 +76,6 @@ describe("exporterJSON / importerJSON — round-trip", () => {
       profil: null,
       contrats: [],
       periodes: [],
-      declarationsMensuelles: [],
       soldeIndemnisationDepart: { date: "2026-02-01", delaiRestant: 5, franchiseCPRestante: 5 }, // quotaCPCarryOver absent
     });
     const reimporte = importerJSON(exportAncien);
@@ -66,7 +88,6 @@ describe("exporterJSON / importerJSON — round-trip", () => {
       profil: null,
       contrats: [],
       periodes: [],
-      declarationsMensuelles: [],
       soldeIndemnisationDepart: { date: "2026-02-01", delaiRestant: 5, franchiseCPRestante: 5, quotaCPCarryOver: 2 }, // ni ajReelle, ni ajReelleHistorique
     });
     const reimporte = importerJSON(exportAncien);
@@ -79,7 +100,6 @@ describe("exporterJSON / importerJSON — round-trip", () => {
       profil: null,
       contrats: [],
       periodes: [],
-      declarationsMensuelles: [],
       soldeIndemnisationDepart: { date: "2026-02-01", delaiRestant: 5, franchiseCPRestante: 5, quotaCPCarryOver: 2, ajReelle: 55.02 },
     });
     const reimporte = importerJSON(exportAncien);
@@ -92,7 +112,6 @@ describe("exporterJSON / importerJSON — round-trip", () => {
       profil: null,
       contrats: [],
       periodes: [],
-      declarationsMensuelles: [],
       soldeIndemnisationDepart: { date: "2026-02-01", delaiRestant: 5, franchiseCPRestante: 5, quotaCPCarryOver: 2, ajReelle: null },
     });
     const reimporte = importerJSON(exportAncien);

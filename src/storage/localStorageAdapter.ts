@@ -3,7 +3,7 @@
 // toucher aux composants : ceux-ci n'appellent jamais localStorage
 // directement, seulement les fonctions exportées ici.
 import { z } from "zod";
-import type { Contrat, DeclarationMensuelle, PeriodeAssimilee, Profil, SoldeIndemnisationDepart } from "../types";
+import type { Contrat, PeriodeAssimilee, Profil, SoldeIndemnisationDepart } from "../types";
 import { profilSchema } from "../lib/coherenceProfil";
 
 const CLE_STOCKAGE = "cadence:v1:donnees";
@@ -21,11 +21,10 @@ export interface DonneesApp {
   profil: Profil | null;
   contrats: Contrat[];
   periodes: PeriodeAssimilee[];
-  declarationsMensuelles: DeclarationMensuelle[];
   soldeIndemnisationDepart: SoldeIndemnisationDepart | null;
 }
 
-const donneesVides: DonneesApp = { profil: null, contrats: [], periodes: [], declarationsMensuelles: [], soldeIndemnisationDepart: null };
+const donneesVides: DonneesApp = { profil: null, contrats: [], periodes: [], soldeIndemnisationDepart: null };
 
 // Validation à la frontière (import JSON, lecture localStorage) : un
 // utilisateur peut importer un fichier corrompu ou modifié à la main.
@@ -54,13 +53,6 @@ const periodeSchema = z.object({
   type: z.enum(["maternite", "adoption", "accident_travail", "ald", "suspension_contrat", "maladie_intercontrat"]),
   dateDebut: z.string(),
   dateFin: z.string(),
-});
-
-const declarationMensuelleSchema = z.object({
-  id: z.string(),
-  mois: z.string(),
-  joursDeclares: z.number(),
-  source: z.enum(["manuel", "lecture_releve"]),
 });
 
 const soldeIndemnisationDepartSchema = z.object({
@@ -118,10 +110,13 @@ const donneesAppSchema = z.object({
   profil: profilSchema.nullable(),
   contrats: z.array(contratSchema),
   periodes: z.array(periodeSchema),
-  // .default(...) : un export antérieur au module indemnisation mensuelle n'a pas ces deux champs
-  // du tout — pas une migration de schemaVersion, juste une donnée absente qui redevient l'état
-  // vide (devoir sacré n°1 : un ancien export doit toujours pouvoir se réimporter sans perte).
-  declarationsMensuelles: z.array(declarationMensuelleSchema).default([]),
+  // .default(null) : un export antérieur au module indemnisation mensuelle n'a pas ce champ du
+  // tout — pas une migration de schemaVersion, juste une donnée absente qui redevient l'état vide
+  // (devoir sacré n°1 : un ancien export doit toujours pouvoir se réimporter sans perte).
+  // `declarationsMensuelles` (ancienne saisie manuelle de "jours déclarés") retiré le 2026-07-24 :
+  // remplacé par un calcul automatique depuis les contrats (calculerSerieDepuisContrats), cf.
+  // docs/reprise.md. Un ancien export qui contient encore cette clé n'échoue pas pour autant —
+  // Zod ignore silencieusement les clés inconnues.
   soldeIndemnisationDepart: soldeIndemnisationDepartSchema.nullable().default(null),
 });
 
@@ -194,9 +189,5 @@ export function creerContrat(partiel: Omit<Contrat, "id">): Contrat {
 }
 
 export function creerPeriode(partiel: Omit<PeriodeAssimilee, "id">): PeriodeAssimilee {
-  return { id: crypto.randomUUID(), ...partiel };
-}
-
-export function creerDeclarationMensuelle(partiel: Omit<DeclarationMensuelle, "id">): DeclarationMensuelle {
   return { id: crypto.randomUUID(), ...partiel };
 }

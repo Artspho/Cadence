@@ -1,20 +1,18 @@
 import { useMemo, useState } from "react";
-import type { DeclarationMensuelle, Profil, SoldeIndemnisationDepart } from "../types";
+import type { Contrat, Profil, SoldeIndemnisationDepart } from "../types";
 import type { FranceTravailConfig } from "../config/franceTravailConfig";
-import { calculerSerieDepuisDeclarations } from "../engine/indemnisationMensuelle";
+import { calculerSerieDepuisContrats } from "../engine/indemnisationMensuelle";
 
 interface RevenusMensuelsProps {
   profil: Profil;
   soldeDepart: SoldeIndemnisationDepart | null;
-  declarations: DeclarationMensuelle[];
+  contrats: Contrat[];
   config: FranceTravailConfig;
   onConfigurerSolde: (solde: SoldeIndemnisationDepart) => void;
-  onAjouterDeclaration: (partiel: Omit<DeclarationMensuelle, "id">) => void;
-  onSupprimerDeclaration: (id: string) => void;
   dateDuJour: string;
 }
 
-export function RevenusMensuels({ profil, soldeDepart, declarations, config, onConfigurerSolde, onAjouterDeclaration, onSupprimerDeclaration, dateDuJour }: RevenusMensuelsProps) {
+export function RevenusMensuels({ profil, soldeDepart, contrats, config, onConfigurerSolde, dateDuJour }: RevenusMensuelsProps) {
   // Première admission = pas encore indemnisé, en train de viser les 507 h d'ouverture — ce
   // module (montants mensuels déjà versés) n'a aucun sens dans ce contexte, cf. docs/reprise.md.
   if (profil.situation === "premiere_admission") {
@@ -29,8 +27,7 @@ export function RevenusMensuels({ profil, soldeDepart, declarations, config, onC
     <div className="space-y-6 max-w-[900px]">
       <SoldeRecap solde={soldeDepart} />
       <GestionAjReelle solde={soldeDepart} onConfigurer={onConfigurerSolde} />
-      <FormulaireDeclaration onAjouter={onAjouterDeclaration} />
-      <TableauResultats soldeDepart={soldeDepart} declarations={declarations} config={config} onSupprimer={onSupprimerDeclaration} />
+      <TableauResultats soldeDepart={soldeDepart} contrats={contrats} config={config} dateDuJour={dateDuJour} />
     </div>
   );
 }
@@ -246,90 +243,21 @@ function GestionAjReelle({ solde, onConfigurer }: { solde: SoldeIndemnisationDep
   );
 }
 
-function FormulaireDeclaration({ onAjouter }: { onAjouter: (partiel: Omit<DeclarationMensuelle, "id">) => void }) {
-  const [mois, setMois] = useState("");
-  const [joursDeclares, setJoursDeclares] = useState(0);
-  const [source, setSource] = useState<DeclarationMensuelle["source"]>("lecture_releve");
-
-  function ajouter() {
-    if (!mois) return;
-    onAjouter({ mois, joursDeclares, source });
-    setMois("");
-    setJoursDeclares(0);
-  }
-
-  return (
-    <div className="bg-surface border border-line rounded-card p-5 space-y-4">
-      <h3 className="font-display text-base font-medium">Ajouter un mois</h3>
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="block text-xs uppercase tracking-[.03em] text-muted mb-2" htmlFor="ri-mois">
-            Mois
-          </label>
-          <input
-            id="ri-mois"
-            type="month"
-            value={mois}
-            onChange={(e) => setMois(e.target.value)}
-            className="w-full bg-surface-2 border border-line rounded-lg px-3 py-2 text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-mint"
-          />
-        </div>
-        <div>
-          <label className="block text-xs uppercase tracking-[.03em] text-muted mb-2" htmlFor="ri-jours-declares">
-            Jours travaillés déclarés
-          </label>
-          <input
-            id="ri-jours-declares"
-            type="number"
-            min={0}
-            value={joursDeclares}
-            onChange={(e) => setJoursDeclares(Math.max(0, Number(e.target.value)))}
-            className="w-full bg-surface-2 border border-line rounded-lg px-3 py-2 text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-mint"
-          />
-        </div>
-      </div>
-
-      <div>
-        <span className="block text-xs uppercase tracking-[.03em] text-muted mb-2">Provenance de ce chiffre</span>
-        <div className="flex gap-2">
-          <button
-            onClick={() => setSource("lecture_releve")}
-            className={`flex-1 rounded-lg border px-3 py-2 text-sm text-left transition-colors ${source === "lecture_releve" ? "border-mint bg-mint/10" : "border-line bg-surface-2"}`}
-          >
-            D'après mon relevé
-          </button>
-          <button
-            onClick={() => setSource("manuel")}
-            className={`flex-1 rounded-lg border px-3 py-2 text-sm text-left transition-colors ${source === "manuel" ? "border-amber bg-amber/10" : "border-line bg-surface-2"}`}
-          >
-            Estimation provisoire
-          </button>
-        </div>
-      </div>
-
-      <button onClick={ajouter} disabled={!mois} className="bg-mint text-bg font-medium rounded-lg px-4 py-2 disabled:opacity-40 disabled:cursor-not-allowed transition-opacity">
-        Ajouter
-      </button>
-    </div>
-  );
-}
-
 function TableauResultats({
   soldeDepart,
-  declarations,
+  contrats,
   config,
-  onSupprimer,
+  dateDuJour,
 }: {
   soldeDepart: SoldeIndemnisationDepart;
-  declarations: DeclarationMensuelle[];
+  contrats: Contrat[];
   config: FranceTravailConfig;
-  onSupprimer: (id: string) => void;
+  dateDuJour: string;
 }) {
-  const resultats = useMemo(() => calculerSerieDepuisDeclarations(soldeDepart, declarations, config), [soldeDepart, declarations, config]);
-  const declarationsParMois = useMemo(() => new Map(declarations.map((d) => [d.mois, d])), [declarations]);
+  const resultats = useMemo(() => calculerSerieDepuisContrats(soldeDepart, contrats, dateDuJour, config), [soldeDepart, contrats, dateDuJour, config]);
 
   if (resultats.length === 0) {
-    return <p className="text-sm text-muted bg-surface border border-line rounded-card p-6 text-center">Aucun mois saisi pour l'instant — ajoute ton premier mois ci-dessus.</p>;
+    return <p className="text-sm text-muted bg-surface border border-line rounded-card p-6 text-center">Aucun contrat depuis le mois du solde de départ pour l'instant.</p>;
   }
 
   // Aucune AJ réelle renseignée du tout : pas de repli sur une estimation (devoir n°2), la
@@ -351,40 +279,26 @@ function TableauResultats({
           <thead className="text-xs uppercase tracking-[.03em] text-muted border-b border-line">
             <tr>
               <th className="text-left px-4 py-3">Mois</th>
-              <th className="text-right px-4 py-3">Jours déclarés</th>
+              <th className="text-right px-4 py-3">Heures travaillées</th>
               <th className="text-right px-4 py-3">Non indemnisables</th>
               <th className="text-right px-4 py-3">Délai</th>
               <th className="text-right px-4 py-3">Franchise CP</th>
               <th className="text-right px-4 py-3">Jours indemnisés</th>
               <th className="text-right px-4 py-3">≈ Montant (AJ relevé)</th>
-              <th className="px-4 py-3" />
             </tr>
           </thead>
           <tbody>
-            {resultats.map((r) => {
-              const declaration = declarationsParMois.get(r.moisLabel);
-              return (
-                <tr key={r.moisLabel} className="border-b border-line last:border-0">
-                  <td className="px-4 py-3">
-                    {r.moisLabel}
-                    {declaration?.source === "manuel" && <span className="ml-2 text-[11px] text-amber">provisoire</span>}
-                  </td>
-                  <td className="text-right px-4 py-3 text-muted">{declaration?.joursDeclares ?? "—"}</td>
-                  <td className="text-right px-4 py-3 text-muted">{r.joursNonIndemnisables}</td>
-                  <td className="text-right px-4 py-3 text-muted">{r.delaiConsomme}</td>
-                  <td className="text-right px-4 py-3 text-muted">{r.franchiseCPConsommee}</td>
-                  <td className="text-right px-4 py-3 font-medium">{r.joursIndemnises}</td>
-                  <td className="text-right px-4 py-3 font-medium">{r.montantMensuel.calculable ? `${r.montantMensuel.montant.toFixed(2)} €` : "—"}</td>
-                  <td className="px-4 py-3 text-right">
-                    {declaration && (
-                      <button onClick={() => onSupprimer(declaration.id)} className="text-xs text-muted hover:text-red transition-colors">
-                        Supprimer
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
+            {resultats.map((r) => (
+              <tr key={r.moisLabel} className="border-b border-line last:border-0">
+                <td className="px-4 py-3">{r.moisLabel}</td>
+                <td className="text-right px-4 py-3 text-muted">{r.heuresDuMois} h</td>
+                <td className="text-right px-4 py-3 text-muted">{r.joursNonIndemnisables}</td>
+                <td className="text-right px-4 py-3 text-muted">{r.delaiConsomme}</td>
+                <td className="text-right px-4 py-3 text-muted">{r.franchiseCPConsommee}</td>
+                <td className="text-right px-4 py-3 font-medium">{r.joursIndemnises}</td>
+                <td className="text-right px-4 py-3 font-medium">{r.montantMensuel.calculable ? `${r.montantMensuel.montant.toFixed(2)} €` : "—"}</td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>
