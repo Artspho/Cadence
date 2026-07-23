@@ -49,6 +49,8 @@ export const profilSchema = z
     activiteHorsAnnexe10: z.boolean().optional(), // déprécié, cf. types/index.ts — jamais écrit, lu en repli seulement
     regimeDeclare: z.enum(["annexe10_pur", "mixte", "inconnu"]).optional(),
     dateAnniversairePrecedente: z.string().optional(), // réadmission uniquement, jamais bloquant si absent
+    dureeDroitsMois: z.union([z.literal(12), z.literal(6)]).optional(), // connue à l'ouverture, jamais déduite de l'historique — franchise salaires
+    salairesHorsAnnexe10PRA: z.number().nullable().optional(), // franchise salaires, cf. engine/indemnisationMensuelle.ts
   })
   .refine((p) => validerCoherenceProfil(p).coherent, (p) => ({ message: validerCoherenceProfil(p).raison ?? "Profil incohérent." }));
 

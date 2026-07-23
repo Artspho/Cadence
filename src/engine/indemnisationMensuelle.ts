@@ -13,7 +13,7 @@
 // (lecture initiale erronée du 2026-07-23, corrigée : le 4j consommé en février 2026 s'explique
 // entièrement par le report du forfait de janvier, absorbé par le délai d'attente ce mois-là, pas
 // par l'absence de plafond).
-import type { DeclarationMensuelle, FranchiseSalairesResultat, MoisIndemnisationEntree, MoisIndemnisationResultat, SoldeIndemnisation, SoldeIndemnisationDepart } from "../types";
+import type { DeclarationMensuelle, FranchiseSalairesResultat, MoisIndemnisationEntree, MoisIndemnisationResultat, Profil, SoldeIndemnisation, SoldeIndemnisationDepart } from "../types";
 import type { FranceTravailConfig } from "../config/franceTravailConfig";
 import { joursDansMois, moisCle } from "./dateUtils";
 
@@ -87,4 +87,44 @@ export function calculerSerieDepuisDeclarations(soldeDepart: SoldeIndemnisationD
     .map((d) => ({ moisLabel: d.mois, joursDuMois: joursDansMois(d.mois), joursDeclares: d.joursDeclares }));
 
   return calculerSerieIndemnisation({ delaiRestant: soldeDepart.delaiRestant, franchiseCPRestante: soldeDepart.franchiseCPRestante, quotaCPCarryOver: soldeDepart.quotaCPCarryOver ?? 0 }, mois, config);
+}
+
+// Cherche la valeur historique la plus récente dont la date d'effet est ≤ la date cible — null si
+// la date cible est antérieure à toute revalorisation connue (jamais une valeur extrapolée).
+function valeurALaDate(dateISO: string, historique: { dateEffet: string; valeur: number }[]): number | null {
+  const applicables = historique.filter((h) => h.dateEffet <= dateISO).sort((a, b) => b.dateEffet.localeCompare(a.dateEffet));
+  return applicables.length > 0 ? applicables[0].valeur : null;
+}
+
+/**
+ * Franchise salaires (guide France Travail p.14, formule certifiée le 2026-07-23 — ARTCENA +
+ * flyer officiel) : `arrondi( (SR_total / SMIC_mensuel) × (SJM / (3 × SMIC_journalier)) − 27 )`,
+ * jamais négative. SMIC lu à la date de fin de PRA (`Profil.dateAnniversaire`), pas la valeur
+ * courante — une PRA close avant la dernière revalorisation doit lire l'ancienne valeur.
+ *
+ * TODO : SR_total devrait inclure tous salaires PRA non plafonnés y compris hors A10 — champ
+ * `Profil.salairesHorsAnnexe10PRA` prévu mais optionnel en bêta. Vérifier sur un relevé réel avec
+ * franchise salaires > 0 avant de retirer l'avertissement `sousEstimeeHorsA10`.
+ *
+ * PAS ENCORE câblée sur la consommation mensuelle (répartition sur `min(dureeDroitsMois,
+ * repartitionMoisMax)` mois + report, cf. franchise CP) : cette fonction calcule seulement le
+ * TOTAL, `calculerMoisIndemnisation` continue de renvoyer `franchise_salaires_non_certifiee`
+ * jusqu'à ce que la répartition soit conçue et câblée (cf. docs/reprise.md).
+ */
+export function calculerFranchiseSalaires(srContrats: number, sjm: number, profil: Profil, config: FranceTravailConfig): FranchiseSalairesResultat {
+  const dateFinPRA = profil.dateAnniversaire;
+  if (!dateFinPRA) {
+    return FRANCHISE_SALAIRES_NON_CERTIFIEE;
+  }
+
+  const smicMensuel = valeurALaDate(dateFinPRA, config.valeursDatees.smicMensuelBrutHistorique);
+  const smicJournalier = valeurALaDate(dateFinPRA, config.valeursDatees.smicJournalierBrutHistorique);
+  if (smicMensuel === null || smicJournalier === null) {
+    return FRANCHISE_SALAIRES_NON_CERTIFIEE;
+  }
+
+  const srTotal = srContrats + (profil.salairesHorsAnnexe10PRA ?? 0);
+  const brut = Math.round((srTotal / smicMensuel) * (sjm / (3 * smicJournalier)) - 27);
+
+  return { valeur: Math.max(0, brut), totalNonVerifie: true, sousEstimeeHorsA10: profil.salairesHorsAnnexe10PRA == null };
 }

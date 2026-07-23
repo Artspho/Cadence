@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { franceTravailConfig } from "../../config/franceTravailConfig";
-import { calculerMoisIndemnisation, calculerSerieDepuisDeclarations, calculerSerieIndemnisation } from "../indemnisationMensuelle";
+import { calculerFranchiseSalaires, calculerMoisIndemnisation, calculerSerieDepuisDeclarations, calculerSerieIndemnisation } from "../indemnisationMensuelle";
 import type { DeclarationMensuelle, MoisIndemnisationEntree, SoldeIndemnisation, SoldeIndemnisationDepart } from "../../types";
+import { profil } from "./testUtils";
 
 describe("calculerMoisIndemnisation", () => {
   it("jours non indemnisables = ceil(joursDéclarés × 1,3), avant tout calcul de place disponible", () => {
@@ -118,5 +119,53 @@ describe("calculerSerieDepuisDeclarations", () => {
     // cas certifié ci-dessus, volontairement : ce test documente le comportement par défaut, pas
     // une reproduction du cas réel.
     expect(resultats[0].franchiseCPConsommee).toBe(2);
+  });
+});
+
+describe("calculerFranchiseSalaires — formule certifiée le 2026-07-23 (ARTCENA + flyer officiel)", () => {
+  it("calcule un total positif, arrondi, à partir de la formule", () => {
+    const smicMensuel = 1867.02; // valeur au 01/06/2026
+    const smicJournalier = 86.17;
+    const srTotal = smicMensuel * 30; // SR / smicMensuel = 30, exactement
+    const sjm = 3 * smicJournalier * 2; // SJM / (3 × smicJournalier) = 2, exactement
+    const p = profil({ dateAnniversaire: "2026-12-31" }); // après le 01/06/2026
+    const resultat = calculerFranchiseSalaires(srTotal, sjm, p, franceTravailConfig);
+    // 30 × 2 − 27 = 33
+    expect(resultat).toEqual({ valeur: 33, totalNonVerifie: true, sousEstimeeHorsA10: true });
+  });
+
+  it("franchise nulle (jamais négative) quand le résultat brut est ≤ 0", () => {
+    const p = profil({ dateAnniversaire: "2026-12-31" });
+    const resultat = calculerFranchiseSalaires(0, 0, p, franceTravailConfig);
+    expect(resultat.valeur).toBe(0);
+  });
+
+  it("lit le SMIC à la date de fin de PRA, pas la valeur courante", () => {
+    const smicMensuel = 1823.03; // valeur au 01/01/2026, PAS la valeur courante (1867,02 au 01/06/2026)
+    const smicJournalier = 84.14;
+    const srTotal = smicMensuel * 30;
+    const sjm = 3 * smicJournalier * 2;
+    const p = profil({ dateAnniversaire: "2026-03-15" }); // avant la revalorisation du 01/06/2026
+    const resultat = calculerFranchiseSalaires(srTotal, sjm, p, franceTravailConfig);
+    expect(resultat).toEqual({ valeur: 33, totalNonVerifie: true, sousEstimeeHorsA10: true });
+  });
+
+  it("sousEstimeeHorsA10 = false quand salairesHorsAnnexe10PRA est renseigné", () => {
+    const p = profil({ dateAnniversaire: "2026-12-31", salairesHorsAnnexe10PRA: 5000 });
+    const resultat = calculerFranchiseSalaires(10000, 100, p, franceTravailConfig);
+    if (resultat.valeur === null) throw new Error("valeur ne devrait pas être null ici");
+    expect(resultat.sousEstimeeHorsA10).toBe(false);
+  });
+
+  it("valeur null quand la date de fin de PRA est inconnue — jamais une formule devinée", () => {
+    const p = profil({ dateAnniversaire: "" });
+    const resultat = calculerFranchiseSalaires(100000, 100, p, franceTravailConfig);
+    expect(resultat).toEqual({ valeur: null, avertissement: "franchise_salaires_non_certifiee" });
+  });
+
+  it("valeur null quand la date de fin de PRA est antérieure à toute revalorisation SMIC connue", () => {
+    const p = profil({ dateAnniversaire: "2020-01-01" });
+    const resultat = calculerFranchiseSalaires(100000, 100, p, franceTravailConfig);
+    expect(resultat).toEqual({ valeur: null, avertissement: "franchise_salaires_non_certifiee" });
   });
 });

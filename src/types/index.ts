@@ -71,6 +71,17 @@ export interface Profil {
   // comportement inchangé (garde-fou TRANCHES_MAX, cf. SeuilReadmission "historique_insuffisant") ;
   // aucune migration requise pour les profils déjà enregistrés (champ optionnel).
   dateAnniversairePrecedente?: string;
+  // Durée de la période de droits en mois, connue à l'ouverture (notification France Travail) —
+  // sert à la répartition de la franchise salaires (min(dureeDroitsMois, repartitionMoisMax) mois,
+  // cf. engine/indemnisationMensuelle.ts). Standard = 12 ; clause de rattrapage (6 mois,
+  // franceTravailConfig.readmission.clauseRattrapage) = 6. Optionnel, jamais déduit de
+  // l'historique d'activité (devoir sacré n°2) — absent tant que non renseigné.
+  dureeDroitsMois?: 12 | 6;
+  // Salaires perçus pendant la PRA hors Annexe 10 (technicien A8, régime général…), non plafonnés
+  // — composante de SR_total pour la franchise salaires. `null`/absent : la franchise salaires est
+  // alors estimée sur les seuls salaires Annexe 10 (peut être sous-estimée), jamais bloquant —
+  // cf. FranchiseSalairesResultat.sousEstimeeHorsA10.
+  salairesHorsAnnexe10PRA?: number | null;
 }
 
 // ── Historique : un exercice = un cycle de 12 mois entre deux dates anniversaire ──
@@ -253,14 +264,20 @@ export interface MoisIndemnisationEntree {
   joursDeclares: number; // jours travaillés bruts saisis par l'utilisateur — PAS la colonne "non indem." du relevé (calculée, cf. joursNonIndemnisables)
 }
 
-// Franchise salaires : toujours cette valeur, jamais une formule devinée — la formule officielle
-// (guide p.14, 4 variables incluant le SMIC) n'a pas pu être vérifiée à 100 % depuis l'extraction
-// PDF, et aucun relevé réel fourni ne montre de franchise salaires active pour la confronter
-// (devoir sacré n°2 : jamais un chiffre faux). À rouvrir si un relevé réel en montre une active.
-export interface FranchiseSalairesResultat {
-  valeur: null;
-  avertissement: "franchise_salaires_non_certifiee";
-}
+// Franchise salaires (guide p.14, formule certifiée le 2026-07-23 — ARTCENA + flyer officiel
+// France Travail). Deux issues possibles :
+// - `valeur: null` : entrées manquantes (date de fin de PRA inconnue, ou SMIC mensuel/journalier
+//   non trouvé à cette date dans l'historique) — jamais une formule devinée à partir de données
+//   absentes (devoir sacré n°2).
+// - `valeur: number` : calculée, mais avec deux réserves distinctes, toujours à afficher
+//   ensemble : `totalNonVerifie` (toujours `true` pour l'instant — le TOTAL n'a jamais été
+//   confronté à un relevé réel montrant une franchise salaires active, seule la répartition
+//   mensuelle l'a été officiellement, cf. docs/reprise.md) et `sousEstimeeHorsA10` (`true` quand
+//   `Profil.salairesHorsAnnexe10PRA` est absent : SR_total ne compte alors que les salaires
+//   Annexe 10, potentiellement sous-estimé).
+export type FranchiseSalairesResultat =
+  | { valeur: null; avertissement: "franchise_salaires_non_certifiee" }
+  | { valeur: number; totalNonVerifie: true; sousEstimeeHorsA10: boolean };
 
 // Saisie mois par mois par l'utilisateur, après réception de son relevé France Travail — jamais
 // déduite des `Contrat` (qui trackent des heures/cachets par contrat, pas des jours calendaires
