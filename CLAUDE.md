@@ -492,6 +492,22 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
   changé côté France Travail) + tests `areBrute`/`areNette` relancés (18 tests) pour confirmer que
   c'est le code, pas juste la règle documentée, qui reproduit ce résultat. 127 tests verts au
   total, `tsc -b` propre. Détail complet : `docs/reprise.md`.
+- ✅ **Chantier `ajReelleHistorique` (2026-07-24)** : `SoldeIndemnisationDepart.ajReelle: number |
+  null` remplacé par `ajReelleHistorique: {dateEffet, valeur}[]` — un utilisateur peut connaître
+  plusieurs taux d'AJ réelle successifs sur une même période d'indemnisation (ex. 54,55 € jusqu'au
+  17/01/2026 puis 55,02 € à partir du 18/01/2026). Reste sur `SoldeIndemnisationDepart` (pas
+  déplacé vers `Profil`, décision actée avec l'utilisateur : évite le circuit des 3 portes de
+  cohérence sans bénéfice fonctionnel pour la bêta). `engine/ajReelleUtils.ts` (`getAjReelleAt`)
+  cherche le taux applicable à une date ; nouveau type discriminé `MontantMensuelResultat` +
+  champ `MoisIndemnisationResultat.montantMensuel`, calculé uniquement dans
+  `calculerSerieDepuisDeclarations` (le `moisLabel` de `calculerMoisIndemnisation`/
+  `calculerSerieIndemnisation` reste purement informatif, jamais une vraie date). `RevenusMensuels.tsx` :
+  éditeur de périodes AJ (date d'effet/valeur/suppression), plus de repli sur une AJ estimée
+  (devoir n°2) — encart ambre si aucune période connue, `—` mois par mois si hors couverture.
+  Migration silencieuse de l'ancien champ `ajReelle` dans `localStorageAdapter.ts`, appliquée à la
+  fois au chargement localStorage et à l'import JSON. Au passage : `RevenusMensuels.tsx` masqué en
+  première admission (module sans objet avant l'ouverture des droits). 136 tests verts, `tsc -b`
+  propre, vérifié dans le navigateur à chaque étape. Détail complet : `docs/reprise.md`.
 - ⬜ **Non traité (V2/V3) :** coordination européenne (périodes U1/PDU1) — même famille qu'Annexe 8/article 65, hors périmètre Annexe 10 pur. Aucune logique ni champ de données ne l'anticipe encore (détail dans `docs/SPEC.md` §10 et §11.C). Ne pas confondre avec le champ `territoire` du contrat, qui couvre un cas différent (cachet ponctuel joué en EEE/Suisse/UK mais déclaré en France).
 - 🔁 **Maintenance de la config** (récurrent, perso — hors app, pas de backend en bêta) : une fois
   par mois, vérifier à la source officielle SMIC (horaire / mensuel / journalier), PMSS, et les

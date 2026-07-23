@@ -8,12 +8,11 @@ Mémoire durable à consulter au démarrage : `CLAUDE.md`, `docs/SPEC.md`, `docs
 
 Deux devoirs sacrés : (1) ne jamais perdre les données ; (2) ne jamais afficher un chiffre faux (ni faux « feu vert » rassurant, ni faux « Bloqué », ni faux montant, ni fausse alerte, ni valeur sentinelle brute).
 
-État : les deux devoirs sacrés sont tenus, la bêta a son socle. 127 tests verts, tsc propre. Dernier lot committé : correctif AJ réelle (`f6cb937` — montants de « Revenus mensuels » calculés sur l'AJ prévisionnelle au lieu de l'AJ réelle notifiée, un faux chiffre pour un utilisateur déjà en cours d'indemnisation). Tous les items §11.A du SPEC sont désormais traités.
-
-État : les deux devoirs sacrés sont tenus. Dernier correctif committé : cf. section dédiée
-« Fait (2026-07-24 : correctif AJ réelle committé, vérification PE en direct, PDF officiel lu en
-entier) » plus bas, complétée par le correctif du `27` en dur (même date, voir juste après cette
-section pour le détail).
+État : les deux devoirs sacrés sont tenus, la bêta a son socle. 136 tests verts, `tsc -b` propre.
+Dernier chantier committé : `ajReelleHistorique` (remplace l'ancien `ajReelle: number | null` par
+un historique de taux successifs, cf. section dédiée « Fait (2026-07-24 : chantier
+ajReelleHistorique — plusieurs taux d'AJ réelle successifs) » plus bas). Tous les items §11.A du
+SPEC sont désormais traités.
 
 ## Fait dans les sessions récentes
 
@@ -369,10 +368,69 @@ c'est bien le code de Cadence, pas juste la règle documentée, qui reproduit ce
    seule l'absence de cas chiffré réel reste la réserve (`totalNonVerifie`).
 
 127 tests verts (inchangé, aucune logique modifiée — seule la source de la constante change),
-`tsc -b` propre. Pas de vérification navigateur nécessaire : `calculerFranchiseSalaires` n'est
-toujours pas câblée dans `calculerMoisIndemnisation` (rien de nouveau visible à l'écran, cf.
-« Chantier suivant » plus haut). Pas encore committé — à committer séparément du reste (changement
-isolé, un seul fichier moteur touché).
+`tsc -b` propre. Committé (`16cd13b`).
+
+## Fait (2026-07-24 : chantier ajReelleHistorique — plusieurs taux d'AJ réelle successifs)
+
+Chantier demandé juste après le correctif ci-dessus, en 7 étapes ordonnées, chacune testée
+(`npm run test` + `tsc -b`) et committée séparément.
+
+**Étape 0 (`1f28ce1`)** : libellés du champ AJ réelle dans `RevenusMensuels.tsx` — en-tête de
+colonne et légende du tableau étaient déjà corrects mot pour mot ; seul le tooltip du champ de
+saisie manquait le mot « nette » et contenait une phrase résiduelle avec une valeur personnelle
+codée en dur (« Pour toi : 55,02 € depuis le 18/01/2026 ») — retirée.
+
+**Étape 1 (`a015849` + correctif `60fbaa7`)** : `RevenusMensuels.tsx` affiche désormais un encart
+neutre (« La simulation mensuelle sera disponible une fois tes droits ouverts... ») à la place du
+tableau quand `profil.situation === "premiere_admission"` — ce module n'a aucun sens avant
+l'ouverture des droits. Premier jet référençait un « onglet Projection » qui n'existe pas
+(corrigé en « onglet Tableau de bord », les tabs sont Tableau de bord/Mon profil/Contrats/Import
+PDF/Historique/Simulateur/Revenus mensuels).
+
+**Étape 2 (A à E, `ecd8406`/`e3e43cc`/`6047fc6`/`8203d85`/`e97ef39`)** : `SoldeIndemnisationDepart.
+ajReelle: number | null` remplacé par `ajReelleHistorique: {dateEffet, valeur}[]` — un utilisateur
+peut connaître plusieurs taux successifs sur une même période d'indemnisation (ex. 54,55 €
+jusqu'au 17/01/2026 puis 55,02 € à partir du 18/01/2026). **Décision actée avec l'utilisateur** :
+le champ reste sur `SoldeIndemnisationDepart` (pas déplacé vers `Profil`, malgré le pseudo-code
+initial qui écrivait `profil.ajReelleHistorique`) — `SoldeIndemnisationDepart` est déjà le point de
+configuration de la simulation mensuelle, l'AJ réelle en est une entrée comme les autres ; un
+déplacement vers `Profil` aurait fait passer ce champ par les 3 portes de cohérence
+(`lib/coherenceProfil.ts`) sans bénéfice fonctionnel, risque de régression pour la bêta.
+- **A** : type mis à jour, JSDoc explicite sur le fait que c'est indépendant de la date du solde de
+  départ.
+- **B** : `engine/ajReelleUtils.ts` (`getAjReelleAt`) — recherche la valeur dont la `dateEffet` est
+  la plus récente ≤ la date cible, `null` si aucune ou tableau vide/absent. 5 tests dédiés.
+- **C** : nouveau type discriminé `MontantMensuelResultat` (même famille que
+  `FranchiseSalairesResultat`) + champ `MoisIndemnisationResultat.montantMensuel`. Calculé
+  uniquement dans `calculerSerieDepuisDeclarations` (pas dans `calculerMoisIndemnisation`/
+  `calculerSerieIndemnisation`, dont le `moisLabel` reste **purement informatif**, jamais une vraie
+  date, cf. commentaire existant sur `MoisIndemnisationEntree` — les préserver inchangés évite de
+  casser cette invariante). 4 tests dédiés.
+- **D** : `RevenusMensuels.tsx` — nouveau bloc « Allocation journalière réelle » (éditeur de
+  périodes : date d'effet/AJ nette/suppression/tri/placeholder), réutilise `onConfigurerSolde`
+  existant (déjà générique). `TableauResultats` : tableau des montants mensuels remplacé par un
+  encart ambre si `ajReelleHistorique` est vide (plus de repli sur une AJ estimée — devoir n°2,
+  Cadence ne peut pas recalculer l'AJ réelle d'une réadmission déjà ouverte) ; par mois,
+  `montantMensuel.calculable === false` affiche `—` plutôt qu'un chiffre deviné. Prop
+  `ajNetteParJour` retirée (plus utilisée nulle part).
+- **E** : Zod (`localStorageAdapter.ts`) — `ajReelleHistorique: [...].default([])` +
+  `migrerAjReelleHistorique()`, migration silencieuse appliquée aux deux chemins de lecture
+  (`chargerDonnees` ET `importerJSON`, via un helper `parserDonnees` partagé) : un ancien champ
+  `ajReelle` (nombre) devient une entrée unique à une date arbitrairement ancienne (2000-01-01),
+  `ajReelle: null` ne produit aucune entrée. 3 tests dédiés.
+
+136 tests verts au total, `tsc -b` propre à chaque commit. **Vérifié dans le navigateur** à
+plusieurs étapes : ajout/suppression d'une période AJ, bascule encart ambre ↔ tableau, montant
+exact sur le cas certifié mars 2026 (935,34 € = 17 j × 55,02 €), migration silencieuse d'un solde
+seedé avec l'ancien champ `ajReelle` confirmée après rechargement.
+
+**Incident signalé en cours de vérification (sans conséquence sur les vraies données)** : perte
+accidentelle des données de test du navigateur de prévisualisation — une variable JS tenant la
+sauvegarde (`window.__cadenceBackup`) a été détruite par un `navigate()` intermédiaire avant d'être
+utilisée pour restaurer, écrivant la chaîne littérale `"undefined"` dans le `localStorage` de ce
+navigateur de dev isolé. Signalé immédiatement à l'utilisateur plutôt que corrigé silencieusement ;
+jeu de données de test reconstitué à partir des cas certifiés de ce document (situation
+réadmission, solde de départ, déclarations fév-mai 2026) + contrats inventés minimaux.
 
 **Demande initiale** : ajouter un module `engine/indemnisationMensuelle.ts` (montant ARE réellement
 versé mois par mois, pas juste l'AJ théorique) + composant `RevenusMensuels.tsx`. L'utilisateur a
