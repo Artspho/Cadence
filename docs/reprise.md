@@ -8,7 +8,7 @@ Mémoire durable à consulter au démarrage : `CLAUDE.md`, `docs/SPEC.md`, `docs
 
 Deux devoirs sacrés : (1) ne jamais perdre les données ; (2) ne jamais afficher un chiffre faux (ni faux « feu vert » rassurant, ni faux « Bloqué », ni faux montant, ni fausse alerte, ni valeur sentinelle brute).
 
-État : les deux devoirs sacrés sont tenus, la bêta a son socle. 91 tests verts, tsc propre, git à jour (dernier lot : renommage « À propos » → « Mon profil » + remontée dans la nav, commits `3da9ff6`/`841d9a1`).
+État : les deux devoirs sacrés sont tenus, la bêta a son socle. 100 tests verts, tsc propre. Dernier lot codé (pas encore committé au moment d'écrire cette ligne) : contrat récurrent pour l'enseignement (cf. section « Fait » dédiée ci-dessous).
 
 ## Fait dans les sessions récentes
 
@@ -98,6 +98,30 @@ masqué. 91 tests verts (aucun test ne référençait l'ancien libellé), tsc pr
 navigateur : ordre et libellé corrects, contenu de l'écran inchangé, alerte et indice Onboarding
 disent bien « Mon profil ».
 
+## Fait (contrat récurrent pour l'enseignement)
+
+Item 1 du backlog traité. 4 décisions tranchées par l'utilisateur avant de coder : (1) payé en
+heures, jamais en cachets — fixé dans le formulaire, pas de choix laissé ; (2) bouton séparé
+(`ContractFormRecurrent.tsx`) plutôt qu'un toggle dans `ContractForm.tsx` déjà ramifié par
+type/territoire ; (3) `ContractList.tsx` groupe par série (repliable) plutôt qu'une liste plate —
+40 lignes identiques aurait été inutilisable ; (4) option architecturale confirmée : contrats
+matérialisés à la création (normaux, tagués `recurrenceId` + `source: "recurrent"`) plutôt qu'une
+entité « série » dépliée à la volée par le moteur — zéro risque de point d'appel oublié dans
+`engine/`, zéro migration. `lib/contratRecurrent.ts` (`genererContratsRecurrents`) génère un
+contrat « enseignement »/« heures » par mois de la plage hors mois exclus (chips de sélection),
+daté fin de mois. **Limite actée dès le plan, pas une découverte a posteriori** : pas d'édition de
+série après coup, seule la suppression complète + régénération permet de corriger une série mal
+saisie — remarque de l'utilisateur prise en compte : le bouton « Supprimer la série » est visible
+directement sur la ligne résumé (pas caché derrière un dépli), avec confirmation navigateur
+(nombre de contrats + employeur) avant toute suppression groupée. `engine/` intouché. 9 tests
+dédiés ajoutés, 100 tests verts au total, `tsc -b` propre. Vérifié dans le navigateur : génération
+avec exclusion d'un mois, dépliage de la série, suppression d'un seul mois (total recalculé),
+Dashboard cohérent (répartition « Enseignement · 24 h » après suppression d'un mois sur 3).
+Tentative de suppression de série annulée par le navigateur automatisé au niveau de la boîte de
+confirmation — le garde-fou marche (rien supprimé tant que non confirmé), mais le chemin
+« confirmé » n'a pas pu être vérifié bout en bout en automatisé, **à tester manuellement au moins
+une fois**. Détail complet : `CLAUDE.md` « État actuel ».
+
 ## PROCHAINE ACTION
 
 Plus rien en urgence. Aucune priorité imposée : le reste du backlog reste au choix selon ce qui te
@@ -131,30 +155,23 @@ semble le plus utile. Détail complet : « Ensuite (backlog) ».
 
 ### Idées consignées le 2026-07-23 (à cadrer plus tard, pas de plan pour l'instant)
 
-Items « date de précédente ouverture de droits » et « renommer À propos en Mon profil » retirés de
-cette liste : faits (cf. sections « Fait » ci-dessus). Reste, inchangé :
+Items « date de précédente ouverture de droits », « renommer À propos en Mon profil » et
+« contrat récurrent pour l'enseignement » retirés de cette liste : faits (cf. sections « Fait »
+ci-dessus). Reste, inchangé :
 
-1. **Contrat récurrent pour l'enseignement** : saisie d'un CDD régulier (même employeur, heures
-   similaires chaque mois) en une fois, avec exclusion de certains mois (vacances, etc.), plutôt que
-   mois par mois. Impact que je vois : modèle `Contrat` (soit un nouveau type de contrat « récurrent »
-   avec règle de génération, soit une génération de contrats individuels à la saisie — deux
-   approches aux implications différentes sur `decompteHeures.ts` et sur l'historique/`cycles.ts` qui
-   suppose aujourd'hui des contrats individuels datés). Risque principal : la logique
-   d'exclusion de mois est une nouvelle branche métier à spécifier précisément avant de toucher
-   `engine/`.
-2. **V2+ : analyse IA du contrat** (vérifier automatiquement CDD vs CDI déguisé, conformité du
+1. **V2+ : analyse IA du contrat** (vérifier automatiquement CDD vs CDI déguisé, conformité du
    contrat). **Tension déjà documentée à rappeler explicitement le jour où cet item est repris** :
    le principe « 100 % local, aucune donnée envoyée » (SPEC, import PDF) serait rompu par
    construction — nécessiterait un service externe (LLM ou autre), donc un consentement RGPD
    explicite à obtenir, pas un simple ajout technique. Change la nature de l'app sur ce point précis,
    à ne pas sous-estimer.
-3. **Contrats à venir persistés, ajustant directement le graphique de projection** — à distinguer du
+2. **Contrats à venir persistés, ajustant directement le graphique de projection** — à distinguer du
    `Simulateur.tsx` actuel qui fait un « et si » temporaire sans rien persister. À rapprocher de
    l'item déjà présent au SPEC §11.B (« projection honnête basée sur les contrats déjà signés à
    venir » + fourchette plutôt que fausse précision) : probablement la même idée à formaliser,
    pas une fonctionnalité isolée à concevoir séparément — relire le §11.B en même temps que celui-ci
    avant de cadrer un plan.
-4. **V3+ : légalité des contrats** (minimums légaux, contrats limites/border) — reliée à l'item 2
+3. **V3+ : légalité des contrats** (minimums légaux, contrats limites/border) — reliée à l'item 1
    (analyse IA). Même tension vie privée à rappeler : toute analyse automatisée de ce type
    soulève la même question de service externe + consentement RGPD explicite.
 

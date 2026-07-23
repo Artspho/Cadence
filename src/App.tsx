@@ -15,6 +15,7 @@ import { TopBar, type Onglet } from "./components/TopBar";
 import { Onboarding } from "./components/Onboarding";
 import { Dashboard } from "./components/Dashboard";
 import { ContractForm } from "./components/ContractForm";
+import { ContractFormRecurrent } from "./components/ContractFormRecurrent";
 import { ContractList } from "./components/ContractList";
 import { ImportBulletins } from "./components/ImportBulletins";
 import { AlertCenter } from "./components/AlertCenter";
@@ -36,6 +37,7 @@ export default function App() {
   const [erreurImport, setErreurImport] = useState<string | null>(null);
   const [fichierEnAttenteImport, setFichierEnAttenteImport] = useState<File | null>(null);
   const [importEnCours, setImportEnCours] = useState(false);
+  const [formRecurrentOuvert, setFormRecurrentOuvert] = useState(false);
   const chargementTermine = useRef(false);
   const inputImportRef = useRef<HTMLInputElement>(null);
 
@@ -89,6 +91,15 @@ export default function App() {
 
   function supprimerContrat(id: string) {
     setDonnees((d) => (d ? { ...d, contrats: d.contrats.filter((c) => c.id !== id) } : d));
+  }
+
+  function ajouterContratsRecurrents(contrats: Contrat[]) {
+    setDonnees((d) => (d ? { ...d, contrats: [...d.contrats, ...contrats] } : d));
+    setFormRecurrentOuvert(false);
+  }
+
+  function supprimerSerie(recurrenceId: string) {
+    setDonnees((d) => (d ? { ...d, contrats: d.contrats.filter((c) => c.recurrenceId !== recurrenceId) } : d));
   }
 
   // Rempart devoir n°1 : forme (Zod) puis cohérence (situation/date), jamais l'un sans l'autre.
@@ -217,8 +228,18 @@ export default function App() {
 
         {onglet === "contrats" && calculs && (
           <div className="space-y-6">
+            <div className="flex items-center justify-end">
+              <button
+                type="button"
+                onClick={() => setFormRecurrentOuvert((v) => !v)}
+                className="text-xs px-3 py-1.5 rounded-full border border-line text-muted hover:text-ink transition-colors"
+              >
+                {formRecurrentOuvert ? "Fermer" : "+ Contrat récurrent (enseignement)"}
+              </button>
+            </div>
+            {formRecurrentOuvert && <ContractFormRecurrent onValider={ajouterContratsRecurrents} onAnnuler={() => setFormRecurrentOuvert(false)} />}
             <ContractForm profil={profil} config={franceTravailConfig} decompteActuel={calculs.decompte} onValider={ajouterContrat} />
-            <ContractList contrats={donnees.contrats} config={franceTravailConfig} onSupprimer={supprimerContrat} />
+            <ContractList contrats={donnees.contrats} config={franceTravailConfig} onSupprimer={supprimerContrat} onSupprimerSerie={supprimerSerie} />
           </div>
         )}
 

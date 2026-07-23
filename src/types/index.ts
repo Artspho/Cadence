@@ -25,7 +25,12 @@ export interface Contrat {
   employeur: string;
   etablissementAgree?: boolean; // enseignement : condition de prise en compte
   enRapportAvecMetier?: boolean; // enseignement : condition de prise en compte
-  source?: "manuel" | "import_pdf"; // provenance ; un import PDF est revu avant validation
+  source?: "manuel" | "import_pdf" | "recurrent"; // provenance ; un import PDF est revu avant validation
+  // Présent uniquement sur les contrats matérialisés par un contrat récurrent (lib/contratRecurrent.ts) :
+  // même valeur partagée par tous les contrats générés en une fois, sert à les regrouper/les
+  // supprimer ensemble dans ContractList.tsx. Absent = contrat saisi normalement, comportement
+  // inchangé (champ optionnel, aucune migration requise).
+  recurrenceId?: string;
 }
 
 // Périodes assimilées (5 h/jour) & événements affectant la période de référence

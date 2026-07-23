@@ -77,10 +77,12 @@ src/
   storage/localStorageAdapter.ts  # + export/import JSON (schemaVersion, anti-écrasement)
     __tests__/
   components/                     # Dashboard, ProjectionChart, ContractForm,
-                                   # ContractList, ImportBulletins, AlertCenter,
-                                   # Historique, Simulateur, TopBar, Onboarding,
+                                   # ContractFormRecurrent, ContractList, ImportBulletins,
+                                   # AlertCenter, Historique, Simulateur, TopBar, Onboarding,
                                    # MonProfil, AvertissementHorsPerimetre,
                                    # ConfirmationImport, DashboardVide
+  lib/contratRecurrent.ts         # genererContratsRecurrents() — contrat récurrent enseignement
+    __tests__/
   App.tsx  main.tsx  index.css
 ```
 
@@ -261,6 +263,35 @@ src/
   `Onboarding.tsx` et `alertes.ts` (ce dernier disait déjà « Mon profil » par anticipation avant
   même que l'onglet soit renommé — corrigé au passage). 91 tests verts, détail complet :
   `docs/reprise.md`.
+- ✅ **Contrat récurrent pour l'enseignement** (item 1 du backlog) : `lib/contratRecurrent.ts`
+  (`genererContratsRecurrents`) matérialise, à la validation d'un seul formulaire
+  (`ContractFormRecurrent.tsx`, bouton dédié « + Contrat récurrent (enseignement) » dans l'onglet
+  Contrats, séparé de `ContractForm.tsx`), **un `Contrat` normal par mois** de la plage choisie
+  (hors mois exclus, sélection par chips), daté du dernier jour du mois, `type: "enseignement"`
+  et `typeRemuneration: "heures"` **fixés** (l'enseignement se paie en heures de cours, jamais en
+  cachets — décision produit actée, pas un oubli). **Option architecturale retenue** (vs. une
+  entité « série » dépliée à la volée par le moteur, rejetée) : chaque contrat généré est
+  indépendant dès sa création, seulement tagué `recurrenceId` (partagé par la série) +
+  `source: "recurrent"` (`Contrat`, `types/index.ts`) — **`engine/` totalement intouché**
+  (`cycles.ts`/`decompteHeures.ts` voient des contrats datés normaux, aucun risque de point d'appel
+  du moteur qui oublierait de déplier une série, cf. devoir sacré n°2). Limite actée dès le plan,
+  pas découverte après coup : **pas d'édition de série après coup**, seule voie de correction
+  « supprimer toute la série + régénérer » — d'où un bouton « Supprimer la série » **visible
+  directement sur la ligne résumé** (pas caché derrière un dépli), avec confirmation navigateur
+  (nombre de contrats + employeur dans le message) avant toute suppression groupée. `ContractList.tsx`
+  groupe désormais les contrats partageant un `recurrenceId` en une ligne repliable (résumé :
+  employeur, nb de contrats, plage de mois, total heures/€) ; les contrats isolés (sans
+  `recurrenceId`) gardent l'affichage plat existant, les deux types de lignes sont triés ensemble
+  par date décroissante. Suppression individuelle d'un mois dans une série repliée toujours
+  possible (cas d'une exception ponctuelle), sans passer par la suppression de toute la série.
+  `localStorageAdapter.ts` (schéma Zod) accepte les nouveaux champs `source: "recurrent"` et
+  `recurrenceId` (optionnels, round-trip export/import JSON testé). 9 tests dédiés
+  (`lib/__tests__/contratRecurrent.test.ts` : génération, dates de fin de mois, `recurrenceId`
+  partagé, id uniques, exclusion de mois, plage vide/inversée, mois unique). 100 tests verts au
+  total, `tsc -b` propre. Vérifié dans le navigateur : génération avec exclusion, dépliage de
+  série, suppression d'un seul mois (total recalculé), tentative de suppression de série annulée
+  au niveau de la confirmation (donc pas testée jusqu'au bout en automatisé — à re-vérifier
+  manuellement par l'utilisateur au moins une fois), Dashboard cohérent avec les heures générées.
 - ⬜ **Non traité (V2/V3) :** coordination européenne (périodes U1/PDU1) — même famille qu'Annexe 8/article 65, hors périmètre Annexe 10 pur. Aucune logique ni champ de données ne l'anticipe encore (détail dans `docs/SPEC.md` §10 et §11.C). Ne pas confondre avec le champ `territoire` du contrat, qui couvre un cas différent (cachet ponctuel joué en EEE/Suisse/UK mais déclaré en France).
 - 🔁 **Maintenance de la config** (récurrent, perso — hors app, pas de backend en bêta) : une fois
   par mois, vérifier à la source officielle SMIC (horaire / mensuel / journalier), PMSS, et les

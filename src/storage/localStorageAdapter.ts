@@ -40,7 +40,8 @@ const contratSchema = z.object({
   employeur: z.string(),
   etablissementAgree: z.boolean().optional(),
   enRapportAvecMetier: z.boolean().optional(),
-  source: z.enum(["manuel", "import_pdf"]).optional(),
+  source: z.enum(["manuel", "import_pdf", "recurrent"]).optional(),
+  recurrenceId: z.string().optional(),
 });
 
 const periodeSchema = z.object({
