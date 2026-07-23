@@ -3,7 +3,7 @@ import type { Profil } from "../types";
 /**
  * Régime déclaré effectif d'un profil : lit `regimeDeclare` s'il existe, sinon migre depuis
  * `activiteHorsAnnexe10` (déprécié) sans jamais changer le comportement d'un profil déjà
- * enregistré (devoir sacré n°1). Utilisé aussi bien pour l'affichage (Onboarding/À propos,
+ * enregistré (devoir sacré n°1). Utilisé aussi bien pour l'affichage (Onboarding/Mon profil,
  * qui doivent montrer l'état réel d'un profil legacy) que pour le verrou d'écran ci-dessous.
  */
 export function regimeEffectif(profil: Profil): NonNullable<Profil["regimeDeclare"]> {
