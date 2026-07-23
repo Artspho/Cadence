@@ -122,15 +122,29 @@ export const franceTravailConfig = {
   // ── Valeurs volatiles à renseigner (revalorisées régulièrement) ──
   valeursDatees: {
     smicHoraireBrut: 12.31 as number | null, // ✅ arrêté du 22 mai 2026, en vigueur au 01/06/2026 (ancienne valeur : 12,02 € au 01/01/2026)
-    smicMensuelBrut: null as number | null, // 🔶 TODO (franchise salaires)
-    smicJournalierBrut: null as number | null, // 🔶 TODO (franchise salaires)
+    smicMensuelBrut: 1867.02 as number | null, // ✅ arrêté du 22 mai 2026, en vigueur au 01/06/2026 (ancienne valeur : 1823,03 € au 01/01/2026)
+    // 🔶 Non certifié : dérivé de smicHoraireBrut × 7 — à confirmer depuis une source officielle
+    // (utilisé pour la franchise salaires, cf. engine/indemnisationMensuelle.ts, docs/reprise.md).
+    smicJournalierBrut: 86.17 as number | null,
     pmssMensuel: null as number | null, // 🔶 TODO (plafond de cumul)
-    // Historique daté, réservé au module indemnisation mensuelle (V2) — distinct de
-    // smicHoraireBrut ci-dessus (valeur courante unique, lue telle quelle par areBrute.ts
-    // pour la réadmission allongée ; ne PAS y toucher, cf. docs/reprise.md).
+    // Historiques datés, réservés au module indemnisation mensuelle (V2) — distincts des valeurs
+    // courantes ci-dessus (lues telles quelles par areBrute.ts pour la réadmission allongée ; ne
+    // PAS y toucher, cf. docs/reprise.md). La franchise salaires exige le SMIC à la date de fin de
+    // PRA, potentiellement une date passée : une valeur courante unique donnerait un résultat faux
+    // sur toute PRA antérieure à la dernière revalorisation (devoir sacré n°2).
     smicHoraireBrutHistorique: [
       { dateEffet: "2026-01-01", valeur: 12.02 }, // ✅ info.gouv.fr
       { dateEffet: "2026-06-01", valeur: 12.31 }, // ✅ arrêté du 22 mai 2026
+    ] as { dateEffet: string; valeur: number }[],
+    smicMensuelBrutHistorique: [
+      { dateEffet: "2026-01-01", valeur: 1823.03 }, // ✅ info.gouv.fr
+      { dateEffet: "2026-06-01", valeur: 1867.02 }, // ✅ arrêté du 22 mai 2026
+    ] as { dateEffet: string; valeur: number }[],
+    // 🔶 Non certifiés : dérivés de smicHoraireBrutHistorique × 7 — mêmes réserves que
+    // smicJournalierBrut ci-dessus, à confirmer depuis une source officielle.
+    smicJournalierBrutHistorique: [
+      { dateEffet: "2026-01-01", valeur: 84.14 },
+      { dateEffet: "2026-06-01", valeur: 86.17 },
     ] as { dateEffet: string; valeur: number }[],
   },
 } as const;
@@ -231,6 +245,8 @@ export const franceTravailConfigSchema = z.object({
     smicJournalierBrut: nullableNumber,
     pmssMensuel: nullableNumber,
     smicHoraireBrutHistorique: z.array(z.object({ dateEffet: z.string(), valeur: z.number() })),
+    smicMensuelBrutHistorique: z.array(z.object({ dateEffet: z.string(), valeur: z.number() })),
+    smicJournalierBrutHistorique: z.array(z.object({ dateEffet: z.string(), valeur: z.number() })),
   }),
 });
 
