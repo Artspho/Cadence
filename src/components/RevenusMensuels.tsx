@@ -202,26 +202,33 @@ function TableauResultats({
   // tableau (cf. calculerSerieDepuisContrats, engine/indemnisationMensuelle.ts).
   const franchiseSalaires = mois.find((m) => m.calculable)?.franchiseSalaires;
 
-  // ── Zone franchise : les mois suivant la réadmission où la franchise congés payés et/ou le
-  // délai d'attente peuvent encore s'appliquer restent flous + cadenas (feature Premium — upload
-  // du relevé FT pour un calcul exact). `calculerSerie` n'est délibérément PAS appelé sur ces mois :
-  // son mécanisme de report ne réduit `delaiRestant` que lorsqu'il est consommé, jamais pendant un
-  // mois grisé — câblé sur le vrai `ouvertureDroits.delaiAttenteInitial`, ça romprait la
-  // reconstruction dès le 2e mois (cf. docs/reprise.md). Au-delà de cette zone, franchise ET délai
-  // sont garantis épuisés (0), `calculerSerie` y est fiable sans ce mécanisme.
+  // ── Zone franchise : EXACTEMENT 2 mois grisés — le mois de réadmission (index 0, déjà grisé
+  // séparément via m.calculable === false) et le mois plein suivant (index 1, ex. février pour
+  // Benoît). Fixe, volontairement PAS proportionnelle à `franchiseCPTotale` (pas de
+  // ceil(franchiseCPTotale / franchiseCPMensuelleMax) + 1) : ce que FT applique encore au-delà
+  // (ex. 1 j de franchise CP en mars) est trop marginal pour justifier de cacher l'information —
+  // à partir de l'index 2, `calculerSerie` tourne avec franchise=0/délai=0 et affiche un vrai
+  // chiffre. `calculerSerie` n'est délibérément PAS appelé sur les 2 mois grisés : son mécanisme
+  // de report ne réduit `delaiRestant` que lorsqu'il est consommé, jamais pendant un mois grisé —
+  // câblé sur le vrai `ouvertureDroits.delaiAttenteInitial`, ça romprait la reconstruction dès le
+  // 2e mois (cf. docs/reprise.md).
   const franchiseCPMensuelleMax = config.differesEtFranchises.franchiseCongesPayes.forfaitMensuelBas;
-  const tailleZoneFranchise = Math.ceil(ouvertureDroits.franchiseCPTotale / franchiseCPMensuelleMax) + 1;
   const moisOuvertureCle = moisCle(ouvertureDroits.dateOuverture);
   const tauxPASFraction = (ouvertureDroits.tauxPrelevementSource ?? 0) / 100;
 
   function indexDepuisOuverture(moisLabel: string): number {
     return moisEntre(bornesDuMois(moisOuvertureCle).debut, bornesDuMois(moisLabel).debut).length - 1;
   }
-  // Index 0 (mois de réadmission) déjà grisé séparément (m.calculable === false) — la zone
-  // franchise ne couvre que les mois PLEINS qui suivent.
+  // Index 0 (mois de réadmission) déjà grisé séparément (m.calculable === false) — ne reste ici
+  // que l'index 1 (le mois plein suivant).
+  //
+  // Limite connue, non couverte : si `ouvertureDroits.dateOuverture` tombe exactement le 1er du
+  // mois (pas de split ancien/nouveau dossier), `calculerSerieDepuisContrats` ne grise aucun mois
+  // de réadmission — l'index 0 est alors un mois plein normal, jamais grisé du tout (ni par le
+  // mécanisme réadmission, ni par enZoneFranchise, qui ne couvre que l'index 1). Pas de profil
+  // réel dans ce cas à ce jour ; à corriger si un tel profil se présente.
   function enZoneFranchise(moisLabel: string): boolean {
-    const index = indexDepuisOuverture(moisLabel);
-    return index >= 1 && index <= tailleZoneFranchise - 1;
+    return indexDepuisOuverture(moisLabel) === 1;
   }
 
   // Mois hors zone franchise : franchise CP et délai garantis à 0 pour ce mois, `calculerSerie`
