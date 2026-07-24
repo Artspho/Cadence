@@ -115,11 +115,11 @@ export const franceTravailConfig = {
   cotisations: {
     seuilExoneration: 31.96,        // ✅ AJ brute < ce seuil : aucune cotisation
     seuilRetraiteCompl: 60,         // ✅ 31,96 < AJ ≤ 60 : retraite compl. seule
-    tauxRetraiteComplementaire: 0.0093, // ✅ 0,93 % du SJM
+    tauxRetraiteComplementaire: 0.0093, // ✅ 0,93 % du SJR
     tauxCSG: { normal: 0.062, reduit: 0.0380 }, // ✅ selon barème d'imposition
     tauxCRDS: 0.005,                // ✅
     tauxAlsaceMoselle: 0.015,       // ✅ régime local
-    diviseurSJM_Annexe10: 10,       // ✅ SJM = SR / (NHTM / 10)
+    diviseurSJR_Annexe10: 10,       // ✅ SJR = SR / (NHTM / 10)
   },
 
   // ── Réadmission & clause de rattrapage ────────────────────────
@@ -296,10 +296,10 @@ AJ_brute = clamp(A + B + C, plancher = 44, plafond = 174,80)
 
 ### 6.5 AJ nette estimée (`areNette.ts`)
 ```
-SJM (Annexe 10) = SR / (NHTM / 10)
+SJR (Annexe 10) = SR / (NHTM / 10)
 - AJ brute < 31,96 €            -> nette = brute (aucune cotisation)
-- 31,96 € < AJ ≤ 60 €          -> − 0,93 % du SJM (retraite complémentaire)
-- AJ > 60 €                     -> − 0,93 % SJM − CSG (6,2 % ou 3,80 %) − CRDS (0,5 %)
+- 31,96 € < AJ ≤ 60 €          -> − 0,93 % du SJR (retraite complémentaire)
+- AJ > 60 €                     -> − 0,93 % SJR − CSG (6,2 % ou 3,80 %) − CRDS (0,5 %)
 - Alsace-Moselle                -> − 1,50 % supplémentaire
 ```
 Afficher clairement « net estimé » avec avertissement (l'AJ réelle peut être minorée par d'autres prélèvements).

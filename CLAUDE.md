@@ -166,7 +166,7 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
   active dès qu'un profil réadmission a une fenêtre étendue. `.pmssMensuel` reste à `null` (TODO
   volontaire, module indemnisation mensuelle V2, non utilisé ailleurs).
 - ✅ **Bug CSG/CRDS corrigé** (`docs/validation.md`, cas Fictif #2/#3) : `areNette.ts` calculait
-  CSG (6,2 %) + CRDS (0,5 %) sur le SJM entier au lieu de l'allocation après retraite — écart d'un
+  CSG (6,2 %) + CRDS (0,5 %) sur le SJR entier au lieu de l'allocation après retraite — écart d'un
   facteur ~8, invisible avant ces deux cas de validation. Corrigé : assiette = 98,25 % de
   l'allocation après retraite (`cotisations.tauxAssietteCSGCRDS`), écrêtement au plancher
   `cotisations.plancherEcretementJournalier` (62 €, source simulateur officiel FT — **distinct**
@@ -459,8 +459,8 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
   renseigné (2j), et non-régression sur un solde existant configuré avant ce champ (défaut 0,
   résultat plus conservateur qu'avant à raison). **Franchise salaires (2026-07-23) : formule
   certifiée (ARTCENA + flyer officiel FT) implémentée, TOTAL seul, PAS ENCORE câblée dans le
-  réducteur mensuel** — `calculerFranchiseSalaires(srContrats, sjm, profil, config)` calcule
-  `arrondi((SR_total/SMIC_mensuel) × (SJM/(3×SMIC_journalier)) − 27)`, jamais négative, SMIC lu à
+  réducteur mensuel** — `calculerFranchiseSalaires(srContrats, sjr, profil, config)` calcule
+  `arrondi((SR_total/SMIC_mensuel) × (SJR/(3×SMIC_journalier)) − 27)`, jamais négative, SMIC lu à
   `profil.dateAnniversaire` (date de fin de PRA) via l'historique. Nouveaux champs `Profil`
   optionnels : `dureeDroitsMois` (12 standard / 6 clause de rattrapage, connue à l'ouverture,
   jamais déduite de l'historique d'activité) et `salairesHorsAnnexe10PRA` (composante de SR_total
@@ -562,7 +562,7 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
   14 commits `2edb88e`→`502b495`) : `tauxPrelevementSource`/`montantNet`, mois de réadmission non
   calculé (nouveau type `LigneSerieIndemnisation`), alerte `pas_taux_janvier`, répartition mensuelle
   de la franchise salaires câblée (mécanisme complet, mais **pas encore branchée sur de vraies
-  données** dans l'app — SR/SJM jamais fournis à `calculerSerieDepuisContrats`), colonnes « Revenus
+  données** dans l'app — SR/SJR jamais fournis à `calculerSerieDepuisContrats`), colonnes « Revenus
   contrats »/« Revenu total ». 159 tests verts. Détail complet : `docs/reprise.md`.
 - 🔴 **Point 2 non résolu (AJ brute vs nette)** : les relevés officiels disent « Allocation
   **brute** » pour la valeur que Cadence traite comme point de départ net dans
@@ -589,7 +589,7 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 
 **Prochaines pistes** : voir les deux points 🔴 juste au-dessus (point 2 AJ brut/net, dossier
 OneDrive) et `docs/reprise.md` pour le détail. Chantier ouvert restant sur la franchise
-salaires : fournir de vrais SR/SJM à `calculerSerieDepuisContrats` (via
+salaires : fournir de vrais SR/SJR à `calculerSerieDepuisContrats` (via
 `srSjmPourFranchiseSalaires`) quelque part dans l'app — le mécanisme de répartition mensuelle est
 déjà câblé et testé, seule la donnée réelle manque. Plus aucun ❌ confirmé par ailleurs dans la
 liste, la cohérence de profil est tenue par construction, et tous les items §11.A sont désormais traités

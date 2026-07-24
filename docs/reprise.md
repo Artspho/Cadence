@@ -29,7 +29,7 @@ au démarrage sans que le contexte l'indique — attendre que l'utilisateur revi
 
 ## Fait dans les sessions récentes
 
-- areNette.ts corrigé (bug CSG/CRDS calculée sur SJM au lieu de l'allocation, facteur ~8) : assiette = 98,25 % de l'allocation après retraite + écrêtement au plancher. Champ dédié `cotisations.plancherEcretementJournalier` = 62,00 (PAS dans `smicJournalierBrut`, réservé franchise salaires). Cas #2 et #3 → « ✅ code conforme » dans validation.md.
+- areNette.ts corrigé (bug CSG/CRDS calculée sur SJR au lieu de l'allocation, facteur ~8) : assiette = 98,25 % de l'allocation après retraite + écrêtement au plancher. Champ dédié `cotisations.plancherEcretementJournalier` = 62,00 (PAS dans `smicJournalierBrut`, réservé franchise salaires). Cas #2 et #3 → « ✅ code conforme » dans validation.md.
 - Export/import JSON (devoir n°1) : ordre sauvegarde de secours → validation Zod → écriture ; 3 messages d'erreur distincts ; import remplace (pas fusion) avec sauvegarde auto avant.
 - Bandeau règles datées + péremption honnête : `meta.valableJusquau` (null tant que pas de date sourcée), fonction pure `estPerime(date, valableJusquau)`. Supprimé un `SEUIL_PEREMPTION_JOURS = 365` inventé. Un seul juge de péremption désormais.
 - Bouton feedback : `mailto:` vers benoit.zahra@orange.fr, corps neutre sans aucune donnée utilisateur, `config/contact.ts`. Adresse null → rien affiché.
@@ -285,8 +285,8 @@ observable sur les cas certifiés actuels (restante ≤ 5j du début à la fin).
 ## Fait (2026-07-23 : franchise salaires — formule certifiée implémentée, TOTAL seul)
 
 Formule certifiée par l'utilisateur (sources ARTCENA + flyer officiel France Travail) :
-`arrondi( (SR_total / SMIC_mensuel) × (SJM / (3 × SMIC_journalier)) − 27 )`, jamais négative (0 si
-résultat ≤ 0). `engine/indemnisationMensuelle.ts` : `calculerFranchiseSalaires(srContrats, sjm,
+`arrondi( (SR_total / SMIC_mensuel) × (SJR / (3 × SMIC_journalier)) − 27 )`, jamais négative (0 si
+résultat ≤ 0). `engine/indemnisationMensuelle.ts` : `calculerFranchiseSalaires(srContrats, sjr,
 profil, config)`.
 
 **Règles appliquées** :
@@ -353,7 +353,7 @@ c'est bien le code de Cadence, pas juste la règle documentée, qui reproduit ce
 **PDF officiel `GUIDE-INTERMITTENT.pdf` lu en entier (28 pages, fourni par l'utilisateur le
 2026-07-24)** — remplace l'ancienne extraction image (non fiable à 100 %) par le texte réel :
 - **Page 14 confirme mot pour mot** la formule franchise salaires déjà implémentée :
-  `[Salaires de la période de référence / SMIC mensuel] × [SJM / (3 × SMIC journalier)] − 27 jours`,
+  `[Salaires de la période de référence / SMIC mensuel] × [SJR / (3 × SMIC journalier)] − 27 jours`,
   et confirme texto « SMIC mensuel et SMIC journalier : valeurs à la date de fin de la période de
   référence » (= `profil.dateAnniversaire`, déjà notre mécanisme) et « Salaires de la période de
   référence : total de vos rémunérations brutes non plafonnées sur la période visée, **quel que
@@ -489,8 +489,8 @@ relevé.
   → **Résolu (2026-07-23), voir section ci-dessous** : il n'y a pas de forfait mensuel plafonné,
   la franchise CP se consomme intégralement selon la place disponible chaque mois.
 - **Alerte sérieuse sur la formule franchise salaires** : le guide (p.14) montre une formule à
-  **4 variables** — `arrondi( (SR / SMIC_mensuel) × (SJM / (3 × SMIC_journalier)) − 27 )` — alors
-  que la formule proposée par l'utilisateur (`floor(SR / (3 × SJM) − 27)`) n'utilise que SR et SJM,
+  **4 variables** — `arrondi( (SR / SMIC_mensuel) × (SJR / (3 × SMIC_journalier)) − 27 )` — alors
+  que la formule proposée par l'utilisateur (`floor(SR / (3 × SJR) − 27)`) n'utilise que SR et SJR,
   sans aucun terme SMIC. L'exemple « certifié par élimination » donné (résultat 0) ne permet PAS de
   distinguer les deux formules : les deux donnent 0 sur ce cas (résultat très négatif dans les deux
   cas). Recommandation : utiliser la formule du guide, mais l'extraction du PDF (texte depuis une
@@ -805,7 +805,7 @@ verts, `tsc -b` propre à chaque étape. Détail complet dans l'historique git ;
   (quota mensuel = `ceil(total / min(dureeDroitsMois, repartitionMoisMax))`, carry-over, épuisement
   jamais négatif). **Limite actée explicitement** : `calculerSerieDepuisContrats` accepte un
   paramètre optionnel `srSjmPourFranchiseSalaires` mais **personne ne le fournit encore** (ni
-  `RevenusMensuels.tsx` ni `alertes.ts`) — le SR/SJM réels (compteur « montant ARE », pas celui-ci)
+  `RevenusMensuels.tsx` ni `alertes.ts`) — le SR/SJR réels (compteur « montant ARE », pas celui-ci)
   ne sont pas câblés dans l'app, donc la franchise salaires reste `franchise_salaires_non_certifiee`
   en pratique malgré le mécanisme fonctionnel et testé. Champs profil `dureeDroitsMois`/
   `salairesHorsAnnexe10PRA` ajoutés au formulaire (`988330a`) ; `formule: null` vestige retiré de
