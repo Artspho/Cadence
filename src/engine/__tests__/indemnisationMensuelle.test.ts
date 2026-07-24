@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { franceTravailConfig } from "../../config/franceTravailConfig";
 import { calculerFranchiseSalaires, calculerMoisIndemnisation, calculerSerieDepuisContrats, calculerSerieIndemnisation } from "../indemnisationMensuelle";
-import type { Contrat, MoisIndemnisationEntree, SoldeIndemnisation, SoldeIndemnisationDepart } from "../../types";
+import type { MoisIndemnisationEntree, SoldeIndemnisation } from "../../types";
 import { contrat, profil } from "./testUtils";
 
 describe("calculerMoisIndemnisation", () => {
@@ -62,6 +62,17 @@ describe("calculerMoisIndemnisation", () => {
     expect(resultat.delaiConsomme).toBe(0);
     expect(resultat.franchiseCPConsommee).toBe(0);
   });
+
+  it("le palier du forfait mensuel se décide sur la franchise TOTALE fournie, pas sur le restant courant (corrige une limite connue, cf. docs/reprise.md)", () => {
+    const solde: SoldeIndemnisation = { delaiRestant: 0, franchiseCPRestante: 20, quotaCPCarryOver: 0 }; // restant <= 24
+    const entree: MoisIndemnisationEntree = { moisLabel: "test", joursDuMois: 31, heuresDuMois: 0 };
+    // Sans 4e argument (défaut = franchiseCPRestante, comportement historique) : restant 20 <= 24 -> forfait bas (2j).
+    const resultatDefaut = calculerMoisIndemnisation(solde, entree, franceTravailConfig);
+    expect(resultatDefaut.franchiseCPConsommee).toBe(2);
+    // Avec la franchise TOTALE réelle (30, > 24) : forfait haut (3j), même si le restant courant est déjà sous le seuil.
+    const resultatAvecTotal = calculerMoisIndemnisation(solde, entree, franceTravailConfig, 30);
+    expect(resultatAvecTotal.franchiseCPConsommee).toBe(3);
+  });
 });
 
 describe("calculerSerieIndemnisation — cas certifiés sur relevés France Travail réels (fév-mai 2026, cf. docs/reprise.md)", () => {
@@ -89,25 +100,65 @@ describe("calculerSerieIndemnisation — cas certifiés sur relevés France Trav
 });
 
 describe("calculerSerieDepuisContrats", () => {
-  const soldeDepart: SoldeIndemnisationDepart = { date: "2026-02-01", delaiRestant: 5, franchiseCPRestante: 5, quotaCPCarryOver: 2, ajReelleHistorique: [] };
+  // Scénario synthétique, pas une reproduction du cas réel certifié : depuis le refactor du
+  // 2026-07-25 (ouvertureDroits remplace un solde de mi-parcours saisi à la main), revalider les 4
+  // mois certifiés demanderait les vrais contrats depuis la vraie date d'ouverture (mars 2025),
+  // qu'on n'a pas. Décision actée avec l'utilisateur : garder calculerSerieIndemnisation (cas
+  // certifiés, ci-dessus) inchangé, et valider ici seulement le MÉCANISME de simulation depuis
+  // ouvertureDroits sur des données inventées.
+  const ouvertureDroits = { dateOuverture: "2026-02-01", franchiseCPTotale: 0, delaiAttenteInitial: 0 };
 
-  // Un contrat par mois, un seul jour, heures = le total réel du mois (cf. docs/reprise.md) — le
-  // découpage mensuel lui-même (contrat chevauchant deux mois) est testé dans decoupageMensuel.test.ts.
-  const contratsCertifies: Contrat[] = [
-    contrat({ dateDebut: "2026-02-10", date: "2026-02-10", typeRemuneration: "heures", nbHeures: 153, salaireBrut: 0 }),
-    contrat({ dateDebut: "2026-03-10", date: "2026-03-10", typeRemuneration: "heures", nbHeures: 105, salaireBrut: 0 }),
-    contrat({ dateDebut: "2026-04-10", date: "2026-04-10", typeRemuneration: "heures", nbHeures: 93, salaireBrut: 0 }),
-    contrat({ dateDebut: "2026-05-10", date: "2026-05-10", typeRemuneration: "heures", nbHeures: 21, salaireBrut: 0 }),
-  ];
+  it("calculable: false quand Profil.ouvertureDroits est absent — pas de chiffre inventé", () => {
+    const p = profil({});
+    const resultat = calculerSerieDepuisContrats(p, { dateDepart: "2026-02-01" }, [], "2026-02-28", franceTravailConfig);
+    expect(resultat).toEqual({ calculable: false, raison: "ouverture_droits_manquante" });
+  });
 
-  it("reproduit les 4 mois certifiés à partir des vrais contrats, quel que soit leur ordre de saisie", () => {
-    const contratsDesordre = [contratsCertifies[2], contratsCertifies[0], contratsCertifies[3], contratsCertifies[1]];
-    const resultats = calculerSerieDepuisContrats(soldeDepart, contratsDesordre, "2026-05-31", franceTravailConfig);
-    expect(resultats.map((r) => r.moisLabel)).toEqual(["2026-02", "2026-03", "2026-04", "2026-05"]);
-    expect(resultats.map((r) => r.joursIndemnises)).toEqual([0, 17, 18, 29]);
+  it("un mois sans aucun contrat obtient 0 h (pas d'absence silencieuse)", () => {
+    const p = profil({ ouvertureDroits });
+    const contratFevrier = contrat({ dateDebut: "2026-02-10", date: "2026-02-10", typeRemuneration: "heures", nbHeures: 10, salaireBrut: 0 });
+    const resultat = calculerSerieDepuisContrats(p, { dateDepart: "2026-02-01" }, [contratFevrier], "2026-04-30", franceTravailConfig);
+    if (!resultat.calculable) throw new Error("devrait être calculable");
+    expect(resultat.mois.map((m) => m.moisLabel)).toEqual(["2026-02", "2026-03", "2026-04"]);
+    expect(resultat.mois[1].heuresDuMois).toBe(0); // mars : aucun contrat -> 0 h, pas absent du tableau
+  });
+
+  it("dateDepart borne seulement l'affichage : les mois simulés avant restent cachés, pas absents du calcul", () => {
+    const p = profil({ ouvertureDroits });
+    const contratJanvier = contrat({ dateDebut: "2026-02-05", date: "2026-02-05", typeRemuneration: "heures", nbHeures: 10, salaireBrut: 0 });
+    // dateDepart posterieur au mois d'ouverture : février doit être simulé (pour un état correct)
+    // mais jamais retourné.
+    const resultat = calculerSerieDepuisContrats(p, { dateDepart: "2026-03-01" }, [contratJanvier], "2026-03-31", franceTravailConfig);
+    if (!resultat.calculable) throw new Error("devrait être calculable");
+    expect(resultat.mois.map((m) => m.moisLabel)).toEqual(["2026-03"]);
+  });
+
+  it("s'arrête au mois du dernier contrat, ou à aujourd'hui si plus tardif", () => {
+    const p = profil({ ouvertureDroits });
+    const contratFevrier = contrat({ dateDebut: "2026-02-10", date: "2026-02-10", typeRemuneration: "heures", nbHeures: 10, salaireBrut: 0 });
+    const resultat = calculerSerieDepuisContrats(p, { dateDepart: "2026-02-01" }, [contratFevrier], "2026-04-15", franceTravailConfig);
+    if (!resultat.calculable) throw new Error("devrait être calculable");
+    expect(resultat.mois.map((m) => m.moisLabel)).toEqual(["2026-02", "2026-03", "2026-04"]); // dateDuJour (avril) > dernier contrat (février)
+  });
+
+  it("montantMensuel non calculable (aj_manquante) quand Profil.ajReelleHistorique est vide", () => {
+    const p = profil({ ouvertureDroits });
+    const resultat = calculerSerieDepuisContrats(p, { dateDepart: "2026-02-01" }, [], "2026-02-28", franceTravailConfig);
+    if (!resultat.calculable) throw new Error("devrait être calculable");
+    expect(resultat.mois[0].montantMensuel).toEqual({ calculable: false, raison: "aj_manquante" });
+  });
+
+  it("montantMensuel lit Profil.ajReelleHistorique (déplacé depuis SoldeIndemnisationDepart le 2026-07-25)", () => {
+    // délai et franchise à 0 : tout le mois (28 j) est indemnisé, pour isoler le calcul du montant.
+    const p = profil({ ouvertureDroits, ajReelleHistorique: [{ dateEffet: "2026-01-01", valeur: 50 }] });
+    const resultat = calculerSerieDepuisContrats(p, { dateDepart: "2026-02-01" }, [], "2026-02-28", franceTravailConfig);
+    if (!resultat.calculable) throw new Error("devrait être calculable");
+    expect(resultat.mois[0].joursIndemnises).toBe(28);
+    expect(resultat.mois[0].montantMensuel).toEqual({ calculable: true, montant: 28 * 50, ajUtilisee: 50 });
   });
 
   it("régression : les contrats artiste comptent bien, mélangés avec un enseignement récurrent sur le même mois (bug signalé, non reproduit)", () => {
+    const p = profil({ ouvertureDroits });
     const enseignementRecurrent = ["2026-02", "2026-03", "2026-04", "2026-05", "2026-06"].map((mois) =>
       contrat({
         dateDebut: `${mois}-01`,
@@ -126,56 +177,11 @@ describe("calculerSerieDepuisContrats", () => {
       contrat({ dateDebut: "2026-06-12", date: "2026-06-12", employeur: "Les Arts Phocéens", type: "artiste", typeRemuneration: "heures", nbHeures: 26, salaireBrut: 400 }),
       contrat({ dateDebut: "2026-06-20", date: "2026-06-20", employeur: "Les Arts Phocéens", type: "artiste", typeRemuneration: "cachet", nbCachets: 6, salaireBrut: 700 }), // 72h
     ];
-    const resultats = calculerSerieDepuisContrats(soldeDepart, [...enseignementRecurrent, ...artisteJuin], "2026-06-30", franceTravailConfig);
-    const juin = resultats.find((r) => r.moisLabel === "2026-06");
+    const resultat = calculerSerieDepuisContrats(p, { dateDepart: "2026-02-01" }, [...enseignementRecurrent, ...artisteJuin], "2026-06-30", franceTravailConfig);
+    if (!resultat.calculable) throw new Error("devrait être calculable");
+    const juin = resultat.mois.find((m) => m.moisLabel === "2026-06");
     expect(juin?.heuresDuMois).toBe(167); // 21 (Levallois) + 48 + 26 + 72 (Arts Phocéens) — pas 21
     expect(juin?.joursNonIndemnisables).toBe(21); // floor(167 × 1,3 / 10) = floor(21,71) = 21
-  });
-
-  it("un mois sans aucun contrat obtient 0 h (pas d'absence silencieuse)", () => {
-    // Seuls fév et avril ont un contrat ; mars et mai doivent quand même apparaître, à 0 h.
-    const resultats = calculerSerieDepuisContrats(soldeDepart, [contratsCertifies[0], contratsCertifies[2]], "2026-05-31", franceTravailConfig);
-    expect(resultats.map((r) => r.moisLabel)).toEqual(["2026-02", "2026-03", "2026-04", "2026-05"]);
-    expect(resultats[1].joursNonIndemnisables).toBe(0); // mars : 0 h -> 0 JNI
-  });
-
-  it("ignore les contrats antérieurs au mois du solde de départ (contexte, pas à recalculer)", () => {
-    const contratJanvier = contrat({ dateDebut: "2026-01-10", date: "2026-01-10", typeRemuneration: "heures", nbHeures: 200, salaireBrut: 0 }); // "régularisé", hors périmètre du solde
-    const resultats = calculerSerieDepuisContrats(soldeDepart, [contratJanvier, contratsCertifies[0]], "2026-02-28", franceTravailConfig);
-    expect(resultats).toHaveLength(1);
-    expect(resultats[0].moisLabel).toBe("2026-02");
-  });
-
-  it("s'arrête au mois du dernier contrat, ou à aujourd'hui si plus tardif", () => {
-    const resultats = calculerSerieDepuisContrats(soldeDepart, [contratsCertifies[0]], "2026-04-15", franceTravailConfig);
-    expect(resultats.map((r) => r.moisLabel)).toEqual(["2026-02", "2026-03", "2026-04"]); // dateDuJour (avril) > dernier contrat (février)
-  });
-
-  it("quotaCPCarryOver absent (solde configuré avant l'ajout du champ) : défaut 0, jamais une exception", () => {
-    const soldeSansCarryOver: SoldeIndemnisationDepart = { date: "2026-02-01", delaiRestant: 5, franchiseCPRestante: 5, ajReelleHistorique: [] };
-    const resultats = calculerSerieDepuisContrats(soldeSansCarryOver, [contratsCertifies[0]], "2026-02-28", franceTravailConfig);
-    // Sans le report de 2j (défaut 0) : quota = 0 + 2 (forfait) = 2, pas 4 — résultat différent du
-    // cas certifié ci-dessus, volontairement : ce test documente le comportement par défaut, pas
-    // une reproduction du cas réel.
-    expect(resultats[0].franchiseCPConsommee).toBe(2);
-  });
-
-  it("montantMensuel non calculable (aj_manquante) quand ajReelleHistorique est vide", () => {
-    const resultats = calculerSerieDepuisContrats(soldeDepart, [contratsCertifies[1]], "2026-03-31", franceTravailConfig);
-    expect(resultats[0].montantMensuel).toEqual({ calculable: false, raison: "aj_manquante" });
-  });
-
-  it("montantMensuel calculé à partir de l'AJ applicable à chaque mois (deux taux successifs)", () => {
-    const soldeAvecHistorique: SoldeIndemnisationDepart = {
-      ...soldeDepart,
-      ajReelleHistorique: [
-        { dateEffet: "2025-03-24", valeur: 54.55 },
-        { dateEffet: "2026-01-18", valeur: 55.02 },
-      ],
-    };
-    // 17 jours indemnisés en mars (cf. cas certifié), taux du 18/01/2026 applicable.
-    const resultats = calculerSerieDepuisContrats(soldeAvecHistorique, [contratsCertifies[0], contratsCertifies[1]], "2026-03-31", franceTravailConfig);
-    expect(resultats[1].montantMensuel).toEqual({ calculable: true, montant: 17 * 55.02, ajUtilisee: 55.02 });
   });
 });
 

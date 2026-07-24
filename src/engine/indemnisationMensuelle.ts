@@ -13,7 +13,7 @@
 // (lecture initiale erronée du 2026-07-23, corrigée : le 4j consommé en février 2026 s'explique
 // entièrement par le report du forfait de janvier, absorbé par le délai d'attente ce mois-là, pas
 // par l'absence de plafond).
-import type { Contrat, FranchiseSalairesResultat, MoisIndemnisationEntree, MoisIndemnisationResultat, MontantMensuelResultat, Profil, SoldeIndemnisation, SoldeIndemnisationDepart } from "../types";
+import type { Contrat, FranchiseSalairesResultat, MoisIndemnisationEntree, MoisIndemnisationResultat, MontantMensuelResultat, Profil, SerieIndemnisationResultat, SoldeIndemnisation, SoldeIndemnisationDepart } from "../types";
 import type { FranceTravailConfig } from "../config/franceTravailConfig";
 import { joursDansMois, moisCle, moisSuivant } from "./dateUtils";
 import { getAjReelleAt } from "./ajReelleUtils";
@@ -41,18 +41,27 @@ function calculerMontantMensuel(joursIndemnises: number, debutDuMoisISO: string,
   return { calculable: true, montant: Math.round(joursIndemnises * ajUtilisee * 100) / 100, ajUtilisee };
 }
 
-// Palier bas/haut du forfait mensuel de franchise CP. Basé sur `franchiseCPRestante` (seule
-// grandeur suivie par ce module) faute de suivre le total ORIGINAL accordé à l'ouverture des
-// droits — une hypothèse simplificatrice : si le total initial dépassait le seuil (palier haut,
-// 3j/mois) puis redescendait en-dessous à force d'être consommé, ce calcul redescendrait à tort
-// au palier bas en cours de route. Non observable sur les cas certifiés actuels (restante ≤ 5j
-// du début à la fin) — à corriger si un profil avec une franchise totale > seuil se présente.
-function forfaitMensuelCP(franchiseCPRestante: number, config: FranceTravailConfig): number {
+// Palier bas/haut du forfait mensuel de franchise CP, décidé par la franchise TOTALE accordée à
+// l'ouverture des droits (Profil.ouvertureDroits.franchiseCPTotale) — pas par le restant courant.
+// Corrige une limite connue (cf. docs/reprise.md, 2026-07-23) : baser la décision sur le restant
+// ferait redescendre à tort au palier bas un profil dont le total dépassait le seuil, une fois
+// consommé sous ce seuil.
+function forfaitMensuelCP(franchiseCPTotale: number, config: FranceTravailConfig): number {
   const { forfaitMensuelBas, forfaitMensuelHaut, seuilFranchiseTotaleJours } = config.differesEtFranchises.franchiseCongesPayes;
-  return franchiseCPRestante <= seuilFranchiseTotaleJours ? forfaitMensuelBas : forfaitMensuelHaut;
+  return franchiseCPTotale <= seuilFranchiseTotaleJours ? forfaitMensuelBas : forfaitMensuelHaut;
 }
 
-export function calculerMoisIndemnisation(soldeDepart: SoldeIndemnisation, entree: MoisIndemnisationEntree, config: FranceTravailConfig): MoisIndemnisationResultat {
+// `franchiseCPTotale` : optionnel, défaut = `soldeDepart.franchiseCPRestante` — préserve à
+// l'identique le comportement historique (limite connue incluse) pour tout appelant qui ne la
+// fournit pas explicitement, notamment les tests bas niveau existants. Seul
+// `calculerSerieDepuisContrats` fournit la vraie valeur (Profil.ouvertureDroits.franchiseCPTotale),
+// constante sur toute la série, corrigeant la limite pour le nouveau chemin automatique.
+export function calculerMoisIndemnisation(
+  soldeDepart: SoldeIndemnisation,
+  entree: MoisIndemnisationEntree,
+  config: FranceTravailConfig,
+  franchiseCPTotale: number = soldeDepart.franchiseCPRestante,
+): MoisIndemnisationResultat {
   // floor confirmé par relevés réels A10 (fév/mars/avril/mai 2026, cf. docs/reprise.md) — PAS
   // ceil, contrairement à un premier essai de formule qui s'en écartait dès le premier mois testé.
   // floor(153×1,3/10)=19, floor(105×1,3/10)=13, floor(93×1,3/10)=12, floor(21×1,3/10)=2 :
@@ -63,7 +72,7 @@ export function calculerMoisIndemnisation(soldeDepart: SoldeIndemnisation, entre
   const delaiConsomme = Math.min(soldeDepart.delaiRestant, reliquatApresTravail);
   const reliquatApresDelai = reliquatApresTravail - delaiConsomme;
 
-  const forfaitMensuel = forfaitMensuelCP(soldeDepart.franchiseCPRestante, config);
+  const forfaitMensuel = forfaitMensuelCP(franchiseCPTotale, config);
   const quotaDisponible = soldeDepart.quotaCPCarryOver + forfaitMensuel;
   const franchiseCPConsommee = Math.min(quotaDisponible, soldeDepart.franchiseCPRestante, reliquatApresDelai);
   const joursIndemnises = reliquatApresDelai - franchiseCPConsommee;
@@ -85,12 +94,14 @@ export function calculerMoisIndemnisation(soldeDepart: SoldeIndemnisation, entre
   };
 }
 
-// Enchaîne les mois : le soldeFin de chacun nourrit le soldeDepart du suivant.
-export function calculerSerieIndemnisation(soldeDepart: SoldeIndemnisation, mois: MoisIndemnisationEntree[], config: FranceTravailConfig): MoisIndemnisationResultat[] {
+// Enchaîne les mois : le soldeFin de chacun nourrit le soldeDepart du suivant. `franchiseCPTotale`
+// (optionnel, même défaut que calculerMoisIndemnisation par mois) reste CONSTANTE sur toute la
+// série quand fournie — c'est la même ouverture de droits du début à la fin.
+export function calculerSerieIndemnisation(soldeDepart: SoldeIndemnisation, mois: MoisIndemnisationEntree[], config: FranceTravailConfig, franchiseCPTotale?: number): MoisIndemnisationResultat[] {
   const resultats: MoisIndemnisationResultat[] = [];
   let solde = soldeDepart;
   for (const entree of mois) {
-    const resultat = calculerMoisIndemnisation(solde, entree, config);
+    const resultat = calculerMoisIndemnisation(solde, entree, config, franchiseCPTotale ?? solde.franchiseCPRestante);
     resultats.push(resultat);
     solde = resultat.soldeFin;
   }
@@ -98,16 +109,31 @@ export function calculerSerieIndemnisation(soldeDepart: SoldeIndemnisation, mois
 }
 
 /**
- * Calcule la série mensuelle directement depuis les VRAIS contrats, à partir du mois du solde de
- * départ (inclus) jusqu'au dernier mois couvert par un contrat ou aujourd'hui (le plus tardif des
- * deux) — remplace la saisie manuelle de "jours déclarés" (cf. docs/reprise.md, 2026-07-24) :
+ * Calcule la série mensuelle directement depuis les VRAIS contrats. La simulation de l'état
+ * interne (délai d'attente, franchise CP) tourne depuis `Profil.ouvertureDroits.dateOuverture` —
+ * la VRAIE date d'origine, jamais une date de relevé de mi-parcours saisie à la main (cf.
+ * docs/reprise.md, 2026-07-25) — jusqu'au dernier mois couvert par un contrat ou aujourd'hui (le
+ * plus tardif des deux). `soldeDepart.dateDepart` ne sert qu'à choisir à partir de quel mois le
+ * résultat est RETOURNÉ (affiché) : les mois antérieurs entre l'ouverture et `dateDepart` sont
+ * simulés (avec 0 h si aucun contrat ne les couvre) mais jamais renvoyés — seul un état de départ
+ * correct pour `dateDepart` en dépend.
+ *
  * heuresDuMois est agrégée mois par mois via repartirContratParMois (engine/decoupageMensuel.ts),
- * qui répartit chaque contrat sur les mois civils qu'il chevauche au prorata des jours.
- * Un mois sans aucun contrat obtient 0 h (jours non indemnisables = 0, mois entièrement indemnisé
- * une fois délai/franchise épuisés) — comportement honnête, pas une absence silencieuse.
+ * qui répartit chaque contrat sur les mois civils qu'il chevauche au prorata des jours. Un mois
+ * sans aucun contrat obtient 0 h (jours non indemnisables = 0) — comportement honnête, pas une
+ * absence silencieuse.
+ *
+ * `calculable: false` si `Profil.ouvertureDroits` est absent : aucun point de départ n'est
+ * inventé (devoir n°2).
  */
-export function calculerSerieDepuisContrats(soldeDepart: SoldeIndemnisationDepart, contrats: Contrat[], dateDuJour: string, config: FranceTravailConfig): MoisIndemnisationResultat[] {
-  const moisDepart = moisCle(soldeDepart.date);
+export function calculerSerieDepuisContrats(profil: Profil, soldeDepart: SoldeIndemnisationDepart, contrats: Contrat[], dateDuJour: string, config: FranceTravailConfig): SerieIndemnisationResultat {
+  const { ouvertureDroits } = profil;
+  if (!ouvertureDroits) {
+    return { calculable: false, raison: "ouverture_droits_manquante" };
+  }
+
+  const moisOuverture = moisCle(ouvertureDroits.dateOuverture);
+  const moisAffichageDebut = moisCle(soldeDepart.dateDepart);
 
   const heuresParMois = new Map<string, number>();
   for (const contrat of contrats) {
@@ -116,23 +142,33 @@ export function calculerSerieDepuisContrats(soldeDepart: SoldeIndemnisationDepar
     }
   }
 
-  const moisTries = [...heuresParMois.keys(), moisCle(dateDuJour)].sort();
+  const moisTries = [...heuresParMois.keys(), moisCle(dateDuJour), moisAffichageDebut].sort();
   const moisFin = moisTries[moisTries.length - 1];
 
   const mois: MoisIndemnisationEntree[] = [];
-  for (let curseur = moisDepart; curseur <= moisFin; curseur = moisSuivant(curseur)) {
+  for (let curseur = moisOuverture; curseur <= moisFin; curseur = moisSuivant(curseur)) {
     mois.push({ moisLabel: curseur, joursDuMois: joursDansMois(curseur), heuresDuMois: heuresParMois.get(curseur) ?? 0 });
   }
 
-  const resultats = calculerSerieIndemnisation({ delaiRestant: soldeDepart.delaiRestant, franchiseCPRestante: soldeDepart.franchiseCPRestante, quotaCPCarryOver: soldeDepart.quotaCPCarryOver ?? 0 }, mois, config);
+  const soldeInitial: SoldeIndemnisation = {
+    delaiRestant: ouvertureDroits.delaiAttenteInitial,
+    franchiseCPRestante: ouvertureDroits.franchiseCPTotale,
+    quotaCPCarryOver: 0,
+  };
+
+  const resultatsComplets = calculerSerieIndemnisation(soldeInitial, mois, config, ouvertureDroits.franchiseCPTotale);
 
   // moisLabel provient ici d'un vrai "YYYY-MM" énuméré ci-dessus, contrairement au moisLabel
   // purement informatif de calculerMoisIndemnisation/calculerSerieIndemnisation — recalcul du
   // montant mensuel sûr uniquement à ce niveau.
-  return resultats.map((resultat) => ({
-    ...resultat,
-    montantMensuel: calculerMontantMensuel(resultat.joursIndemnises, `${resultat.moisLabel}-01`, soldeDepart.ajReelleHistorique),
-  }));
+  const resultatsAffiches = resultatsComplets
+    .filter((resultat) => resultat.moisLabel >= moisAffichageDebut)
+    .map((resultat) => ({
+      ...resultat,
+      montantMensuel: calculerMontantMensuel(resultat.joursIndemnises, `${resultat.moisLabel}-01`, profil.ajReelleHistorique),
+    }));
+
+  return { calculable: true, mois: resultatsAffiches };
 }
 
 // Cherche la valeur historique la plus récente dont la date d'effet est ≤ la date cible — null si

@@ -333,3 +333,8 @@ export interface MoisIndemnisationResultat {
   franchiseSalaires: FranchiseSalairesResultat;
   montantMensuel: MontantMensuelResultat;
 }
+
+// Résultat de `calculerSerieDepuisContrats` : `calculable: false` quand `Profil.ouvertureDroits`
+// est absent — la simulation entière est bloquée plutôt que de deviner un point de départ
+// (devoir n°2), cf. RevenusMensuels.tsx.
+export type SerieIndemnisationResultat = { calculable: false; raison: "ouverture_droits_manquante" } | { calculable: true; mois: MoisIndemnisationResultat[] };
