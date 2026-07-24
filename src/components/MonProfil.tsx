@@ -268,11 +268,13 @@ function MonIndemnisationEnCours({ profil, onModifierProfil }: { profil: Profil;
   const [dateOuverture, setDateOuverture] = useState(ouverture?.dateOuverture ?? "");
   const [franchiseCPTotale, setFranchiseCPTotale] = useState(ouverture?.franchiseCPTotale ?? 0);
   const [delaiAttenteInitial, setDelaiAttenteInitial] = useState(ouverture?.delaiAttenteInitial ?? 7);
+  const [tauxPrelevementSource, setTauxPrelevementSource] = useState(ouverture?.tauxPrelevementSource?.toString() ?? "");
   const [erreur, setErreur] = useState<string | null>(null);
 
   function enregistrer() {
     if (!dateOuverture) return;
-    const resultat = onModifierProfil({ ...profil, ouvertureDroits: { dateOuverture, franchiseCPTotale, delaiAttenteInitial } });
+    const tauxSaisi = tauxPrelevementSource.trim() === "" ? undefined : Number(tauxPrelevementSource);
+    const resultat = onModifierProfil({ ...profil, ouvertureDroits: { dateOuverture, franchiseCPTotale, delaiAttenteInitial, tauxPrelevementSource: tauxSaisi } });
     if (!resultat.ok) {
       setErreur(resultat.erreur);
       return;
@@ -331,6 +333,24 @@ function MonIndemnisationEnCours({ profil, onModifierProfil }: { profil: Profil;
             className="w-full bg-surface-2 border border-line rounded-lg px-3 py-2 text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-mint"
           />
           <p className="text-xs text-faint mt-1">Sur ta notification, rubrique « Délai d'attente ». Presque toujours 7 jours.</p>
+        </div>
+
+        <div>
+          <label className="block text-xs uppercase tracking-[.03em] text-muted mb-2" htmlFor="profil-taux-pas">
+            Taux de prélèvement à la source (%)
+          </label>
+          <input
+            id="profil-taux-pas"
+            type="number"
+            min={0}
+            max={99}
+            step={0.1}
+            placeholder="ex. 7,2"
+            value={tauxPrelevementSource}
+            onChange={(e) => setTauxPrelevementSource(e.target.value)}
+            className="w-full bg-surface-2 border border-line rounded-lg px-3 py-2 text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-mint"
+          />
+          <p className="text-xs text-faint mt-1">Retrouve ton taux sur impots.gouv.fr ou sur ton bulletin France Travail.</p>
         </div>
 
         {erreur && <p className="text-xs text-red">{erreur}</p>}

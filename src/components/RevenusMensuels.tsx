@@ -185,6 +185,9 @@ function TableauResultats({
   }
 
   const desMoisSansAj = mois.some((m) => !m.montantMensuel.calculable);
+  // tauxPrelevementSource vit sur ouvertureDroits (renseigné une fois dans "Mon profil"), pas sur
+  // chaque mois — s'il est absent, on ne peut structurellement pas calculer de montant net ici.
+  const tauxRenseigne = profil.ouvertureDroits?.tauxPrelevementSource != null;
 
   return (
     <div className="bg-surface border border-line rounded-card overflow-hidden">
@@ -198,7 +201,8 @@ function TableauResultats({
               <th className="text-right px-4 py-3">Délai</th>
               <th className="text-right px-4 py-3">Franchise CP</th>
               <th className="text-right px-4 py-3">Jours indemnisés</th>
-              <th className="text-right px-4 py-3">≈ Montant (AJ relevé)</th>
+              <th className="text-right px-4 py-3">{tauxRenseigne ? "Montant brut" : "≈ Montant (AJ relevé)"}</th>
+              {tauxRenseigne && <th className="text-right px-4 py-3">≈ Net reçu</th>}
             </tr>
           </thead>
           <tbody>
@@ -211,6 +215,11 @@ function TableauResultats({
                 <td className="text-right px-4 py-3 text-muted">{m.franchiseCPConsommee}</td>
                 <td className="text-right px-4 py-3 font-medium">{m.joursIndemnises}</td>
                 <td className="text-right px-4 py-3 font-medium">{m.montantMensuel.calculable ? `${m.montantMensuel.montant.toFixed(2)} €` : "—"}</td>
+                {tauxRenseigne && (
+                  <td className="text-right px-4 py-3 font-medium">
+                    {m.montantMensuel.calculable && m.montantMensuel.montantNet != null ? `${m.montantMensuel.montantNet.toFixed(2)} €` : "—"}
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>
@@ -219,6 +228,7 @@ function TableauResultats({
       <div className="px-4 py-3 border-t border-line text-xs space-y-1">
         <p className="text-faint">Montant calculé sur l'AJ indiquée sur ton relevé France Travail.</p>
         {desMoisSansAj && <p className="text-amber">Certains mois n'ont pas de taux d'AJ connu pour leur période (« — ») — ajoute une période dont la date d'effet les couvre dans « Mon profil ».</p>}
+        {!tauxRenseigne && <p className="text-amber">Renseigne ton taux PAS dans le profil pour voir le montant réellement viré.</p>}
         <p className="text-faint">Franchise salaires non calculée par Cadence pour l'instant (formule non certifiée sur une source fiable) — vérifie ce point directement sur ton relevé France Travail.</p>
       </div>
     </div>
