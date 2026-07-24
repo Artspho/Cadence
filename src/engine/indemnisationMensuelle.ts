@@ -13,9 +13,9 @@
 // (lecture initiale erronée du 2026-07-23, corrigée : le 4j consommé en février 2026 s'explique
 // entièrement par le report du forfait de janvier, absorbé par le délai d'attente ce mois-là, pas
 // par l'absence de plafond).
-import type { Contrat, FranchiseSalairesResultat, MoisIndemnisationEntree, MoisIndemnisationResultat, MontantMensuelResultat, Profil, SerieIndemnisationResultat, SoldeIndemnisation, SoldeIndemnisationDepart } from "../types";
+import type { Contrat, FranchiseSalairesResultat, LigneSerieIndemnisation, MoisIndemnisationEntree, MoisIndemnisationResultat, MontantMensuelResultat, Profil, SerieIndemnisationResultat, SoldeIndemnisation, SoldeIndemnisationDepart } from "../types";
 import type { FranceTravailConfig } from "../config/franceTravailConfig";
-import { joursDansMois, moisCle, moisSuivant } from "./dateUtils";
+import { bornesDuMois, joursDansMois, moisCle, moisSuivant } from "./dateUtils";
 import { getAjReelleAt } from "./ajReelleUtils";
 import { repartirContratParMois } from "./decoupageMensuel";
 
@@ -70,10 +70,9 @@ function calculerMontantMensuel(joursIndemnises: number, debutDuMoisISO: string,
 // ligne, aucun cumul dans les totaux. La ligne reste présente (pas retirée du tableau) pour que la
 // chronologie mois par mois reste continue, sans trou silencieux.
 //
-// Rien de ce qui précède n'est câblé : `calculerSerieDepuisContrats` traite toujours chaque mois
-// civil comme un bloc unique (un seul `ouvertureDroits`, un seul taux). Prochaine étape : détecter
-// le mois contenant `dateOuverture` avec un reliquat de jours avant elle, le marquer non calculé
-// plutôt que de le simuler comme le reste de la série.
+// Q1 et Q3 sont désormais câblés (cf. `calculerSerieDepuisContrats` plus bas et
+// `LigneSerieIndemnisation` dans types/index.ts). Q2 (alerte taux PAS multi-années) reste à
+// faire — pas encore câblée dans `alertes.ts`.
 
 // Palier bas/haut du forfait mensuel de franchise CP, décidé par la franchise TOTALE accordée à
 // l'ouverture des droits (Profil.ouvertureDroits.franchiseCPTotale) — pas par le restant courant.
@@ -112,6 +111,7 @@ export function calculerMoisIndemnisation(
   const joursIndemnises = reliquatApresDelai - franchiseCPConsommee;
 
   return {
+    calculable: true,
     moisLabel: entree.moisLabel,
     heuresDuMois: entree.heuresDuMois,
     joursNonIndemnisables,
@@ -169,6 +169,12 @@ export function calculerSerieDepuisContrats(profil: Profil, soldeDepart: SoldeIn
   const moisOuverture = moisCle(ouvertureDroits.dateOuverture);
   const moisAffichageDebut = moisCle(soldeDepart.dateDepart);
 
+  // Mois de réadmission (Q1, cf. commentaire "Mois de transition" plus haut) : dateOuverture ne
+  // tombe pas le 1er du mois calendaire -> ce mois est partagé avec l'ancien droit, jamais
+  // simulé. La simulation réelle démarre au mois suivant.
+  const estMoisReadmission = ouvertureDroits.dateOuverture !== bornesDuMois(moisOuverture).debut;
+  const moisDebutCalcul = estMoisReadmission ? moisSuivant(moisOuverture) : moisOuverture;
+
   const heuresParMois = new Map<string, number>();
   for (const contrat of contrats) {
     for (const part of repartirContratParMois(contrat, config)) {
@@ -176,11 +182,11 @@ export function calculerSerieDepuisContrats(profil: Profil, soldeDepart: SoldeIn
     }
   }
 
-  const moisTries = [...heuresParMois.keys(), moisCle(dateDuJour), moisAffichageDebut].sort();
+  const moisTries = [...heuresParMois.keys(), moisCle(dateDuJour), moisAffichageDebut, moisDebutCalcul].sort();
   const moisFin = moisTries[moisTries.length - 1];
 
   const mois: MoisIndemnisationEntree[] = [];
-  for (let curseur = moisOuverture; curseur <= moisFin; curseur = moisSuivant(curseur)) {
+  for (let curseur = moisDebutCalcul; curseur <= moisFin; curseur = moisSuivant(curseur)) {
     mois.push({ moisLabel: curseur, joursDuMois: joursDansMois(curseur), heuresDuMois: heuresParMois.get(curseur) ?? 0 });
   }
 
@@ -195,14 +201,28 @@ export function calculerSerieDepuisContrats(profil: Profil, soldeDepart: SoldeIn
   // moisLabel provient ici d'un vrai "YYYY-MM" énuméré ci-dessus, contrairement au moisLabel
   // purement informatif de calculerMoisIndemnisation/calculerSerieIndemnisation — recalcul du
   // montant mensuel sûr uniquement à ce niveau.
-  const resultatsAffiches = resultatsComplets
+  const resultatsAffiches: LigneSerieIndemnisation[] = resultatsComplets
     .filter((resultat) => resultat.moisLabel >= moisAffichageDebut)
     .map((resultat) => ({
       ...resultat,
       montantMensuel: calculerMontantMensuel(resultat.joursIndemnises, `${resultat.moisLabel}-01`, profil.ajReelleHistorique, ouvertureDroits.tauxPrelevementSource),
     }));
 
-  return { calculable: true, mois: resultatsAffiches };
+  // Ligne "mois de réadmission" (Q3) : seulement si ce mois entre dans la plage affichée
+  // (dateDepart peut être choisi après lui, auquel cas il ne doit jamais apparaître).
+  const ligneReadmission: LigneSerieIndemnisation[] =
+    estMoisReadmission && moisOuverture >= moisAffichageDebut
+      ? [
+          {
+            calculable: false,
+            type: "readmission",
+            moisLabel: moisOuverture,
+            messageTooltip: "Mois de réadmission — le calcul est partagé entre deux droits. Consulte ton relevé France Travail pour le montant exact.",
+          },
+        ]
+      : [];
+
+  return { calculable: true, mois: [...ligneReadmission, ...resultatsAffiches] };
 }
 
 // Cherche la valeur historique la plus récente dont la date d'effet est ≤ la date cible — null si

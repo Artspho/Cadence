@@ -120,7 +120,9 @@ describe("calculerSerieDepuisContrats", () => {
     const resultat = calculerSerieDepuisContrats(p, { dateDepart: "2026-02-01" }, [contratFevrier], "2026-04-30", franceTravailConfig);
     if (!resultat.calculable) throw new Error("devrait être calculable");
     expect(resultat.mois.map((m) => m.moisLabel)).toEqual(["2026-02", "2026-03", "2026-04"]);
-    expect(resultat.mois[1].heuresDuMois).toBe(0); // mars : aucun contrat -> 0 h, pas absent du tableau
+    const mars = resultat.mois[1];
+    if (!mars.calculable) throw new Error("devrait être calculable (pas un mois de réadmission)");
+    expect(mars.heuresDuMois).toBe(0); // mars : aucun contrat -> 0 h, pas absent du tableau
   });
 
   it("dateDepart borne seulement l'affichage : les mois simulés avant restent cachés, pas absents du calcul", () => {
@@ -145,7 +147,9 @@ describe("calculerSerieDepuisContrats", () => {
     const p = profil({ ouvertureDroits });
     const resultat = calculerSerieDepuisContrats(p, { dateDepart: "2026-02-01" }, [], "2026-02-28", franceTravailConfig);
     if (!resultat.calculable) throw new Error("devrait être calculable");
-    expect(resultat.mois[0].montantMensuel).toEqual({ calculable: false, raison: "aj_manquante" });
+    const premier = resultat.mois[0];
+    if (!premier.calculable) throw new Error("devrait être calculable (pas un mois de réadmission)");
+    expect(premier.montantMensuel).toEqual({ calculable: false, raison: "aj_manquante" });
   });
 
   it("montantMensuel lit Profil.ajReelleHistorique (déplacé depuis SoldeIndemnisationDepart le 2026-07-25)", () => {
@@ -153,8 +157,10 @@ describe("calculerSerieDepuisContrats", () => {
     const p = profil({ ouvertureDroits, ajReelleHistorique: [{ dateEffet: "2026-01-01", valeur: 50 }] });
     const resultat = calculerSerieDepuisContrats(p, { dateDepart: "2026-02-01" }, [], "2026-02-28", franceTravailConfig);
     if (!resultat.calculable) throw new Error("devrait être calculable");
-    expect(resultat.mois[0].joursIndemnises).toBe(28);
-    expect(resultat.mois[0].montantMensuel).toEqual({ calculable: true, montant: 28 * 50, ajUtilisee: 50 });
+    const premier = resultat.mois[0];
+    if (!premier.calculable) throw new Error("devrait être calculable (pas un mois de réadmission)");
+    expect(premier.joursIndemnises).toBe(28);
+    expect(premier.montantMensuel).toEqual({ calculable: true, montant: 28 * 50, ajUtilisee: 50 });
   });
 
   it("montantNet = montantBrut × (1 - taux/100), arrondi, quand tauxPrelevementSource est renseigné", () => {
@@ -164,7 +170,9 @@ describe("calculerSerieDepuisContrats", () => {
     });
     const resultat = calculerSerieDepuisContrats(p, { dateDepart: "2026-02-01" }, [], "2026-02-28", franceTravailConfig);
     if (!resultat.calculable) throw new Error("devrait être calculable");
-    const montantMensuel = resultat.mois[0].montantMensuel;
+    const premier = resultat.mois[0];
+    if (!premier.calculable) throw new Error("devrait être calculable (pas un mois de réadmission)");
+    const montantMensuel = premier.montantMensuel;
     if (!montantMensuel.calculable) throw new Error("devrait être calculable");
     expect(montantMensuel.montant).toBe(1400); // 28 j × 50 €
     expect(montantMensuel.montantNet).toBe(Math.round(1400 * (1 - 7.2 / 100) * 100) / 100); // 1299.2
@@ -174,7 +182,9 @@ describe("calculerSerieDepuisContrats", () => {
     const p = profil({ ouvertureDroits, ajReelleHistorique: [{ dateEffet: "2026-01-01", valeur: 50 }] });
     const resultat = calculerSerieDepuisContrats(p, { dateDepart: "2026-02-01" }, [], "2026-02-28", franceTravailConfig);
     if (!resultat.calculable) throw new Error("devrait être calculable");
-    const montantMensuel = resultat.mois[0].montantMensuel;
+    const premier = resultat.mois[0];
+    if (!premier.calculable) throw new Error("devrait être calculable (pas un mois de réadmission)");
+    const montantMensuel = premier.montantMensuel;
     if (!montantMensuel.calculable) throw new Error("devrait être calculable");
     expect(montantMensuel.montantNet).toBeUndefined();
   });
@@ -202,8 +212,28 @@ describe("calculerSerieDepuisContrats", () => {
     const resultat = calculerSerieDepuisContrats(p, { dateDepart: "2026-02-01" }, [...enseignementRecurrent, ...artisteJuin], "2026-06-30", franceTravailConfig);
     if (!resultat.calculable) throw new Error("devrait être calculable");
     const juin = resultat.mois.find((m) => m.moisLabel === "2026-06");
-    expect(juin?.heuresDuMois).toBe(167); // 21 (Levallois) + 48 + 26 + 72 (Arts Phocéens) — pas 21
-    expect(juin?.joursNonIndemnisables).toBe(21); // floor(167 × 1,3 / 10) = floor(21,71) = 21
+    if (!juin?.calculable) throw new Error("devrait être calculable (pas un mois de réadmission)");
+    expect(juin.heuresDuMois).toBe(167); // 21 (Levallois) + 48 + 26 + 72 (Arts Phocéens) — pas 21
+    expect(juin.joursNonIndemnisables).toBe(21); // floor(167 × 1,3 / 10) = floor(21,71) = 21
+  });
+
+  it("dateOuverture le 18/01/2026 : premier élément de la série est le mois de réadmission non calculé", () => {
+    const p = profil({ ouvertureDroits: { dateOuverture: "2026-01-18", franchiseCPTotale: 0, delaiAttenteInitial: 0 } });
+    const resultat = calculerSerieDepuisContrats(p, { dateDepart: "2026-01-01" }, [], "2026-02-28", franceTravailConfig);
+    if (!resultat.calculable) throw new Error("devrait être calculable");
+    expect(resultat.mois.map((m) => m.moisLabel)).toEqual(["2026-01", "2026-02"]); // janvier (réadmission) puis février calculé normalement
+    const premier = resultat.mois[0];
+    if (premier.calculable) throw new Error("janvier devrait être un mois de réadmission non calculable");
+    expect(premier.type).toBe("readmission");
+  });
+
+  it("dateOuverture le 01/02/2026 : aucun mois de transition, la série commence normalement en février", () => {
+    const p = profil({ ouvertureDroits: { dateOuverture: "2026-02-01", franchiseCPTotale: 0, delaiAttenteInitial: 0 } });
+    const resultat = calculerSerieDepuisContrats(p, { dateDepart: "2026-02-01" }, [], "2026-02-28", franceTravailConfig);
+    if (!resultat.calculable) throw new Error("devrait être calculable");
+    expect(resultat.mois.map((m) => m.moisLabel)).toEqual(["2026-02"]);
+    const premier = resultat.mois[0];
+    if (!premier.calculable) throw new Error("février devrait être calculable, pas un mois de réadmission");
   });
 });
 

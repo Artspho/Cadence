@@ -184,7 +184,9 @@ function TableauResultats({
     );
   }
 
-  const desMoisSansAj = mois.some((m) => !m.montantMensuel.calculable);
+  // Les lignes "mois de réadmission" (m.calculable === false) n'ont pas de montantMensuel — on ne
+  // les compte pas ici, distinct du cas "AJ manquante" qui, lui, reste un vrai mois calculé.
+  const desMoisSansAj = mois.some((m) => m.calculable && !m.montantMensuel.calculable);
   // tauxPrelevementSource vit sur ouvertureDroits (renseigné une fois dans "Mon profil"), pas sur
   // chaque mois — s'il est absent, on ne peut structurellement pas calculer de montant net ici.
   const tauxRenseigne = profil.ouvertureDroits?.tauxPrelevementSource != null;
@@ -206,22 +208,47 @@ function TableauResultats({
             </tr>
           </thead>
           <tbody>
-            {mois.map((m) => (
-              <tr key={m.moisLabel} className="border-b border-line last:border-0">
-                <td className="px-4 py-3">{m.moisLabel}</td>
-                <td className="text-right px-4 py-3 text-muted">{m.heuresDuMois} h</td>
-                <td className="text-right px-4 py-3 text-muted">{m.joursNonIndemnisables}</td>
-                <td className="text-right px-4 py-3 text-muted">{m.delaiConsomme}</td>
-                <td className="text-right px-4 py-3 text-muted">{m.franchiseCPConsommee}</td>
-                <td className="text-right px-4 py-3 font-medium">{m.joursIndemnises}</td>
-                <td className="text-right px-4 py-3 font-medium">{m.montantMensuel.calculable ? `${m.montantMensuel.montant.toFixed(2)} €` : "—"}</td>
-                {tauxRenseigne && (
-                  <td className="text-right px-4 py-3 font-medium">
-                    {m.montantMensuel.calculable && m.montantMensuel.montantNet != null ? `${m.montantMensuel.montantNet.toFixed(2)} €` : "—"}
-                  </td>
-                )}
-              </tr>
-            ))}
+            {mois.map((m) => {
+              // Mois de réadmission : ligne grisée, aucun montant, jamais dans les totaux (cf.
+              // desMoisSansAj ci-dessus, qui l'exclut déjà de son propre calcul).
+              if (!m.calculable) {
+                return (
+                  <tr key={m.moisLabel} className="border-b border-line last:border-0 text-faint">
+                    <td className="px-4 py-3">
+                      <span className="inline-flex items-center gap-1">
+                        {m.moisLabel}
+                        <span title={m.messageTooltip} aria-label={m.messageTooltip} className="cursor-help">
+                          ℹ️
+                        </span>
+                      </span>
+                    </td>
+                    <td className="text-right px-4 py-3">—</td>
+                    <td className="text-right px-4 py-3">—</td>
+                    <td className="text-right px-4 py-3">—</td>
+                    <td className="text-right px-4 py-3">—</td>
+                    <td className="text-right px-4 py-3">—</td>
+                    <td className="text-right px-4 py-3">—</td>
+                    {tauxRenseigne && <td className="text-right px-4 py-3">—</td>}
+                  </tr>
+                );
+              }
+              return (
+                <tr key={m.moisLabel} className="border-b border-line last:border-0">
+                  <td className="px-4 py-3">{m.moisLabel}</td>
+                  <td className="text-right px-4 py-3 text-muted">{m.heuresDuMois} h</td>
+                  <td className="text-right px-4 py-3 text-muted">{m.joursNonIndemnisables}</td>
+                  <td className="text-right px-4 py-3 text-muted">{m.delaiConsomme}</td>
+                  <td className="text-right px-4 py-3 text-muted">{m.franchiseCPConsommee}</td>
+                  <td className="text-right px-4 py-3 font-medium">{m.joursIndemnises}</td>
+                  <td className="text-right px-4 py-3 font-medium">{m.montantMensuel.calculable ? `${m.montantMensuel.montant.toFixed(2)} €` : "—"}</td>
+                  {tauxRenseigne && (
+                    <td className="text-right px-4 py-3 font-medium">
+                      {m.montantMensuel.calculable && m.montantMensuel.montantNet != null ? `${m.montantMensuel.montantNet.toFixed(2)} €` : "—"}
+                    </td>
+                  )}
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

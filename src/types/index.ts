@@ -324,6 +324,7 @@ export interface SoldeIndemnisationDepart {
 export type MontantMensuelResultat = { calculable: false; raison: "aj_manquante" } | { calculable: true; montant: number; ajUtilisee: number; montantNet?: number };
 
 export interface MoisIndemnisationResultat {
+  calculable: true; // discriminant partagé avec MoisReadmissionNonCalcule, cf. LigneSerieIndemnisation
   moisLabel: string;
   heuresDuMois: number; // repasse l'entrée (calculée depuis les contrats) pour affichage, cf. RevenusMensuels.tsx
   joursNonIndemnisables: number; // Math.floor(heuresDuMois × coeffJoursNonIndemnisables / diviseurJoursTravaillesA10), première opération du réducteur
@@ -335,7 +336,22 @@ export interface MoisIndemnisationResultat {
   montantMensuel: MontantMensuelResultat;
 }
 
+// Mois de réadmission (transition entre deux droits) : `ouvertureDroits.dateOuverture` ne tombe
+// pas le 1er du mois calendaire, ce mois est donc partagé entre l'ancien et le nouveau droit.
+// Cadence n'a structurellement pas accès à l'ancien droit — jamais simulé, jamais un chiffre
+// deviné (devoir n°2), cf. engine/indemnisationMensuelle.ts (calculerSerieDepuisContrats).
+export interface MoisReadmissionNonCalcule {
+  calculable: false;
+  type: "readmission";
+  moisLabel: string; // ISO "YYYY-MM"
+  messageTooltip: string;
+}
+
+// Une ligne de la série mensuelle affichée : soit un mois normalement calculé, soit un mois de
+// réadmission non calculé — discriminées par `calculable`, cf. RevenusMensuels.tsx.
+export type LigneSerieIndemnisation = MoisIndemnisationResultat | MoisReadmissionNonCalcule;
+
 // Résultat de `calculerSerieDepuisContrats` : `calculable: false` quand `Profil.ouvertureDroits`
 // est absent — la simulation entière est bloquée plutôt que de deviner un point de départ
 // (devoir n°2), cf. RevenusMensuels.tsx.
-export type SerieIndemnisationResultat = { calculable: false; raison: "ouverture_droits_manquante" } | { calculable: true; mois: MoisIndemnisationResultat[] };
+export type SerieIndemnisationResultat = { calculable: false; raison: "ouverture_droits_manquante" } | { calculable: true; mois: LigneSerieIndemnisation[] };
