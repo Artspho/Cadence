@@ -104,6 +104,7 @@ export interface Profil {
     dateOuverture: string; // ISO — date de la notification France Travail
     franchiseCPTotale: number; // jours — chiffre exact de la notification, PAS le solde restant
     delaiAttenteInitial: number; // jours — presque toujours 7
+    tauxPrelevementSource?: number; // % entier ou décimal, ex. 7.2
   };
 }
 
@@ -320,7 +321,7 @@ export interface SoldeIndemnisationDepart {
 // même période d'indemnisation). `calculable: false` couvre à la fois une AJ jamais renseignée et
 // un mois antérieur à toute entrée connue de l'historique — dans les deux cas Cadence ne peut pas
 // recalculer l'AJ réelle elle-même (devoir n°2 : jamais un montant sur la base d'une AJ devinée).
-export type MontantMensuelResultat = { calculable: false; raison: "aj_manquante" } | { calculable: true; montant: number; ajUtilisee: number };
+export type MontantMensuelResultat = { calculable: false; raison: "aj_manquante" } | { calculable: true; montant: number; ajUtilisee: number; montantNet?: number };
 
 export interface MoisIndemnisationResultat {
   moisLabel: string;

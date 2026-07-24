@@ -33,12 +33,14 @@ const MONTANT_MENSUEL_INDISPONIBLE: MontantMensuelResultat = { calculable: false
 // Montant réellement versé pour un mois donné = joursIndemnises × AJ réelle applicable ce mois-là.
 // `debutDuMoisISO` doit être une vraie date ISO (ex. "2026-03-01") — jamais un `moisLabel` non
 // vérifié, cf. avertissement ci-dessus.
-function calculerMontantMensuel(joursIndemnises: number, debutDuMoisISO: string, ajReelleHistorique: { dateEffet: string; valeur: number }[] | undefined): MontantMensuelResultat {
+function calculerMontantMensuel(joursIndemnises: number, debutDuMoisISO: string, ajReelleHistorique: { dateEffet: string; valeur: number }[] | undefined, tauxPrelevementSource?: number): MontantMensuelResultat {
   const ajUtilisee = getAjReelleAt(ajReelleHistorique, debutDuMoisISO);
   if (ajUtilisee === null) {
     return { calculable: false, raison: "aj_manquante" };
   }
-  return { calculable: true, montant: Math.round(joursIndemnises * ajUtilisee * 100) / 100, ajUtilisee };
+  const montant = Math.round(joursIndemnises * ajUtilisee * 100) / 100;
+  const montantNet = tauxPrelevementSource != null ? Math.round(montant * (1 - tauxPrelevementSource / 100) * 100) / 100 : undefined;
+  return { calculable: true, montant, ajUtilisee, montantNet };
 }
 
 // Palier bas/haut du forfait mensuel de franchise CP, décidé par la franchise TOTALE accordée à
@@ -165,7 +167,7 @@ export function calculerSerieDepuisContrats(profil: Profil, soldeDepart: SoldeIn
     .filter((resultat) => resultat.moisLabel >= moisAffichageDebut)
     .map((resultat) => ({
       ...resultat,
-      montantMensuel: calculerMontantMensuel(resultat.joursIndemnises, `${resultat.moisLabel}-01`, profil.ajReelleHistorique),
+      montantMensuel: calculerMontantMensuel(resultat.joursIndemnises, `${resultat.moisLabel}-01`, profil.ajReelleHistorique, ouvertureDroits.tauxPrelevementSource),
     }));
 
   return { calculable: true, mois: resultatsAffiches };

@@ -157,6 +157,28 @@ describe("calculerSerieDepuisContrats", () => {
     expect(resultat.mois[0].montantMensuel).toEqual({ calculable: true, montant: 28 * 50, ajUtilisee: 50 });
   });
 
+  it("montantNet = montantBrut × (1 - taux/100), arrondi, quand tauxPrelevementSource est renseigné", () => {
+    const p = profil({
+      ouvertureDroits: { ...ouvertureDroits, tauxPrelevementSource: 7.2 },
+      ajReelleHistorique: [{ dateEffet: "2026-01-01", valeur: 50 }],
+    });
+    const resultat = calculerSerieDepuisContrats(p, { dateDepart: "2026-02-01" }, [], "2026-02-28", franceTravailConfig);
+    if (!resultat.calculable) throw new Error("devrait être calculable");
+    const montantMensuel = resultat.mois[0].montantMensuel;
+    if (!montantMensuel.calculable) throw new Error("devrait être calculable");
+    expect(montantMensuel.montant).toBe(1400); // 28 j × 50 €
+    expect(montantMensuel.montantNet).toBe(Math.round(1400 * (1 - 7.2 / 100) * 100) / 100); // 1299.2
+  });
+
+  it("montantNet reste absent quand tauxPrelevementSource n'est pas renseigné", () => {
+    const p = profil({ ouvertureDroits, ajReelleHistorique: [{ dateEffet: "2026-01-01", valeur: 50 }] });
+    const resultat = calculerSerieDepuisContrats(p, { dateDepart: "2026-02-01" }, [], "2026-02-28", franceTravailConfig);
+    if (!resultat.calculable) throw new Error("devrait être calculable");
+    const montantMensuel = resultat.mois[0].montantMensuel;
+    if (!montantMensuel.calculable) throw new Error("devrait être calculable");
+    expect(montantMensuel.montantNet).toBeUndefined();
+  });
+
   it("régression : les contrats artiste comptent bien, mélangés avec un enseignement récurrent sur le même mois (bug signalé, non reproduit)", () => {
     const p = profil({ ouvertureDroits });
     const enseignementRecurrent = ["2026-02", "2026-03", "2026-04", "2026-05", "2026-06"].map((mois) =>
