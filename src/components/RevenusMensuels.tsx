@@ -222,6 +222,7 @@ function TableauResultats({
               <th className="text-right px-4 py-3">{tauxRenseigne ? "Montant net avant PAS" : "≈ Montant (AJ relevé)"}</th>
               {tauxRenseigne && <th className="text-right px-4 py-3">≈ Net reçu</th>}
               <th className="text-right px-4 py-3">Revenus contrats</th>
+              <th className="text-right px-4 py-3">Net contrats</th>
               <th className="text-right px-4 py-3">Revenu total</th>
             </tr>
           </thead>
@@ -249,6 +250,7 @@ function TableauResultats({
                     {tauxRenseigne && <td className="text-right px-4 py-3">—</td>}
                     <td className="text-right px-4 py-3">—</td>
                     <td className="text-right px-4 py-3">—</td>
+                    <td className="text-right px-4 py-3">—</td>
                   </tr>
                 );
               }
@@ -269,6 +271,7 @@ function TableauResultats({
                     </td>
                   )}
                   <td className="text-right px-4 py-3 text-muted">{m.salairesContratsBruts > 0 ? `${m.salairesContratsBruts.toFixed(2)} €` : "—"}</td>
+                  <td className="text-right px-4 py-3">{m.salairesContratsBruts > 0 ? <NetContratsPremiumCell /> : "—"}</td>
                   <td className="text-right px-4 py-3 font-semibold text-mint">{are === 0 && m.salairesContratsBruts === 0 ? "—" : `${revenuTotal.toFixed(2)} €`}</td>
                 </tr>
               );
@@ -286,6 +289,9 @@ function TableauResultats({
                 {totalARE === 0 ? "—" : `${totalARE.toFixed(2)} €`}
               </td>
               <td className="text-right px-4 py-3">{totalContrats > 0 ? `${totalContrats.toFixed(2)} €` : "—"}</td>
+              {/* Jamais de total ici : "Net contrats" est un teaser Premium, aucun chiffre réel à
+                  additionner, encore moins avec l'ARE (cf. totalARE/totalRevenu ci-dessus, intouchés). */}
+              <td className="text-right px-4 py-3">—</td>
               <td className="text-right px-4 py-3 font-semibold text-mint">{totalRevenu === 0 ? "—" : `${totalRevenu.toFixed(2)} €`}</td>
             </tr>
           </tfoot>
@@ -310,5 +316,20 @@ function TableauResultats({
         )}
       </div>
     </div>
+  );
+}
+
+const TOOLTIP_NET_CONTRATS_PREMIUM = "Montant net exact disponible en Premium — analyse IA de tes bulletins";
+
+// Teaser Premium : jamais de chiffre, même approximatif (devoir n°2) — un montant flou avec
+// cadenas, pas une estimation qui pourrait être prise pour un vrai calcul Cadence.
+function NetContratsPremiumCell() {
+  return (
+    <span title={TOOLTIP_NET_CONTRATS_PREMIUM} aria-label={TOOLTIP_NET_CONTRATS_PREMIUM} className="inline-flex items-center gap-1 cursor-help select-none">
+      <span aria-hidden="true" className="blur-sm text-faint">
+        ██████
+      </span>
+      <span aria-hidden="true">🔒</span>
+    </span>
   );
 }
