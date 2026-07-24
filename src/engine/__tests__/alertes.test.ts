@@ -135,4 +135,31 @@ describe("detecterAlertes", () => {
     expect(codes(alertes)).not.toContain("situation_mixte");
     expect(codes(alertes)).toContain("plafond_enseignement");
   });
+
+  it("pas_taux_janvier : droit du 18/01/2026 au 17/01/2027, taux PAS renseigné, janvier 2027 en cours d'indemnisation dans la série -> alerte présente", () => {
+    const p = profil({
+      dateAnniversaire: "2026-12-31",
+      ouvertureDroits: { dateOuverture: "2026-01-18", franchiseCPTotale: 0, delaiAttenteInitial: 0, tauxPrelevementSource: 7.2 },
+    });
+    const alertes = detecterAlertes(p, [], [], franceTravailConfig, "2027-01-31", { dateDepart: "2026-01-01" });
+    expect(codes(alertes)).toContain("pas_taux_janvier");
+  });
+
+  it("pas_taux_janvier : même droit mais tauxPrelevementSource absent -> pas d'alerte", () => {
+    const p = profil({
+      dateAnniversaire: "2026-12-31",
+      ouvertureDroits: { dateOuverture: "2026-01-18", franchiseCPTotale: 0, delaiAttenteInitial: 0 },
+    });
+    const alertes = detecterAlertes(p, [], [], franceTravailConfig, "2027-01-31", { dateDepart: "2026-01-01" });
+    expect(codes(alertes)).not.toContain("pas_taux_janvier");
+  });
+
+  it("pas_taux_janvier : droit du 01/01/2026 au 31/12/2026, taux renseigné, aucun janvier en cours (le seul janvier de la série est le mois d'ouverture lui-même) -> pas d'alerte", () => {
+    const p = profil({
+      dateAnniversaire: "2026-12-31",
+      ouvertureDroits: { dateOuverture: "2026-01-01", franchiseCPTotale: 0, delaiAttenteInitial: 0, tauxPrelevementSource: 7.2 },
+    });
+    const alertes = detecterAlertes(p, [], [], franceTravailConfig, "2026-12-31", { dateDepart: "2026-01-01" });
+    expect(codes(alertes)).not.toContain("pas_taux_janvier");
+  });
 });

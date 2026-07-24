@@ -69,7 +69,7 @@ export default function App() {
     const dateCap = diffJours(dateDuJour, fenetre.dateFin) >= 0 ? dateDuJour : fenetre.dateFin;
     const serie = construireSerieAcquisition(profil, contrats, periodes, config, fenetre, dateCap);
     const serieAVenir = construireSerieAVenir(profil, contrats, periodes, config, fenetre, dateCap);
-    const alertes = detecterAlertes(profil, contrats, periodes, config, dateDuJour);
+    const alertes = detecterAlertes(profil, contrats, periodes, config, dateDuJour, donnees.soldeIndemnisationDepart);
     const exercices = decouperExercices(profil, contrats, periodes, config, dateDuJour);
 
     return { fenetre, decompte, ajBrute, ajNette, prediction, dateCap, serie, serieAVenir, alertes, exercices, sr, nht, sar };

@@ -3,16 +3,28 @@
 // (cf. §7.5 et la limite structurelle correspondante en §10 : en SPA locale,
 // ces alertes ne peuvent pas être proactives — pas de backend pour les
 // pousser avant l'échéance, app fermée).
-import type { Alerte, Contrat, PeriodeAssimilee, Profil } from "../types";
+import type { Alerte, Contrat, PeriodeAssimilee, Profil, SoldeIndemnisationDepart } from "../types";
 import type { FranceTravailConfig } from "../config/franceTravailConfig";
 import { calculerDecompteHeures } from "./decompteHeures";
+import { moisCle } from "./dateUtils";
+import { calculerSerieDepuisContrats } from "./indemnisationMensuelle";
 import { calculerFenetreReference } from "./periodeReference";
 import { calculerStatutPrediction } from "./prediction";
 import { profilHorsPerimetre } from "../lib/profilHorsPerimetre";
 
 const SEUIL_APPROCHE_CUMUL_ENS_FORMATION = 0.9; // 90 % du plafond de 338 h : avertir avant d'y être
 
-export function detecterAlertes(profil: Profil, contrats: Contrat[], periodes: PeriodeAssimilee[], config: FranceTravailConfig, dateDuJour: string): Alerte[] {
+// `soldeDepart` optionnel (défaut `null`) : seul le module Revenus mensuels le configure (cf.
+// RevenusMensuels.tsx) — les appelants qui n'en ont pas encore un ne déclenchent simplement pas
+// l'alerte "pas_taux_janvier" (rien à vérifier tant qu'aucune série n'est affichée).
+export function detecterAlertes(
+  profil: Profil,
+  contrats: Contrat[],
+  periodes: PeriodeAssimilee[],
+  config: FranceTravailConfig,
+  dateDuJour: string,
+  soldeDepart: SoldeIndemnisationDepart | null = null,
+): Alerte[] {
   // Garde-fou "situation mixte" : signalé par l'utilisateur (jamais déduit des
   // contrats). Court-circuit volontaire — aucune autre alerte ne doit être
   // renvoyée à côté, puisqu'elles reposeraient toutes sur un décompte/montant
@@ -148,6 +160,26 @@ export function detecterAlertes(profil: Profil, contrats: Contrat[], periodes: P
       message: `Entre ${config.readmission.clauseRattrapage.seuilBas} h et ${config.readmission.clauseRattrapage.seuilHaut} h, tu peux être éligible à la clause de rattrapage sous conditions (ancienneté, délai de demande).`,
       actionSuggeree: `Demande à faire dans les ${config.readmission.clauseRattrapage.delaiDemandeJours} jours suivant l'échéance — vérifie l'éligibilité complète auprès de France Travail.`,
     });
+  }
+
+  // Taux PAS multi-années (Q2, cf. commentaire "Mois de transition" dans indemnisationMensuelle.ts) :
+  // le taux peut avoir changé au 1er janvier (DGFIP), mais Cadence n'en a qu'une valeur scalaire.
+  // Ne se déclenche que si un vrai janvier "en cours d'indemnisation" (pas le mois d'ouverture
+  // lui-même, qui n'a jamais connu qu'un seul taux) apparaît dans la série affichée — une seule
+  // fois par série, jamais une ligne par janvier trouvé.
+  if (profil.ouvertureDroits?.tauxPrelevementSource != null && soldeDepart) {
+    const serie = calculerSerieDepuisContrats(profil, soldeDepart, contrats, dateDuJour, config);
+    const moisOuverture = moisCle(profil.ouvertureDroits.dateOuverture);
+    const janvierEnCours = serie.calculable && serie.mois.some((m) => m.calculable && m.moisLabel.endsWith("-01") && m.moisLabel !== moisOuverture);
+    if (janvierEnCours) {
+      alertes.push({
+        code: "pas_taux_janvier",
+        niveau: "attention",
+        titre: "Taux PAS à vérifier",
+        message:
+          "Ton taux de prélèvement à la source a peut-être été mis à jour au 1ᵉʳ janvier par la DGFIP. Vérifie sur impots.gouv.fr ou ton dernier relevé France Travail et corrige-le dans le profil si besoin.",
+      });
+    }
   }
 
   return alertes;

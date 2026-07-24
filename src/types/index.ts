@@ -130,7 +130,8 @@ export type CodeAlerte =
   | "plafond_cachets_mois" // > 28 cachets sur un mois civil
   | "eligible_rattrapage" // 338–506 h : clause de rattrapage possible
   | "situation_mixte" // garde-fou hors périmètre Annexe 10 pur
-  | "seuil_readmission_non_calculable"; // réadmission : historique de contrats insuffisant pour ajuster le seuil
+  | "seuil_readmission_non_calculable" // réadmission : historique de contrats insuffisant pour ajuster le seuil
+  | "pas_taux_janvier"; // taux de prélèvement à la source potentiellement mis à jour au 1er janvier par la DGFIP
 
 export interface Alerte {
   code: CodeAlerte;
