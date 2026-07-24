@@ -51,6 +51,14 @@ export const profilSchema = z
     dateAnniversairePrecedente: z.string().optional(), // réadmission uniquement, jamais bloquant si absent
     dureeDroitsMois: z.union([z.literal(12), z.literal(6)]).optional(), // connue à l'ouverture, jamais déduite de l'historique — franchise salaires
     salairesHorsAnnexe10PRA: z.number().nullable().optional(), // franchise salaires, cf. engine/indemnisationMensuelle.ts
+    ajReelleHistorique: z.array(z.object({ dateEffet: z.string(), valeur: z.number() })).optional(), // cf. types/index.ts
+    ouvertureDroits: z
+      .object({
+        dateOuverture: z.string(),
+        franchiseCPTotale: z.number(),
+        delaiAttenteInitial: z.number(),
+      })
+      .optional(),
   })
   .refine((p) => validerCoherenceProfil(p).coherent, (p) => ({ message: validerCoherenceProfil(p).raison ?? "Profil incohérent." }));
 

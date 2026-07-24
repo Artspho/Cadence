@@ -87,6 +87,24 @@ export interface Profil {
   // alors estimée sur les seuls salaires Annexe 10 (peut être sous-estimée), jamais bloquant —
   // cf. FranchiseSalairesResultat.sousEstimeeHorsA10.
   salairesHorsAnnexe10PRA?: number | null;
+  // AJ nette notifiée par France Travail pour la réadmission en cours (déplacé depuis
+  // `SoldeIndemnisationDepart` le 2026-07-25 : c'est une caractéristique de l'ouverture de droits,
+  // pas du point de départ choisi pour afficher le tableau mensuel). Peut couvrir plusieurs taux
+  // successifs sur une même période d'indemnisation (ex. 54,55 € jusqu'au 17/01/2026 puis 55,02 €
+  // à partir du 18/01/2026, cf. docs/reprise.md). Chaque entrée : `dateEffet` ISO, `valeur` en € ;
+  // tableau trié croissant par `dateEffet`. Vide ou absent : la simulation mensuelle est bloquée —
+  // aucun fallback sur une AJ estimée n'est possible ici (devoir n°2).
+  ajReelleHistorique?: { dateEffet: string; valeur: number }[];
+  // Paramètres de l'ouverture de droits en cours, saisis une fois depuis la notification France
+  // Travail — consommés automatiquement mois par mois par le moteur
+  // (engine/indemnisationMensuelle.ts : calculerSerieDepuisContrats simule depuis dateOuverture),
+  // jamais reconstruits ni devinés. Absent = simulation mensuelle bloquée (RevenusMensuels.tsx),
+  // jamais un chiffre inventé (devoir n°2).
+  ouvertureDroits?: {
+    dateOuverture: string; // ISO — date de la notification France Travail
+    franchiseCPTotale: number; // jours — chiffre exact de la notification, PAS le solde restant
+    delaiAttenteInitial: number; // jours — presque toujours 7
+  };
 }
 
 // ── Historique : un exercice = un cycle de 12 mois entre deux dates anniversaire ──
@@ -288,29 +306,13 @@ export type FranchiseSalairesResultat =
   | { valeur: null; avertissement: "franchise_salaires_non_certifiee" }
   | { valeur: number; totalNonVerifie: true; sousEstimeeHorsA10: boolean };
 
-// Solde d'ouverture saisi une seule fois par l'utilisateur, à une date de relevé de son choix —
-// jamais reconstruit par Cadence depuis la réadmission (cf. engine/indemnisationMensuelle.ts,
-// docs/reprise.md). `null` tant que l'utilisateur n'a pas encore configuré le module : ne bloque
-// jamais l'accès pour autant, l'écran de configuration propose de partir de 0 par défaut.
+// Choisi une seule fois par l'utilisateur : à partir de quel mois le tableau mensuel devient
+// visible (cf. RevenusMensuels.tsx). Ne porte plus aucun solde depuis le 2026-07-25 — l'état
+// interne (délai d'attente, franchise CP restante) est désormais simulé automatiquement par le
+// moteur depuis `Profil.ouvertureDroits`, jamais saisi ici (cf. engine/indemnisationMensuelle.ts,
+// docs/reprise.md). `null` tant que l'utilisateur n'a pas encore configuré le module.
 export interface SoldeIndemnisationDepart {
-  date: string; // ISO — date du relevé de référence pris comme point de départ
-  delaiRestant: number;
-  franchiseCPRestante: number;
-  // Optionnel pour ne pas casser un solde déjà configuré avant l'ajout de ce champ (défaut 0,
-  // cf. calculerSerieDepuisContrats) — hypothèse prudente, jamais un faux feu vert : un
-  // défaut à 0 sous-estime au pire le quota de départ, il ne le surestime jamais.
-  quotaCPCarryOver?: number;
-  // AJ nette notifiée par France Travail pour la réadmission en cours. Indépendant de la date de
-  // solde de départ — peut couvrir plusieurs taux successifs sur la même période d'indemnisation
-  // (ex. 54,55 € jusqu'au 17/01/2026 puis 55,02 € à partir du 18/01/2026, cf. docs/reprise.md).
-  // Chaque entrée : `dateEffet` ISO (YYYY-MM-DD), date à partir de laquelle ce taux s'applique ;
-  // `valeur` en €. Tableau trié croissant par `dateEffet`.
-  // Remplace l'ancien champ `ajReelle: number | null` (bug corrigé le 2026-07-23 : les montants
-  // affichés utilisaient l'AJ PRÉVISIONNELLE, recalculée depuis les contrats actuels, un faux
-  // chiffre pour un utilisateur déjà en cours d'indemnisation). Vide ou absent : la simulation
-  // mensuelle est bloquée — aucun fallback sur une AJ estimée n'est possible ici, Cadence ne peut
-  // pas recalculer l'AJ réelle d'une réadmission déjà ouverte, seul France Travail la connaît.
-  ajReelleHistorique?: { dateEffet: string; valeur: number }[];
+  dateDepart: string; // ISO
 }
 
 // Montant réellement versé pour un mois = joursIndemnises × AJ réelle applicable à ce mois-là
