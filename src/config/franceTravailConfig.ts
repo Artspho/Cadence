@@ -61,10 +61,15 @@ export const franceTravailConfig = {
   },
 
   // ── Cotisations sur l'AJ (pour l'AJ nette) ────────────────────
+  // Terminologie France Travail vs Cadence :
+  //   "Allocation brute" FT  = sortie de la formule AJ (A+B+C) ci-dessus, ex. 55,02 €/j.
+  //   "Montant net social" FT = AJ brute − retraite complémentaire, ex. 53,81 €/j.
+  //   Cadence appelle ce montant "AJ nette avant PAS" — c'est la même valeur.
+  //   Écart ~2,2 % (pas 5 %) — validé à l'euro près sur fév–juin 2026.
   cotisations: {
     seuilExoneration: 31.96, // ✅ AJ brute < ce seuil : aucune cotisation
     seuilRetraiteCompl: 60, // ✅ 31,96 < AJ ≤ 60 : retraite compl. seule
-    tauxRetraiteComplementaire: 0.0093, // ✅ 0,93 % du SJM
+    tauxRetraiteComplementaire: 0.0093, // ✅ 0,93 % du SJR (Salaire Journalier de Référence) — relevé FT confirmé
     tauxCSG: { normal: 0.062, reduit: 0.038 }, // ✅ selon barème d'imposition
     tauxCRDS: 0.005, // ✅
     tauxAlsaceMoselle: 0.015, // ✅ régime local
