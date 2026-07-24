@@ -8,12 +8,11 @@ Mémoire durable à consulter au démarrage : `CLAUDE.md`, `docs/SPEC.md`, `docs
 
 Deux devoirs sacrés : (1) ne jamais perdre les données ; (2) ne jamais afficher un chiffre faux (ni faux « feu vert » rassurant, ni faux « Bloqué », ni faux montant, ni fausse alerte, ni valeur sentinelle brute).
 
-État : les deux devoirs sacrés sont tenus, la bêta a son socle. 145 tests verts, `tsc -b` propre.
-Dernier chantier committé : découpage mensuel des contrats — `Contrat.dateDebut`, répartition
-prorata (`repartirContratParMois`), JNI calculé automatiquement depuis les vrais contrats
-(`floor(heures × 1,3 / 10)`), `DeclarationMensuelle` supprimée (cf. section dédiée « Fait
-(2026-07-24 : chantier découpage mensuel des contrats — JNI depuis les vrais contrats) » plus bas).
-Tous les items §11.A du SPEC sont désormais traités.
+État : les deux devoirs sacrés sont tenus, la bêta a son socle. 146 tests verts, `tsc -b` propre.
+Dernier chantier committé : `Profil.ouvertureDroits` — simulation automatique de la consommation
+délai/franchise CP depuis la vraie date d'ouverture des droits (cf. section dédiée « Fait
+(2026-07-25 : chantier Profil.ouvertureDroits — simulation automatique depuis l'ouverture des
+droits) » plus bas). Tous les items §11.A du SPEC sont désormais traités.
 
 ## Fait dans les sessions récentes
 
@@ -625,6 +624,53 @@ divergence après édition, blocage de soumission sur date de début postérieur
 - https://www.francetravail.fr/files/live/sites/PE/files/fichiers-en-telechargement/fichiers-en-telechargement---dem/GUIDE-INTERMITTENT.pdf
 - https://www.unedic.org/storage/uploads/2023/07/24/Dossier20de20synthC3A8se20Intermittents20du20spectacle_uid_64be8b31b1a34.pdf
 - https://www.etreintermittent.com/comprendre-et-calculer-le-taux-dindemnisation-dun-intermittent-du-spectacle/
+
+## Fait (2026-07-25 : chantier Profil.ouvertureDroits — simulation automatique depuis l'ouverture des droits)
+
+**Point de départ, à retenir** : la proposition initiale de ce chantier (Question 2 d'un flux
+simplifié « nouvelle indemnisation / déjà en cours ») contenait une formule auto-annulante
+(`franchiseTotale = floor(moisÉcoulés × 2)` puis `restante = franchiseTotale − moisÉcoulés × 2`
+≈ 0 toujours). Signalé avant tout code ; la vraie solution retenue est plus profonde qu'un correctif
+de formule : au lieu d'estimer un solde à une date de relevé de mi-parcours, le moteur simule
+désormais la consommation délai/franchise CP depuis la VRAIE date d'ouverture des droits.
+
+**Modèle** : `Profil.ouvertureDroits: { dateOuverture, franchiseCPTotale, delaiAttenteInitial }` —
+saisi une fois depuis la notification France Travail, jamais reconstruit. `ajReelleHistorique`
+déplacé de `SoldeIndemnisationDepart` vers `Profil` (même raisonnement que `ouvertureDroits` : c'est
+une caractéristique de l'ouverture de droits, pas du point de départ d'affichage).
+`SoldeIndemnisationDepart` ne porte plus que `dateDepart` — un simple filtre d'affichage, l'état
+interne (délai, franchise CP) est simulé automatiquement par `calculerSerieDepuisContrats` depuis
+`ouvertureDroits.dateOuverture`, y compris pour les mois antérieurs à `dateDepart` (simulés mais
+jamais montrés — nécessaire pour un état correct au premier mois affiché).
+
+**Corrige au passage une limite connue** (cf. section « SMIC mensuel/journalier certifiés » plus
+haut) : le palier du forfait mensuel de franchise CP (2j/3j) se décide désormais sur la franchise
+TOTALE (`ouvertureDroits.franchiseCPTotale`, constante), pas sur le restant courant — évite qu'un
+profil dont le total dépasse 24j ne redescende à tort au palier bas une fois consommé sous ce seuil.
+
+**6 commits** :
+- **A** (`101aacc`) — types : `Profil.ouvertureDroits` + `ajReelleHistorique` ajoutés ;
+  `SoldeIndemnisationDepart` réduit à `{ dateDepart }`. `profilSchema` (lib/coherenceProfil.ts) mis
+  à jour (seule définition partagée import/édition).
+- **B** (`79bc714`) — moteur : `calculerSerieDepuisContrats` simule depuis `dateOuverture`,
+  retourne `SerieIndemnisationResultat` (`calculable: false` si `ouvertureDroits` absent — aucun
+  point de départ inventé). `calculerMoisIndemnisation`/`calculerSerieIndemnisation` gagnent un 4e
+  paramètre optionnel `franchiseCPTotale` (défaut = comportement historique, préserve les tests bas
+  niveau existants inchangés, décision actée avec l'utilisateur). `describe("calculerSerieDepuisContrats")`
+  réécrit avec des données synthétiques (pas les vraies données, indisponibles depuis mars 2025).
+- **C** (`d98664c`) — UI : section « Mon indemnisation en cours » dans `MonProfil.tsx` (3 champs
+  guidés + éditeur de périodes AJ déplacé depuis `RevenusMensuels.tsx`).
+- **D-storage** (`431d42f`) — Zod + 2 nouvelles migrations silencieuses (`ajReelleHistorique`
+  solde→profil, solde trimmé vers `{ dateDepart }` — aucune reconstruction d'`ouvertureDroits`
+  possible depuis les anciennes valeurs, devoir n°2).
+- **D+E** (`867b895`) — `RevenusMensuels.tsx` : formulaire de configuration réduit à un seul champ
+  (`dateDepart`) ; garde-fou `ouvertureDroits` absent (encart ambre + lien direct vers « Mon
+  profil »).
+
+146 tests verts, `tsc -b` propre à chaque étape. **Vérifié dans le navigateur de bout en bout** :
+gate `ouvertureDroits` absent + navigation vers le profil, saisie complète, tableau résultant —
+mois antérieur à `dateDepart` simulé mais masqué, 6 mois suivants vérifiés au centime près à la
+main (délai, franchise CP, montants).
 
 ## Ensuite (backlog)
 

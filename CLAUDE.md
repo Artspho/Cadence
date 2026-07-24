@@ -497,9 +497,9 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 - ✅ **Chantier `ajReelleHistorique` (2026-07-24)** : `SoldeIndemnisationDepart.ajReelle: number |
   null` remplacé par `ajReelleHistorique: {dateEffet, valeur}[]` — un utilisateur peut connaître
   plusieurs taux d'AJ réelle successifs sur une même période d'indemnisation (ex. 54,55 € jusqu'au
-  17/01/2026 puis 55,02 € à partir du 18/01/2026). Reste sur `SoldeIndemnisationDepart` (pas
-  déplacé vers `Profil`, décision actée avec l'utilisateur : évite le circuit des 3 portes de
-  cohérence sans bénéfice fonctionnel pour la bêta). `engine/ajReelleUtils.ts` (`getAjReelleAt`)
+  17/01/2026 puis 55,02 € à partir du 18/01/2026). Restait alors sur `SoldeIndemnisationDepart`
+  (**décision revue le 2026-07-25**, cf. chantier `Profil.ouvertureDroits` ci-dessous : déplacé vers
+  `Profil`, l'usage réel de `SoldeIndemnisationDepart` a fini par disparaître entièrement). `engine/ajReelleUtils.ts` (`getAjReelleAt`)
   cherche le taux applicable à une date ; nouveau type discriminé `MontantMensuelResultat` +
   champ `MoisIndemnisationResultat.montantMensuel`, calculé uniquement dans la fonction de série
   du module (le `moisLabel` de `calculerMoisIndemnisation`/`calculerSerieIndemnisation` reste
@@ -520,7 +520,7 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
   `diviseurJoursTravaillesA10`, vestige inutilisé jusqu'ici) — validée mot pour mot sur 4 mois
   réels indépendants (fév/mars/avril/mai 2026, zéro écart). `calculerSerieDepuisContrats` remplace
   `calculerSerieDepuisDeclarations` : agrège `repartirContratParMois` de tous les contrats par
-  mois, plage = [mois du solde de départ .. dernier mois avec contrat ou aujourd'hui]. **`Declaration
+  mois (plage revue le 2026-07-25, cf. chantier `Profil.ouvertureDroits` ci-dessous). **`Declaration
   Mensuelle` supprimée entièrement** (types, storage, UI) — la saisie manuelle des jours déclarés
   est remplacée par un calcul automatique depuis les vrais contrats ; `RevenusMensuels.tsx` : plus
   de formulaire "Ajouter un mois" ni de badge "provisoire", colonne "Heures travaillées" affichée à
@@ -533,6 +533,26 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
   volontairement non touché — compteur distinct, hors périmètre. 145 tests verts, `tsc -b` propre,
   vérifié dans le navigateur (7 contrats réels, 4 mois certifiés exacts en bout en bout). Détail
   complet : `docs/reprise.md`.
+- ✅ **Chantier `Profil.ouvertureDroits` (2026-07-25)** : remplace la saisie manuelle d'un solde de
+  mi-parcours (`SoldeIndemnisationDepart.delaiRestant`/`franchiseCPRestante`/`quotaCPCarryOver`,
+  retirés) par une simulation automatique depuis la VRAIE date d'ouverture des droits.
+  `Profil.ouvertureDroits: { dateOuverture, franchiseCPTotale, delaiAttenteInitial }` saisi une
+  fois depuis la notification France Travail ; `ajReelleHistorique` déplacé ici depuis
+  `SoldeIndemnisationDepart` (même raisonnement). `SoldeIndemnisationDepart` ne porte plus que
+  `dateDepart` — un filtre d'affichage : `calculerSerieDepuisContrats` simule depuis
+  `ouvertureDroits.dateOuverture` en continu (mois antérieurs à `dateDepart` simulés mais jamais
+  montrés, nécessaire pour un état correct au premier mois affiché), retourne
+  `SerieIndemnisationResultat` (`calculable: false` si `ouvertureDroits` absent — aucun point de
+  départ inventé, devoir n°2). Corrige au passage une limite connue : le palier du forfait CP
+  (2j/3j) se décide désormais sur la franchise TOTALE (constante), pas sur le restant courant.
+  UI : nouvelle section « Mon indemnisation en cours » dans `MonProfil.tsx` (3 champs guidés +
+  éditeur AJ déplacé depuis `RevenusMensuels.tsx`) ; `RevenusMensuels.tsx` simplifié à un seul
+  champ de configuration (`dateDepart`) + garde-fou si `ouvertureDroits` absent (encart ambre, lien
+  direct vers le profil). **Origine notable** : la proposition initiale contenait une formule
+  auto-annulante (`franchiseTotale − moisÉcoulés × 2` ≈ 0 toujours) — signalée avant tout code,
+  résolue par ce refactor plus profond plutôt qu'un correctif de formule ponctuel. 146 tests verts,
+  `tsc -b` propre, vérifié dans le navigateur de bout en bout (mois masqués avant `dateDepart`,
+  6 mois vérifiés au centime près à la main). Détail complet : `docs/reprise.md`.
 - ⬜ **Non traité (V2/V3) :** coordination européenne (périodes U1/PDU1) — même famille qu'Annexe 8/article 65, hors périmètre Annexe 10 pur. Aucune logique ni champ de données ne l'anticipe encore (détail dans `docs/SPEC.md` §10 et §11.C). Ne pas confondre avec le champ `territoire` du contrat, qui couvre un cas différent (cachet ponctuel joué en EEE/Suisse/UK mais déclaré en France).
 - 🔁 **Maintenance de la config** (récurrent, perso — hors app, pas de backend en bêta) : une fois
   par mois, vérifier à la source officielle SMIC (horaire / mensuel / journalier), PMSS, et les
