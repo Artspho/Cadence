@@ -57,6 +57,7 @@ export const profilSchema = z
         dateOuverture: z.string(),
         franchiseCPTotale: z.number(),
         delaiAttenteInitial: z.number(),
+        tauxPrelevementSource: z.number().optional(), // % PAS, cf. types/index.ts
       })
       .optional(),
   })
