@@ -272,7 +272,9 @@ function TableauResultats({
                   )}
                   <td className="text-right px-4 py-3 text-muted">{m.salairesContratsBruts > 0 ? `${m.salairesContratsBruts.toFixed(2)} €` : "—"}</td>
                   <td className="text-right px-4 py-3">{m.salairesContratsBruts > 0 ? <NetContratsPremiumCell /> : "—"}</td>
-                  <td className="text-right px-4 py-3 font-semibold text-mint">{are === 0 && m.salairesContratsBruts === 0 ? "—" : `${revenuTotal.toFixed(2)} €`}</td>
+                  {/* Revenu total flouté systématiquement (même sans contrat, donc même pour un
+                      total ARE seul) — jamais un chiffre en clair sur cette colonne. */}
+                  <td className="text-right px-4 py-3">{are === 0 && m.salairesContratsBruts === 0 ? "—" : <NetContratsPremiumCell />}</td>
                 </tr>
               );
             })}
@@ -290,9 +292,15 @@ function TableauResultats({
               </td>
               <td className="text-right px-4 py-3">{totalContrats > 0 ? `${totalContrats.toFixed(2)} €` : "—"}</td>
               {/* Jamais de total ici : "Net contrats" est un teaser Premium, aucun chiffre réel à
-                  additionner, encore moins avec l'ARE (cf. totalARE/totalRevenu ci-dessus, intouchés). */}
+                  additionner, encore moins avec l'ARE. */}
               <td className="text-right px-4 py-3">—</td>
-              <td className="text-right px-4 py-3 font-semibold text-mint">{totalRevenu === 0 ? "—" : `${totalRevenu.toFixed(2)} €`}</td>
+              {/* "Revenu total" : flouté dès qu'au moins un mois de la période a des revenus
+                  contrats (totalContrats > 0) — le total mélangerait alors du net ARE certain avec
+                  du brut contrats, jamais présenté comme un chiffre final propre. Si aucun mois
+                  n'a de contrat, le total est de l'ARE pur, déjà connu, rien à cacher. */}
+              <td className="text-right px-4 py-3 font-semibold text-mint">
+                {totalRevenu === 0 ? "—" : totalContrats > 0 ? <NetContratsPremiumCell /> : `${totalRevenu.toFixed(2)} €`}
+              </td>
             </tr>
           </tfoot>
         </table>
