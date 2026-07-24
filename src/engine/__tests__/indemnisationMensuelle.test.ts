@@ -107,6 +107,31 @@ describe("calculerSerieDepuisContrats", () => {
     expect(resultats.map((r) => r.joursIndemnises)).toEqual([0, 17, 18, 29]);
   });
 
+  it("régression : les contrats artiste comptent bien, mélangés avec un enseignement récurrent sur le même mois (bug signalé, non reproduit)", () => {
+    const enseignementRecurrent = ["2026-02", "2026-03", "2026-04", "2026-05", "2026-06"].map((mois) =>
+      contrat({
+        dateDebut: `${mois}-01`,
+        date: `${mois}-28`,
+        employeur: "Commune de Levallois Perret",
+        type: "enseignement",
+        typeRemuneration: "heures",
+        nbHeures: 21,
+        salaireBrut: 465,
+        etablissementAgree: true,
+        enRapportAvecMetier: true,
+      }),
+    );
+    const artisteJuin = [
+      contrat({ dateDebut: "2026-06-05", date: "2026-06-05", employeur: "Les Arts Phocéens", type: "artiste", typeRemuneration: "heures", nbHeures: 48, salaireBrut: 800 }),
+      contrat({ dateDebut: "2026-06-12", date: "2026-06-12", employeur: "Les Arts Phocéens", type: "artiste", typeRemuneration: "heures", nbHeures: 26, salaireBrut: 400 }),
+      contrat({ dateDebut: "2026-06-20", date: "2026-06-20", employeur: "Les Arts Phocéens", type: "artiste", typeRemuneration: "cachet", nbCachets: 6, salaireBrut: 700 }), // 72h
+    ];
+    const resultats = calculerSerieDepuisContrats(soldeDepart, [...enseignementRecurrent, ...artisteJuin], "2026-06-30", franceTravailConfig);
+    const juin = resultats.find((r) => r.moisLabel === "2026-06");
+    expect(juin?.heuresDuMois).toBe(167); // 21 (Levallois) + 48 + 26 + 72 (Arts Phocéens) — pas 21
+    expect(juin?.joursNonIndemnisables).toBe(21); // floor(167 × 1,3 / 10) = floor(21,71) = 21
+  });
+
   it("un mois sans aucun contrat obtient 0 h (pas d'absence silencieuse)", () => {
     // Seuls fév et avril ont un contrat ; mars et mai doivent quand même apparaître, à 0 h.
     const resultats = calculerSerieDepuisContrats(soldeDepart, [contratsCertifies[0], contratsCertifies[2]], "2026-05-31", franceTravailConfig);
