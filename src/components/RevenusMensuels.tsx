@@ -30,7 +30,7 @@ export function RevenusMensuels({ profil, soldeDepart, contrats, config, onConfi
 
   return (
     <div className="space-y-6 max-w-[900px]">
-      <SoldeRecap solde={soldeDepart} />
+      <SoldeRecap solde={soldeDepart} onConfigurer={onConfigurerSolde} />
       <TableauResultats profil={profil} soldeDepart={soldeDepart} contrats={contrats} config={config} dateDuJour={dateDuJour} />
     </div>
   );
@@ -91,10 +91,55 @@ function ConfigurationSolde({ dateDuJour, onConfigurer }: { dateDuJour: string; 
   );
 }
 
-function SoldeRecap({ solde }: { solde: SoldeIndemnisationDepart }) {
+function SoldeRecap({ solde, onConfigurer }: { solde: SoldeIndemnisationDepart; onConfigurer: (solde: SoldeIndemnisationDepart) => void }) {
+  const [modification, setModification] = useState(false);
+  const [dateDepart, setDateDepart] = useState(solde.dateDepart);
+
+  if (modification) {
+    return (
+      <div className="bg-surface border border-line rounded-card p-4 text-sm text-muted flex flex-wrap items-center gap-3">
+        <label htmlFor="ri-date-depart-modif" className="text-ink">
+          Tableau affiché à partir de :
+        </label>
+        <input
+          id="ri-date-depart-modif"
+          type="date"
+          value={dateDepart}
+          onChange={(e) => setDateDepart(e.target.value)}
+          className="bg-surface-2 border border-line rounded-lg px-3 py-1.5 text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-mint"
+        />
+        <button
+          onClick={() => {
+            if (!dateDepart) return;
+            onConfigurer({ dateDepart });
+            setModification(false);
+          }}
+          disabled={!dateDepart}
+          className="bg-mint text-bg font-medium rounded-lg px-3 py-1.5 text-xs disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          Enregistrer
+        </button>
+        <button
+          onClick={() => {
+            setDateDepart(solde.dateDepart);
+            setModification(false);
+          }}
+          className="px-3 py-1.5 rounded-lg border border-line text-muted text-xs"
+        >
+          Annuler
+        </button>
+      </div>
+    );
+  }
+
   return (
-    <div className="bg-surface border border-line rounded-card p-4 text-sm text-muted">
-      Tableau affiché à partir de : <span className="text-ink">{solde.dateDepart}</span>
+    <div className="bg-surface border border-line rounded-card p-4 text-sm text-muted flex flex-wrap items-center gap-3">
+      <span>
+        Tableau affiché à partir de : <span className="text-ink">{solde.dateDepart}</span>
+      </span>
+      <button onClick={() => setModification(true)} className="text-xs text-mint hover:underline">
+        Modifier
+      </button>
     </div>
   );
 }
