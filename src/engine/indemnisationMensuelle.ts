@@ -43,6 +43,42 @@ function calculerMontantMensuel(joursIndemnises: number, debutDuMoisISO: string,
   return { calculable: true, montant, ajUtilisee, montantNet };
 }
 
+// TODO : mois de transition
+//
+// Le mois contenant la date anniversaire (renouvellement de droits) peut être coupé en deux
+// périodes distinctes — cf. janvier 2026 de Benoît : ancien droit (AJ 54,55 €) jusqu'au 17/01,
+// nouveau droit (AJ 55,02 €, nouveau délai d'attente) à partir du 18/01. Trois questions restent
+// ouvertes, à trancher avec l'utilisateur avant d'écrire la moindre logique :
+//
+// Q1 — Mécanique du mois coupé : France Travail calcule-t-il en deux passes séparées (chaque
+// droit sur ses propres jours, chacun avec son propre décompte non-indemnisable/délai/franchise
+// CP) ou fait-il une moyenne pondérée sur le mois entier ? D'après le relevé réel de janvier 2026
+// (ancien droit : 54,55 €, 13 AJ payées ; nouveau droit : démarre le 18/01 avec son propre délai
+// d'attente, absorbé ce mois-là — cf. docs/reprise.md, "régularisé") la réponse semble être deux
+// passes séparées, pas une moyenne — à confirmer explicitement avant de modéliser quoi que ce
+// soit (le cas janvier 2026 est qualifié de "régularisé" dans docs/reprise.md, donc pas un
+// exemple standard à généraliser sans vérification).
+//
+// Q2 — tauxPrelevementSource multi-années : c'est aujourd'hui un scalaire unique sur
+// Profil.ouvertureDroits (cf. types/index.ts). Le taux PAS peut changer d'une année sur l'autre
+// (nouveau taux transmis par la DGFIP à France Travail, généralement en septembre pour l'année
+// suivante) — un droit qui chevauche deux années civiles peut donc avoir deux taux différents en
+// cours de route. Deux options, à trancher avant de toucher la structure : (a) un tableau
+// `{ annee: number; taux: number }[]`, même famille que `ajReelleHistorique` ; ou (b) garder le
+// scalaire et ajouter une alerte du type "ton taux PAS a peut-être changé en janvier, pense à le
+// mettre à jour" plutôt qu'une vraie modélisation temporelle.
+//
+// Q3 — Affichage du mois de transition dans RevenusMensuels.tsx : une ligne par droit (deux
+// lignes pour janvier, chacune avec ses propres jours/AJ/montant) ? Une seule ligne fusionnée
+// avec un badge "transition" et un montant approximatif ? Ou ne pas afficher ce mois du tout et
+// renvoyer explicitement vers le relevé officiel (devoir n°2 : jamais un chiffre approximatif
+// présenté comme certain) ?
+//
+// Aucune des trois n'est câblée : `calculerSerieDepuisContrats` traite aujourd'hui chaque mois
+// civil comme un bloc unique (un seul `ouvertureDroits`, un seul taux), donc un vrai mois de
+// transition produirait un résultat simplifié plutôt qu'un chiffre inventé de toutes pièces — mais
+// pas nécessairement le bon chiffre. À reprendre une fois les 3 questions tranchées.
+
 // Palier bas/haut du forfait mensuel de franchise CP, décidé par la franchise TOTALE accordée à
 // l'ouverture des droits (Profil.ouvertureDroits.franchiseCPTotale) — pas par le restant courant.
 // Corrige une limite connue (cf. docs/reprise.md, 2026-07-23) : baser la décision sur le restant

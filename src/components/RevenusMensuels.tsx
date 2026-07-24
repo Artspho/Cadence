@@ -201,7 +201,7 @@ function TableauResultats({
               <th className="text-right px-4 py-3">Délai</th>
               <th className="text-right px-4 py-3">Franchise CP</th>
               <th className="text-right px-4 py-3">Jours indemnisés</th>
-              <th className="text-right px-4 py-3">{tauxRenseigne ? "Montant brut" : "≈ Montant (AJ relevé)"}</th>
+              <th className="text-right px-4 py-3">{tauxRenseigne ? "Montant net avant PAS" : "≈ Montant (AJ relevé)"}</th>
               {tauxRenseigne && <th className="text-right px-4 py-3">≈ Net reçu</th>}
             </tr>
           </thead>
