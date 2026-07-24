@@ -343,6 +343,9 @@ export interface MoisIndemnisationResultat {
   soldeFin: SoldeIndemnisation; // à réinjecter comme soldeDepart du mois suivant
   franchiseSalaires: FranchiseSalairesResultat;
   montantMensuel: MontantMensuelResultat;
+  // Somme des salaireBrut des contrats attribués à ce mois calendaire après repartirContratParMois.
+  // Toujours >= 0. Inclut enseignement (Levallois etc.) et spectacle.
+  salairesContratsBruts: number;
 }
 
 // Mois de réadmission (transition entre deux droits) : `ouvertureDroits.dateOuverture` ne tombe
@@ -354,6 +357,9 @@ export interface MoisReadmissionNonCalcule {
   type: "readmission";
   moisLabel: string; // ISO "YYYY-MM"
   messageTooltip: string;
+  // Toujours 0 (jamais calculé pour ce mois) — présent uniquement pour que RevenusMensuels.tsx
+  // puisse itérer sur un seul tableau sans garde-fou spécifique à ce champ, cf. LigneSerieIndemnisation.
+  salairesContratsBruts: number;
 }
 
 // Une ligne de la série mensuelle affichée : soit un mois normalement calculé, soit un mois de

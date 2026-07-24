@@ -153,6 +153,9 @@ export function calculerMoisIndemnisation(
     },
     franchiseSalaires,
     montantMensuel: MONTANT_MENSUEL_INDISPONIBLE,
+    // Placeholder, même mécanique que montantMensuel ci-dessus : calculerMoisIndemnisation n'a pas
+    // accès aux contrats — seul calculerSerieDepuisContrats recalcule ce champ correctement.
+    salairesContratsBruts: 0,
   };
 }
 
@@ -225,9 +228,14 @@ export function calculerSerieDepuisContrats(
   const moisDebutCalcul = estMoisReadmission ? moisSuivant(moisOuverture) : moisOuverture;
 
   const heuresParMois = new Map<string, number>();
+  // Salaires bruts des contrats attribués à chaque mois (repartirContratParMois prorate déjà
+  // salaireBrut au même titre que les heures) — enseignement ET spectacle, aucun filtre de type
+  // ici (à la différence de SR/NHT dans salaireReference.ts, un compteur volontairement distinct).
+  const salairesParMois = new Map<string, number>();
   for (const contrat of contrats) {
     for (const part of repartirContratParMois(contrat, config)) {
       heuresParMois.set(part.moisCle, (heuresParMois.get(part.moisCle) ?? 0) + part.heures);
+      salairesParMois.set(part.moisCle, (salairesParMois.get(part.moisCle) ?? 0) + part.salaireBrut);
     }
   }
 
@@ -265,6 +273,7 @@ export function calculerSerieDepuisContrats(
     .map((resultat) => ({
       ...resultat,
       montantMensuel: calculerMontantMensuel(resultat.joursIndemnises, `${resultat.moisLabel}-01`, profil.ajReelleHistorique, ouvertureDroits.tauxPrelevementSource),
+      salairesContratsBruts: salairesParMois.get(resultat.moisLabel) ?? 0,
     }));
 
   // Ligne "mois de réadmission" (Q3) : seulement si ce mois entre dans la plage affichée
@@ -277,6 +286,7 @@ export function calculerSerieDepuisContrats(
             type: "readmission",
             moisLabel: moisOuverture,
             messageTooltip: "Mois de réadmission — le calcul est partagé entre deux droits. Consulte ton relevé France Travail pour le montant exact.",
+            salairesContratsBruts: 0,
           },
         ]
       : [];

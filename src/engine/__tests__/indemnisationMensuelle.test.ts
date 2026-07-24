@@ -171,6 +171,36 @@ describe("calculerSerieDepuisContrats", () => {
     expect(mars.heuresDuMois).toBe(0); // mars : aucun contrat -> 0 h, pas absent du tableau
   });
 
+  it("salairesContratsBruts : somme les salaireBrut de tous les contrats du mois (enseignement + spectacle)", () => {
+    const p = profil({ ouvertureDroits });
+    const contratEnseignement = contrat({
+      dateDebut: "2026-02-01",
+      date: "2026-02-01",
+      type: "enseignement",
+      typeRemuneration: "heures",
+      nbHeures: 21,
+      salaireBrut: 1000,
+      etablissementAgree: true,
+      enRapportAvecMetier: true,
+    });
+    const contratSpectacle = contrat({ dateDebut: "2026-02-10", date: "2026-02-10", typeRemuneration: "cachet", nbCachets: 1, salaireBrut: 500 });
+    const resultat = calculerSerieDepuisContrats(p, { dateDepart: "2026-02-01" }, [contratEnseignement, contratSpectacle], "2026-02-28", franceTravailConfig);
+    if (!resultat.calculable) throw new Error("devrait être calculable");
+    const premier = resultat.mois[0];
+    if (!premier.calculable) throw new Error("devrait être calculable (pas un mois de réadmission)");
+    expect(premier.salairesContratsBruts).toBe(1500);
+  });
+
+  it("salairesContratsBruts = 0 pour un mois sans aucun contrat", () => {
+    const p = profil({ ouvertureDroits });
+    const contratFevrier = contrat({ dateDebut: "2026-02-10", date: "2026-02-10", typeRemuneration: "heures", nbHeures: 10, salaireBrut: 200 });
+    const resultat = calculerSerieDepuisContrats(p, { dateDepart: "2026-02-01" }, [contratFevrier], "2026-03-31", franceTravailConfig);
+    if (!resultat.calculable) throw new Error("devrait être calculable");
+    const mars = resultat.mois[1];
+    if (!mars.calculable) throw new Error("devrait être calculable (pas un mois de réadmission)");
+    expect(mars.salairesContratsBruts).toBe(0);
+  });
+
   it("dateDepart borne seulement l'affichage : les mois simulés avant restent cachés, pas absents du calcul", () => {
     const p = profil({ ouvertureDroits });
     const contratJanvier = contrat({ dateDebut: "2026-02-05", date: "2026-02-05", typeRemuneration: "heures", nbHeures: 10, salaireBrut: 0 });

@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import type { Contrat, Profil, SoldeIndemnisationDepart } from "../types";
+import type { Contrat, MoisIndemnisationResultat, Profil, SoldeIndemnisationDepart } from "../types";
 import type { FranceTravailConfig } from "../config/franceTravailConfig";
 import { calculerSerieDepuisContrats } from "../engine/indemnisationMensuelle";
 
@@ -195,6 +195,18 @@ function TableauResultats({
   // tableau (cf. calculerSerieDepuisContrats, engine/indemnisationMensuelle.ts).
   const franchiseSalaires = mois.find((m) => m.calculable)?.franchiseSalaires;
 
+  // Revenu ARE du mois : net avant PAS si le taux est renseigné, montant sinon, 0 si le mois n'a
+  // pas d'AJ connue pour sa période (traité comme "pas d'ARE ce mois-ci", pas une erreur).
+  function revenuARE(m: MoisIndemnisationResultat): number {
+    if (!m.montantMensuel.calculable) return 0;
+    return tauxRenseigne && m.montantMensuel.montantNet != null ? m.montantMensuel.montantNet : m.montantMensuel.montant;
+  }
+
+  const moisCalcules = mois.filter((m): m is MoisIndemnisationResultat => m.calculable);
+  const totalARE = moisCalcules.reduce((acc, m) => acc + revenuARE(m), 0);
+  const totalContrats = moisCalcules.reduce((acc, m) => acc + m.salairesContratsBruts, 0);
+  const totalRevenu = totalARE + totalContrats;
+
   return (
     <div className="bg-surface border border-line rounded-card overflow-hidden">
       <div className="overflow-x-auto">
@@ -209,6 +221,8 @@ function TableauResultats({
               <th className="text-right px-4 py-3">Jours indemnisés</th>
               <th className="text-right px-4 py-3">{tauxRenseigne ? "Montant net avant PAS" : "≈ Montant (AJ relevé)"}</th>
               {tauxRenseigne && <th className="text-right px-4 py-3">≈ Net reçu</th>}
+              <th className="text-right px-4 py-3">Revenus contrats</th>
+              <th className="text-right px-4 py-3">Revenu total</th>
             </tr>
           </thead>
           <tbody>
@@ -233,9 +247,13 @@ function TableauResultats({
                     <td className="text-right px-4 py-3">—</td>
                     <td className="text-right px-4 py-3">—</td>
                     {tauxRenseigne && <td className="text-right px-4 py-3">—</td>}
+                    <td className="text-right px-4 py-3">—</td>
+                    <td className="text-right px-4 py-3">—</td>
                   </tr>
                 );
               }
+              const are = revenuARE(m);
+              const revenuTotal = are + m.salairesContratsBruts;
               return (
                 <tr key={m.moisLabel} className="border-b border-line last:border-0">
                   <td className="px-4 py-3">{m.moisLabel}</td>
@@ -250,10 +268,27 @@ function TableauResultats({
                       {m.montantMensuel.calculable && m.montantMensuel.montantNet != null ? `${m.montantMensuel.montantNet.toFixed(2)} €` : "—"}
                     </td>
                   )}
+                  <td className="text-right px-4 py-3 text-muted">{m.salairesContratsBruts > 0 ? `${m.salairesContratsBruts.toFixed(2)} €` : "—"}</td>
+                  <td className="text-right px-4 py-3 font-semibold text-mint">{are === 0 && m.salairesContratsBruts === 0 ? "—" : `${revenuTotal.toFixed(2)} €`}</td>
                 </tr>
               );
             })}
           </tbody>
+          <tfoot>
+            <tr className="border-t border-line font-medium">
+              <td className="px-4 py-3" colSpan={6}>
+                Total
+              </td>
+              {/* ARE : une seule cellule totalisée, fusionnée sur "Montant..."/"Net reçu" — c'est le
+                  même chiffre final que revenuARE(m) utilise déjà par ligne, pas la peine de
+                  dupliquer un total "avant PAS" que personne n'a demandé. */}
+              <td className="text-right px-4 py-3" colSpan={tauxRenseigne ? 2 : 1}>
+                {totalARE === 0 ? "—" : `${totalARE.toFixed(2)} €`}
+              </td>
+              <td className="text-right px-4 py-3">{totalContrats > 0 ? `${totalContrats.toFixed(2)} €` : "—"}</td>
+              <td className="text-right px-4 py-3 font-semibold text-mint">{totalRevenu === 0 ? "—" : `${totalRevenu.toFixed(2)} €`}</td>
+            </tr>
+          </tfoot>
         </table>
       </div>
       <div className="px-4 py-3 border-t border-line text-xs space-y-1">
