@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { franceTravailConfig } from "../../config/franceTravailConfig";
 import { calculerAJBrute } from "../areBrute";
-import { calculerAJNette, calculerSJR } from "../areNette";
+import { calculerAJNette, calculerSJM } from "../areNette";
 import { profil } from "./testUtils";
 
 describe("calculerAJNette", () => {
@@ -12,17 +12,17 @@ describe("calculerAJNette", () => {
   });
 
   it("seule la retraite complémentaire s'applique entre 31,96 € et 60 €", () => {
-    const sjr = 100;
-    const resultat = calculerAJNette(50, sjr, profil(), franceTravailConfig);
-    const retraiteAttendue = 0.0093 * sjr;
+    const sjm = 100;
+    const resultat = calculerAJNette(50, sjm, profil(), franceTravailConfig);
+    const retraiteAttendue = 0.0093 * sjm;
     expect(resultat.net).toBeCloseTo(50 - retraiteAttendue, 5);
     expect(resultat.detailCotisations).toHaveLength(1);
   });
 
-  it("retraite + CSG + CRDS s'appliquent au-delà de 60 €, assiette = 98,25 % de l'allocation APRÈS retraite (pas le SJR)", () => {
-    const sjr = 100;
-    const resultat = calculerAJNette(100, sjr, profil({ baremeCSG: "normal" }), franceTravailConfig);
-    const retraite = 0.0093 * sjr;
+  it("retraite + CSG + CRDS s'appliquent au-delà de 60 €, assiette = 98,25 % de l'allocation APRÈS retraite (pas le SJM)", () => {
+    const sjm = 100;
+    const resultat = calculerAJNette(100, sjm, profil({ baremeCSG: "normal" }), franceTravailConfig);
+    const retraite = 0.0093 * sjm;
     const netApresRetraite = 100 - retraite;
     const assiette = 0.9825 * netApresRetraite;
     const attendu = netApresRetraite - 0.062 * assiette - 0.005 * assiette;
@@ -31,17 +31,17 @@ describe("calculerAJNette", () => {
   });
 
   it("le barème CSG réduit change le montant net", () => {
-    const sjr = 100;
-    const normal = calculerAJNette(100, sjr, profil({ baremeCSG: "normal" }), franceTravailConfig);
-    const reduit = calculerAJNette(100, sjr, profil({ baremeCSG: "reduit" }), franceTravailConfig);
+    const sjm = 100;
+    const normal = calculerAJNette(100, sjm, profil({ baremeCSG: "normal" }), franceTravailConfig);
+    const reduit = calculerAJNette(100, sjm, profil({ baremeCSG: "reduit" }), franceTravailConfig);
     expect(reduit.net).toBeGreaterThan(normal.net);
   });
 
-  it("le régime Alsace-Moselle retire 1,5 % supplémentaire du SJR", () => {
-    const sjr = 100;
-    const sansAlsace = calculerAJNette(100, sjr, profil({ alsaceMoselle: false }), franceTravailConfig);
-    const avecAlsace = calculerAJNette(100, sjr, profil({ alsaceMoselle: true }), franceTravailConfig);
-    expect(sansAlsace.net - avecAlsace.net).toBeCloseTo(0.015 * sjr, 5);
+  it("le régime Alsace-Moselle retire 1,5 % supplémentaire du SJM", () => {
+    const sjm = 100;
+    const sansAlsace = calculerAJNette(100, sjm, profil({ alsaceMoselle: false }), franceTravailConfig);
+    const avecAlsace = calculerAJNette(100, sjm, profil({ alsaceMoselle: true }), franceTravailConfig);
+    expect(sansAlsace.net - avecAlsace.net).toBeCloseTo(0.015 * sjm, 5);
   });
 
   it("bande 60-62 € : allocation déjà au plancher (ou en dessous) après retraite → aucune CSG/CRDS, jamais de montant négatif", () => {
@@ -67,8 +67,8 @@ describe("calculerAJNette", () => {
       const ajBrute = calculerAJBrute({ salaireRetenu: 14579, nht: 710, config: franceTravailConfig });
       expect(ajBrute.brut).toBeCloseTo(65.59, 1);
 
-      const sjr = calculerSJR(14579, 710, franceTravailConfig);
-      const resultat = calculerAJNette(ajBrute.brut, sjr, profil({ alsaceMoselle: false }), franceTravailConfig);
+      const sjm = calculerSJM(14579, 710, franceTravailConfig);
+      const resultat = calculerAJNette(ajBrute.brut, sjm, profil({ alsaceMoselle: false }), franceTravailConfig);
 
       const retraite = resultat.detailCotisations.find((c) => c.libelle.includes("Retraite"));
       const csgCrds = resultat.detailCotisations.find((c) => c.libelle.includes("écrêtées"));
@@ -82,8 +82,8 @@ describe("calculerAJNette", () => {
       const ajBrute = calculerAJBrute({ salaireRetenu: 50000, nht: 710, config: franceTravailConfig });
       expect(ajBrute.brut).toBeCloseTo(76.91, 1);
 
-      const sjr = calculerSJR(50000, 710, franceTravailConfig);
-      const resultat = calculerAJNette(ajBrute.brut, sjr, profil({ alsaceMoselle: false }), franceTravailConfig);
+      const sjm = calculerSJM(50000, 710, franceTravailConfig);
+      const resultat = calculerAJNette(ajBrute.brut, sjm, profil({ alsaceMoselle: false }), franceTravailConfig);
 
       const retraite = resultat.detailCotisations.find((c) => c.libelle.includes("Retraite"));
       const csg = resultat.detailCotisations.find((c) => c.libelle.startsWith("CSG ("));

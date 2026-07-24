@@ -81,7 +81,7 @@ export function DetailCalcul({ decompte, ajBrute, ajNette, sr, nht, sar }: Detai
 
         <Section titre="AJ nette estimée">
           {ligne("AJ brute", `${ajNette.brut.toFixed(2)} €`)}
-          {ligne("SJR", `${ajNette.sjr.toFixed(2)} €`)}
+          {ligne("SJM", `${ajNette.sjm.toFixed(2)} €`)}
           {ajNette.detailCotisations.length === 0 && ligne("Prélèvements", "aucun — AJ brute sous le seuil d'exonération")}
           {ajNette.detailCotisations.map((c, i) => (
             <div key={i}>{ligne(c.libelle, `− ${c.montant.toFixed(2)} €`)}</div>

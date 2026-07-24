@@ -318,9 +318,9 @@ describe("calculerFranchiseSalaires — formule certifiée le 2026-07-23 (ARTCEN
     const smicMensuel = 1867.02; // valeur au 01/06/2026
     const smicJournalier = 86.17;
     const srTotal = smicMensuel * 30; // SR / smicMensuel = 30, exactement
-    const sjr = 3 * smicJournalier * 2; // SJR / (3 × smicJournalier) = 2, exactement
+    const sjm = 3 * smicJournalier * 2; // SJM / (3 × smicJournalier) = 2, exactement
     const p = profil({ dateAnniversaire: "2026-12-31" }); // après le 01/06/2026
-    const resultat = calculerFranchiseSalaires(srTotal, sjr, p, franceTravailConfig);
+    const resultat = calculerFranchiseSalaires(srTotal, sjm, p, franceTravailConfig);
     // 30 × 2 − 27 = 33
     expect(resultat).toEqual({ valeur: 33, totalNonVerifie: true, sousEstimeeHorsA10: true });
   });
@@ -335,9 +335,9 @@ describe("calculerFranchiseSalaires — formule certifiée le 2026-07-23 (ARTCEN
     const smicMensuel = 1823.03; // valeur au 01/01/2026, PAS la valeur courante (1867,02 au 01/06/2026)
     const smicJournalier = 84.14;
     const srTotal = smicMensuel * 30;
-    const sjr = 3 * smicJournalier * 2;
+    const sjm = 3 * smicJournalier * 2;
     const p = profil({ dateAnniversaire: "2026-03-15" }); // avant la revalorisation du 01/06/2026
-    const resultat = calculerFranchiseSalaires(srTotal, sjr, p, franceTravailConfig);
+    const resultat = calculerFranchiseSalaires(srTotal, sjm, p, franceTravailConfig);
     expect(resultat).toEqual({ valeur: 33, totalNonVerifie: true, sousEstimeeHorsA10: true });
   });
 

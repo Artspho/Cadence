@@ -69,11 +69,11 @@ export const franceTravailConfig = {
   cotisations: {
     seuilExoneration: 31.96, // ✅ AJ brute < ce seuil : aucune cotisation
     seuilRetraiteCompl: 60, // ✅ 31,96 < AJ ≤ 60 : retraite compl. seule
-    tauxRetraiteComplementaire: 0.0093, // ✅ 0,93 % du SJR (Salaire Journalier de Référence) — relevé FT confirmé
+    tauxRetraiteComplementaire: 0.0093, // ✅ 0,93 % du SJM
     tauxCSG: { normal: 0.062, reduit: 0.038 }, // ✅ selon barème d'imposition
     tauxCRDS: 0.005, // ✅
     tauxAlsaceMoselle: 0.015, // ✅ régime local
-    diviseurSJR_Annexe10: 10, // ✅ SJR = SR / (NHTM / 10)
+    diviseurSJM_Annexe10: 10, // ✅ SJM = SR / (NHTM / 10)
     tauxAssietteCSGCRDS: 0.9825, // ✅ abattement de 1,75 % sur l'allocation après retraite — cf. docs/validation.md, cas #2/#3
     plancherEcretementJournalier: 62.0, // ✅ simulateur officiel FT (docs/validation.md, cas #2/#3) — distinct de valeursDatees.smicJournalierBrut (réservé à la franchise salaires, valeur/usage potentiellement différents)
   },
@@ -211,7 +211,7 @@ export const franceTravailConfigSchema = z.object({
     tauxCSG: z.object({ normal: z.number(), reduit: z.number() }),
     tauxCRDS: z.number(),
     tauxAlsaceMoselle: z.number(),
-    diviseurSJR_Annexe10: z.number().positive(),
+    diviseurSJM_Annexe10: z.number().positive(),
     tauxAssietteCSGCRDS: z.number().positive(),
     plancherEcretementJournalier: z.number().positive(),
   }),

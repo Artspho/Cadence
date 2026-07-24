@@ -102,7 +102,7 @@ function quotaMensuelSalaires(franchiseSalaires: FranchiseSalairesResultat, dure
 // constante sur toute la série, corrigeant la limite pour le nouveau chemin automatique.
 // `franchiseSalaires`/`dureeDroitsMois` : mêmes défauts (non certifiée / 12 mois) pour ne rien
 // changer au comportement des appelants qui ne les fournissent pas — seul
-// `calculerSerieDepuisContrats` peut fournir un résultat réel, et seulement si le SR/SJR
+// `calculerSerieDepuisContrats` peut fournir un résultat réel, et seulement si le SR/SJM
 // nécessaires à `calculerFranchiseSalaires` lui sont explicitement passés (cf. plus bas).
 export function calculerMoisIndemnisation(
   soldeDepart: SoldeIndemnisation,
@@ -200,7 +200,7 @@ export function calculerSerieIndemnisation(
  * inventé (devoir n°2).
  *
  * `srSjmPourFranchiseSalaires` optionnel : `calculerFranchiseSalaires` a besoin du SR (salaire de
- * référence) et du SJR, deux grandeurs du compteur "montant ARE" (`salaireReference.ts`), pas de
+ * référence) et du SJM, deux grandeurs du compteur "montant ARE" (`salaireReference.ts`), pas de
  * celui-ci ("jours indemnisés") — cf. règle d'or "deux compteurs, jamais mélangés". Tant qu'aucun
  * appelant ne les fournit explicitement, la franchise salaires reste `franchise_salaires_non_certifiee`
  * (comportement historique inchangé) plutôt que de deviner un total à partir de 0 (devoir n°2).
@@ -211,7 +211,7 @@ export function calculerSerieDepuisContrats(
   contrats: Contrat[],
   dateDuJour: string,
   config: FranceTravailConfig,
-  srSjmPourFranchiseSalaires?: { srContrats: number; sjr: number },
+  srSjmPourFranchiseSalaires?: { srContrats: number; sjm: number },
 ): SerieIndemnisationResultat {
   const { ouvertureDroits } = profil;
   if (!ouvertureDroits) {
@@ -251,7 +251,7 @@ export function calculerSerieDepuisContrats(
   // l'ouverture des droits, pas une valeur qui varie mois par mois). `valeur: null` -> restante à 0,
   // aucune application (devoir n°2) — cf. quotaMensuelSalaires, qui donne alors un quota de 0.
   const franchiseSalaires: FranchiseSalairesResultat = srSjmPourFranchiseSalaires
-    ? calculerFranchiseSalaires(srSjmPourFranchiseSalaires.srContrats, srSjmPourFranchiseSalaires.sjr, profil, config)
+    ? calculerFranchiseSalaires(srSjmPourFranchiseSalaires.srContrats, srSjmPourFranchiseSalaires.sjm, profil, config)
     : FRANCHISE_SALAIRES_NON_CERTIFIEE;
   const dureeDroitsMois = profil.dureeDroitsMois ?? 12;
 
@@ -302,7 +302,7 @@ function valeurALaDate(dateISO: string, historique: { dateEffet: string; valeur:
 }
 
 /**
- * Franchise salaires : `arrondi( (SR_total / SMIC_mensuel) × (SJR / (3 × SMIC_journalier)) −
+ * Franchise salaires : `arrondi( (SR_total / SMIC_mensuel) × (SJM / (3 × SMIC_journalier)) −
  * seuilNonIndemnisationJours )`, jamais négative. Formule confirmée mot pour mot depuis le texte
  * du guide officiel France Travail (`GUIDE-INTERMITTENT.pdf`, page 14, lu en entier le
  * 2026-07-24) — plus une extraction d'image incertaine. SMIC lu à la date de fin de PRA
@@ -319,12 +319,12 @@ function valeurALaDate(dateISO: string, historique: { dateEffet: string; valeur:
  * Répartition mensuelle câblée (2026-07-25, cf. quotaMensuelSalaires/SoldeIndemnisation ci-dessus) :
  * cette fonction calcule le TOTAL, consommé ensuite mois par mois sur `min(dureeDroitsMois,
  * repartitionMoisMax)` mois avec report du non-consommé — même mécanique que la franchise CP.
- * Reste non câblé : le SR/SJR réels ne sont fournis nulle part dans l'app (`calculerSerieDepuisContrats`
+ * Reste non câblé : le SR/SJM réels ne sont fournis nulle part dans l'app (`calculerSerieDepuisContrats`
  * les accepte en paramètre optionnel `srSjmPourFranchiseSalaires`, mais aucun appelant — RevenusMensuels.tsx,
  * alertes.ts — ne les calcule et ne les lui passe pour l'instant) : `calculerMoisIndemnisation` continue
  * donc de renvoyer `franchise_salaires_non_certifiee` en pratique jusqu'à ce chantier (cf. docs/reprise.md).
  */
-export function calculerFranchiseSalaires(srContrats: number, sjr: number, profil: Profil, config: FranceTravailConfig): FranchiseSalairesResultat {
+export function calculerFranchiseSalaires(srContrats: number, sjm: number, profil: Profil, config: FranceTravailConfig): FranchiseSalairesResultat {
   const dateFinPRA = profil.dateAnniversaire;
   if (!dateFinPRA) {
     return FRANCHISE_SALAIRES_NON_CERTIFIEE;
@@ -337,7 +337,7 @@ export function calculerFranchiseSalaires(srContrats: number, sjr: number, profi
   }
 
   const srTotal = srContrats + (profil.salairesHorsAnnexe10PRA ?? 0);
-  const brut = Math.round((srTotal / smicMensuel) * (sjr / (3 * smicJournalier)) - config.indemnisationMensuelle.seuilNonIndemnisationJours);
+  const brut = Math.round((srTotal / smicMensuel) * (sjm / (3 * smicJournalier)) - config.indemnisationMensuelle.seuilNonIndemnisationJours);
 
   return { valeur: Math.max(0, brut), totalNonVerifie: true, sousEstimeeHorsA10: profil.salairesHorsAnnexe10PRA == null };
 }

@@ -12,7 +12,7 @@ coïncident pas encore.
 
 ### ✅ Validé — code Cadence = source externe
 - **Cas réel #1** (notif FT 03/02/2026) : A10, réadmission, 710 h, SR 9 229,35 € →
-  net 53,81 €. Écart 0,00 €. Couvre A+B+C, SJR, retraite compl. seule (AJ ≤ 60 €).
+  net 53,81 €. Écart 0,00 €. Couvre A+B+C, SJM, retraite compl. seule (AJ ≤ 60 €).
 - **CSG/CRDS** : **règle ET code désormais conformes** au simulateur officiel, depuis le
   commit `f0d18ae` (test permanent au vert sur #2 et #3 — plus de repli manuel).
   - Cas #2 (SR 14 579 €, écrêté) : CSG/CRDS 1,68 €, net 62,00 € — teste le plancher.
@@ -87,14 +87,14 @@ s'accordent ne prouvent rien (elles peuvent se tromper de la même façon).
 Verdict : ✅ concordant · ⚠️ écart à expliquer · ❌ bug à corriger
 
 **Note sur le cas Réel #1** : chemin de calcul exercé = A + B + C (formule standard, pas de
-période allongée) → SJR → palier retraite complémentaire seule (31,96 € < AJ brute ≤ 60 €,
+période allongée) → SJM → palier retraite complémentaire seule (31,96 € < AJ brute ≤ 60 €,
 donc pas de CSG/CRDS sur ce cas). Cohérence croisée vérifiée sur le régime Alsace-Moselle : le
 calcul sans cotisation locale tombe pile sur le net réel (53,81 €), celui avec cotisation locale
 donne 51,86 € — confirme que ce profil n'est pas Alsace-Moselle. La branche CSG/CRDS (AJ brute
 > 60 €) reste à éprouver sur un futur cas réel, tout comme la formule réadmission allongée.
 
 **Note sur le cas Fictif #2 — Bug détecté par validation** : `areNette.ts` applique CSG (6,2 %)
-+ CRDS (0,5 %) sur le SJR entier, sans la règle d'écrêtement qui limite le prélèvement pour ne
++ CRDS (0,5 %) sur le SJM entier, sans la règle d'écrêtement qui limite le prélèvement pour ne
 pas faire passer l'allocation sous un plancher lié au SMIC. Formule du SPEC §6.5 incomplète.
 À corriger UNIQUEMENT une fois la règle sourcée ET `smicHoraireBrut` renseigné en config. Ne pas
 deviner. → **Corrigé dans le commit `f0d18ae`** (voir la règle établie ci-dessous et le tableau
@@ -105,19 +105,19 @@ ci-dessus, désormais ✅ conforme).
 les taux nus, sans que l'écrêtement ne masque une éventuelle erreur. Le corrigé du simulateur
 officiel a été comparé au calcul de la RÈGLE établie ci-dessous (calcul manuel), pas à la sortie
 du code Cadence actuel — `areNette.ts` n'a pas été exécuté sur ce cas, il produirait un résultat
-tout aussi faux que sur #2 (même bug d'assiette sur le SJR). Concordance au centime sur les 4
+tout aussi faux que sur #2 (même bug d'assiette sur le SJM). Concordance au centime sur les 4
 postes (A+B+C, retraite, CSG/CRDS, net) : confirme la règle une seconde fois, sur un cas de nature
 différente du #2. → **Corrigé dans le commit `f0d18ae`** : `areNette.ts` produit désormais ce
 résultat directement, cas #2 et #3 transformés en tests permanents (`areNette.test.ts`).
 
 #### 2026-07-20 — Règle CSG/CRDS établie (implémentée le 2026-07-20, commit `f0d18ae`)
 
-- **Assiette** : 98,25 % de l'AJ brute (abattement de 1,75 %), pas le SJR.
+- **Assiette** : 98,25 % de l'AJ brute (abattement de 1,75 %), pas le SJM.
 - **Taux** : CSG 6,2 % ou 3,8 % + CRDS 0,5 % — déjà en config (`cotisations.tauxCSG`, `cotisations.tauxCRDS`), rien à ajouter côté taux.
 - **Exonération** : aucune CSG/CRDS si l'AJ brute ≤ SMIC journalier.
 - **Écrêtement** : le prélèvement CSG/CRDS ne peut jamais faire passer l'AJ nette sous le SMIC journalier (= SMIC horaire × 35/7, arrondi).
 - **Bugs identifiés** (les deux à corriger ensemble) :
-  (a) l'assiette actuelle est le SJR au lieu de l'AJ brute → facteur d'erreur ~8 sur ce cas ;
+  (a) l'assiette actuelle est le SJM au lieu de l'AJ brute → facteur d'erreur ~8 sur ce cas ;
   (b) l'écrêtement est totalement absent du code actuel.
 - **Valeur sourcée** : SMIC horaire brut = **12,31 €** au 01/06/2026 (source officielle
   info.gouv.fr / travail-emploi.gouv.fr) → SMIC journalier ≈ 12,31 × 35/7 = 61,55 €, arrondi à
