@@ -190,6 +190,10 @@ function TableauResultats({
   // tauxPrelevementSource vit sur ouvertureDroits (renseigné une fois dans "Mon profil"), pas sur
   // chaque mois — s'il est absent, on ne peut structurellement pas calculer de montant net ici.
   const tauxRenseigne = profil.ouvertureDroits?.tauxPrelevementSource != null;
+  // franchiseSalaires est un TOTAL (pas une valeur qui varie mois par mois) : le même objet est
+  // porté par chaque mois calculé de la série, un seul suffit pour l'afficher une fois en pied de
+  // tableau (cf. calculerSerieDepuisContrats, engine/indemnisationMensuelle.ts).
+  const franchiseSalaires = mois.find((m) => m.calculable)?.franchiseSalaires;
 
   return (
     <div className="bg-surface border border-line rounded-card overflow-hidden">
@@ -256,7 +260,19 @@ function TableauResultats({
         <p className="text-faint">Montant calculé sur l'AJ indiquée sur ton relevé France Travail.</p>
         {desMoisSansAj && <p className="text-amber">Certains mois n'ont pas de taux d'AJ connu pour leur période (« — ») — ajoute une période dont la date d'effet les couvre dans « Mon profil ».</p>}
         {!tauxRenseigne && <p className="text-amber">Renseigne ton taux PAS dans le profil pour voir le montant réellement viré.</p>}
-        <p className="text-faint">Franchise salaires non calculée par Cadence pour l'instant (formule non certifiée sur une source fiable) — vérifie ce point directement sur ton relevé France Travail.</p>
+        {franchiseSalaires?.valeur === null && (
+          <p className="text-faint">Franchise salaires non calculée par Cadence pour l'instant (formule non certifiée sur une source fiable) — vérifie ce point directement sur ton relevé France Travail.</p>
+        )}
+        {franchiseSalaires && franchiseSalaires.valeur !== null && franchiseSalaires.valeur > 0 && (
+          <>
+            <p className="text-faint">
+              Franchise salaires : {franchiseSalaires.valeur} jour{franchiseSalaires.valeur > 1 ? "s" : ""} à déduire de ton indemnisation (formule officielle, guide France Travail p.14).
+            </p>
+            {franchiseSalaires.sousEstimeeHorsA10 && (
+              <p className="text-amber">⚠️ Franchise salaires sous-estimée : renseigne tes salaires hors Annexe 10 dans le profil pour un calcul complet.</p>
+            )}
+          </>
+        )}
       </div>
     </div>
   );

@@ -243,7 +243,10 @@ export function MonProfil({ dateDuJour, profil, onModifierProfil }: MonProfilPro
           <li>Risque de faux « feu vert » : des heures oubliées ou un cas hors périmètre peuvent afficher un statut rassurant à tort.</li>
           <li>Les profils mixtes (Annexe 10 + Annexe 8 + régime général) reposent sur ton propre signalement (ci-dessus) : rien n'est déduit automatiquement de tes contrats.</li>
           <li>Les alertes sont calculées à l'ouverture de l'app, pas envoyées de façon proactive (pas de backend).</li>
-          <li>La formule de la franchise salaires reste un TODO : elle n'a pas pu être transcrite de façon fiable depuis le guide.</li>
+          <li>
+            La franchise salaires est calculée selon la formule officielle (guide France Travail, page 14). Si tu n'as eu que des contrats Annexe 10, le calcul est complet. Si tu avais aussi des
+            contrats hors spectacle, renseigne le champ ci-dessus pour affiner.
+          </li>
         </ul>
       </section>
 
@@ -269,12 +272,22 @@ function MonIndemnisationEnCours({ profil, onModifierProfil }: { profil: Profil;
   const [franchiseCPTotale, setFranchiseCPTotale] = useState(ouverture?.franchiseCPTotale ?? 0);
   const [delaiAttenteInitial, setDelaiAttenteInitial] = useState(ouverture?.delaiAttenteInitial ?? 7);
   const [tauxPrelevementSource, setTauxPrelevementSource] = useState(ouverture?.tauxPrelevementSource?.toString() ?? "");
+  // dureeDroitsMois/salairesHorsAnnexe10PRA vivent sur Profil, pas ouvertureDroits (cf.
+  // types/index.ts) — composantes de la franchise salaires, connues indépendamment de la
+  // notification d'ouverture de droits elle-même.
+  const [dureeDroitsMois, setDureeDroitsMois] = useState(profil.dureeDroitsMois?.toString() ?? "");
+  const [salairesHorsAnnexe10PRA, setSalairesHorsAnnexe10PRA] = useState(profil.salairesHorsAnnexe10PRA?.toString() ?? "");
   const [erreur, setErreur] = useState<string | null>(null);
 
   function enregistrer() {
     if (!dateOuverture) return;
     const tauxSaisi = tauxPrelevementSource.trim() === "" ? undefined : Number(tauxPrelevementSource);
-    const resultat = onModifierProfil({ ...profil, ouvertureDroits: { dateOuverture, franchiseCPTotale, delaiAttenteInitial, tauxPrelevementSource: tauxSaisi } });
+    const resultat = onModifierProfil({
+      ...profil,
+      dureeDroitsMois: dureeDroitsMois === "" ? undefined : (Number(dureeDroitsMois) as 12 | 6),
+      salairesHorsAnnexe10PRA: salairesHorsAnnexe10PRA.trim() === "" ? null : Number(salairesHorsAnnexe10PRA),
+      ouvertureDroits: { dateOuverture, franchiseCPTotale, delaiAttenteInitial, tauxPrelevementSource: tauxSaisi },
+    });
     if (!resultat.ok) {
       setErreur(resultat.erreur);
       return;
@@ -333,6 +346,39 @@ function MonIndemnisationEnCours({ profil, onModifierProfil }: { profil: Profil;
             className="w-full bg-surface-2 border border-line rounded-lg px-3 py-2 text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-mint"
           />
           <p className="text-xs text-faint mt-1">Sur ta notification, rubrique « Délai d'attente ». Presque toujours 7 jours.</p>
+        </div>
+
+        <div>
+          <label className="block text-xs uppercase tracking-[.03em] text-muted mb-2" htmlFor="profil-duree-droits">
+            Durée des droits
+          </label>
+          <select
+            id="profil-duree-droits"
+            value={dureeDroitsMois}
+            onChange={(e) => setDureeDroitsMois(e.target.value)}
+            className="w-full bg-surface-2 border border-line rounded-lg px-3 py-2 text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-mint"
+          >
+            <option value="">—</option>
+            <option value="12">12 mois (standard)</option>
+            <option value="6">6 mois (clause de rattrapage)</option>
+          </select>
+          <p className="text-xs text-faint mt-1">Indiqué dans ta notification France Travail. Standard = 12 mois. Clause de rattrapage = 6 mois.</p>
+        </div>
+
+        <div>
+          <label className="block text-xs uppercase tracking-[.03em] text-muted mb-2" htmlFor="profil-salaires-hors-a10">
+            Salaires hors Annexe 10 sur la période de référence (€)
+          </label>
+          <input
+            id="profil-salaires-hors-a10"
+            type="number"
+            min={0}
+            placeholder="0 si tu n'as eu que des contrats spectacle"
+            value={salairesHorsAnnexe10PRA}
+            onChange={(e) => setSalairesHorsAnnexe10PRA(e.target.value)}
+            className="w-full bg-surface-2 border border-line rounded-lg px-3 py-2 text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-mint"
+          />
+          <p className="text-xs text-faint mt-1">Salaires bruts totaux des contrats hors spectacle (régime général, Annexe 8…) sur ta période de référence. Laisse vide si tu n'en as pas eu.</p>
         </div>
 
         <div>
