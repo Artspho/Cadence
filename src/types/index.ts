@@ -281,6 +281,14 @@ export interface SoldeIndemnisation {
   // autorisé — corrigé le 2026-07-23 après une lecture initiale erronée des relevés réels
   // (cf. docs/reprise.md) qui avait fait conclure, à tort, à l'absence de tout plafond mensuel.
   quotaCPCarryOver: number;
+  // Franchise salaires : jours restants à consommer — même modèle exact que franchiseCPRestante,
+  // consommée APRÈS le délai d'attente ET la franchise CP (ordre confirmé par le guide officiel,
+  // page 17). `0` si la franchise salaires totale n'a pas pu être calculée (`valeur: null`, cf.
+  // FranchiseSalairesResultat) — pas d'application plutôt qu'un chiffre deviné (devoir n°2).
+  franchiseSalairesRestante: number;
+  // Report du quota mensuel de franchise salaires non consommé le mois précédent — même mécanique
+  // que quotaCPCarryOver, cf. commentaire ci-dessus.
+  quotaSalairesCarryOver: number;
 }
 
 export interface MoisIndemnisationEntree {

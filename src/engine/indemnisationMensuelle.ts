@@ -84,16 +84,33 @@ function forfaitMensuelCP(franchiseCPTotale: number, config: FranceTravailConfig
   return franchiseCPTotale <= seuilFranchiseTotaleJours ? forfaitMensuelBas : forfaitMensuelHaut;
 }
 
+// Quota mensuel de franchise salaires : total réparti sur min(dureeDroitsMois, repartitionMoisMax)
+// mois, arrondi au jour supérieur (jamais un reliquat de jour perdu par arrondi vers le bas).
+// `valeur: null` (franchise non certifiée, cf. calculerFranchiseSalaires) -> quota 0, aucune
+// application plutôt qu'un chiffre deviné (devoir n°2). Recalculé fraîchement à chaque mois à
+// partir de la franchise TOTALE (jamais du restant courant) — même principe que forfaitMensuelCP.
+function quotaMensuelSalaires(franchiseSalaires: FranchiseSalairesResultat, dureeDroitsMois: 12 | 6, config: FranceTravailConfig): number {
+  if (franchiseSalaires.valeur === null) return 0;
+  const nbMoisRepartition = Math.min(dureeDroitsMois, config.differesEtFranchises.franchiseSalaires.repartitionMoisMax);
+  return Math.ceil(franchiseSalaires.valeur / nbMoisRepartition);
+}
+
 // `franchiseCPTotale` : optionnel, défaut = `soldeDepart.franchiseCPRestante` — préserve à
 // l'identique le comportement historique (limite connue incluse) pour tout appelant qui ne la
 // fournit pas explicitement, notamment les tests bas niveau existants. Seul
 // `calculerSerieDepuisContrats` fournit la vraie valeur (Profil.ouvertureDroits.franchiseCPTotale),
 // constante sur toute la série, corrigeant la limite pour le nouveau chemin automatique.
+// `franchiseSalaires`/`dureeDroitsMois` : mêmes défauts (non certifiée / 12 mois) pour ne rien
+// changer au comportement des appelants qui ne les fournissent pas — seul
+// `calculerSerieDepuisContrats` peut fournir un résultat réel, et seulement si le SR/SJM
+// nécessaires à `calculerFranchiseSalaires` lui sont explicitement passés (cf. plus bas).
 export function calculerMoisIndemnisation(
   soldeDepart: SoldeIndemnisation,
   entree: MoisIndemnisationEntree,
   config: FranceTravailConfig,
   franchiseCPTotale: number = soldeDepart.franchiseCPRestante,
+  franchiseSalaires: FranchiseSalairesResultat = FRANCHISE_SALAIRES_NON_CERTIFIEE,
+  dureeDroitsMois: 12 | 6 = 12,
 ): MoisIndemnisationResultat {
   // floor confirmé par relevés réels A10 (fév/mars/avril/mai 2026, cf. docs/reprise.md) — PAS
   // ceil, contrairement à un premier essai de formule qui s'en écartait dès le premier mois testé.
@@ -108,7 +125,16 @@ export function calculerMoisIndemnisation(
   const forfaitMensuel = forfaitMensuelCP(franchiseCPTotale, config);
   const quotaDisponible = soldeDepart.quotaCPCarryOver + forfaitMensuel;
   const franchiseCPConsommee = Math.min(quotaDisponible, soldeDepart.franchiseCPRestante, reliquatApresDelai);
-  const joursIndemnises = reliquatApresDelai - franchiseCPConsommee;
+  const reliquatApresFranchiseCP = reliquatApresDelai - franchiseCPConsommee;
+
+  // Franchise salaires : APRÈS le délai d'attente ET la franchise CP (ordre confirmé par le guide
+  // officiel, point 3 de la liste page 17) — même mécanisme de carry-over que la franchise CP
+  // ci-dessus (report du non-consommé, plafonné par le restant réel ET par les jours du mois
+  // encore disponibles, jamais de jours indemnisés négatifs).
+  const quotaMensuel = quotaMensuelSalaires(franchiseSalaires, dureeDroitsMois, config);
+  const quotaSalairesDisponible = soldeDepart.quotaSalairesCarryOver + quotaMensuel;
+  const franchiseSalairesConsommee = Math.min(quotaSalairesDisponible, soldeDepart.franchiseSalairesRestante, reliquatApresFranchiseCP);
+  const joursIndemnises = reliquatApresFranchiseCP - franchiseSalairesConsommee;
 
   return {
     calculable: true,
@@ -122,20 +148,30 @@ export function calculerMoisIndemnisation(
       delaiRestant: soldeDepart.delaiRestant - delaiConsomme,
       franchiseCPRestante: soldeDepart.franchiseCPRestante - franchiseCPConsommee,
       quotaCPCarryOver: quotaDisponible - franchiseCPConsommee,
+      franchiseSalairesRestante: soldeDepart.franchiseSalairesRestante - franchiseSalairesConsommee,
+      quotaSalairesCarryOver: quotaSalairesDisponible - franchiseSalairesConsommee,
     },
-    franchiseSalaires: FRANCHISE_SALAIRES_NON_CERTIFIEE,
+    franchiseSalaires,
     montantMensuel: MONTANT_MENSUEL_INDISPONIBLE,
   };
 }
 
 // Enchaîne les mois : le soldeFin de chacun nourrit le soldeDepart du suivant. `franchiseCPTotale`
 // (optionnel, même défaut que calculerMoisIndemnisation par mois) reste CONSTANTE sur toute la
-// série quand fournie — c'est la même ouverture de droits du début à la fin.
-export function calculerSerieIndemnisation(soldeDepart: SoldeIndemnisation, mois: MoisIndemnisationEntree[], config: FranceTravailConfig, franchiseCPTotale?: number): MoisIndemnisationResultat[] {
+// série quand fournie — c'est la même ouverture de droits du début à la fin. Idem
+// `franchiseSalaires`/`dureeDroitsMois`.
+export function calculerSerieIndemnisation(
+  soldeDepart: SoldeIndemnisation,
+  mois: MoisIndemnisationEntree[],
+  config: FranceTravailConfig,
+  franchiseCPTotale?: number,
+  franchiseSalaires: FranchiseSalairesResultat = FRANCHISE_SALAIRES_NON_CERTIFIEE,
+  dureeDroitsMois: 12 | 6 = 12,
+): MoisIndemnisationResultat[] {
   const resultats: MoisIndemnisationResultat[] = [];
   let solde = soldeDepart;
   for (const entree of mois) {
-    const resultat = calculerMoisIndemnisation(solde, entree, config, franchiseCPTotale ?? solde.franchiseCPRestante);
+    const resultat = calculerMoisIndemnisation(solde, entree, config, franchiseCPTotale ?? solde.franchiseCPRestante, franchiseSalaires, dureeDroitsMois);
     resultats.push(resultat);
     solde = resultat.soldeFin;
   }
@@ -159,8 +195,21 @@ export function calculerSerieIndemnisation(soldeDepart: SoldeIndemnisation, mois
  *
  * `calculable: false` si `Profil.ouvertureDroits` est absent : aucun point de départ n'est
  * inventé (devoir n°2).
+ *
+ * `srSjmPourFranchiseSalaires` optionnel : `calculerFranchiseSalaires` a besoin du SR (salaire de
+ * référence) et du SJM, deux grandeurs du compteur "montant ARE" (`salaireReference.ts`), pas de
+ * celui-ci ("jours indemnisés") — cf. règle d'or "deux compteurs, jamais mélangés". Tant qu'aucun
+ * appelant ne les fournit explicitement, la franchise salaires reste `franchise_salaires_non_certifiee`
+ * (comportement historique inchangé) plutôt que de deviner un total à partir de 0 (devoir n°2).
  */
-export function calculerSerieDepuisContrats(profil: Profil, soldeDepart: SoldeIndemnisationDepart, contrats: Contrat[], dateDuJour: string, config: FranceTravailConfig): SerieIndemnisationResultat {
+export function calculerSerieDepuisContrats(
+  profil: Profil,
+  soldeDepart: SoldeIndemnisationDepart,
+  contrats: Contrat[],
+  dateDuJour: string,
+  config: FranceTravailConfig,
+  srSjmPourFranchiseSalaires?: { srContrats: number; sjm: number },
+): SerieIndemnisationResultat {
   const { ouvertureDroits } = profil;
   if (!ouvertureDroits) {
     return { calculable: false, raison: "ouverture_droits_manquante" };
@@ -190,13 +239,23 @@ export function calculerSerieDepuisContrats(profil: Profil, soldeDepart: SoldeIn
     mois.push({ moisLabel: curseur, joursDuMois: joursDansMois(curseur), heuresDuMois: heuresParMois.get(curseur) ?? 0 });
   }
 
+  // Franchise salaires : calculée une seule fois, au démarrage de la série (c'est un TOTAL fixé à
+  // l'ouverture des droits, pas une valeur qui varie mois par mois). `valeur: null` -> restante à 0,
+  // aucune application (devoir n°2) — cf. quotaMensuelSalaires, qui donne alors un quota de 0.
+  const franchiseSalaires: FranchiseSalairesResultat = srSjmPourFranchiseSalaires
+    ? calculerFranchiseSalaires(srSjmPourFranchiseSalaires.srContrats, srSjmPourFranchiseSalaires.sjm, profil, config)
+    : FRANCHISE_SALAIRES_NON_CERTIFIEE;
+  const dureeDroitsMois = profil.dureeDroitsMois ?? 12;
+
   const soldeInitial: SoldeIndemnisation = {
     delaiRestant: ouvertureDroits.delaiAttenteInitial,
     franchiseCPRestante: ouvertureDroits.franchiseCPTotale,
     quotaCPCarryOver: 0,
+    franchiseSalairesRestante: franchiseSalaires.valeur ?? 0,
+    quotaSalairesCarryOver: 0,
   };
 
-  const resultatsComplets = calculerSerieIndemnisation(soldeInitial, mois, config, ouvertureDroits.franchiseCPTotale);
+  const resultatsComplets = calculerSerieIndemnisation(soldeInitial, mois, config, ouvertureDroits.franchiseCPTotale, franchiseSalaires, dureeDroitsMois);
 
   // moisLabel provient ici d'un vrai "YYYY-MM" énuméré ci-dessus, contrairement au moisLabel
   // purement informatif de calculerMoisIndemnisation/calculerSerieIndemnisation — recalcul du
@@ -247,10 +306,13 @@ function valeurALaDate(dateISO: string, historique: { dateEffet: string; valeur:
  * vérifier sur un relevé réel avec franchise salaires > 0 avant de retirer l'avertissement
  * `sousEstimeeHorsA10` (aucun relevé fourni à ce jour ne montre cette franchise active).
  *
- * PAS ENCORE câblée sur la consommation mensuelle (répartition sur `min(dureeDroitsMois,
- * repartitionMoisMax)` mois + report, cf. franchise CP) : cette fonction calcule seulement le
- * TOTAL, `calculerMoisIndemnisation` continue de renvoyer `franchise_salaires_non_certifiee`
- * jusqu'à ce que la répartition soit conçue et câblée (cf. docs/reprise.md).
+ * Répartition mensuelle câblée (2026-07-25, cf. quotaMensuelSalaires/SoldeIndemnisation ci-dessus) :
+ * cette fonction calcule le TOTAL, consommé ensuite mois par mois sur `min(dureeDroitsMois,
+ * repartitionMoisMax)` mois avec report du non-consommé — même mécanique que la franchise CP.
+ * Reste non câblé : le SR/SJM réels ne sont fournis nulle part dans l'app (`calculerSerieDepuisContrats`
+ * les accepte en paramètre optionnel `srSjmPourFranchiseSalaires`, mais aucun appelant — RevenusMensuels.tsx,
+ * alertes.ts — ne les calcule et ne les lui passe pour l'instant) : `calculerMoisIndemnisation` continue
+ * donc de renvoyer `franchise_salaires_non_certifiee` en pratique jusqu'à ce chantier (cf. docs/reprise.md).
  */
 export function calculerFranchiseSalaires(srContrats: number, sjm: number, profil: Profil, config: FranceTravailConfig): FranchiseSalairesResultat {
   const dateFinPRA = profil.dateAnniversaire;
