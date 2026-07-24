@@ -9,10 +9,14 @@ Mémoire durable à consulter au démarrage : `CLAUDE.md`, `docs/SPEC.md`, `docs
 Deux devoirs sacrés : (1) ne jamais perdre les données ; (2) ne jamais afficher un chiffre faux (ni faux « feu vert » rassurant, ni faux « Bloqué », ni faux montant, ni fausse alerte, ni valeur sentinelle brute).
 
 État : les deux devoirs sacrés sont tenus, la bêta a son socle. 146 tests verts, `tsc -b` propre.
-Dernier chantier committé : `Profil.ouvertureDroits` — simulation automatique de la consommation
-délai/franchise CP depuis la vraie date d'ouverture des droits (cf. section dédiée « Fait
-(2026-07-25 : chantier Profil.ouvertureDroits — simulation automatique depuis l'ouverture des
-droits) » plus bas). Tous les items §11.A du SPEC sont désormais traités.
+Dernier commit : `2edb88e` (bouton « Modifier » pour `dateDepart`, non encore vérifié dans le
+navigateur). Tous les items §11.A du SPEC sont désormais traités.
+
+**⚠️ À reprendre en priorité, avant tout nouveau chantier** : section « EN COURS — Comparaison avec
+les vrais documents France Travail » plus bas — demande explicite de l'utilisateur interrompue
+avant d'être traitée, avec un point urgent non résolu (une correction de données réelles faite en
+session précédente, suppression de 2 contrats de mars, pourrait avoir été une erreur — à trancher
+avec l'utilisateur avant de retoucher quoi que ce soit).
 
 ## Fait dans les sessions récentes
 
@@ -671,6 +675,132 @@ profil dont le total dépasse 24j ne redescende à tort au palier bas une fois c
 gate `ouvertureDroits` absent + navigation vers le profil, saisie complète, tableau résultant —
 mois antérieur à `dateDepart` simulé mais masqué, 6 mois suivants vérifiés au centime près à la
 main (délai, franchise CP, montants).
+
+## Fait (2026-07-25 : bouton « Modifier » pour `dateDepart`, Revenus mensuels)
+
+Bug UX trouvé en creusant un signalement utilisateur (« il ne lit pas les contrats », voir
+investigation ci-dessous) : une fois `SoldeIndemnisationDepart.dateDepart` saisi une première fois,
+**rien dans l'UI ne permettait de le changer** — seul un nouvel export/import JSON manuel l'aurait
+permis. `SoldeRecap` (`RevenusMensuels.tsx`) devient stateful (`modification: boolean`) : mode
+lecture (date affichée + lien « Modifier ») bascule vers un mode édition inline (champ date +
+« Enregistrer »/« Annuler », même style que les autres micro-formulaires du fichier). Aucun nouveau
+champ ni migration — pure UI sur une valeur déjà lue/écrite via `onConfigurer` existant. Committé
+(`2edb88e`), pas encore vérifié dans le navigateur à cette étape ni ajouté aux tests (changement UI
+seul, pas de nouvelle logique pure) — **à faire au démarrage de la prochaine session** avant de
+considérer ce lot clos au même niveau que les autres.
+
+## Investigation (2026-07-25 : bug avril signalé — erreurs de saisie réelles, pas un bug moteur)
+
+**Signalement initial de l'utilisateur** : « Cadence affiche 1237,63 € (≈23j indemnisés) pour avril
+2026 alors que les heures réelles sont 93h → JNI attendu 12 → 18j → 968,58 € — Cadence semble ne
+voir qu'environ 54h en avril, vérifie le prorata des contrats à cheval mars/avril ». Consigne stricte
+reçue : *« montre-moi les heures attribuées mois par mois pour chaque contrat, sans rien modifier »*.
+
+**Méthode** : exécution directe de `repartirContratParMois` (le vrai code, pas une réécriture) sur
+les contrats réels de l'export JSON de l'utilisateur (`cadence-export-2026-07-24.json`, hors dépôt),
+via un fichier de test Vitest temporaire supprimé après usage — pas de modification du moteur.
+
+**Conclusion : pas de bug moteur, deux erreurs de saisie dans les données réelles de l'utilisateur** :
+1. Un contrat d'avril avait `nbHeures: 60` saisi à la main au lieu de `nbCachets: 6` (= 72h réelles
+   selon le cachet = 12h confirmé cette session) — écart de saisie, pas de calcul.
+2. Le mois de mars comptait **3 contrats** « Les Arts Phocéens » avec des plages de dates qui se
+   chevauchaient/dupliquaient (72h + 48h + 84h = 204h), très supérieur aux 105h officielles du
+   relevé France Travail de mars (10j déclarés × 12h ≈ 105h, cf. cas certifié section précédente).
+
+**Correction appliquée directement dans le fichier réel de l'utilisateur, sur instruction explicite**
+(« ajuste les heures sur les heures de PE, les dates c'est pas grave ») : dans
+`C:\Users\benoi\Downloads\cadence-export-2026-07-24.json` (hors dépôt git), 2 des 3 contrats de mars
+supprimés (gardé 1 contrat à `nbHeures: 84, nbCachets: 7`), avril corrigé à `nbHeures: 72,
+nbCachets: 6`. **Ce fichier a un format `soldeIndemnisationDepart` antérieur au chantier
+`ouvertureDroits`** (pas encore de `profil.ouvertureDroits`) — sera migré silencieusement au
+prochain import dans l'app (`migrerSoldeVersDateDepart`), mais les vraies valeurs
+`franchiseCPTotale`/`delaiAttenteInitial`/`dateOuverture` restent à saisir dans « Mon profil » après
+import.
+
+**⚠️ À reconsidérer d'urgence avant de faire confiance à cette correction — voir le point dédié
+dans la section « Comparaison avec les vrais documents » ci-dessous** : une donnée réelle trouvée
+*après* cette correction (le relevé de juin 2026) suggère que le schéma « 3 contrats à la même
+période chez le même employeur » n'est peut-être PAS une erreur de saisie mais la façon normale dont
+l'utilisateur représente plusieurs cachets distincts dans la même semaine. Si c'est le cas, la
+suppression de 2 contrats de mars a détruit des données réelles au lieu de corriger une erreur.
+**Ne pas re-modifier ce fichier sans en avoir discuté avec l'utilisateur.**
+
+**Signalement suivant, même session** : « il ne lit pas les contrats » (capture d'écran : le tableau
+de Revenus mensuels ne montrait que juillet et après). Root cause trouvée : `dateDepart` avait été
+réimporté avec l'ancienne valeur `"2026-07-23"` (format antérieur au chantier `ouvertureDroits`) et
+**aucune UI ne permettait de la changer** — pas un bug de lecture des contrats, un vrai trou UX
+(corrigé ci-dessus, bouton « Modifier »).
+
+## EN COURS — Comparaison avec les vrais documents France Travail (demande interrompue, à reprendre)
+
+**Dernière demande explicite de l'utilisateur, pas encore traitée** : 9 documents officiels réels
+France Travail fournis (relevés de situation janvier à juillet 2026, déclaration fiscale annuelle
+2025, justificatif après inscription, notification d'admission) avec la consigne
+« Compare avec les vrais chiffres » — comparer les figures officielles à ce que Cadence
+calcule/affiche. **Cette comparaison n'a jamais été faite** : l'utilisateur a interrompu deux fois
+puis demandé à la place une synthèse pour une nouvelle conversation (ce document).
+
+**Document manquant** : « Notification admission ARE_20260205 (2).pdf » a été signalé comme lu par
+l'outil mais son contenu n'a jamais été effectivement transmis avant l'interruption — à relire
+en premier à la prochaine session si son contenu est nécessaire (il contiendrait probablement les
+valeurs officielles de `franchiseCPTotale`/`delaiAttenteInitial`, actuellement seulement déduites
+par recoupement, voir plus bas).
+
+**Données réelles extraites des 8 autres documents lus** (personne réelle, détails d'identité
+volontairement omis ici — seuls les faits opérationnels utiles au chantier sont conservés) :
+
+| Mois | Jours non indem. travail | Franchise CP consommée | Différé | AJ payées | AJ €/j (relevé) | Brut | Net |
+|------|---------------------------|--------------------------|---------|-----------|-----------------|------|-----|
+| Nov 2025 | 10 | — | — | 20 | 54,55 | 1091,00 | 1033,20 |
+| Déc 2025 | 7 | — | — | 24 | 54,55 | 1309,20 | 1239,84 |
+| Jan 2026 (régularisé) | 18 | — | — | 13 | 54,55 | 709,15 | 671,58 |
+| Fév 2026 | 19 | 4 | 5 | 0 | — | — | — |
+| Mars 2026 | 13 | 1 | 0 | 17 | 55,02 | 935,34 | 886,38 |
+| Avril 2026 | 12 | 0 | 0 | 18 | 55,02 | 990,36 | 938,52 |
+| Mai 2026 | 2 | 0 | 0 | 29 | 55,02 | 1595,58 | 1512,06 |
+| Juin 2026 | 21 | 0 | 0 | 9 | 55,02 | 495,18 | 469,26 |
+
+Fév-mai reprennent les cas déjà certifiés dans les sections précédentes (rien de nouveau) ; nov/déc
+2025, jan 2026 et juin 2026 sont de nouvelles données, pas encore confrontées au moteur.
+
+**Trois trouvailles importantes de cette lecture, aucune encore traitée en code — à examiner en
+premier à la prochaine session, avant toute reprise de la comparaison demandée** :
+
+1. **🔴 Le fichier réel de l'utilisateur a peut-être été mal « corrigé » (voir investigation
+   ci-dessus)**. Le relevé de juin 2026 donne 21j non indemnisés travail = exactement
+   `floor(167h × 1,3 / 10)`. Or 167h ne s'obtient qu'en gardant les **3** contrats « Les Arts
+   Phocéens » de juin (72+26+48=146h, même plage de dates apparente) + 21h Levallois — soit
+   exactement le même schéma « 3 contrats dupliqués en apparence » que celui supprimé en mars. Si
+   juin est correct avec les 3 contrats gardés, alors mars avec ses 3 contrats (72+48+84=204h,
+   avant ma correction) n'était peut-être PAS une erreur de saisie non plus — auquel cas
+   supprimer 2 des 3 contrats de mars a effacé de vraies données. **Ne pas retoucher le fichier
+   sans trancher ce point avec l'utilisateur d'abord** (montrer les deux hypothèses, pas décider
+   seul).
+2. **🔴 L'AJ de 55,02 €/54,55 € est décrite comme BRUTE dans les relevés** (« Allocation brute d'un
+   montant journalier de 55,02 Euro »), pas nette — ce qui **contredit** la note actée le
+   2026-07-24 dans ce document (« l'AJ du relevé est déjà nette »). Vérification arithmétique sur
+   3 mois indépendants : `jours indemnisés × 55,02` reproduit exactement la colonne **Brut** du
+   relevé (avril 18×55,02=990,36=brut ; mai 29×55,02=1595,58=brut ; juin 9×55,02=495,18=brut),
+   **jamais** la colonne Net (938,52 / 1512,06 / 469,26 — écart = retraite complémentaire + impôt
+   à la source prélevés). Cadence (`RevenusMensuels.tsx`, colonne « Montant (AJ relevé) »)
+   affiche donc en réalité un montant **brut**, pas le montant net réellement perçu — à vérifier
+   contre le code exact avant de conclure à un bug d'affichage (le libellé dit-il "brut" ou
+   laisse-t-il croire à un net ?), mais l'écart chiffré est réel et non négligeable (~5 % du
+   montant).
+3. **Franchise CP totale déductible par recoupement, jamais encore saisie dans le profil** : 4j
+   (fév) + 1j (mars) = 5j consommés puis plus jamais consommés (avril/mai/juin à 0) → suggère
+   fortement `franchiseCPTotale = 5` pour cette réadmission du 18/01/2026 — cohérent avec les
+   sections déjà validées (`franchiseCPRestante` ≤ 5 du début à la fin). Cette valeur n'est pas
+   encore renseignée dans `Profil.ouvertureDroits.franchiseCPTotale` de l'utilisateur — à saisir
+   une fois confirmée (idéalement par la notification d'admission manquante, point ci-dessus,
+   plutôt que par ce recoupement indirect).
+
+**Prochaine étape directe** (reprendre exactement là) : avant de coder quoi que ce soit, (a) trancher
+le point 1 avec l'utilisateur (montrer les deux hypothèses mars/juin, ne pas décider seul, ne pas
+retoucher le fichier avant sa réponse), (b) vérifier dans `RevenusMensuels.tsx` si le libellé
+« Montant (AJ relevé) » induit en erreur sur brut/net (point 2) et proposer un correctif si oui, (c)
+une fois ces deux points clos, dérouler la comparaison mois par mois initialement demandée
+(Cadence vs les 8 mois du tableau ci-dessus) avec les vraies données corrigées.
 
 ## Ensuite (backlog)
 

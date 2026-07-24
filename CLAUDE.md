@@ -553,6 +553,16 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
   résolue par ce refactor plus profond plutôt qu'un correctif de formule ponctuel. 146 tests verts,
   `tsc -b` propre, vérifié dans le navigateur de bout en bout (mois masqués avant `dateDepart`,
   6 mois vérifiés au centime près à la main). Détail complet : `docs/reprise.md`.
+- ✅ **Bouton « Modifier » pour `dateDepart`** (2026-07-25, `2edb88e`) : `SoldeRecap`
+  (`RevenusMensuels.tsx`) permet désormais de changer la date d'affichage du tableau après coup
+  (auparavant seul un ré-import JSON le permettait — trou UX trouvé en investiguant un
+  signalement utilisateur). Pas encore vérifié dans le navigateur ni testé automatiquement
+  (UI seule). Détail complet : `docs/reprise.md`.
+- 🔴 **EN COURS, prioritaire** : comparaison entre les chiffres de Cadence et 9 documents réels
+  France Travail fournis par l'utilisateur — demande interrompue avant traitement, avec un doute
+  urgent sur une correction de données réelles faite en session précédente (2 contrats de mars
+  supprimés à tort ?). **Détail complet et prochaine étape exacte : `docs/reprise.md`, section
+  « EN COURS — Comparaison avec les vrais documents France Travail ».**
 - ⬜ **Non traité (V2/V3) :** coordination européenne (périodes U1/PDU1) — même famille qu'Annexe 8/article 65, hors périmètre Annexe 10 pur. Aucune logique ni champ de données ne l'anticipe encore (détail dans `docs/SPEC.md` §10 et §11.C). Ne pas confondre avec le champ `territoire` du contrat, qui couvre un cas différent (cachet ponctuel joué en EEE/Suisse/UK mais déclaré en France).
 - 🔁 **Maintenance de la config** (récurrent, perso — hors app, pas de backend en bêta) : une fois
   par mois, vérifier à la source officielle SMIC (horaire / mensuel / journalier), PMSS, et les
