@@ -589,6 +589,14 @@ visuel fin sur `docs/maquette_dashboard.html`.
 
 ---
 
+## Décisions actées
+
+Bug avril 2026 (1237€ vs 968€) : résolu — origine données incorrectes (contrats inventés qui
+chevauchaient le mois). `repartirContratParMois` validé sur données réelles. Aucune modification
+de code.
+
+---
+
 ## Périmètre BÊTA (ce qu'on construit maintenant)
 
 Objectif : bêta entre amis pour valider que l'app aide à s'organiser.
