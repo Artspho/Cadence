@@ -2,16 +2,32 @@
 // restante, délai d'attente restant, report du forfait mensuel non consommé) d'un mois sur
 // l'autre. Module indépendant : n'importe que `franchises.ts`, jamais `indemnisationMensuelle.ts`.
 import { appliquerFranchises } from "./franchises";
+import type { FranceTravailConfig } from "../config/franceTravailConfig";
+
+// Une part de contrat sur un mois donné : heures hors-cachet (enseignement, CDDU horaires) et
+// nombre de cachets. Les deux sont convertis en un total d'heures unique (cachets × config.
+// heuresParCachet) avant application du coefficient Annexe 10 — même constantes que
+// `indemnisationMensuelle.ts` (`coeffJoursNonIndemnisables`, `diviseurJoursTravaillesA10`), lues
+// depuis la config plutôt qu'en dur, mais aucune dépendance de code vers ce fichier.
+export interface ContratMois {
+  heures: number;
+  cachets: number;
+}
+
+/** floor((Σheures + Σcachets × heuresParCachet) × coeffJoursNonIndemnisables / diviseurJoursTravaillesA10). */
+export function calculerJoursTravailes(contratsMois: ContratMois[], config: FranceTravailConfig): number {
+  const totalHeures = contratsMois.reduce((total, c) => total + c.heures + c.cachets * config.heuresParCachet, 0);
+  return Math.floor((totalHeures * config.indemnisationMensuelle.coeffJoursNonIndemnisables) / config.indemnisationMensuelle.diviseurJoursTravaillesA10);
+}
 
 export interface MoisInput {
   joursDuMois: number;
-  joursTravailes: number; // calculé en amont (heures/10 + cachets)
+  joursTravailes: number; // calculé en amont, cf. calculerJoursTravailes ci-dessus
   estGrise: boolean; // true = mois de réadmission, rien n'est calculé ce mois-ci
 }
 
 export interface MoisOutput {
   joursIndemnisables: number;
-  ajBrute: number;
   netSocial: number;
   netApresPAS: number;
   franchiseCPConsommee: number;
@@ -21,7 +37,6 @@ export interface MoisOutput {
 
 export interface ParamsCalculerSerie {
   mois: MoisInput[];
-  ajBrute: number;
   ajNetteAvantPAS: number;
   tauxPAS: number;
   franchiseCPTotale: number;
@@ -30,7 +45,7 @@ export interface ParamsCalculerSerie {
 }
 
 export function calculerSerie(params: ParamsCalculerSerie): MoisOutput[] {
-  const { mois, ajBrute, ajNetteAvantPAS, tauxPAS, franchiseCPTotale, franchiseCPMensuelleMax, delaiAttente } = params;
+  const { mois, ajNetteAvantPAS, tauxPAS, franchiseCPTotale, franchiseCPMensuelleMax, delaiAttente } = params;
 
   let franchiseCPRestante = franchiseCPTotale;
   let delaiRestant = delaiAttente;
@@ -45,7 +60,6 @@ export function calculerSerie(params: ParamsCalculerSerie): MoisOutput[] {
       carryOver += franchiseCPMensuelleMax;
       resultats.push({
         joursIndemnisables: 0,
-        ajBrute: 0,
         netSocial: 0,
         netApresPAS: 0,
         franchiseCPConsommee: 0,
@@ -76,7 +90,6 @@ export function calculerSerie(params: ParamsCalculerSerie): MoisOutput[] {
 
     resultats.push({
       joursIndemnisables,
-      ajBrute: joursIndemnisables * ajBrute,
       netSocial,
       netApresPAS: netSocial * (1 - tauxPAS),
       franchiseCPConsommee,

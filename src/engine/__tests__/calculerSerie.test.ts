@@ -1,5 +1,32 @@
 import { describe, expect, it } from "vitest";
-import { calculerSerie } from "../calculerSerie";
+import { calculerJoursTravailes, calculerSerie } from "../calculerSerie";
+import { franceTravailConfig } from "../../config/franceTravailConfig";
+
+describe("calculerJoursTravailes — données FT réelles Benoît", () => {
+  it("mai 2026 : 0 cachet + 21h enseignement = 21h → floor(21×1,3/10) = 2 j", () => {
+    expect(calculerJoursTravailes([{ heures: 21, cachets: 0 }], franceTravailConfig)).toBe(2);
+  });
+
+  it("juin 2026 : 11 cachets×12h + 35h enseignement = 167h → floor(167×1,3/10) = 21 j", () => {
+    expect(calculerJoursTravailes([{ heures: 35, cachets: 11 }], franceTravailConfig)).toBe(21);
+  });
+
+  it("février 2026 : 11 cachets×12h + 21h = 153h → floor(153×1,3/10) = 19 j", () => {
+    expect(calculerJoursTravailes([{ heures: 21, cachets: 11 }], franceTravailConfig)).toBe(19);
+  });
+
+  it("cumule plusieurs contrats sur le même mois avant d'appliquer le coefficient", () => {
+    // Même total (7 cachets + 21h = 105h) réparti sur deux entrées plutôt qu'une seule.
+    const resultat = calculerJoursTravailes(
+      [
+        { heures: 21, cachets: 3 },
+        { heures: 0, cachets: 4 },
+      ],
+      franceTravailConfig,
+    );
+    expect(resultat).toBe(13); // floor(105×1,3/10) = 13, cf. mars 2026
+  });
+});
 
 describe("calculerSerie — série Benoît (données FT certifiées, relevé du 14/04/2026)", () => {
   it("janvier grisé, février à zéro, mars/avril/mai conformes au relevé", () => {
@@ -11,7 +38,6 @@ describe("calculerSerie — série Benoît (données FT certifiées, relevé du 
         { joursDuMois: 30, joursTravailes: 12, estGrise: false }, // avril 2026
         { joursDuMois: 31, joursTravailes: 2, estGrise: false }, // mai 2026
       ],
-      ajBrute: 55.02,
       ajNetteAvantPAS: 53.81,
       tauxPAS: 0.031,
       franchiseCPTotale: 5,
@@ -25,7 +51,6 @@ describe("calculerSerie — série Benoît (données FT certifiées, relevé du 
 
     expect(resultats[0]).toEqual({
       joursIndemnisables: 0,
-      ajBrute: 0,
       netSocial: 0,
       netApresPAS: 0,
       franchiseCPConsommee: 0,
@@ -44,19 +69,16 @@ describe("calculerSerie — série Benoît (données FT certifiées, relevé du 
     expect(resultats[2].joursIndemnisables).toBe(17);
     expect(resultats[2].franchiseCPConsommee).toBe(1);
     expect(resultats[2].delaiConsomme).toBe(0);
-    expect(resultats[2].ajBrute).toBeCloseTo(935.34, 2);
     expect(resultats[2].netSocial).toBeCloseTo(914.77, 2);
     expect(resultats[2].netApresPAS).toBeCloseTo(886.41, 2);
 
     // Avril : plus aucune franchise ni délai.
     expect(resultats[3].joursIndemnisables).toBe(18);
     expect(resultats[3].franchiseCPConsommee).toBe(0);
-    expect(resultats[3].ajBrute).toBeCloseTo(990.36, 2);
 
     // Mai : idem.
     expect(resultats[4].joursIndemnisables).toBe(29);
     expect(resultats[4].franchiseCPConsommee).toBe(0);
-    expect(resultats[4].ajBrute).toBeCloseTo(1595.58, 2);
   });
 });
 
@@ -64,7 +86,6 @@ describe("calculerSerie — comportement générique", () => {
   it("sans franchise ni délai, un seul mois : jours indemnisables = jours non travaillés", () => {
     const resultats = calculerSerie({
       mois: [{ joursDuMois: 30, joursTravailes: 12, estGrise: false }],
-      ajBrute: 55.02,
       ajNetteAvantPAS: 53.81,
       tauxPAS: 0.031,
       franchiseCPTotale: 0,
