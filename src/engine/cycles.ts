@@ -14,7 +14,7 @@ import { ajouterJours, diffJours, toDate, toISO } from "./dateUtils";
 import { calculerDecompteHeures } from "./decompteHeures";
 import { calculerSalaireReference } from "./salaireReference";
 import { calculerAJBrute } from "./areBrute";
-import { calculerAJNette, calculerSJM } from "./areNette";
+import { calculerAJNette, calculerSJR } from "./areNette";
 
 const CYCLES_MAX = 10; // profondeur d'historique reconstruite (couvre largement les 5 ans de l'ancienneté)
 
@@ -41,8 +41,8 @@ export function decouperExercices(profil: Profil, contrats: Contrat[], periodes:
       const { sr, sar, nht } = calculerSalaireReference(contrats, periodes, profil, config, { dateDebut, dateFin });
       const resultatBrut = calculerAJBrute({ salaireRetenu: sar ?? sr, nht, config });
       ajBrute = resultatBrut.brut;
-      const sjm = calculerSJM(sr, nht, config);
-      ajNette = calculerAJNette(resultatBrut.brut, sjm, profil, config).net;
+      const sjr = calculerSJR(sr, nht, config);
+      ajNette = calculerAJNette(resultatBrut.brut, sjr, profil, config).net;
     }
 
     exercices.push({

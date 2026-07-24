@@ -5,7 +5,7 @@ import { calculerFenetreReference } from "../engine/periodeReference";
 import { calculerDecompteHeures } from "../engine/decompteHeures";
 import { calculerSalaireReference } from "../engine/salaireReference";
 import { calculerAJBrutePourFenetre } from "../engine/areBrute";
-import { calculerAJNette, calculerSJM } from "../engine/areNette";
+import { calculerAJNette, calculerSJR } from "../engine/areNette";
 import { calculerStatutPrediction } from "../engine/prediction";
 import { ContractForm } from "./ContractForm";
 
@@ -23,8 +23,8 @@ function evaluer(profil: Profil, contrats: Contrat[], periodes: PeriodeAssimilee
   const decompte = calculerDecompteHeures(contrats, periodes, profil, config, fenetre);
   const { sr, sar, nht } = calculerSalaireReference(contrats, periodes, profil, config, fenetre);
   const ajBrute = calculerAJBrutePourFenetre(fenetre, decompte.total, sar ?? sr, nht, config);
-  const sjm = calculerSJM(sr, nht, config);
-  const ajNette = calculerAJNette(ajBrute.brut, sjm, profil, config);
+  const sjr = calculerSJR(sr, nht, config);
+  const ajNette = calculerAJNette(ajBrute.brut, sjr, profil, config);
   const prediction = calculerStatutPrediction(profil, contrats, periodes, config, dateDuJour);
   return { decompte, ajBrute, ajNette, prediction };
 }

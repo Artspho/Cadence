@@ -217,7 +217,7 @@ export interface DetailCotisation {
 export interface AJNetteResultat {
   brut: number;
   net: number;
-  sjm: number;
+  sjr: number;
   detailCotisations: DetailCotisation[];
 }
 

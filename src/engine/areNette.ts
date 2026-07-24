@@ -4,10 +4,10 @@
 import type { AJNetteResultat, DetailCotisation, Profil } from "../types";
 import type { FranceTravailConfig } from "../config/franceTravailConfig";
 
-/** SJM (Annexe 10) = SR / (NHT / 10). Protégé contre la division par zéro (NHT = 0, ex. tout début de carrière). */
-export function calculerSJM(sr: number, nht: number, config: FranceTravailConfig): number {
+/** SJR (Annexe 10) = SR / (NHT / 10). Protégé contre la division par zéro (NHT = 0, ex. tout début de carrière). */
+export function calculerSJR(sr: number, nht: number, config: FranceTravailConfig): number {
   if (nht <= 0) return 0;
-  return sr / (nht / config.cotisations.diviseurSJM_Annexe10);
+  return sr / (nht / config.cotisations.diviseurSJR_Annexe10);
 }
 
 export function calculerAJNette(ajBrute: number, sjr: number, profil: Profil, config: FranceTravailConfig): AJNetteResultat {
@@ -15,7 +15,7 @@ export function calculerAJNette(ajBrute: number, sjr: number, profil: Profil, co
   const detailCotisations: DetailCotisation[] = [];
 
   if (ajBrute < seuilExoneration) {
-    return { brut: ajBrute, net: ajBrute, sjm: sjr, detailCotisations };
+    return { brut: ajBrute, net: ajBrute, sjr, detailCotisations };
   }
 
   const retraite = tauxRetraiteComplementaire * sjr;
@@ -60,5 +60,5 @@ export function calculerAJNette(ajBrute: number, sjr: number, profil: Profil, co
     net -= alsace;
   }
 
-  return { brut: ajBrute, net: Math.max(0, net), sjm: sjr, detailCotisations };
+  return { brut: ajBrute, net: Math.max(0, net), sjr, detailCotisations };
 }

@@ -73,7 +73,7 @@ export const franceTravailConfig = {
     tauxCSG: { normal: 0.062, reduit: 0.038 }, // ✅ selon barème d'imposition
     tauxCRDS: 0.005, // ✅
     tauxAlsaceMoselle: 0.015, // ✅ régime local
-    diviseurSJM_Annexe10: 10, // ✅ SJM = SR / (NHTM / 10)
+    diviseurSJR_Annexe10: 10, // ✅ SJR = SR / (NHTM / 10)
     tauxAssietteCSGCRDS: 0.9825, // ✅ abattement de 1,75 % sur l'allocation après retraite — cf. docs/validation.md, cas #2/#3
     plancherEcretementJournalier: 62.0, // ✅ simulateur officiel FT (docs/validation.md, cas #2/#3) — distinct de valeursDatees.smicJournalierBrut (réservé à la franchise salaires, valeur/usage potentiellement différents)
   },
@@ -211,7 +211,7 @@ export const franceTravailConfigSchema = z.object({
     tauxCSG: z.object({ normal: z.number(), reduit: z.number() }),
     tauxCRDS: z.number(),
     tauxAlsaceMoselle: z.number(),
-    diviseurSJM_Annexe10: z.number().positive(),
+    diviseurSJR_Annexe10: z.number().positive(),
     tauxAssietteCSGCRDS: z.number().positive(),
     plancherEcretementJournalier: z.number().positive(),
   }),
