@@ -558,11 +558,21 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
   (auparavant seul un ré-import JSON le permettait — trou UX trouvé en investiguant un
   signalement utilisateur). Pas encore vérifié dans le navigateur ni testé automatiquement
   (UI seule). Détail complet : `docs/reprise.md`.
-- 🔴 **EN COURS, prioritaire** : comparaison entre les chiffres de Cadence et 9 documents réels
-  France Travail fournis par l'utilisateur — demande interrompue avant traitement, avec un doute
-  urgent sur une correction de données réelles faite en session précédente (2 contrats de mars
-  supprimés à tort ?). **Détail complet et prochaine étape exacte : `docs/reprise.md`, section
-  « EN COURS — Comparaison avec les vrais documents France Travail ».**
+- ✅ **Taux PAS, franchise salaires mensuelle, mois de réadmission, revenus contrats** (2026-07-26,
+  14 commits `2edb88e`→`502b495`) : `tauxPrelevementSource`/`montantNet`, mois de réadmission non
+  calculé (nouveau type `LigneSerieIndemnisation`), alerte `pas_taux_janvier`, répartition mensuelle
+  de la franchise salaires câblée (mécanisme complet, mais **pas encore branchée sur de vraies
+  données** dans l'app — SR/SJM jamais fournis à `calculerSerieDepuisContrats`), colonnes « Revenus
+  contrats »/« Revenu total ». 159 tests verts. Détail complet : `docs/reprise.md`.
+- 🔴 **Point 2 non résolu (AJ brute vs nette)** : les relevés officiels disent « Allocation
+  **brute** » pour la valeur que Cadence traite comme point de départ net dans
+  `ajReelleHistorique` — écart potentiel ~5 % jamais réinvestigué. **Comparaison complète Cadence
+  vs les 8 mois réels** toujours pas déroulée non plus (demande d'origine de l'utilisateur).
+  **Confusion de dossier non résolue** : deux copies du projet existent (`C:\Users\benoi\cadence`,
+  la vraie, vs `C:\Users\benoi\OneDrive\Bureau\cadence\cadence`, une ossature de tout début jamais
+  construite) — l'utilisateur a montré une capture de la seconde en la prenant pour l'app actuelle,
+  deux questions de clarification posées sans réponse. **Détail complet et prochaine étape exacte :
+  `docs/reprise.md`.**
 - ⬜ **Non traité (V2/V3) :** coordination européenne (périodes U1/PDU1) — même famille qu'Annexe 8/article 65, hors périmètre Annexe 10 pur. Aucune logique ni champ de données ne l'anticipe encore (détail dans `docs/SPEC.md` §10 et §11.C). Ne pas confondre avec le champ `territoire` du contrat, qui couvre un cas différent (cachet ponctuel joué en EEE/Suisse/UK mais déclaré en France).
 - 🔁 **Maintenance de la config** (récurrent, perso — hors app, pas de backend en bêta) : une fois
   par mois, vérifier à la source officielle SMIC (horaire / mensuel / journalier), PMSS, et les
@@ -577,11 +587,12 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
   actuellement datée « 2026.06 » (alignée sur la revalorisation SMIC du 1er juin 2026) — prochaine
   échéance connue : la revalorisation SMIC/PMSS du 1er janvier suivant.
 
-**Prochaines pistes** : chantier ouvert identifié = câbler la répartition mensuelle de la
-franchise salaires (min(dureeDroitsMois, 8) mois + report, comme la franchise CP — formule du
-TOTAL déjà implémentée et testée, cf. 🚧/✅ ci-dessus) + UI pour `dureeDroitsMois`/
-`salairesHorsAnnexe10PRA` sur le profil. Plus aucun ❌ confirmé par ailleurs dans la liste, la
-cohérence de profil est tenue par construction, et tous les items §11.A sont désormais traités
+**Prochaines pistes** : voir les deux points 🔴 juste au-dessus (point 2 AJ brut/net, dossier
+OneDrive) et `docs/reprise.md` pour le détail. Chantier ouvert restant sur la franchise
+salaires : fournir de vrais SR/SJM à `calculerSerieDepuisContrats` (via
+`srSjmPourFranchiseSalaires`) quelque part dans l'app — le mécanisme de répartition mensuelle est
+déjà câblé et testé, seule la donnée réelle manque. Plus aucun ❌ confirmé par ailleurs dans la
+liste, la cohérence de profil est tenue par construction, et tous les items §11.A sont désormais traités
 (transparence du calcul comprise). Sinon, sans urgence : les deux limites connues 🔶 ci-dessus, le
 `rythme_hors_limite` différé (backlog `docs/reprise.md`/`docs/validation.md`), l'installation
 réelle sur un vrai téléphone (PWA techniquement prête, dépend du déploiement bêta), alignement

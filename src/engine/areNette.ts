@@ -10,16 +10,16 @@ export function calculerSJM(sr: number, nht: number, config: FranceTravailConfig
   return sr / (nht / config.cotisations.diviseurSJM_Annexe10);
 }
 
-export function calculerAJNette(ajBrute: number, sjm: number, profil: Profil, config: FranceTravailConfig): AJNetteResultat {
+export function calculerAJNette(ajBrute: number, sjr: number, profil: Profil, config: FranceTravailConfig): AJNetteResultat {
   const { seuilExoneration, seuilRetraiteCompl, tauxRetraiteComplementaire, tauxCSG, tauxCRDS, tauxAlsaceMoselle, tauxAssietteCSGCRDS, plancherEcretementJournalier } = config.cotisations;
   const detailCotisations: DetailCotisation[] = [];
 
   if (ajBrute < seuilExoneration) {
-    return { brut: ajBrute, net: ajBrute, sjm, detailCotisations };
+    return { brut: ajBrute, net: ajBrute, sjm: sjr, detailCotisations };
   }
 
-  const retraite = tauxRetraiteComplementaire * sjm;
-  detailCotisations.push({ libelle: "Retraite complémentaire (0,93 % du SJM)", montant: retraite });
+  const retraite = tauxRetraiteComplementaire * sjr;
+  detailCotisations.push({ libelle: "Retraite complémentaire (0,93 % du SJR)", montant: retraite });
   let net = ajBrute - retraite;
 
   if (ajBrute > seuilRetraiteCompl) {
@@ -37,7 +37,7 @@ export function calculerAJNette(ajBrute: number, sjm: number, profil: Profil, co
     // montant NÉGATIF (net > brut), un chiffre faux (devoir sacré n°2).
     if (net > plancherEcretementJournalier) {
       const taux = profil.baremeCSG === "reduit" ? tauxCSG.reduit : tauxCSG.normal;
-      const assiette = tauxAssietteCSGCRDS * net; // 98,25 % de l'allocation APRÈS retraite, pas le SJM
+      const assiette = tauxAssietteCSGCRDS * net; // 98,25 % de l'allocation APRÈS retraite, pas le SJR
       const csgTheorique = taux * assiette;
       const crdsTheorique = tauxCRDS * assiette;
       const netSansEcretement = net - csgTheorique - crdsTheorique;
@@ -55,10 +55,10 @@ export function calculerAJNette(ajBrute: number, sjm: number, profil: Profil, co
   }
 
   if (profil.alsaceMoselle) {
-    const alsace = tauxAlsaceMoselle * sjm;
-    detailCotisations.push({ libelle: "Régime local Alsace-Moselle (1,50 % du SJM)", montant: alsace });
+    const alsace = tauxAlsaceMoselle * sjr;
+    detailCotisations.push({ libelle: "Régime local Alsace-Moselle (1,50 % du SJR)", montant: alsace });
     net -= alsace;
   }
 
-  return { brut: ajBrute, net: Math.max(0, net), sjm, detailCotisations };
+  return { brut: ajBrute, net: Math.max(0, net), sjm: sjr, detailCotisations };
 }

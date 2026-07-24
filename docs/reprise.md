@@ -8,15 +8,24 @@ Mémoire durable à consulter au démarrage : `CLAUDE.md`, `docs/SPEC.md`, `docs
 
 Deux devoirs sacrés : (1) ne jamais perdre les données ; (2) ne jamais afficher un chiffre faux (ni faux « feu vert » rassurant, ni faux « Bloqué », ni faux montant, ni fausse alerte, ni valeur sentinelle brute).
 
-État : les deux devoirs sacrés sont tenus, la bêta a son socle. 146 tests verts, `tsc -b` propre.
-Dernier commit : `2edb88e` (bouton « Modifier » pour `dateDepart`, non encore vérifié dans le
-navigateur). Tous les items §11.A du SPEC sont désormais traités.
+État : les deux devoirs sacrés sont tenus, la bêta a son socle. 159 tests verts, `tsc -b` propre.
+Dernier commit : `502b495` (revenus contrats + revenu total par mois). Tous les items §11.A du
+SPEC sont désormais traités.
 
-**⚠️ À reprendre en priorité, avant tout nouveau chantier** : section « EN COURS — Comparaison avec
-les vrais documents France Travail » plus bas — demande explicite de l'utilisateur interrompue
-avant d'être traitée, avec un point urgent non résolu (une correction de données réelles faite en
-session précédente, suppression de 2 contrats de mars, pourrait avoir été une erreur — à trancher
-avec l'utilisateur avant de retoucher quoi que ce soit).
+**⚠️ Point d'attention avant tout nouveau chantier — confusion de dossier non résolue** : il existe
+**deux copies** du projet sur cette machine : `C:\Users\benoi\cadence` (le vrai dépôt git, celui de
+toute cette session et de tout le travail décrit ci-dessous) et
+`C:\Users\benoi\OneDrive\Bureau\cadence\cadence` (une ossature de tout début de projet, sans git,
+sans `storage/`, sans Onboarding, rien de construit — son propre `CLAUDE.md` dit encore
+« ⬜ storage/, components/, câblage App.tsx »). L'utilisateur a montré une capture d'écran de cette
+**seconde** copie (« Ossature prête. ») en pensant que c'était l'app actuelle, bloquée sans action
+possible. Deux questions de clarification posées (quel dossier corriger, quelle hypothèse) ont
+toutes les deux été **rejetées sans réponse** par l'utilisateur — **rien n'a été fait sur ce point,
+à reprendre en premier** : soit c'est un vieux dossier oublié (l'app réelle tourne déjà très bien
+depuis `C:\Users\benoi\cadence`, rien à coder), soit c'est un second projet volontairement distinct
+à faire avancer en parallèle (auquel cas il faut construire l'import/export et l'onglet Profil
+avant que les deux boutons demandés aient un sens). Ne pas relancer une demande de clarification
+au démarrage sans que le contexte l'indique — attendre que l'utilisateur revienne dessus.
 
 ## Fait dans les sessions récentes
 
@@ -731,76 +740,85 @@ réimporté avec l'ancienne valeur `"2026-07-23"` (format antérieur au chantier
 **aucune UI ne permettait de la changer** — pas un bug de lecture des contrats, un vrai trou UX
 (corrigé ci-dessus, bouton « Modifier »).
 
-## EN COURS — Comparaison avec les vrais documents France Travail (demande interrompue, à reprendre)
+## Résolu (2026-07-26) — comparaison avec les vrais documents France Travail, points 1 et 3
 
-**Dernière demande explicite de l'utilisateur, pas encore traitée** : 9 documents officiels réels
-France Travail fournis (relevés de situation janvier à juillet 2026, déclaration fiscale annuelle
-2025, justificatif après inscription, notification d'admission) avec la consigne
-« Compare avec les vrais chiffres » — comparer les figures officielles à ce que Cadence
-calcule/affiche. **Cette comparaison n'a jamais été faite** : l'utilisateur a interrompu deux fois
-puis demandé à la place une synthèse pour une nouvelle conversation (ce document).
+**Point 1 (mars/juin, contrats « Les Arts Phocéens ») — RÉSOLU par les vraies pièces, pas par un
+choix arbitraire.** Les 6 « Justificatif de déclaration de situation mensuelle » officiels
+(janvier à juin 2026, fournis par l'utilisateur) ont tranché : ni l'hypothèse « garder les 3
+contrats » ni « n'en garder qu'1 » n'étaient correctes pour mars. Le vrai mars 2026 déclaré ne
+comporte **aucun** contrat « Les Arts Phocéens » — seulement Levallois Perret (21h) + 7 cachets
+sous l'employeur **« onpl »** (731,16 €), total 105h, collant exactement au 13 JNI déjà certifié.
+Juin, lui, a bien 2 (pas 3) lignes « Les Arts Phocéens » (6 puis 4 cachets) + un 3e employeur
+« Les Étoiles du Classique » (14h+1 cachet), total 167h. Fichier réel de l'utilisateur
+(`cadence-export-2026-07-24.json`, hors dépôt) corrigé en conséquence pour les 6 mois, avec
+confirmation arithmétique exacte (heures ET euros) contre les 6 documents sur chacun. Nouveau
+fichier : `cadence-export-2026-07-24-corrige.json` (Downloads, hors dépôt) — à réimporter par
+l'utilisateur, pas encore fait à la connaissance de Cadence.
 
-**Document manquant** : « Notification admission ARE_20260205 (2).pdf » a été signalé comme lu par
-l'outil mais son contenu n'a jamais été effectivement transmis avant l'interruption — à relire
-en premier à la prochaine session si son contenu est nécessaire (il contiendrait probablement les
-valeurs officielles de `franchiseCPTotale`/`delaiAttenteInitial`, actuellement seulement déduites
-par recoupement, voir plus bas).
+**Point 3 (franchise CP totale) — confirmé** : les mêmes documents et le mécanisme déjà câblé
+(`Profil.ouvertureDroits.franchiseCPTotale`) donnent la valeur réelle par construction dès que
+l'utilisateur la saisit depuis sa notification — plus un recoupement indirect nécessaire. **Reste
+à vérifier que l'utilisateur l'a effectivement saisie dans son vrai profil** (pas fait pendant
+cette session, aucune donnée réelle modifiée côté profil).
 
-**Données réelles extraites des 8 autres documents lus** (personne réelle, détails d'identité
-volontairement omis ici — seuls les faits opérationnels utiles au chantier sont conservés) :
+## Pas résolu — à reprendre
 
-| Mois | Jours non indem. travail | Franchise CP consommée | Différé | AJ payées | AJ €/j (relevé) | Brut | Net |
-|------|---------------------------|--------------------------|---------|-----------|-----------------|------|-----|
-| Nov 2025 | 10 | — | — | 20 | 54,55 | 1091,00 | 1033,20 |
-| Déc 2025 | 7 | — | — | 24 | 54,55 | 1309,20 | 1239,84 |
-| Jan 2026 (régularisé) | 18 | — | — | 13 | 54,55 | 709,15 | 671,58 |
-| Fév 2026 | 19 | 4 | 5 | 0 | — | — | — |
-| Mars 2026 | 13 | 1 | 0 | 17 | 55,02 | 935,34 | 886,38 |
-| Avril 2026 | 12 | 0 | 0 | 18 | 55,02 | 990,36 | 938,52 |
-| Mai 2026 | 2 | 0 | 0 | 29 | 55,02 | 1595,58 | 1512,06 |
-| Juin 2026 | 21 | 0 | 0 | 9 | 55,02 | 495,18 | 469,26 |
+- **Point 2 (AJ brute vs nette, tension jamais rouverte)** : les relevés officiels disent texto
+  « Allocation **brute** d'un montant journalier de 55,02 € » (retraite complémentaire retenue en
+  plus), alors que Cadence stocke 55,02 dans `Profil.ajReelleHistorique` comme si c'était déjà net.
+  Cette session a ajouté `tauxPrelevementSource`/`montantNet` (retenue à la source, une déduction
+  **différente**, en aval) mais n'a **jamais rouvert** la question d'origine : le 55,02 € que
+  Cadence traite comme « point de départ net » est peut-être en réalité le brut FT (avant retraite
+  complémentaire + CSG/CRDS), ce qui rendrait tous les montants de `RevenusMensuels.tsx`
+  légèrement surestimés (~5 %). À investiguer avant de faire confiance à la colonne « Montant net
+  avant PAS » sur des vraies données.
+- **La comparaison complète Cadence vs les 8 mois réels** (demande d'origine de l'utilisateur,
+  tableau déjà réuni ci-dessus dans les versions précédentes de ce document) **n'a toujours pas été
+  déroulée** — la session est partie sur une longue série de chantiers fonctionnels (PAS, franchise
+  salaires, mois de réadmission, revenus contrats) au lieu d'y revenir. À reprendre une fois le
+  fichier corrigé réimporté et le point 2 tranché.
+- **Confusion de dossier OneDrive** (cf. tout en haut de ce document) — non résolue, l'utilisateur
+  n'a répondu à aucune des deux questions posées.
 
-Fév-mai reprennent les cas déjà certifiés dans les sections précédentes (rien de nouveau) ; nov/déc
-2025, jan 2026 et juin 2026 sont de nouvelles données, pas encore confrontées au moteur.
+## Fait (2026-07-26 : PAS, franchise salaires mensuelle, mois de réadmission, revenus contrats)
 
-**Trois trouvailles importantes de cette lecture, aucune encore traitée en code — à examiner en
-premier à la prochaine session, avant toute reprise de la comparaison demandée** :
+Longue session, 14 commits, tous sur `C:\Users\benoi\cadence` (`2edb88e`→`502b495`), 159 tests
+verts, `tsc -b` propre à chaque étape. Détail complet dans l'historique git ; résumé par thème :
 
-1. **🔴 Le fichier réel de l'utilisateur a peut-être été mal « corrigé » (voir investigation
-   ci-dessus)**. Le relevé de juin 2026 donne 21j non indemnisés travail = exactement
-   `floor(167h × 1,3 / 10)`. Or 167h ne s'obtient qu'en gardant les **3** contrats « Les Arts
-   Phocéens » de juin (72+26+48=146h, même plage de dates apparente) + 21h Levallois — soit
-   exactement le même schéma « 3 contrats dupliqués en apparence » que celui supprimé en mars. Si
-   juin est correct avec les 3 contrats gardés, alors mars avec ses 3 contrats (72+48+84=204h,
-   avant ma correction) n'était peut-être PAS une erreur de saisie non plus — auquel cas
-   supprimer 2 des 3 contrats de mars a effacé de vraies données. **Ne pas retoucher le fichier
-   sans trancher ce point avec l'utilisateur d'abord** (montrer les deux hypothèses, pas décider
-   seul).
-2. **🔴 L'AJ de 55,02 €/54,55 € est décrite comme BRUTE dans les relevés** (« Allocation brute d'un
-   montant journalier de 55,02 Euro »), pas nette — ce qui **contredit** la note actée le
-   2026-07-24 dans ce document (« l'AJ du relevé est déjà nette »). Vérification arithmétique sur
-   3 mois indépendants : `jours indemnisés × 55,02` reproduit exactement la colonne **Brut** du
-   relevé (avril 18×55,02=990,36=brut ; mai 29×55,02=1595,58=brut ; juin 9×55,02=495,18=brut),
-   **jamais** la colonne Net (938,52 / 1512,06 / 469,26 — écart = retraite complémentaire + impôt
-   à la source prélevés). Cadence (`RevenusMensuels.tsx`, colonne « Montant (AJ relevé) »)
-   affiche donc en réalité un montant **brut**, pas le montant net réellement perçu — à vérifier
-   contre le code exact avant de conclure à un bug d'affichage (le libellé dit-il "brut" ou
-   laisse-t-il croire à un net ?), mais l'écart chiffré est réel et non négligeable (~5 % du
-   montant).
-3. **Franchise CP totale déductible par recoupement, jamais encore saisie dans le profil** : 4j
-   (fév) + 1j (mars) = 5j consommés puis plus jamais consommés (avril/mai/juin à 0) → suggère
-   fortement `franchiseCPTotale = 5` pour cette réadmission du 18/01/2026 — cohérent avec les
-   sections déjà validées (`franchiseCPRestante` ≤ 5 du début à la fin). Cette valeur n'est pas
-   encore renseignée dans `Profil.ouvertureDroits.franchiseCPTotale` de l'utilisateur — à saisir
-   une fois confirmée (idéalement par la notification d'admission manquante, point ci-dessus,
-   plutôt que par ce recoupement indirect).
+- **Correctif bug avril + clôture** (`b91d0ed`) : confirmé data-only (contrats inventés qui
+  chevauchaient le mois), `repartirContratParMois` validé sain — note dans `CLAUDE.md`
+  « Décisions actées ».
+- **Taux de prélèvement à la source (PAS)** : `Profil.ouvertureDroits.tauxPrelevementSource?: number`
+  + `MontantMensuelResultat.montantNet` (`montant × (1 − taux/100)`, arrondi). Champ formulaire
+  « Mon profil ». **Bug trouvé en vérifiant dans le navigateur** : `profilSchema`
+  (`lib/coherenceProfil.ts`) écartait silencieusement `tauxPrelevementSource` (Zod sans erreur) —
+  corrigé en commit `fix:` séparé, avec test de non-régression dédié (`c2a5729`, `11ba1c0`).
+  Colonne « Montant net avant PAS » / « ≈ Net reçu » dans `RevenusMensuels.tsx`.
+- **Mois de réadmission (mois chevauchant deux droits)** : décision actée — jamais calculé,
+  `LigneSerieIndemnisation` (nouveau type discriminé, `types/index.ts`) ajoute
+  `MoisReadmissionNonCalcule` à côté de `MoisIndemnisationResultat`. Ligne grisée + tooltip dans le
+  tableau, exclue des totaux. Alerte `pas_taux_janvier` ajoutée (`alertes.ts`, nouveau 6e paramètre
+  optionnel `soldeDepart` sur `detecterAlertes`, rétro-compatible) : signale un janvier « en cours
+  d'indemnisation » (pas le mois d'ouverture) si le taux PAS est renseigné, une fois par série.
+- **Franchise salaires — répartition mensuelle câblée** (`aaee824`) : `SoldeIndemnisation` gagne
+  `franchiseSalairesRestante`/`quotaSalairesCarryOver`, même mécanique exacte que la franchise CP
+  (quota mensuel = `ceil(total / min(dureeDroitsMois, repartitionMoisMax))`, carry-over, épuisement
+  jamais négatif). **Limite actée explicitement** : `calculerSerieDepuisContrats` accepte un
+  paramètre optionnel `srSjmPourFranchiseSalaires` mais **personne ne le fournit encore** (ni
+  `RevenusMensuels.tsx` ni `alertes.ts`) — le SR/SJM réels (compteur « montant ARE », pas celui-ci)
+  ne sont pas câblés dans l'app, donc la franchise salaires reste `franchise_salaires_non_certifiee`
+  en pratique malgré le mécanisme fonctionnel et testé. Champs profil `dureeDroitsMois`/
+  `salairesHorsAnnexe10PRA` ajoutés au formulaire (`988330a`) ; `formule: null` vestige retiré de
+  `franceTravailConfig.ts` (`e69e99b`, y compris du schéma Zod qui le validait aussi).
+- **Revenus contrats + revenu total par mois** (`502b495`) : `MoisIndemnisationResultat` gagne
+  `salairesContratsBruts` (somme des `salaireBrut` prorata via `repartirContratParMois`, déjà
+  disponible, aucune nouvelle logique de répartition). Deux colonnes dans `RevenusMensuels.tsx` +
+  ligne « Total » en pied de tableau (ARE fusionné sur une seule cellule quand le PAS est renseigné,
+  pas de total « avant PAS » redondant non demandé).
 
-**Prochaine étape directe** (reprendre exactement là) : avant de coder quoi que ce soit, (a) trancher
-le point 1 avec l'utilisateur (montrer les deux hypothèses mars/juin, ne pas décider seul, ne pas
-retoucher le fichier avant sa réponse), (b) vérifier dans `RevenusMensuels.tsx` si le libellé
-« Montant (AJ relevé) » induit en erreur sur brut/net (point 2) et proposer un correctif si oui, (c)
-une fois ces deux points clos, dérouler la comparaison mois par mois initialement demandée
-(Cadence vs les 8 mois du tableau ci-dessus) avec les vraies données corrigées.
+**Vérifié dans le navigateur à chaque étape** (jeu de données de test seedé, restauré après chaque
+vérification) : champ PAS persistant, ligne de réadmission grisée avec tooltip exact, colonnes
+Revenus contrats/Revenu total avec total recalculé à la main (7403,50 € + 2100,00 € = 9503,50 €).
 
 ## Ensuite (backlog)
 
