@@ -62,4 +62,13 @@ describe("validerProfilPourEcriture", () => {
     expect(resultat.ok).toBe(true);
     if (resultat.ok) expect(resultat.profil.dateAnniversairePrecedente).toBeUndefined();
   });
+
+  it("profilSchema conserve tauxPrelevementSource (non-régression : Zod l'écartait silencieusement avant le fix, cf. docs/reprise.md)", () => {
+    const candidat = profil({
+      ouvertureDroits: { dateOuverture: "2026-01-18", franchiseCPTotale: 10, delaiAttenteInitial: 7, tauxPrelevementSource: 7.2 },
+    });
+    const resultat = validerProfilPourEcriture(candidat);
+    expect(resultat.ok).toBe(true);
+    if (resultat.ok) expect(resultat.profil.ouvertureDroits?.tauxPrelevementSource).toBe(7.2);
+  });
 });
