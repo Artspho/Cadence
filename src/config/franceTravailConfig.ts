@@ -109,9 +109,8 @@ export const franceTravailConfig = {
     },
     franchiseSalaires: {
       repartitionMoisMax: 8, // ✅ répartie sur 8 mois max
-      // 🔶 TODO : transcrire la formule EXACTE de la franchise salaires
-      //     depuis le guide (implique salaires de la période, SMIC journalier).
-      formule: null,
+      // Formule transcrite dans engine/indemnisationMensuelle.ts
+      // calculerFranchiseSalaires — source : guide FT mars 2026 p.14
     },
   },
 
@@ -237,7 +236,6 @@ export const franceTravailConfigSchema = z.object({
     }),
     franchiseSalaires: z.object({
       repartitionMoisMax: z.number(),
-      formule: z.null(),
     }),
   }),
   indemnisationMensuelle: z.object({
