@@ -149,12 +149,17 @@ export function ContractForm({ profil, config, decompteActuel, valeurInitiale, o
             type="button"
             key={t.id}
             onClick={() => setType(t.id)}
+            title={t.id === "ptp" ? "Projet de Transition Professionnelle — 1 h de PTP compte comme 1 h Annexe 10 pour les 507 h." : undefined}
             className={`rounded-lg border px-3 py-2 text-sm transition-colors ${type === t.id ? "border-mint bg-mint/10 text-ink" : "border-line bg-surface-2 text-muted"}`}
           >
             {t.label}
           </button>
         ))}
       </div>
+
+      {type === "ptp" && (
+        <p className="text-xs text-faint">Projet de Transition Professionnelle — 1 h de PTP compte comme 1 h Annexe 10 pour les 507 h.</p>
+      )}
 
       {type === "enseignement" && onValiderRecurrent && (
         <div className="rounded-lg bg-teal/10 px-4 py-3 space-y-2">
