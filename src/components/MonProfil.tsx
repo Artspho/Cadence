@@ -228,8 +228,8 @@ export function MonProfil({ dateDuJour, profil, onModifierProfil }: MonProfilPro
           <li>Annexe 10 uniquement. Pas d'arbitrage Annexe 8 ni régime général (article 65).</li>
           <li>Estimation, pas décision. Les montants sont indicatifs ; France Travail seul fait foi.</li>
           <li>
-            Le suivi des jours réellement indemnisés mois par mois est disponible (onglet « Revenus mensuels »), à partir d'un solde de départ que tu renseignes toi-même depuis ton relevé France
-            Travail. La franchise salaires et le plafond de cumul (118&nbsp;% du PMSS) ne sont pas calculés.
+            Le suivi des jours réellement indemnisés mois par mois est disponible (onglet « Revenus mensuels »), calculé automatiquement depuis tes contrats et l'ouverture de tes droits
+            (renseignée ci-dessus, section « Mon indemnisation en cours »). La franchise salaires et le plafond de cumul (118&nbsp;% du PMSS) ne sont pas calculés.
           </li>
           <li>Import PDF assisté, pas magique : extraction locale, revue avant enregistrement, non garantie exacte.</li>
         </ul>

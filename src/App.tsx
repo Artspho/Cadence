@@ -263,6 +263,7 @@ export default function App() {
               contrats={donnees.contrats}
               config={franceTravailConfig}
               onConfigurerSolde={configurerSoldeIndemnisation}
+              onAllerVersProfil={() => setOnglet("profil")}
               dateDuJour={dateDuJour}
             />
           ))}
