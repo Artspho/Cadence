@@ -4,7 +4,7 @@
 // directement, seulement les fonctions exportées ici.
 import { z } from "zod";
 import type { Contrat, PeriodeAssimilee, Profil, SoldeIndemnisationDepart } from "../types";
-import { profilSchema } from "../lib/coherenceProfil";
+import { profilSchema, profilSchemaForme } from "../lib/coherenceProfil";
 
 const CLE_STOCKAGE = "cadence:v1:donnees";
 
@@ -128,12 +128,18 @@ function migrerContratsDateDebut(brut: unknown): unknown {
   return { ...donnees, contrats };
 }
 
-// profilSchema (forme + cohérence situation/date) vit désormais dans lib/coherenceProfil.ts —
-// unique définition, réutilisée ici ET par App.tsx (validerProfilPourEcriture), pour que l'import
-// JSON et l'édition en mémoire referment exactement la même porte (cf. lib/coherenceProfil.ts).
-
-const donneesAppSchema = z.object({
-  profil: profilSchema.nullable(),
+// profilSchema/profilSchemaForme (forme, +cohérence pour le second) vivent désormais dans
+// lib/coherenceProfil.ts — définitions uniques, réutilisées ici ET par App.tsx
+// (validerProfilPourEcriture). Deux schémas de données distincts ci-dessous, PAS un seul :
+// - `donneesAppSchemaLecture` (profilSchemaForme, sans cohérence) pour `chargerDonnees` — un
+//   profil déjà enregistré avant l'ajout d'une nouvelle règle de cohérence ne doit jamais se
+//   mettre à échouer au simple chargement de page (devoir sacré n°1, cf. lib/coherenceProfil.ts).
+// - `donneesAppSchemaEcriture` (profilSchema, avec cohérence) pour `importerJSON` — une action
+//   explicite de l'utilisateur, doit fermer la même porte que l'édition en mémoire (cf.
+//   validerProfilPourEcriture) : sinon un JSON incohérent (le tien, ou celui d'un ami en retour
+//   d'usage, cf. SPEC §11.A) pourrait réinjecter ce que ni l'onboarding ni l'édition n'auraient
+//   jamais laissé naître.
+const champsCommuns = {
   contrats: z.array(contratSchema),
   periodes: z.array(periodeSchema),
   // .default(null) : un export antérieur au module indemnisation mensuelle n'a pas ce champ du
@@ -144,17 +150,19 @@ const donneesAppSchema = z.object({
   // docs/reprise.md. Un ancien export qui contient encore cette clé n'échoue pas pour autant —
   // Zod ignore silencieusement les clés inconnues.
   soldeIndemnisationDepart: soldeIndemnisationDepartSchema.nullable().default(null),
-});
+};
+const donneesAppSchemaLecture = z.object({ profil: profilSchemaForme.nullable(), ...champsCommuns });
+const donneesAppSchemaEcriture = z.object({ profil: profilSchema.nullable(), ...champsCommuns });
 
-function parserDonnees(brut: unknown) {
-  return donneesAppSchema.safeParse(migrerSoldeVersDateDepart(migrerAjReelleHistoriqueVersProfil(migrerContratsDateDebut(migrerAjReelleHistorique(brut)))));
+function migrer(brut: unknown) {
+  return migrerSoldeVersDateDepart(migrerAjReelleHistoriqueVersProfil(migrerContratsDateDebut(migrerAjReelleHistorique(brut))));
 }
 
 export async function chargerDonnees(): Promise<DonneesApp> {
   try {
     const brut = window.localStorage.getItem(CLE_STOCKAGE);
     if (!brut) return donneesVides;
-    const parse = parserDonnees(JSON.parse(brut));
+    const parse = donneesAppSchemaLecture.safeParse(migrer(JSON.parse(brut)));
     if (!parse.success) {
       console.error("Données locales corrompues, réinitialisation.", parse.error);
       return donneesVides;
@@ -203,9 +211,13 @@ export function importerJSON(contenu: string): DonneesApp {
     );
   }
 
-  const parse = parserDonnees(brut);
+  const parse = donneesAppSchemaEcriture.safeParse(migrer(brut));
   if (!parse.success) {
-    throw new Error("Ce fichier n'a pas la structure attendue par Cadence.");
+    // Message de cohérence spécifique (ex. dateLimiteIndemnisation avant dateOuverture) si c'est la
+    // cause du refus (`.refine()`, cf. lib/coherenceProfil.ts) — message générique de forme sinon,
+    // pour ne pas changer le comportement déjà testé sur un fichier structurellement invalide.
+    const messageCoherence = parse.error.issues.find((i) => i.code === "custom")?.message;
+    throw new Error(messageCoherence ?? "Ce fichier n'a pas la structure attendue par Cadence.");
   }
   return parse.data;
 }

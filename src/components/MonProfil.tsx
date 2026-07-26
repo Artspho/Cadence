@@ -271,6 +271,7 @@ function MonIndemnisationEnCours({ profil, onModifierProfil }: { profil: Profil;
   const [dateOuverture, setDateOuverture] = useState(ouverture?.dateOuverture ?? "");
   const [franchiseCPTotale, setFranchiseCPTotale] = useState(ouverture?.franchiseCPTotale ?? 0);
   const [delaiAttenteInitial, setDelaiAttenteInitial] = useState(ouverture?.delaiAttenteInitial ?? 7);
+  const [dateLimiteIndemnisation, setDateLimiteIndemnisation] = useState(ouverture?.dateLimiteIndemnisation ?? "");
   const [tauxPrelevementSource, setTauxPrelevementSource] = useState(ouverture?.tauxPrelevementSource?.toString() ?? "");
   // dureeDroitsMois/salairesHorsAnnexe10PRA vivent sur Profil, pas ouvertureDroits (cf.
   // types/index.ts) — composantes de la franchise salaires, connues indépendamment de la
@@ -286,7 +287,13 @@ function MonIndemnisationEnCours({ profil, onModifierProfil }: { profil: Profil;
       ...profil,
       dureeDroitsMois: dureeDroitsMois === "" ? undefined : (Number(dureeDroitsMois) as 12 | 6),
       salairesHorsAnnexe10PRA: salairesHorsAnnexe10PRA.trim() === "" ? null : Number(salairesHorsAnnexe10PRA),
-      ouvertureDroits: { dateOuverture, franchiseCPTotale, delaiAttenteInitial, tauxPrelevementSource: tauxSaisi },
+      ouvertureDroits: {
+        dateOuverture,
+        franchiseCPTotale,
+        delaiAttenteInitial,
+        tauxPrelevementSource: tauxSaisi,
+        dateLimiteIndemnisation: dateLimiteIndemnisation.trim() === "" ? undefined : dateLimiteIndemnisation,
+      },
     });
     if (!resultat.ok) {
       setErreur(resultat.erreur);
@@ -346,6 +353,23 @@ function MonIndemnisationEnCours({ profil, onModifierProfil }: { profil: Profil;
             className="w-full bg-surface-2 border border-line rounded-lg px-3 py-2 text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-mint"
           />
           <p className="text-xs text-faint mt-1">Sur ta notification, rubrique « Délai d'attente ». Presque toujours 7 jours.</p>
+        </div>
+
+        <div>
+          <label className="block text-xs uppercase tracking-[.03em] text-muted mb-2" htmlFor="profil-date-limite-indemnisation">
+            Date limite de ton indemnisation
+          </label>
+          <input
+            id="profil-date-limite-indemnisation"
+            type="date"
+            value={dateLimiteIndemnisation}
+            onChange={(e) => setDateLimiteIndemnisation(e.target.value)}
+            className="w-full bg-surface-2 border border-line rounded-lg px-3 py-2 text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-mint"
+          />
+          <p className="text-xs text-faint mt-1">
+            Sur ta notification, phrase « La date limite de votre indemnisation est le JJ/MM/AAAA ». Laisse vide si tu ne l'as pas sous la main — le suivi mensuel restera alors non borné dans le
+            temps.
+          </p>
         </div>
 
         <div>

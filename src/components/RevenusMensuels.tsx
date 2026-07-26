@@ -142,7 +142,17 @@ function SoldeRecap({ solde, onConfigurer }: { solde: SoldeIndemnisationDepart; 
       <span>
         Tableau affiché à partir de : <span className="text-ink">{solde.dateDepart}</span>
       </span>
-      <button onClick={() => setModification(true)} className="text-xs text-mint hover:underline">
+      <button
+        onClick={() => {
+          // Resynchronise systématiquement sur la valeur réelle courante avant d'ouvrir
+          // l'édition — `dateDepart` (state local) était initialisé une seule fois au montage
+          // (`useState(solde.dateDepart)`) et ne se resynchronisait jamais si `solde` changeait
+          // sans remonter ce composant, risque de resaisir/écraser avec une valeur périmée.
+          setDateDepart(solde.dateDepart);
+          setModification(true);
+        }}
+        className="text-xs text-mint hover:underline"
+      >
         Modifier
       </button>
     </div>

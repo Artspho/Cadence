@@ -240,7 +240,17 @@ export function calculerSerieDepuisContrats(
   }
 
   const moisTries = [...heuresParMois.keys(), moisCle(dateDuJour), moisAffichageDebut, moisDebutCalcul].sort();
-  const moisFin = moisTries[moisTries.length - 1];
+  let moisFin = moisTries[moisTries.length - 1];
+
+  // Borne dure sur la fin réelle des droits (ouvertureDroits.dateLimiteIndemnisation, fait déclaré
+  // par l'utilisateur depuis sa notification, jamais calculé ici) — pas seulement un filtre
+  // d'affichage : aucun mois au-delà n'est simulé, jamais montré comme s'il faisait partie d'une
+  // période d'indemnisation qui n'existe plus. Optionnel : tant qu'absent, comportement historique
+  // inchangé (série non bornée, cf. dateDuJour/contrats/moisAffichageDebut ci-dessus).
+  if (ouvertureDroits.dateLimiteIndemnisation) {
+    const moisLimite = moisCle(ouvertureDroits.dateLimiteIndemnisation);
+    if (moisLimite < moisFin) moisFin = moisLimite;
+  }
 
   const mois: MoisIndemnisationEntree[] = [];
   for (let curseur = moisDebutCalcul; curseur <= moisFin; curseur = moisSuivant(curseur)) {

@@ -105,6 +105,15 @@ export interface Profil {
     franchiseCPTotale: number; // jours — chiffre exact de la notification, PAS le solde restant
     delaiAttenteInitial: number; // jours — presque toujours 7
     tauxPrelevementSource?: number; // % entier ou décimal, ex. 7.2
+    // Date de fin de la période d'indemnisation en cours — chiffre exact de la notification
+    // France Travail (« La date limite de votre indemnisation est le JJ/MM/AAAA »), jamais
+    // calculée par Cadence (même principe que franchiseCPTotale/delaiAttenteInitial : le moteur ne
+    // devine pas une durée réglementaire, il consomme un fait déclaré). Optionnel pour ne rien
+    // casser sur un profil déjà enregistré avant l'ajout de ce champ — tant qu'absent, la série
+    // mensuelle reste non bornée (comportement historique). Borne dure (pas seulement un filtre
+    // d'affichage) : cf. calculerSerieDepuisContrats, engine/indemnisationMensuelle.ts — aucun mois
+    // au-delà n'est simulé, jamais montré comme s'il faisait partie de droits qui n'existent plus.
+    dateLimiteIndemnisation?: string;
   };
 }
 

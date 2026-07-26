@@ -311,6 +311,42 @@ describe("calculerSerieDepuisContrats", () => {
     const premier = resultat.mois[0];
     if (!premier.calculable) throw new Error("février devrait être calculable, pas un mois de réadmission");
   });
+
+  it("dateLimiteIndemnisation borne dur la série : aucun mois au-delà, même si dateDuJour est bien plus tardif (régression signalée par l'utilisateur, 2026-07-26)", () => {
+    const p = profil({
+      situation: "readmission",
+      ouvertureDroits: { dateOuverture: "2026-01-18", franchiseCPTotale: 5, delaiAttenteInitial: 7, dateLimiteIndemnisation: "2027-01-17" },
+    });
+    // dateDuJour très tardif (2027-02-15) : sans borne, la série irait jusqu'à 2027-02 (cf. mois
+    // suivant sans dateLimiteIndemnisation) — la borne doit l'empêcher, pas seulement le cacher
+    // à l'affichage.
+    const resultat = calculerSerieDepuisContrats(p, { dateDepart: "2026-01-01" }, [], "2027-02-15", franceTravailConfig);
+    if (!resultat.calculable) throw new Error("devrait être calculable");
+    // Tous les mois depuis la réadmission (2026-01, non calculable) jusqu'à 2027-01 inclus (dernier
+    // mois de droits, partiel) — 13 mois, jamais 2027-02.
+    expect(resultat.mois.map((m) => m.moisLabel)).toEqual([
+      "2026-01",
+      "2026-02",
+      "2026-03",
+      "2026-04",
+      "2026-05",
+      "2026-06",
+      "2026-07",
+      "2026-08",
+      "2026-09",
+      "2026-10",
+      "2026-11",
+      "2026-12",
+      "2027-01",
+    ]);
+  });
+
+  it("sans dateLimiteIndemnisation (absente), comportement historique inchangé (non borné)", () => {
+    const p = profil({ situation: "readmission", ouvertureDroits: { dateOuverture: "2026-01-18", franchiseCPTotale: 5, delaiAttenteInitial: 7 } });
+    const resultat = calculerSerieDepuisContrats(p, { dateDepart: "2026-01-01" }, [], "2027-02-15", franceTravailConfig);
+    if (!resultat.calculable) throw new Error("devrait être calculable");
+    expect(resultat.mois[resultat.mois.length - 1].moisLabel).toBe("2027-02");
+  });
 });
 
 describe("calculerFranchiseSalaires — formule certifiée le 2026-07-23 (ARTCENA + flyer officiel)", () => {
