@@ -25,6 +25,7 @@ import { AvertissementHorsPerimetre } from "./components/AvertissementHorsPerime
 import { ConfirmationImport } from "./components/ConfirmationImport";
 import { DashboardVide } from "./components/DashboardVide";
 import { RevenusMensuels } from "./components/RevenusMensuels";
+import { FraisReels } from "./components/fraisReels/FraisReels";
 import { dashboardEstVide } from "./lib/dashboardVide";
 import { profilHorsPerimetre } from "./lib/profilHorsPerimetre";
 import { validerProfilPourEcriture } from "./lib/coherenceProfil";
@@ -269,6 +270,10 @@ export default function App() {
           ))}
 
         {onglet === "profil" && <MonProfil dateDuJour={dateDuJour} profil={profil} onModifierProfil={modifierProfil} />}
+
+        {onglet === "fraisPro" && (
+          <FraisReels profil={profil} soldeIndemnisationDepart={donnees.soldeIndemnisationDepart} contrats={donnees.contrats} config={franceTravailConfig} dateDuJour={dateDuJour} />
+        )}
       </main>
     </div>
   );
