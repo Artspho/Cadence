@@ -139,6 +139,18 @@ export const franceTravailConfig = {
     dateVerification: "2026-07-26",
   },
 
+  // ── Frais professionnels réels (module « Frais réels ») ───────
+  // Source : document SNAM-CGT « Frais professionnels » (mars 2026), cf. docs/spec_frais_reels_cadence.md.
+  fraisReels: {
+    plafondBaseR2025: 145_550, // ✅ plafond de R (base des forfaits 14 %/5 %), 2025
+    tauxForfaitA: 0.14, // ✅ forfait 14 % (instruments, matériel, formation chorégraphique/lyrique...)
+    tauxForfaitB: 0.05, // ✅ forfait 5 % (vestimentaire, représentation, communications...)
+    tauxForfait10: 0.1, // ✅ abattement forfaitaire standard, tous salariés (comparaison)
+    plancher10Pct2025: 495, // ✅ minimum de l'abattement 10 %, 2025
+    plafond10Pct2025: 14_171, // ✅ maximum de l'abattement 10 %, 2025
+    valeurRepasPersonnel2025: 5.45, // ✅ valeur forfaitaire d'un repas au domicile (C3), 2025
+  },
+
   // ── Valeurs volatiles à renseigner (revalorisées régulièrement) ──
   valeursDatees: {
     smicHoraireBrut: 12.31 as number | null, // ✅ arrêté du 22 mai 2026, en vigueur au 01/06/2026 (ancienne valeur : 12,02 € au 01/01/2026)
@@ -243,6 +255,15 @@ export const franceTravailConfigSchema = z.object({
   guso: z.object({
     tauxNetApproxSurBrut: z.number().positive(),
     dateVerification: z.string(),
+  }),
+  fraisReels: z.object({
+    plafondBaseR2025: z.number().positive(),
+    tauxForfaitA: z.number().positive(),
+    tauxForfaitB: z.number().positive(),
+    tauxForfait10: z.number().positive(),
+    plancher10Pct2025: z.number().positive(),
+    plafond10Pct2025: z.number().positive(),
+    valeurRepasPersonnel2025: z.number().positive(),
   }),
   differesEtFranchises: z.object({
     delaiAttenteJours: z.number(),
