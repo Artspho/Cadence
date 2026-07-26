@@ -2,6 +2,12 @@
 // d'un mois donné — ordre confirmé par le relevé France Travail du 14/04/2026 ("franchise CP 4 /
 // différé 5 / travail 19"), franchise CP en premier, délai d'attente ensuite, dans le même mois.
 //
+// TODO — écart connu avec `indemnisationMensuelle.ts`, non corrigé (hors périmètre) : cette fonction
+// consomme CP puis délai, alors que le guide officiel (GUIDE-INTERMITTENT.pdf, p.12-17) confirme
+// texto l'ordre inverse (délai puis CP). L'ordre du relevé cité ci-dessus reflète la colonne
+// d'AFFICHAGE du document, pas nécessairement l'ordre de calcul réel — à trancher explicitement
+// le jour où un cas réel distingue les deux (cf. calculerSerie.ts, même TODO).
+//
 // Ce module est volontairement indépendant de `indemnisationMensuelle.ts` (aucun import dans un
 // sens ni dans l'autre) : il ne connaît pas la notion de report d'un mois sur l'autre
 // (`quotaCPCarryOver`) — c'est à l'appelant de calculer le plafond mensuel EFFECTIF

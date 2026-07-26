@@ -127,6 +127,18 @@ export const franceTravailConfig = {
     plafondCumulCoeffPMSS: 1.18, // ✅ ARE + salaires ≤ 118 % du PMSS
   },
 
+  // ── Estimation paie GUSO (brut → net cachets) ─────────────────
+  guso: {
+    tauxNetApproxSurBrut: 0.77, // ⚠️ APPROXIMATION, pas un taux réglementaire unique — varie
+    // selon convention collective et statut cadre/non-cadre. Source : agrégation de simulateurs
+    // spécialisés (compta-online.com, taux URSSAF officiels, mise à jour 25/03/2026 : cotisation
+    // chômage salariale intermittents 2,4 % non abattue + maladie/vieillesse/AT/allocations
+    // familiales/FNAL au taux de droit commun après abattement de 30 % + CSG/CRDS ~9,7 % sans
+    // abattement), pas un texte officiel unique. Seul le simulateur GUSO officiel
+    // (www.guso.fr) donne le montant exact.
+    dateVerification: "2026-07-26",
+  },
+
   // ── Valeurs volatiles à renseigner (revalorisées régulièrement) ──
   valeursDatees: {
     smicHoraireBrut: 12.31 as number | null, // ✅ arrêté du 22 mai 2026, en vigueur au 01/06/2026 (ancienne valeur : 12,02 € au 01/01/2026)
@@ -227,6 +239,10 @@ export const franceTravailConfigSchema = z.object({
       affiliation12mois: z.number(),
       delaiDemandeJours: z.number(),
     }),
+  }),
+  guso: z.object({
+    tauxNetApproxSurBrut: z.number().positive(),
+    dateVerification: z.string(),
   }),
   differesEtFranchises: z.object({
     delaiAttenteJours: z.number(),

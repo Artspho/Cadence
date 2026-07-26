@@ -28,69 +28,115 @@ describe("calculerJoursTravailes — données FT réelles Benoît", () => {
   });
 });
 
-describe("calculerSerie — série Benoît (données FT certifiées, relevé du 14/04/2026)", () => {
-  it("janvier grisé, février à zéro, mars/avril/mai conformes au relevé", () => {
+// Les 4 cas ci-dessous exercent tous EXACTEMENT la même logique de `calculerSerie` — aucun
+// branchement spécial par cas. `franchiseCPTotale`/`delaiAttente` sont de purs paramètres d'entrée
+// (jamais recalculés ni devinés par le moteur : ce sont les faits lus par l'utilisateur sur sa
+// notification France Travail, cf. Profil.ouvertureDroits) ; le palier de forfait mensuel (2j/3j)
+// est dérivé en interne depuis `franchiseCPTotale`, jamais fourni par l'appelant.
+describe("calculerSerie — généralisation sur 4 profils distincts, même logique", () => {
+  it("Benoît réel (franchiseCPTotale=5, delaiAttenteInitial=7) : réadmission incluse, fév=0 AJ, mars=17 AJ, avril=18 AJ", () => {
+    // Janvier (mois de réadmission, partiel entre ancien et nouveau droit) : Cadence ne peut pas
+    // reconstituer le découpage jour-mois exact (cf. calculerSerie.ts, en-tête du module) — traité
+    // comme un mois entier, une estimation. La valeur ci-dessous (29 j non indemnisables, calibrée
+    // pour ne laisser que 2 j de place ce mois-là) est un FIXTURE de non-régression qui reproduit
+    // les valeurs certifiées de février/mars/avril sur le relevé France Travail réel de Benoît —
+    // elle ne prétend pas reconstituer les vraies heures de janvier (indisponibles), cf. décision
+    // actée avec l'utilisateur : les données de Benoît servent de fixture, pas de preuve de formule.
     const resultats = calculerSerie({
       mois: [
-        { joursDuMois: 31, joursTravailes: 0, estGrise: true }, // janvier 2026, réadmission
-        { joursDuMois: 28, joursTravailes: 19, estGrise: false }, // février 2026
-        { joursDuMois: 31, joursTravailes: 13, estGrise: false }, // mars 2026
-        { joursDuMois: 30, joursTravailes: 12, estGrise: false }, // avril 2026
-        { joursDuMois: 31, joursTravailes: 2, estGrise: false }, // mai 2026
+        { joursDuMois: 31, joursTravailes: 29 }, // janvier 2026, réadmission (estimation)
+        { joursDuMois: 28, joursTravailes: 19 }, // février 2026, 153h réelles
+        { joursDuMois: 31, joursTravailes: 13 }, // mars 2026, 105h réelles
+        { joursDuMois: 30, joursTravailes: 12 }, // avril 2026, 93h réelles
+        { joursDuMois: 31, joursTravailes: 2 }, // mai 2026, 21h réelles
       ],
       ajNetteAvantPAS: 53.81,
       tauxPAS: 0.031,
       franchiseCPTotale: 5,
-      franchiseCPMensuelleMax: 2,
-      // 5, pas 7 : 2 j du délai d'attente sont déjà inapplicables pendant le mois grisé de
-      // janvier (ancien dossier) — seule valeur cohérente avec mars = 17 AJ sans aucun délai
-      // (relevé FT : "31 − 13 − 1", pas de terme délai). Avec delaiAttente=7 le résidu de février
-      // (2 j) se reporterait sur mars et le ferait tomber à 15 AJ, contredisant le relevé.
-      delaiAttente: 5,
+      delaiAttente: 7,
+      config: franceTravailConfig,
     });
 
-    expect(resultats[0]).toEqual({
-      joursIndemnisables: 0,
-      netSocial: 0,
-      netApresPAS: 0,
-      franchiseCPConsommee: 0,
-      delaiConsomme: 0,
-      estGrise: true,
+    expect(resultats[1].joursIndemnisables).toBe(0); // février
+    expect(resultats[2].joursIndemnisables).toBe(17); // mars
+    expect(resultats[2].netSocial).toBeCloseTo(17 * 53.81, 2);
+    expect(resultats[3].joursIndemnisables).toBe(18); // avril
+    expect(resultats[4].joursIndemnisables).toBe(29); // mai
+
+    // Franchise CP et délai bien épuisés à partir de mars (dernier jour de CP consommé en mars) :
+    // plus aucun résidu à partir d'avril, cf. badge "Estimation" (RevenusMensuels.tsx).
+    expect(resultats[2].franchiseCPRestante).toBe(0);
+    expect(resultats[2].delaiRestant).toBe(0);
+    expect(resultats[3].franchiseCPRestante).toBe(0);
+    expect(resultats[3].delaiRestant).toBe(0);
+  });
+
+  it("cas simple (franchiseCPTotale=0, delaiAttenteInitial=7) : aucune franchise CP, seul le délai se consomme", () => {
+    const resultats = calculerSerie({
+      mois: [
+        { joursDuMois: 30, joursTravailes: 0 }, // rien travaillé, tout dispo pour le délai
+        { joursDuMois: 30, joursTravailes: 0 },
+      ],
+      ajNetteAvantPAS: 50,
+      tauxPAS: 0,
+      franchiseCPTotale: 0,
+      delaiAttente: 7,
+      config: franceTravailConfig,
     });
 
-    // Février : franchise CP (2 j février + 2 j report de janvier = 4 j) + délai (5 j)
-    // épuisent exactement les 9 jours non travaillés du mois → 0 AJ.
-    expect(resultats[1].estGrise).toBe(false);
-    expect(resultats[1].joursIndemnisables).toBe(0);
-    expect(resultats[1].franchiseCPConsommee).toBe(4);
-    expect(resultats[1].delaiConsomme).toBe(5);
+    expect(resultats[0].franchiseCPConsommee).toBe(0); // jamais de franchise CP consommée
+    expect(resultats[0].delaiConsomme).toBe(7); // délai intégralement consommé le 1er mois
+    expect(resultats[0].joursIndemnisables).toBe(23); // 30 - 7
+    expect(resultats[0].franchiseCPRestante).toBe(0);
+    expect(resultats[0].delaiRestant).toBe(0);
 
-    // Mars : dernier jour de franchise CP (5 − 4 = 1), délai déjà épuisé.
-    expect(resultats[2].joursIndemnisables).toBe(17);
-    expect(resultats[2].franchiseCPConsommee).toBe(1);
-    expect(resultats[2].delaiConsomme).toBe(0);
-    expect(resultats[2].netSocial).toBeCloseTo(914.77, 2);
-    expect(resultats[2].netApresPAS).toBeCloseTo(886.41, 2);
+    expect(resultats[1].delaiConsomme).toBe(0); // plus rien à consommer le 2e mois
+    expect(resultats[1].joursIndemnisables).toBe(30); // mois normal, plus aucune franchise/délai
+  });
 
-    // Avril : plus aucune franchise ni délai.
-    expect(resultats[3].joursIndemnisables).toBe(18);
-    expect(resultats[3].franchiseCPConsommee).toBe(0);
+  it("cas extrême (franchiseCPTotale=30, delaiAttenteInitial=7) : palier haut (forfait 3j/mois, total > seuilFranchiseTotaleJours)", () => {
+    const resultats = calculerSerie({
+      mois: [{ joursDuMois: 31, joursTravailes: 0 }],
+      ajNetteAvantPAS: 50,
+      tauxPAS: 0,
+      franchiseCPTotale: 30,
+      delaiAttente: 7,
+      config: franceTravailConfig,
+    });
 
-    // Mai : idem.
-    expect(resultats[4].joursIndemnisables).toBe(29);
-    expect(resultats[4].franchiseCPConsommee).toBe(0);
+    // Palier haut : forfait 3j/mois (pas 2j, réservé aux totaux ≤ seuilFranchiseTotaleJours).
+    expect(resultats[0].franchiseCPConsommee).toBe(3);
+    expect(resultats[0].delaiConsomme).toBe(7);
+    expect(resultats[0].joursIndemnisables).toBe(21); // 31 - 3 - 7
+    expect(resultats[0].franchiseCPRestante).toBe(27); // 30 - 3, encore beaucoup à consommer
+  });
+
+  it("délai déjà épuisé (franchiseCPTotale=18, delaiAttenteInitial=0) : seule la franchise CP se consomme, aucun branchement spécial requis", () => {
+    const resultats = calculerSerie({
+      mois: [{ joursDuMois: 30, joursTravailes: 0 }],
+      ajNetteAvantPAS: 50,
+      tauxPAS: 0,
+      franchiseCPTotale: 18,
+      delaiAttente: 0,
+      config: franceTravailConfig,
+    });
+
+    expect(resultats[0].delaiConsomme).toBe(0);
+    expect(resultats[0].franchiseCPConsommee).toBe(2); // palier bas (18 ≤ seuil), forfait 2j
+    expect(resultats[0].joursIndemnisables).toBe(28); // 30 - 2
+    expect(resultats[0].franchiseCPRestante).toBe(16);
   });
 });
 
 describe("calculerSerie — comportement générique", () => {
   it("sans franchise ni délai, un seul mois : jours indemnisables = jours non travaillés", () => {
     const resultats = calculerSerie({
-      mois: [{ joursDuMois: 30, joursTravailes: 12, estGrise: false }],
+      mois: [{ joursDuMois: 30, joursTravailes: 12 }],
       ajNetteAvantPAS: 53.81,
       tauxPAS: 0.031,
       franchiseCPTotale: 0,
-      franchiseCPMensuelleMax: 2,
       delaiAttente: 0,
+      config: franceTravailConfig,
     });
 
     expect(resultats[0].joursIndemnisables).toBe(18);

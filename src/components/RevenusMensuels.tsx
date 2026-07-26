@@ -4,7 +4,9 @@ import type { FranceTravailConfig } from "../config/franceTravailConfig";
 import { calculerSerieDepuisContrats } from "../engine/indemnisationMensuelle";
 import { calculerJoursTravailes, calculerSerie } from "../engine/calculerSerie";
 import { getAjReelleAt } from "../engine/ajReelleUtils";
-import { bornesDuMois, joursDansMois, moisCle, moisEntre } from "../engine/dateUtils";
+import { joursDansMois } from "../engine/dateUtils";
+import { repartirContratParMois } from "../engine/decoupageMensuel";
+import { calculerNetEstime } from "../engine/estimationPaie";
 
 interface RevenusMensuelsProps {
   profil: Profil;
@@ -147,6 +149,103 @@ function SoldeRecap({ solde, onConfigurer }: { solde: SoldeIndemnisationDepart; 
   );
 }
 
+// Une ligne affichée du tableau — mois de réadmission ou mois normal, TOUJOURS calculée (plus
+// aucun mois grisé/non calculé, cf. pivot documenté en tête de calculerSerie.ts). `estimation` est
+// vrai tant que la franchise CP OU le délai d'attente n'était pas encore intégralement épuisé à
+// l'ENTRÉE de ce mois (donc encore susceptible d'être affecté par l'incertitude du découpage
+// jour-mois du mois de réadmission, cf. `estReadmission`) — jamais un flou, un simple badge texte.
+interface LigneAffichage {
+  moisLabel: string;
+  heuresDuMois: number;
+  joursNonIndemnisables: number;
+  delaiConsomme: number;
+  franchiseCPConsommee: number;
+  joursIndemnisables: number;
+  montant: number | null;
+  montantNet: number | null;
+  salairesContratsBruts: number;
+  estimation: boolean;
+  estReadmission: boolean;
+}
+
+function construireLignesAffichage(profil: Profil, contrats: Contrat[], config: FranceTravailConfig, mois: (MoisIndemnisationResultat | { calculable: false; moisLabel: string; salairesContratsBruts: number })[], ouvertureDroits: NonNullable<Profil["ouvertureDroits"]>, tauxRenseigne: boolean): LigneAffichage[] {
+  const ligneReadmission = mois.find((m) => !m.calculable);
+  const moisCalcules = mois.filter((m): m is MoisIndemnisationResultat => m.calculable);
+  const tauxPASFraction = (ouvertureDroits.tauxPrelevementSource ?? 0) / 100;
+
+  // Heures du mois de réadmission : pas exposées par calculerSerieDepuisContrats (mois jamais
+  // simulé par indemnisationMensuelle.ts, cf. Q1 dans ce fichier moteur) — recalculées ici
+  // directement depuis les vrais contrats, même fonction que le pipeline existant
+  // (repartirContratParMois), traitées comme un mois calendaire entier (approximation assumée,
+  // cf. calculerSerie.ts).
+  const heuresReadmission = ligneReadmission
+    ? contrats.reduce((total, c) => total + repartirContratParMois(c, config).filter((part) => part.moisCle === ligneReadmission.moisLabel).reduce((s, part) => s + part.heures, 0), 0)
+    : 0;
+
+  const entrees = [
+    ...(ligneReadmission
+      ? [
+          {
+            moisLabel: ligneReadmission.moisLabel,
+            joursDuMois: joursDansMois(ligneReadmission.moisLabel),
+            joursTravailes: calculerJoursTravailes([{ heures: heuresReadmission, cachets: 0 }], config),
+            heuresDuMois: heuresReadmission,
+          },
+        ]
+      : []),
+    ...moisCalcules.map((m) => ({
+      moisLabel: m.moisLabel,
+      joursDuMois: joursDansMois(m.moisLabel),
+      joursTravailes: m.joursNonIndemnisables,
+      heuresDuMois: m.heuresDuMois,
+    })),
+  ];
+
+  // Un seul appel, sur toute la série depuis la réadmission incluse : franchiseCPTotale/
+  // delaiAttente sont de purs paramètres d'entrée (jamais recalculés, cf. Profil.ouvertureDroits) —
+  // l'état (franchise CP restante, délai restant) se propage correctement mois après mois, y
+  // compris à travers le mois de réadmission. ajNetteAvantPAS/tauxPAS à 0 : l'AJ réelle peut varier
+  // dans le temps (plusieurs taux successifs), le montant est recalculé mois par mois ci-dessous
+  // plutôt que par calculerSerie (qui suppose un taux unique pour toute la série).
+  const serie = calculerSerie({
+    mois: entrees.map(({ joursDuMois, joursTravailes }) => ({ joursDuMois, joursTravailes })),
+    ajNetteAvantPAS: 0,
+    tauxPAS: 0,
+    franchiseCPTotale: ouvertureDroits.franchiseCPTotale,
+    delaiAttente: ouvertureDroits.delaiAttenteInitial,
+    config,
+  });
+
+  return entrees.map((entree, i) => {
+    const s = serie[i];
+    // Estimation tant qu'il restait quelque chose à consommer à l'ENTRÉE de ce mois (avant sa
+    // propre consommation) — l'état précédent (ou les totaux initiaux pour le tout premier mois).
+    const avant = i === 0 ? { cp: ouvertureDroits.franchiseCPTotale, delai: ouvertureDroits.delaiAttenteInitial } : { cp: serie[i - 1].franchiseCPRestante, delai: serie[i - 1].delaiRestant };
+    const estimation = avant.cp > 0 || avant.delai > 0;
+
+    const ajNetteAvantPAS = getAjReelleAt(profil.ajReelleHistorique, `${entree.moisLabel}-01`);
+    const ajConnue = ajNetteAvantPAS !== null;
+    const montant = ajConnue ? Math.round(s.joursIndemnisables * ajNetteAvantPAS * 100) / 100 : null;
+    const montantNet = ajConnue && tauxRenseigne ? Math.round((montant as number) * (1 - tauxPASFraction) * 100) / 100 : null;
+
+    const mCalculable = moisCalcules.find((m) => m.moisLabel === entree.moisLabel);
+
+    return {
+      moisLabel: entree.moisLabel,
+      heuresDuMois: entree.heuresDuMois,
+      joursNonIndemnisables: entree.joursTravailes,
+      delaiConsomme: s.delaiConsomme,
+      franchiseCPConsommee: s.franchiseCPConsommee,
+      joursIndemnisables: s.joursIndemnisables,
+      montant,
+      montantNet,
+      salairesContratsBruts: mCalculable?.salairesContratsBruts ?? 0,
+      estimation,
+      estReadmission: !mCalculable,
+    };
+  });
+}
+
 function TableauResultats({
   profil,
   soldeDepart,
@@ -202,83 +301,22 @@ function TableauResultats({
   // tableau (cf. calculerSerieDepuisContrats, engine/indemnisationMensuelle.ts).
   const franchiseSalaires = mois.find((m) => m.calculable)?.franchiseSalaires;
 
-  // ── Zone franchise : EXACTEMENT 2 mois grisés — le mois de réadmission (index 0, déjà grisé
-  // séparément via m.calculable === false) et le mois plein suivant (index 1, ex. février pour
-  // Benoît). Fixe, volontairement PAS proportionnelle à `franchiseCPTotale` (pas de
-  // ceil(franchiseCPTotale / franchiseCPMensuelleMax) + 1) : ce que FT applique encore au-delà
-  // (ex. 1 j de franchise CP en mars) est trop marginal pour justifier de cacher l'information —
-  // à partir de l'index 2, `calculerSerie` tourne avec franchise=0/délai=0 et affiche un vrai
-  // chiffre. `calculerSerie` n'est délibérément PAS appelé sur les 2 mois grisés : son mécanisme
-  // de report ne réduit `delaiRestant` que lorsqu'il est consommé, jamais pendant un mois grisé —
-  // câblé sur le vrai `ouvertureDroits.delaiAttenteInitial`, ça romprait la reconstruction dès le
-  // 2e mois (cf. docs/reprise.md).
-  const franchiseCPMensuelleMax = config.differesEtFranchises.franchiseCongesPayes.forfaitMensuelBas;
-  const moisOuvertureCle = moisCle(ouvertureDroits.dateOuverture);
-  const tauxPASFraction = (ouvertureDroits.tauxPrelevementSource ?? 0) / 100;
+  const lignes = construireLignesAffichage(profil, contrats, config, mois, ouvertureDroits, tauxRenseigne);
 
-  function indexDepuisOuverture(moisLabel: string): number {
-    return moisEntre(bornesDuMois(moisOuvertureCle).debut, bornesDuMois(moisLabel).debut).length - 1;
-  }
-  // Index 0 (mois de réadmission) déjà grisé séparément (m.calculable === false) — ne reste ici
-  // que l'index 1 (le mois plein suivant).
-  //
-  // Limite connue, non couverte : si `ouvertureDroits.dateOuverture` tombe exactement le 1er du
-  // mois (pas de split ancien/nouveau dossier), `calculerSerieDepuisContrats` ne grise aucun mois
-  // de réadmission — l'index 0 est alors un mois plein normal, jamais grisé du tout (ni par le
-  // mécanisme réadmission, ni par enZoneFranchise, qui ne couvre que l'index 1). Pas de profil
-  // réel dans ce cas à ce jour ; à corriger si un tel profil se présente.
-  function enZoneFranchise(moisLabel: string): boolean {
-    return indexDepuisOuverture(moisLabel) === 1;
+  const desMoisEnEstimation = lignes.some((l) => l.estimation);
+  const desMoisSansAj = lignes.some((l) => l.montant === null);
+
+  function revenuARE(l: LigneAffichage): number {
+    if (l.montant === null) return 0;
+    return tauxRenseigne && l.montantNet != null ? l.montantNet : l.montant;
   }
 
-  // Mois hors zone franchise : franchise CP et délai garantis à 0 pour ce mois, `calculerSerie`
-  // peut être appelé sans risque avec ces valeurs triviales (aucun report à modéliser). Réutilise
-  // `m.heuresDuMois`, déjà agrégé et proratisé par le pipeline existant (repartirContratParMois) —
-  // aucune nouvelle lecture des contrats bruts.
-  function calculerHorsZone(m: MoisIndemnisationResultat) {
-    const ajNetteAvantPAS = getAjReelleAt(profil.ajReelleHistorique, `${m.moisLabel}-01`);
-    const [resultatMois] = calculerSerie({
-      mois: [
-        {
-          joursDuMois: joursDansMois(m.moisLabel),
-          joursTravailes: calculerJoursTravailes([{ heures: m.heuresDuMois, cachets: 0 }], config),
-          estGrise: false,
-        },
-      ],
-      ajNetteAvantPAS: ajNetteAvantPAS ?? 0,
-      tauxPAS: tauxPASFraction,
-      franchiseCPTotale: 0,
-      franchiseCPMensuelleMax,
-      delaiAttente: 0,
-    });
-    const ajConnue = ajNetteAvantPAS !== null;
-    return {
-      joursIndemnisables: resultatMois.joursIndemnisables,
-      montant: ajConnue ? resultatMois.netSocial : null,
-      montantNet: ajConnue && tauxRenseigne ? resultatMois.netApresPAS : null,
-    };
-  }
-
-  const moisCalcules = mois.filter((m): m is MoisIndemnisationResultat => m.calculable);
-  const moisHorsZone = moisCalcules.filter((m) => !enZoneFranchise(m.moisLabel));
-  const desMoisEnZoneFranchise = moisCalcules.some((m) => enZoneFranchise(m.moisLabel));
-  // Un mois n'a pas d'AJ connue pour sa période (« — ») — distinct des mois en zone franchise,
-  // qui ont leur propre bandeau explicatif (le flou + cadenas parle déjà pour eux).
-  const desMoisSansAj = moisHorsZone.some((m) => calculerHorsZone(m).montant === null);
-
-  // Revenu ARE du mois (hors zone franchise uniquement) : net avant PAS si le taux est renseigné,
-  // montant sinon, 0 si le mois n'a pas d'AJ connue pour sa période (traité comme "pas d'ARE ce
-  // mois-ci", pas une erreur).
-  function revenuARE(m: MoisIndemnisationResultat): number {
-    const vue = calculerHorsZone(m);
-    if (vue.montant === null) return 0;
-    return tauxRenseigne && vue.montantNet != null ? vue.montantNet : vue.montant;
-  }
-
-  // Les mois en zone franchise sont exclus du total ARE (montant réellement inconnu, pas 0) —
-  // même principe que les mois de réadmission, déjà exclus par `moisCalcules`.
-  const totalARE = moisHorsZone.reduce((acc, m) => acc + revenuARE(m), 0);
-  const totalContrats = moisCalcules.reduce((acc, m) => acc + m.salairesContratsBruts, 0);
+  // Tous les mois affichés ont désormais un vrai chiffre (estimé ou certain) — plus aucune
+  // exclusion "zone franchise" des totaux : le badge "Estimation" signale déjà l'incertitude sur
+  // la ligne elle-même, un total qui l'exclurait silencieusement serait incohérent avec le chiffre
+  // affiché juste au-dessus.
+  const totalARE = lignes.reduce((acc, l) => acc + revenuARE(l), 0);
+  const totalContrats = lignes.reduce((acc, l) => acc + l.salairesContratsBruts, 0);
   const totalRevenu = totalARE + totalContrats;
 
   return (
@@ -301,59 +339,41 @@ function TableauResultats({
             </tr>
           </thead>
           <tbody>
-            {mois.map((m) => {
-              // Mois de réadmission : ligne grisée, aucun montant, jamais dans les totaux (cf.
-              // desMoisSansAj ci-dessus, qui l'exclut déjà de son propre calcul).
-              if (!m.calculable) {
-                return (
-                  <tr key={m.moisLabel} className="border-b border-line last:border-0 text-faint">
-                    <td className="px-4 py-3">
-                      <span className="inline-flex items-center gap-1">
-                        {m.moisLabel}
-                        <span title={m.messageTooltip} aria-label={m.messageTooltip} className="cursor-help">
+            {lignes.map((l) => {
+              const are = revenuARE(l);
+              return (
+                <tr key={l.moisLabel} className="border-b border-line last:border-0">
+                  <td className="px-4 py-3">
+                    <span className="inline-flex items-center gap-1.5">
+                      {l.moisLabel}
+                      {l.estReadmission && (
+                        <span title="Mois de réadmission — partagé entre deux droits, traité ici comme un mois entier (approximation)." aria-label="Mois de réadmission" className="cursor-help">
                           ℹ️
                         </span>
-                      </span>
-                    </td>
-                    <td className="text-right px-4 py-3">—</td>
-                    <td className="text-right px-4 py-3">—</td>
-                    <td className="text-right px-4 py-3">—</td>
-                    <td className="text-right px-4 py-3">—</td>
-                    <td className="text-right px-4 py-3">—</td>
-                    <td className="text-right px-4 py-3">—</td>
-                    {tauxRenseigne && <td className="text-right px-4 py-3">—</td>}
-                    <td className="text-right px-4 py-3">—</td>
-                    <td className="text-right px-4 py-3">—</td>
-                    <td className="text-right px-4 py-3">—</td>
-                  </tr>
-                );
-              }
-              const zoneFranchise = enZoneFranchise(m.moisLabel);
-              const vue = zoneFranchise ? null : calculerHorsZone(m);
-              const are = zoneFranchise ? 0 : revenuARE(m);
-              const revenuTotal = are + m.salairesContratsBruts;
-              return (
-                <tr key={m.moisLabel} className="border-b border-line last:border-0">
-                  <td className="px-4 py-3">{m.moisLabel}</td>
-                  <td className="text-right px-4 py-3 text-muted">{m.heuresDuMois} h</td>
-                  <td className="text-right px-4 py-3 text-muted">{m.joursNonIndemnisables}</td>
-                  <td className="text-right px-4 py-3 text-muted">{m.delaiConsomme}</td>
-                  <td className="text-right px-4 py-3 text-muted">{m.franchiseCPConsommee}</td>
-                  <td className="text-right px-4 py-3 font-medium">{zoneFranchise ? <FranchiseEnCoursCell /> : vue!.joursIndemnisables}</td>
-                  <td className="text-right px-4 py-3 font-medium">
-                    {zoneFranchise ? <FranchiseEnCoursCell /> : vue!.montant != null ? `${vue!.montant.toFixed(2)} €` : "—"}
+                      )}
+                      {l.estimation && <BadgeEstimation />}
+                    </span>
                   </td>
-                  {tauxRenseigne && (
-                    <td className="text-right px-4 py-3 font-medium">
-                      {zoneFranchise ? <FranchiseEnCoursCell /> : vue!.montantNet != null ? `${vue!.montantNet.toFixed(2)} €` : "—"}
-                    </td>
-                  )}
-                  <td className="text-right px-4 py-3 text-muted">{m.salairesContratsBruts > 0 ? `${m.salairesContratsBruts.toFixed(2)} €` : "—"}</td>
-                  <td className="text-right px-4 py-3">{m.salairesContratsBruts > 0 ? <NetContratsPremiumCell /> : "—"}</td>
+                  <td className="text-right px-4 py-3 text-muted">{l.heuresDuMois} h</td>
+                  <td className="text-right px-4 py-3 text-muted">{l.joursNonIndemnisables}</td>
+                  <td className="text-right px-4 py-3 text-muted">{l.delaiConsomme}</td>
+                  <td className="text-right px-4 py-3 text-muted">{l.franchiseCPConsommee}</td>
+                  <td className="text-right px-4 py-3 font-medium">{l.joursIndemnisables}</td>
+                  <td className="text-right px-4 py-3 font-medium">{l.montant != null ? `${l.montant.toFixed(2)} €` : "—"}</td>
+                  {tauxRenseigne && <td className="text-right px-4 py-3 font-medium">{l.montantNet != null ? `${l.montantNet.toFixed(2)} €` : "—"}</td>}
+                  <td className="text-right px-4 py-3 text-muted">{l.salairesContratsBruts > 0 ? `${l.salairesContratsBruts.toFixed(2)} €` : "—"}</td>
+                  <td className="text-right px-4 py-3">
+                    {l.salairesContratsBruts > 0 ? (
+                      <span className="inline-flex items-center gap-1.5 justify-end">
+                        ≈ {calculerNetEstime(l.salairesContratsBruts, config).toFixed(2)} €<BadgeEstimationPaie />
+                      </span>
+                    ) : (
+                      "—"
+                    )}
+                  </td>
                   {/* Revenu total flouté systématiquement (même sans contrat, donc même pour un
-                      total ARE seul), et bien sûr en zone franchise (ARE inconnue) — jamais un
-                      chiffre en clair sur cette colonne. */}
-                  <td className="text-right px-4 py-3">{!zoneFranchise && are === 0 && m.salairesContratsBruts === 0 ? "—" : <NetContratsPremiumCell />}</td>
+                      total ARE seul) — jamais un chiffre en clair sur cette colonne. */}
+                  <td className="text-right px-4 py-3">{are === 0 && l.salairesContratsBruts === 0 ? "—" : <NetContratsPremiumCell />}</td>
                 </tr>
               );
             })}
@@ -364,24 +384,20 @@ function TableauResultats({
                 Total
               </td>
               {/* ARE : une seule cellule totalisée, fusionnée sur "Montant..."/"Net reçu" — c'est le
-                  même chiffre final que revenuARE(m) utilise déjà par ligne, pas la peine de
+                  même chiffre final que revenuARE(l) utilise déjà par ligne, pas la peine de
                   dupliquer un total "avant PAS" que personne n'a demandé. */}
               <td className="text-right px-4 py-3" colSpan={tauxRenseigne ? 2 : 1}>
                 {totalARE === 0 ? "—" : `${totalARE.toFixed(2)} €`}
               </td>
               <td className="text-right px-4 py-3">{totalContrats > 0 ? `${totalContrats.toFixed(2)} €` : "—"}</td>
-              {/* Jamais de total ici : "Net contrats" est un teaser Premium, aucun chiffre réel à
-                  additionner, encore moins avec l'ARE. */}
-              <td className="text-right px-4 py-3">—</td>
+              <td className="text-right px-4 py-3">{totalContrats > 0 ? `≈ ${calculerNetEstime(totalContrats, config).toFixed(2)} €` : "—"}</td>
               {/* "Revenu total" : flouté dès qu'au moins un mois de la période a des revenus
-                  contrats (totalContrats > 0) — le total mélangerait alors du net ARE certain avec
-                  du brut contrats, jamais présenté comme un chiffre final propre — ou dès qu'au
-                  moins un mois est en zone franchise, où `totalARE` exclut une ARE réelle mais
-                  encore inconnue (jamais un total présenté comme complet alors qu'il ne l'est pas).
-                  Si aucun mois n'a de contrat ni de zone franchise, le total est de l'ARE pur, déjà
-                  connu, rien à cacher. */}
+                  contrats (totalContrats > 0) — le total mélangerait alors du net ARE avec du brut
+                  contrats, jamais présenté comme un chiffre final propre. Si aucun mois n'a de
+                  contrat, le total est de l'ARE pur (estimé ou certain, déjà signalé ligne par
+                  ligne par le badge), rien à cacher de plus au niveau du total. */}
               <td className="text-right px-4 py-3 font-semibold text-mint">
-                {desMoisEnZoneFranchise ? <NetContratsPremiumCell /> : totalRevenu === 0 ? "—" : totalContrats > 0 ? <NetContratsPremiumCell /> : `${totalRevenu.toFixed(2)} €`}
+                {totalRevenu === 0 ? "—" : totalContrats > 0 ? <NetContratsPremiumCell /> : `${totalRevenu.toFixed(2)} €`}
               </td>
             </tr>
           </tfoot>
@@ -390,9 +406,11 @@ function TableauResultats({
       <div className="px-4 py-3 border-t border-line text-xs space-y-1">
         <p className="text-faint">Montant calculé sur l'AJ indiquée sur ton relevé France Travail.</p>
         {desMoisSansAj && <p className="text-amber">Certains mois n'ont pas de taux d'AJ connu pour leur période (« — ») — ajoute une période dont la date d'effet les couvre dans « Mon profil ».</p>}
-        {desMoisEnZoneFranchise && (
+        {desMoisEnEstimation && (
           <p className="text-faint">
-            Les premiers mois après une réadmission dépendent de ta franchise congés payés et de ton délai d'attente — montant exact disponible en Premium (upload de ton relevé France Travail).
+            <strong className="text-ink font-medium">Estimation</strong> : basée sur la franchise congés payés et le délai d'attente indiqués sur ta notification France Travail (« Mon profil »).
+            Le mois de réadmission est traité comme un mois entier — le découpage exact jour par jour entre l'ancien et le nouveau droit n'est pas reconstituable par Cadence, ce qui rend ce
+            mois-là (et les suivants tant que franchise/délai ne sont pas épuisés) approximatif. Montant exact disponible en Premium (upload de ton relevé France Travail, analyse IA).
           </p>
         )}
         {!tauxRenseigne && <p className="text-amber">Renseigne ton taux PAS dans le profil pour voir le montant réellement viré.</p>}
@@ -429,17 +447,37 @@ function NetContratsPremiumCell() {
   );
 }
 
-const TOOLTIP_ZONE_FRANCHISE_PREMIUM = "Franchise CP et délai d'attente en cours d'application — upload ton relevé FT pour voir le montant exact.";
+const TOOLTIP_ESTIMATION =
+  "Estimation basée sur les infos de ta notification France Travail (franchise congés payés / délai d'attente), pas encore intégralement épuisés à ce stade. Version Premium : upload ton relevé FT, analyse IA, montant garanti exact au centime.";
 
-// Mois en zone franchise (cf. TableauResultats, enZoneFranchise) : même traitement visuel que
-// NetContratsPremiumCell, tooltip dédié — calculerSerie n'est délibérément pas appelé sur ces mois.
-function FranchiseEnCoursCell() {
+// Badge texte (jamais un flou) : le chiffre affiché EST un vrai calcul de Cadence, juste marqué
+// comme estimation tant que la franchise CP ou le délai d'attente n'était pas épuisé à l'entrée du
+// mois — cf. construireLignesAffichage, TableauResultats.
+function BadgeEstimation() {
   return (
-    <span title={TOOLTIP_ZONE_FRANCHISE_PREMIUM} aria-label={TOOLTIP_ZONE_FRANCHISE_PREMIUM} className="inline-flex items-center gap-1 cursor-help select-none">
-      <span aria-hidden="true" className="blur-sm text-faint">
-        ██████
-      </span>
-      <span aria-hidden="true">🔒</span>
+    <span
+      title={TOOLTIP_ESTIMATION}
+      aria-label={TOOLTIP_ESTIMATION}
+      className="inline-flex items-center text-[10px] uppercase tracking-wide font-medium text-amber bg-amber/10 rounded px-1.5 py-0.5 cursor-help select-none whitespace-nowrap"
+    >
+      Estimation · basée sur ta notification FT
+    </span>
+  );
+}
+
+const TOOLTIP_ESTIMATION_PAIE =
+  "Estimation ≈77% du brut (charges salariales moyennes d'artiste). Montant approximatif — les taux réels varient selon ta convention collective. Version Premium : analyse IA de tes bulletins réels, net exact garanti au centime.";
+
+// Colonne "Net contrats", version gratuite : un vrai chiffre (approximatif, jamais un flou) —
+// cf. engine/estimationPaie.ts, franceTravailConfig.ts (guso.tauxNetApproxSurBrut).
+function BadgeEstimationPaie() {
+  return (
+    <span
+      title={TOOLTIP_ESTIMATION_PAIE}
+      aria-label={TOOLTIP_ESTIMATION_PAIE}
+      className="inline-flex items-center text-[10px] uppercase tracking-wide font-medium text-amber bg-amber/10 rounded px-1.5 py-0.5 cursor-help select-none"
+    >
+      ≈77%
     </span>
   );
 }
