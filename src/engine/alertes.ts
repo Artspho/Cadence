@@ -25,12 +25,13 @@ export function detecterAlertes(
   dateDuJour: string,
   soldeDepart: SoldeIndemnisationDepart | null = null,
 ): Alerte[] {
-  // Garde-fou "situation mixte" : signalé par l'utilisateur (jamais déduit des
-  // contrats). Court-circuit volontaire — aucune autre alerte ne doit être
-  // renvoyée à côté, puisqu'elles reposeraient toutes sur un décompte/montant
-  // Annexe 10 qui n'est plus fiable pour ce profil (devoir sacré n°2 : jamais
-  // de faux feu vert, même partiel).
-  if (profilHorsPerimetre(profil)) {
+  const perimetre = profilHorsPerimetre(profil);
+
+  // Garde-fou "situation mixte", cas DÉCLARÉ (mixte / "je ne sais pas") : signalé par l'utilisateur,
+  // jamais déduit des contrats. Court-circuit volontaire — aucune autre alerte ne doit être renvoyée
+  // à côté, puisqu'elles reposeraient toutes sur un décompte/montant Annexe 10 qui n'est plus fiable
+  // pour ce profil (devoir sacré n°2 : jamais de faux feu vert, même partiel).
+  if (perimetre.bloquant) {
     return [
       {
         code: "situation_mixte",
@@ -43,6 +44,21 @@ export function detecterAlertes(
   }
 
   const alertes: Alerte[] = [];
+
+  // Contradiction interne (A10 pur déclaré + salaires hors A10 > 0). PAS de court-circuit ici : on
+  // ne sait pas laquelle des deux saisies est fausse, donc l'app reste utilisable et les autres
+  // alertes gardent leur sens. L'alerte est en tête de liste et en `critique` — et le tableau de
+  // bord masque les montants ARE tant que la contradiction dure (cf. App.tsx).
+  if (perimetre.motif === "salaires_hors_a10_contradictoires") {
+    alertes.push({
+      code: "salaires_hors_a10_contradictoires",
+      niveau: "critique",
+      titre: "Deux saisies se contredisent",
+      message:
+        "Tu as déclaré relever uniquement de l'Annexe 10, mais tu as renseigné des salaires perçus hors Annexe 10 (technicien, régime général…). Ces deux informations ne peuvent pas être vraies en même temps : tant que c'est le cas, l'allocation estimée n'est pas fiable.",
+      actionSuggeree: "Ouvre « Mon profil » pour corriger l'une des deux : ton régime déclaré, ou le montant des salaires hors Annexe 10.",
+    });
+  }
 
   const fenetre = calculerFenetreReference(profil, contrats, periodes, config, dateDuJour);
   const decompte = calculerDecompteHeures(contrats, periodes, profil, config, fenetre);

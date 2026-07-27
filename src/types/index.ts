@@ -138,7 +138,8 @@ export type CodeAlerte =
   | "cumul_ens_formation" // approche des 338 h
   | "plafond_cachets_mois" // > 28 cachets sur un mois civil
   | "eligible_rattrapage" // 338–506 h : clause de rattrapage possible
-  | "situation_mixte" // garde-fou hors périmètre Annexe 10 pur
+  | "situation_mixte" // garde-fou hors périmètre Annexe 10 pur — cas DÉCLARÉ (bloquant)
+  | "salaires_hors_a10_contradictoires" // A10 pur déclaré MAIS salaires hors A10 > 0 — contradiction à lever (non bloquant)
   | "seuil_readmission_non_calculable" // réadmission : historique de contrats insuffisant pour ajuster le seuil
   | "pas_taux_janvier"; // taux de prélèvement à la source potentiellement mis à jour au 1er janvier par la DGFIP
 

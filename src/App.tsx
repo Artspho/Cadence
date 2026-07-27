@@ -27,7 +27,8 @@ import { DashboardVide } from "./components/DashboardVide";
 import { RevenusMensuels } from "./components/RevenusMensuels";
 import { FraisReels } from "./components/fraisReels/FraisReels";
 import { dashboardEstVide } from "./lib/dashboardVide";
-import { profilHorsPerimetre } from "./lib/profilHorsPerimetre";
+import { perimetreBloquant, profilHorsPerimetre } from "./lib/profilHorsPerimetre";
+import { AvertissementContradictionHorsA10 } from "./components/AvertissementContradictionHorsA10";
 import { validerProfilPourEcriture } from "./lib/coherenceProfil";
 
 const dateDuJour = new Date().toISOString().slice(0, 10);
@@ -157,6 +158,13 @@ export default function App() {
     }
   }
 
+  // Statut de périmètre calculé une seule fois : `bloquant` masque tout un onglet (déclaration
+  // explicite), `contradictionHorsA10` laisse l'app utilisable mais marque les montants ARE comme
+  // non fiables partout où ils apparaissent (cf. lib/profilHorsPerimetre.ts).
+  const perimetre = profilHorsPerimetre(profil);
+  const contradictionHorsA10 = perimetre.motif === "salaires_hors_a10_contradictoires";
+  const bandeauContradiction = contradictionHorsA10 ? <AvertissementContradictionHorsA10 onAllerVersProfil={() => setOnglet("profil")} /> : null;
+
   return (
     <div className="min-h-screen">
       <TopBar
@@ -173,7 +181,7 @@ export default function App() {
               neuf. On ne les fait pas fuiter via ce chip, visible sur tous les onglets. L'alerte
               "situation_mixte" reste affichée dans tous les cas : elle est vraie indépendamment
               du nombre de contrats. */}
-          <AlertCenterResume alertes={dashboardEstVide(donnees.contrats) && !profilHorsPerimetre(profil) ? [] : (calculs?.alertes ?? [])} />
+          <AlertCenterResume alertes={dashboardEstVide(donnees.contrats) && !profilHorsPerimetre(profil).horsPerimetre ? [] : (calculs?.alertes ?? [])} />
           <div className="flex items-center gap-2 text-xs">
             <button onClick={exporter} className="px-3 py-1.5 rounded-full border border-line text-muted hover:text-ink transition-colors">
               Exporter mes données (JSON)
@@ -209,14 +217,16 @@ export default function App() {
 
         {onglet === "dashboard" &&
           calculs &&
-          (profilHorsPerimetre(profil) ? (
+          (perimetreBloquant(profil) ? (
             <AvertissementHorsPerimetre />
           ) : dashboardEstVide(donnees.contrats) ? (
             <DashboardVide onAllerVersContrats={() => setOnglet("contrats")} />
           ) : (
             <>
               <AlertCenter alertes={calculs.alertes} />
+              {bandeauContradiction}
               <Dashboard
+                montantsNonFiables={contradictionHorsA10}
                 prediction={calculs.prediction}
                 serie={calculs.serie}
                 serieAVenir={calculs.serieAVenir}
@@ -243,30 +253,45 @@ export default function App() {
           <ImportBulletins profil={profil} config={franceTravailConfig} decompteActuel={calculs.decompte} onImporterContrat={ajouterContrat} />
         )}
 
-        {onglet === "historique" && calculs && (profilHorsPerimetre(profil) ? <AvertissementHorsPerimetre /> : <Historique exercices={calculs.exercices} />)}
+        {onglet === "historique" &&
+          calculs &&
+          (perimetreBloquant(profil) ? (
+            <AvertissementHorsPerimetre />
+          ) : (
+            <div className="space-y-6">
+              {bandeauContradiction}
+              <Historique exercices={calculs.exercices} />
+            </div>
+          ))}
 
         {onglet === "simulateur" &&
           calculs &&
-          (profilHorsPerimetre(profil) ? (
+          (perimetreBloquant(profil) ? (
             <AvertissementHorsPerimetre />
           ) : (
-            <Simulateur profil={profil} contrats={donnees.contrats} periodes={donnees.periodes} config={franceTravailConfig} dateDuJour={dateDuJour} decompteActuel={calculs.decompte} />
+            <div className="space-y-6">
+              {bandeauContradiction}
+              <Simulateur profil={profil} contrats={donnees.contrats} periodes={donnees.periodes} config={franceTravailConfig} dateDuJour={dateDuJour} decompteActuel={calculs.decompte} />
+            </div>
           ))}
 
         {onglet === "revenus" &&
           calculs &&
-          (profilHorsPerimetre(profil) ? (
+          (perimetreBloquant(profil) ? (
             <AvertissementHorsPerimetre />
           ) : (
-            <RevenusMensuels
+            <div className="space-y-6">
+              {bandeauContradiction}
+              <RevenusMensuels
               profil={profil}
               soldeDepart={donnees.soldeIndemnisationDepart}
               contrats={donnees.contrats}
               config={franceTravailConfig}
               onConfigurerSolde={configurerSoldeIndemnisation}
               onAllerVersProfil={() => setOnglet("profil")}
-              dateDuJour={dateDuJour}
-            />
+                dateDuJour={dateDuJour}
+              />
+            </div>
           ))}
 
         {onglet === "profil" && <MonProfil dateDuJour={dateDuJour} profil={profil} onModifierProfil={modifierProfil} />}

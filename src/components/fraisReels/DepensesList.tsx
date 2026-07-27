@@ -2,12 +2,14 @@ import { useMemo, useState } from "react";
 import type { Depense, StatutJustificatif } from "../../types/fraisReels";
 import { COULEUR_BADGE_CATEGORIE, LIBELLES_CATEGORIE_COMPLETS } from "./categorieLabels";
 import { DepenseForm, StatutBadge } from "./DepenseForm";
+import { calculerAffichageJustificatif } from "../../lib/justificatifAffichage";
 
 interface DepensesListProps {
   anneeFiscale: number;
   depenses: Depense[];
   ratioLocalPro: number | null;
   nombreRepasC3Actif: boolean;
+  driveActif: boolean;
   onAjouter: (depense: Omit<Depense, "id">) => void;
   onModifier: (depense: Depense) => void;
   onSupprimer: (id: string) => void;
@@ -17,7 +19,26 @@ type Tri = "date" | "categorie";
 
 const CATEGORIES_JUSTIFICATIF_REQUIS: Depense["categorie"][] = ["C1", "C2", "C3", "C4", "C5", "C6", "C7", "C8", "C9", "D"];
 
-export function DepensesList({ anneeFiscale, depenses, ratioLocalPro, nombreRepasC3Actif, onAjouter, onModifier, onSupprimer }: DepensesListProps) {
+function LienJustificatif({ depense }: { depense: Depense }) {
+  const etat = calculerAffichageJustificatif(depense);
+  if (etat.type === "lien") {
+    return (
+      <a href={etat.url} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="text-xs text-mint underline underline-offset-2">
+        Voir
+      </a>
+    );
+  }
+  if (etat.type === "indisponible") {
+    return (
+      <span className="text-xs text-faint" title="Connecte Google Drive pour y accéder — le fichier reste préservé sur Drive">
+        Sur Drive (non accessible)
+      </span>
+    );
+  }
+  return null;
+}
+
+export function DepensesList({ anneeFiscale, depenses, ratioLocalPro, nombreRepasC3Actif, driveActif, onAjouter, onModifier, onSupprimer }: DepensesListProps) {
   const [tri, setTri] = useState<Tri>("date");
   const [formulaireOuvert, setFormulaireOuvert] = useState(false);
   const [depenseEnEdition, setDepenseEnEdition] = useState<Depense | null>(null);
@@ -74,6 +95,7 @@ export function DepensesList({ anneeFiscale, depenses, ratioLocalPro, nombreRepa
                     <span className="inline-flex items-center gap-1.5">
                       <StatutBadge statut={d.statutJustificatif} />
                       {sansJustificatif(d) && <span className="w-1.5 h-1.5 rounded-full bg-red" title="Justificatif requis pour cette catégorie" aria-label="Justificatif manquant" />}
+                      <LienJustificatif depense={d} />
                     </span>
                   </td>
                 </tr>
@@ -88,6 +110,7 @@ export function DepensesList({ anneeFiscale, depenses, ratioLocalPro, nombreRepa
           anneeFiscale={anneeFiscale}
           ratioLocalPro={ratioLocalPro}
           nombreRepasC3Actif={nombreRepasC3Actif}
+          driveActif={driveActif}
           onValider={(d) => {
             onAjouter(d);
             setFormulaireOuvert(false);
@@ -102,6 +125,7 @@ export function DepensesList({ anneeFiscale, depenses, ratioLocalPro, nombreRepa
           valeurInitiale={depenseEnEdition}
           ratioLocalPro={ratioLocalPro}
           nombreRepasC3Actif={nombreRepasC3Actif}
+          driveActif={driveActif}
           onValider={(d) => {
             onModifier({ ...d, id: depenseEnEdition.id });
             setDepenseEnEdition(null);

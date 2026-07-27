@@ -85,6 +85,35 @@ describe("detecterAlertes", () => {
     expect(alertesInconnu).toEqual(alertesMixte);
   });
 
+  it("contradiction salaires hors A10 : alerte critique en tête, MAIS pas de court-circuit (non bloquant)", () => {
+    const contrats = [contrat({ date: "2026-06-01", type: "enseignement", typeRemuneration: "heures", nbHeures: 90, etablissementAgree: true, enRapportAvecMetier: true })];
+    const p = profil({ dateNaissance: "1990-01-01", dateAnniversaire: "2026-12-31", regimeDeclare: "annexe10_pur", salairesHorsAnnexe10PRA: 8000 });
+
+    const alertes = detecterAlertes(p, contrats, [], franceTravailConfig, "2026-06-15");
+
+    expect(alertes[0].code).toBe("salaires_hors_a10_contradictoires");
+    expect(alertes[0].niveau).toBe("critique");
+    expect(alertes[0].actionSuggeree).toContain("Mon profil");
+    // Contrairement au cas déclaré, les autres alertes restent calculées : l'app reste utilisable.
+    expect(alertes.length).toBeGreaterThan(1);
+    expect(codes(alertes)).toContain("plafond_enseignement");
+    expect(codes(alertes)).not.toContain("situation_mixte");
+  });
+
+  it("anti-faux-positif : salaires hors A10 à 0 ne déclenche aucune alerte de périmètre", () => {
+    const p = profil({ dateNaissance: "1990-01-01", dateAnniversaire: "2026-12-31", regimeDeclare: "annexe10_pur", salairesHorsAnnexe10PRA: 0 });
+    const alertes = detecterAlertes(p, [contrat({ date: "2026-06-01", nbCachets: 20 })], [], franceTravailConfig, "2026-06-15");
+    expect(codes(alertes)).not.toContain("salaires_hors_a10_contradictoires");
+    expect(codes(alertes)).not.toContain("situation_mixte");
+  });
+
+  it("une déclaration « mixte » garde son court-circuit même avec des salaires hors A10 renseignés", () => {
+    const p = profil({ dateNaissance: "1990-01-01", dateAnniversaire: "2026-12-31", regimeDeclare: "mixte", salairesHorsAnnexe10PRA: 8000 });
+    const alertes = detecterAlertes(p, [contrat({ date: "2026-06-01", nbCachets: 20 })], [], franceTravailConfig, "2026-06-15");
+    expect(alertes).toHaveLength(1);
+    expect(alertes[0].code).toBe("situation_mixte");
+  });
+
   it("signale seuil_readmission_non_calculable quand l'historique de contrats est trop court pour ajuster le seuil de réadmission", () => {
     const p = profil({ dateAnniversaire: "2027-01-17", situation: "readmission" });
     const contrats = [contrat({ date: "2026-01-27", nbCachets: 40 })]; // 480 h, rien avant

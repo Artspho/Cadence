@@ -1,24 +1,19 @@
 import { useState } from "react";
 import type { CategorieFrais, Depense, StatutJustificatif } from "../../types/fraisReels";
 import { CATEGORIES_ORDONNEES, LIBELLES_CATEGORIE_COMPLETS } from "./categorieLabels";
+import { calculerStatutJustificatif } from "../../lib/statutJustificatif";
+import { getToken } from "../../lib/googleDriveAuth";
+import { uploaderJustificatif } from "../../lib/googleDriveStorage";
 
 interface DepenseFormProps {
   anneeFiscale: number;
   valeurInitiale?: Depense; // édition si présent, ajout sinon
   ratioLocalPro: number | null; // config.localPro.surfaceProM2/surfaceTotalM2, null si non renseigné
   nombreRepasC3Actif: boolean; // config.nombreRepasC3 renseigné (> 0)
+  driveActif: boolean; // config.driveConnecte && config.stockageJustificatifs === 'drive'
   onValider: (depense: Omit<Depense, "id">) => void;
   onSupprimer?: () => void;
   onAnnuler: () => void;
-}
-
-// Statut calculé automatiquement (jamais saisi à la main) — cf. spec §8 : 'fourni' si un fichier
-// est uploadé, 'non_requis' pour les catégories A/B (aucun justificatif requis tant que la qualité
-// d'artiste est incontestable, SNAM §5), 'manquant' sinon (catégories C/D).
-function calculerStatutJustificatif(categorie: CategorieFrais, aUnFichier: boolean): StatutJustificatif {
-  if (aUnFichier) return "fourni";
-  if (categorie === "A" || categorie === "B") return "non_requis";
-  return "manquant";
 }
 
 function lireFichierEnBase64(fichier: File): Promise<string> {
@@ -30,7 +25,7 @@ function lireFichierEnBase64(fichier: File): Promise<string> {
   });
 }
 
-export function DepenseForm({ anneeFiscale, valeurInitiale, ratioLocalPro, nombreRepasC3Actif, onValider, onSupprimer, onAnnuler }: DepenseFormProps) {
+export function DepenseForm({ anneeFiscale, valeurInitiale, ratioLocalPro, nombreRepasC3Actif, driveActif, onValider, onSupprimer, onAnnuler }: DepenseFormProps) {
   const [date, setDate] = useState(valeurInitiale?.date ?? "");
   const [categorie, setCategorie] = useState<CategorieFrais>(valeurInitiale?.categorie ?? "C1");
   const [description, setDescription] = useState(valeurInitiale?.description ?? "");
@@ -39,8 +34,11 @@ export function DepenseForm({ anneeFiscale, valeurInitiale, ratioLocalPro, nombr
   const [partProPct, setPartProPct] = useState(Math.round((valeurInitiale?.partPro ?? 1) * 100).toString());
   const [justificatifNom, setJustificatifNom] = useState(valeurInitiale?.justificatifNom);
   const [justificatifData, setJustificatifData] = useState(valeurInitiale?.justificatifData);
+  const [driveFileId, setDriveFileId] = useState(valeurInitiale?.driveFileId);
+  const [driveWebViewLink, setDriveWebViewLink] = useState(valeurInitiale?.driveWebViewLink);
   const [notes, setNotes] = useState(valeurInitiale?.notes ?? "");
   const [erreur, setErreur] = useState<string | null>(null);
+  const [envoiEnCours, setEnvoiEnCours] = useState(false);
 
   const partProEffectivePct = categorie === "C6" && ratioLocalPro !== null ? Math.round(ratioLocalPro * 100) : Number(partProPct) || 0;
   const partProVerrouillee = categorie === "C6" && ratioLocalPro !== null;
@@ -49,19 +47,46 @@ export function DepenseForm({ anneeFiscale, valeurInitiale, ratioLocalPro, nombr
   const remboursementNum = parseFloat(remboursementEmployeur) || 0;
   const montantDeductible = Math.max(0, (montantTotalNum - remboursementNum) * (partProEffectivePct / 100));
 
-  const statutJustificatif = calculerStatutJustificatif(categorie, Boolean(justificatifData));
+  const statutJustificatif = calculerStatutJustificatif(categorie, Boolean(justificatifData) || Boolean(driveFileId));
 
+  // Justificatif local (base64) et Drive sont exclusifs : on efface toujours l'autre mode avant
+  // d'écrire le nouveau, sinon une dépense pourrait garder un driveFileId périmé après un
+  // remplacement en local (ou l'inverse).
   async function onFichierChoisi(fichier: File | undefined) {
     if (!fichier) return;
     if (fichier.size > 5 * 1024 * 1024) {
       setErreur("Fichier trop volumineux (max 5 Mo).");
       return;
     }
+
+    if (driveActif) {
+      const token = getToken();
+      if (token) {
+        setEnvoiEnCours(true);
+        setErreur(null);
+        try {
+          const { driveFileId: id, driveWebViewLink: lien } = await uploaderJustificatif(token, fichier, anneeFiscale);
+          setDriveFileId(id);
+          setDriveWebViewLink(lien);
+          setJustificatifNom(fichier.name);
+          setJustificatifData(undefined);
+          setEnvoiEnCours(false);
+          return;
+        } catch {
+          setErreur("Échec de l'envoi vers Google Drive — fichier stocké localement à la place.");
+          setEnvoiEnCours(false);
+          // tombe dans le fallback localStorage ci-dessous
+        }
+      }
+    }
+
     try {
       const base64 = await lireFichierEnBase64(fichier);
       setJustificatifData(base64);
       setJustificatifNom(fichier.name);
-      setErreur(null);
+      setDriveFileId(undefined);
+      setDriveWebViewLink(undefined);
+      if (!driveActif) setErreur(null);
     } catch {
       setErreur("Échec de la lecture du fichier.");
     }
@@ -82,6 +107,8 @@ export function DepenseForm({ anneeFiscale, valeurInitiale, ratioLocalPro, nombr
       statutJustificatif,
       justificatifNom,
       justificatifData,
+      driveFileId,
+      driveWebViewLink,
       notes: notes.trim() || undefined,
     });
   }
@@ -174,11 +201,12 @@ export function DepenseForm({ anneeFiscale, valeurInitiale, ratioLocalPro, nombr
 
         <div>
           <span className="block text-xs uppercase tracking-[.03em] text-muted mb-1">Justificatif</span>
-          <label className="inline-block bg-surface-2 border border-line rounded-lg px-4 py-2 text-sm cursor-pointer hover:border-line-strong transition-colors">
-            {justificatifNom ? "Remplacer le fichier" : "Choisir un fichier (PDF, JPG, PNG)"}
-            <input type="file" accept="application/pdf,image/jpeg,image/png" className="hidden" onChange={(e) => onFichierChoisi(e.target.files?.[0])} />
+          <label className={`inline-block bg-surface-2 border border-line rounded-lg px-4 py-2 text-sm transition-colors ${envoiEnCours ? "opacity-60" : "cursor-pointer hover:border-line-strong"}`}>
+            {envoiEnCours ? "Envoi vers Drive…" : justificatifNom ? "Remplacer le fichier" : "Choisir un fichier (PDF, JPG, PNG)"}
+            <input type="file" accept="application/pdf,image/jpeg,image/png" className="hidden" disabled={envoiEnCours} onChange={(e) => onFichierChoisi(e.target.files?.[0])} />
           </label>
           {justificatifNom && <span className="text-xs text-muted ml-2">{justificatifNom}</span>}
+          {driveFileId && <span className="text-xs text-faint ml-2">(sur Google Drive)</span>}
           <p className="mt-2">
             <StatutBadge statut={statutJustificatif} />
           </p>
@@ -194,7 +222,7 @@ export function DepenseForm({ anneeFiscale, valeurInitiale, ratioLocalPro, nombr
         {erreur && <p className="text-sm text-red">{erreur}</p>}
 
         <div className="flex gap-2 pt-2">
-          <button type="submit" disabled={!date || !description.trim() || montantTotalNum <= 0} className="flex-1 bg-mint text-bg font-medium rounded-lg py-2.5 disabled:opacity-40 disabled:cursor-not-allowed">
+          <button type="submit" disabled={!date || !description.trim() || montantTotalNum <= 0 || envoiEnCours} className="flex-1 bg-mint text-bg font-medium rounded-lg py-2.5 disabled:opacity-40 disabled:cursor-not-allowed">
             {valeurInitiale ? "Enregistrer les modifications" : "Ajouter la dépense"}
           </button>
           <button type="button" onClick={onAnnuler} className="px-4 rounded-lg border border-line text-muted">

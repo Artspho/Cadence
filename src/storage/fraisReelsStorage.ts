@@ -7,7 +7,7 @@
 // piège que documenté dans coherenceProfil.ts : ne jamais faire échouer un chargement de page sur
 // une donnée déjà stockée avant l'ajout d'une règle).
 import { z } from "zod";
-import type { ConfigFraisReels, Depense } from "../types/fraisReels";
+import type { BienAmorti, ConfigFraisReels, Depense } from "../types/fraisReels";
 
 const categorieFraisSchema = z.enum(["A", "B", "C1", "C2", "C3", "C4", "C5", "C6", "C7", "C8", "C9", "D"]);
 
@@ -37,6 +37,30 @@ const revenuImposableSchema = z.object({
   indemnitesJournalieres: z.number(),
 });
 
+const vehiculeFraisKmSchema = z.object({
+  type: z.enum(["voiture", "moto", "cyclomoteur"]),
+  motorisation: z.enum(["thermique_hybride", "electrique"]).optional(),
+  puissanceFiscale: z.number().optional(),
+});
+
+const paramsFraisKmC1Schema = z.object({
+  vehicule: vehiculeFraisKmSchema,
+  trajet: z.object({
+    mode: z.literal("c1"),
+    distanceDomicileTravail: z.number(),
+    nombreAR: z.number(),
+    choixPersonnel: z.boolean().nullable().optional(),
+  }),
+});
+
+const paramsFraisKmC2Schema = z.object({
+  vehicule: vehiculeFraisKmSchema,
+  trajet: z.object({
+    mode: z.literal("c2"),
+    kmParcourus: z.number(),
+  }),
+});
+
 const configFraisReelsSchema = z.object({
   anneeFiscale: z.number(),
   profilFiscal: z.enum(["artiste_exclusif", "artiste_enseignant_majoritaire", "artiste_enseignant_accessoire", "enseignant_pur"]),
@@ -45,6 +69,9 @@ const configFraisReelsSchema = z.object({
   modeB: z.enum(["forfait", "reel"]),
   localPro: z.object({ surfaceTotalM2: z.number(), surfaceProM2: z.number() }).optional(),
   nombreRepasC3: z.number().optional(),
+  stockageJustificatifs: z.enum(["local", "drive"]).optional(),
+  driveConnecte: z.boolean().optional(),
+  fraisKm: z.object({ c1: paramsFraisKmC1Schema.optional(), c2: paramsFraisKmC2Schema.optional() }).optional(),
 });
 
 const donneesFraisReelsSchema = z.object({
@@ -84,5 +111,53 @@ export async function sauvegarderFraisReels(anneeFiscale: number, donnees: Donne
 }
 
 export function creerDepense(partiel: Omit<Depense, "id">): Depense {
+  return { id: crypto.randomUUID(), ...partiel };
+}
+
+// ── Biens amortis (C7, Q1/Q4) ───────────────────────────────────────────────────────────────
+// Clé DÉLIBÉRÉMENT NON suffixée par l'année, contrairement à `cadence_frais_reels_<annee>` :
+// un bien acheté en 2025 et amorti sur 5 ans doit encore générer une annuité en 2026…2029 sans
+// que l'utilisateur le ressaisisse. On stocke donc la liste BRUTE des biens (désignation, date
+// d'achat, prix HT, durée retenue) une seule fois, et c'est `calculerAmortissementsAnnee` qui
+// dérive, pour une année d'imposition donnée, quels biens sont en cours et quelle annuité
+// s'applique. Aucune donnée calculée (annuité, reste à amortir) n'est persistée : elle serait
+// périmée dès le changement d'année (même discipline que `Depense.montantDeductible`, toujours
+// recalculé depuis les champs source par le moteur).
+const CLE_BIENS_AMORTIS = "cadence_frais_reels_biens_amortis";
+
+const bienAmortiSchema = z.object({
+  id: z.string(),
+  designation: z.string(),
+  categorie: z.enum(["informatique", "sonorisation_electronique", "instrument", "mobilier_bureau", "autre_outillage"]),
+  prixHT: z.number(),
+  dateAchat: z.string(),
+  dureeAns: z.number(),
+  tauxPro: z.number(),
+  justificatifId: z.string().optional(),
+});
+
+const biensAmortisSchema = z.array(bienAmortiSchema);
+
+export async function chargerBiensAmortis(): Promise<BienAmorti[]> {
+  try {
+    const brut = window.localStorage.getItem(CLE_BIENS_AMORTIS);
+    if (!brut) return [];
+    const parse = biensAmortisSchema.safeParse(JSON.parse(brut));
+    if (!parse.success) {
+      console.error("Biens amortis corrompus, réinitialisation.", parse.error);
+      return [];
+    }
+    return parse.data;
+  } catch (erreur) {
+    console.error("Impossible de lire les biens amortis.", erreur);
+    return [];
+  }
+}
+
+export async function sauvegarderBiensAmortis(biens: BienAmorti[]): Promise<void> {
+  window.localStorage.setItem(CLE_BIENS_AMORTIS, JSON.stringify(biens));
+}
+
+export function creerBienAmorti(partiel: Omit<BienAmorti, "id">): BienAmorti {
   return { id: crypto.randomUUID(), ...partiel };
 }

@@ -149,6 +149,59 @@ export const franceTravailConfig = {
     plancher10Pct2025: 495, // ✅ minimum de l'abattement 10 %, 2025
     plafond10Pct2025: 14_171, // ✅ maximum de l'abattement 10 %, 2025
     valeurRepasPersonnel2025: 5.45, // ✅ valeur forfaitaire d'un repas au domicile (C3), 2025
+    // Amortissement linéaire (C7) — cf. engine/fraisReels/calculerAmortissement.ts. Durées
+    // indicatives par nature de bien (proposées à l'UI, jamais devinées par le moteur qui reçoit
+    // toujours dureeAns explicitement de l'appelant).
+    amortissements: {
+      dureesParDefaut: {
+        informatique: 3, // ✅ BOFIP BOI-RSA-BASE-30-50-30-20170621
+        sonorisation_electronique: 5, // ✅
+        instrument: 5, // 🔶 cas d'espèce — durée à valider avec le fisc
+        mobilier_bureau: 10, // ✅
+        autre_outillage: 5, // ✅
+      },
+      seuilAmortissementHT: 500, // ✅ en dessous : déduction intégrale, pas d'amortissement
+    },
+    // Barème kilométrique (C1/C2) — cf. engine/fraisReels/calculerFraisKilometriques.ts. Source
+    // DGFiP, barème revenus 2025 (déclaration 2026), inchangé depuis 2023. Lignes ordonnées par
+    // cvMax croissant (99 = "7 CV et plus", plafond conventionnel) ; tranches ordonnées par kmMax
+    // croissant (null = dernière tranche, sans plafond). coefficients[i]/fixes[i] = tranche i.
+    baremesKilometriques: {
+      // Cast au niveau du tableau (pas de l'élément) : sous le `as const` englobant toute la
+      // config, un tableau littéral devient un tuple `readonly`, incompatible avec le type mutable
+      // `number[]`/`{...}[]` attendu par FranceTravailConfig (inféré depuis le schéma Zod ci-dessous,
+      // lu par le moteur) — même pattern que valeursDatees.smicHoraireBrutHistorique plus bas.
+      voiture: {
+        tranches: [
+          { kmMax: 5000 }, // tranche 0 : montant = d × coeff
+          { kmMax: 20000 }, // tranche 1 : montant = (d × coeff) + fixe
+          { kmMax: null }, // tranche 2 : montant = d × coeff
+        ] as { kmMax: number | null }[],
+        lignes: [
+          { cvMax: 3, coefficients: [0.529, 0.316, 0.37], fixes: [0, 1065, 0] }, // ✅
+          { cvMax: 4, coefficients: [0.606, 0.34, 0.407], fixes: [0, 1330, 0] }, // ✅
+          { cvMax: 5, coefficients: [0.636, 0.357, 0.427], fixes: [0, 1395, 0] }, // ✅
+          { cvMax: 6, coefficients: [0.665, 0.374, 0.447], fixes: [0, 1457, 0] }, // ✅
+          { cvMax: 99, coefficients: [0.697, 0.394, 0.47], fixes: [0, 1515, 0] }, // ✅ 7 CV et plus
+        ] as { cvMax: number; coefficients: number[]; fixes: number[] }[],
+        majorationElectrique: 0.2, // ✅ majoration forfaitaire véhicule 100 % électrique
+      },
+      moto: {
+        tranches: [{ kmMax: 3000 }, { kmMax: 6000 }, { kmMax: null }] as { kmMax: number | null }[],
+        lignes: [
+          { cvMax: 2, coefficients: [0.395, 0.099, 0.248], fixes: [0, 891, 0] }, // ✅
+          { cvMax: 5, coefficients: [0.468, 0.082, 0.275], fixes: [0, 1158, 0] }, // ✅
+          { cvMax: 99, coefficients: [0.606, 0.079, 0.343], fixes: [0, 1583, 0] }, // ✅
+        ] as { cvMax: number; coefficients: number[]; fixes: number[] }[],
+      },
+      cyclomoteur: {
+        // Pas de puissance fiscale (cylindrée ≤ 50 cm³) : un seul jeu de coefficients/fixes.
+        tranches: [{ kmMax: 3000 }, { kmMax: 6000 }, { kmMax: null }] as { kmMax: number | null }[],
+        coefficients: [0.315, 0.079, 0.198] as number[], // ✅
+        fixes: [0, 711, 0] as number[], // ✅
+      },
+      plafondC1AllerKm: 40, // ✅ Q3 — plafond domicile↔travail (km aller simple)
+    },
   },
 
   // ── Valeurs volatiles à renseigner (revalorisées régulièrement) ──
@@ -264,6 +317,33 @@ export const franceTravailConfigSchema = z.object({
     plancher10Pct2025: z.number().positive(),
     plafond10Pct2025: z.number().positive(),
     valeurRepasPersonnel2025: z.number().positive(),
+    amortissements: z.object({
+      dureesParDefaut: z.object({
+        informatique: z.number().positive(),
+        sonorisation_electronique: z.number().positive(),
+        instrument: z.number().positive(),
+        mobilier_bureau: z.number().positive(),
+        autre_outillage: z.number().positive(),
+      }),
+      seuilAmortissementHT: z.number().positive(),
+    }),
+    baremesKilometriques: z.object({
+      voiture: z.object({
+        tranches: z.array(z.object({ kmMax: z.number().positive().nullable() })),
+        lignes: z.array(z.object({ cvMax: z.number().positive(), coefficients: z.array(z.number().positive()), fixes: z.array(z.number()) })),
+        majorationElectrique: z.number().positive(),
+      }),
+      moto: z.object({
+        tranches: z.array(z.object({ kmMax: z.number().positive().nullable() })),
+        lignes: z.array(z.object({ cvMax: z.number().positive(), coefficients: z.array(z.number().positive()), fixes: z.array(z.number()) })),
+      }),
+      cyclomoteur: z.object({
+        tranches: z.array(z.object({ kmMax: z.number().positive().nullable() })),
+        coefficients: z.array(z.number().positive()),
+        fixes: z.array(z.number()),
+      }),
+      plafondC1AllerKm: z.number().positive(),
+    }),
   }),
   differesEtFranchises: z.object({
     delaiAttenteJours: z.number(),

@@ -1,8 +1,9 @@
 // Moteur pur du module Frais réels — zéro React, aucune constante réglementaire en dur (tout lu
 // depuis config.fraisReels, franceTravailConfig.ts). Source de vérité réglementaire : document
 // SNAM-CGT « Frais professionnels » (mars 2026), cf. docs/spec_frais_reels_cadence.md.
-import type { CategorieFrais, ConfigFraisReels, Depense, ProfilFiscalFraisReels, ResultatFraisReels, RevenuImposableArtistique } from "../types/fraisReels";
+import type { BienAmorti, CategorieFrais, ConfigFraisReels, Depense, ProfilFiscalFraisReels, ResultatFraisReels, RevenuImposableArtistique } from "../types/fraisReels";
 import type { FranceTravailConfig } from "../config/franceTravailConfig";
+import { calculerAmortissementsAnnee, type RetourCalculerAmortissementsAnnee } from "./fraisReels/calculerAmortissementsAnnee";
 
 const arrondi = (valeur: number): number => Math.round(valeur * 100) / 100;
 
@@ -43,7 +44,19 @@ const CATEGORIES_C_ET_D: CategorieFrais[] = ["C1", "C2", "C3", "C4", "C5", "C6",
  * pré-remplissage suggéré de `Depense.partPro` à la création d'une dépense C6). Le moteur applique
  * la même formule générique (`montantDeductible`) à toutes les catégories, C6 comme les autres.
  */
-export function calculerFraisReels(depenses: Depense[], config: ConfigFraisReels, ftConfig: FranceTravailConfig): ResultatFraisReels {
+/**
+ * `biensAmortis`/`anneeImposition` (optionnels, Q4 — amortissements multi-années) : si les DEUX
+ * sont fournis, leur contribution (`calculerAmortissementsAnnee`) est ajoutée au poste C7 et le
+ * détail exposé via `amortissements` dans le résultat. Absents (cas historique) : comportement
+ * strictement identique à avant leur introduction, aucun changement pour les appelants existants.
+ */
+export function calculerFraisReels(
+  depenses: Depense[],
+  config: ConfigFraisReels,
+  ftConfig: FranceTravailConfig,
+  biensAmortis?: BienAmorti[],
+  anneeImposition?: number,
+): ResultatFraisReels & { amortissements?: RetourCalculerAmortissementsAnnee } {
   const baseR = calculerBaseR(config.revenu, config.profilFiscal, ftConfig);
 
   const depensesParCategorie: Record<string, Depense[]> = {};
@@ -68,6 +81,11 @@ export function calculerFraisReels(depenses: Depense[], config: ConfigFraisReels
     }
   }
 
+  const amortissements = biensAmortis && anneeImposition !== undefined ? calculerAmortissementsAnnee(biensAmortis, anneeImposition, ftConfig) : undefined;
+  if (amortissements) {
+    montantC.C7 = arrondi((montantC.C7 ?? 0) + amortissements.totalDeductible);
+  }
+
   const totalC = Object.values(montantC).reduce((total, montant) => total + montant, 0);
   const totalFraisReels = arrondi(montantA + montantB + totalC);
 
@@ -77,7 +95,7 @@ export function calculerFraisReels(depenses: Depense[], config: ConfigFraisReels
   const avantage = arrondi(totalFraisReels - forfait10Pct);
   const recommandation = avantage > 0 ? "frais_reels" : avantage < 0 ? "forfait_10" : "identique";
 
-  return { baseR, montantA, montantB, montantC, totalFraisReels, forfait10Pct, avantage, recommandation, depensesParCategorie };
+  return { baseR, montantA, montantB, montantC, totalFraisReels, forfait10Pct, avantage, recommandation, depensesParCategorie, amortissements };
 }
 
 // Libellés SNAM par catégorie (cf. spec §4, §8) — utilisés uniquement pour la sortie texte, jamais
@@ -134,8 +152,10 @@ export function genererTexteDeclaration(result: ResultatFraisReels, config: Conf
   }
 
   lignes.push(`TOTAL FRAIS REELS : ${result.totalFraisReels.toFixed(2)} €`);
-  const signe = result.avantage >= 0 ? "+" : "";
-  lignes.push(`(forfait 10% aurait donne : ${result.forfait10Pct.toFixed(2)} € - avantage frais reels : ${signe}${result.avantage.toFixed(2)} €)`);
 
+  // Volontairement PAS de ligne de comparaison au forfait 10 % ici : `forfait10Pct`/`avantage` sont
+  // une aide à la décision interne (« déclarer aux frais réels ou pas »), affichée dans l'UI
+  // (FraisReelsGraphiques). Ce texte-ci part tel quel dans la case libre d'impots.gouv.fr et en
+  // page 3 du PDF : le fisc n'y attend que le détail des frais déclarés, pas notre arbitrage.
   return lignes.join("\n").trim();
 }

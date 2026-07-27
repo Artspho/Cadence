@@ -1,12 +1,18 @@
 import type { ConfigFraisReels, Depense, ModeForfait } from "../../types/fraisReels";
 import type { FranceTravailConfig } from "../../config/franceTravailConfig";
-import { calculerFraisReels } from "../../engine/fraisReels";
+import { calculerArbitrageForfaits } from "../../lib/arbitrageForfaits";
+import { DriveSettings } from "./DriveSettings";
+import { FraisKilometriques } from "./FraisKilometriques";
 
 interface ForfaitsReglagesProps {
   config: ConfigFraisReels;
   depenses: Depense[];
   ftConfig: FranceTravailConfig;
   onChangerConfig: (config: ConfigFraisReels) => void;
+  // Blocs supplémentaires de la carte « réglages » dont l'état ne vit pas dans ConfigFraisReels
+  // (biens amortis : liste durable, hors année fiscale) — passés en children plutôt qu'en props
+  // pour éviter de faire transiter leur état par ce composant, qui n'en a pas besoin.
+  children?: React.ReactNode;
 }
 
 function RubriqueForfait({ label, mode, montantForfait, montantReel, onChanger }: { label: string; mode: ModeForfait; montantForfait: number; montantReel: number; onChanger: (mode: ModeForfait) => void }) {
@@ -34,13 +40,14 @@ function RubriqueForfait({ label, mode, montantForfait, montantReel, onChanger }
   );
 }
 
-export function ForfaitsReglages({ config, depenses, ftConfig, onChangerConfig }: ForfaitsReglagesProps) {
+export function ForfaitsReglages({ config, depenses, ftConfig, onChangerConfig, children }: ForfaitsReglagesProps) {
   const forfaitsDesactives = config.profilFiscal === "enseignant_pur";
 
-  const forfaitA = calculerFraisReels(depenses, { ...config, modeA: "forfait" }, ftConfig).montantA;
-  const reelA = calculerFraisReels(depenses, { ...config, modeA: "reel" }, ftConfig).montantA;
-  const forfaitB = calculerFraisReels(depenses, { ...config, modeB: "forfait" }, ftConfig).montantB;
-  const reelB = calculerFraisReels(depenses, { ...config, modeB: "reel" }, ftConfig).montantB;
+  // Même source que la carte de comparaison (FraisReelsGraphiques) : un seul endroit rejoue
+  // `calculerFraisReels` avec le mode forcé, pour éviter que les deux vues divergent un jour.
+  const arbitrage = calculerArbitrageForfaits(depenses, config, ftConfig);
+  const { reel: reelA, forfait: forfaitA } = arbitrage.a;
+  const { reel: reelB, forfait: forfaitB } = arbitrage.b;
 
   const localProActif = Boolean(config.localPro);
   const ratioLocalPro = config.localPro && config.localPro.surfaceTotalM2 > 0 ? (config.localPro.surfaceProM2 / config.localPro.surfaceTotalM2) * 100 : null;
@@ -140,6 +147,12 @@ export function ForfaitsReglages({ config, depenses, ftConfig, onChangerConfig }
           </div>
         )}
       </div>
+
+      <FraisKilometriques config={config} ftConfig={ftConfig} onChangerConfig={onChangerConfig} />
+
+      {children}
+
+      <DriveSettings config={config} onChangerConfig={onChangerConfig} />
     </section>
   );
 }

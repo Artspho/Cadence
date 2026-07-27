@@ -48,6 +48,8 @@ export type ProfilFiscalFraisReels =
   | "artiste_enseignant_accessoire" // 14%+5% sur artistique seulement
   | "enseignant_pur"; // pas de forfaits A/B, C/D seulement
 
+import type { ParamsFraisKilometriques } from "../engine/fraisReels/calculerFraisKilometriques";
+
 export interface ConfigFraisReels {
   anneeFiscale: number;
   profilFiscal: ProfilFiscalFraisReels;
@@ -66,6 +68,33 @@ export interface ConfigFraisReels {
   // décision actée avec l'utilisateur le 2026-07-26 : « sans justificatifs suffisamment précis »
   // est une ALTERNATIVE aux dépenses réelles, pas un ajout.
   nombreRepasC3?: number;
+  // Étape 3 (Google Drive, optionnel) : mode de stockage des justificatifs à la création d'une
+  // nouvelle dépense. Absent = 'local' (comportement historique, aucune migration des dépenses
+  // déjà stockées en base64). N'affecte jamais les dépenses existantes, seulement les nouvelles.
+  stockageJustificatifs?: "local" | "drive";
+  driveConnecte?: boolean;
+  // C1/C2 barème kilométrique (Q2/Q3, cf. engine/fraisReels/calculerFraisKilometriques.ts) —
+  // saisies utilisateur uniquement (jamais de montant recalculé stocké ici) ; chaque bloc absent
+  // (utilisateur n'a saisi que l'un des deux, ou aucun) reste `undefined`, jamais un objet à zéro.
+  fraisKm?: {
+    c1?: ParamsFraisKilometriques;
+    c2?: ParamsFraisKilometriques;
+  };
+}
+
+// Bien amortissable (> seuilAmortissementHT, cf. franceTravailConfig.fraisReels.amortissements) —
+// contribue à C7 sur plusieurs exercices, cf. engine/fraisReels/calculerAmortissementsAnnee.ts.
+export type CategorieBienAmorti = "informatique" | "sonorisation_electronique" | "instrument" | "mobilier_bureau" | "autre_outillage";
+
+export interface BienAmorti {
+  id: string; // uuid v4
+  designation: string; // ex. "Violoncelle Scherl & Roth"
+  categorie: CategorieBienAmorti;
+  prixHT: number;
+  dateAchat: string; // ISO "YYYY-MM-DD"
+  dureeAns: number; // peut différer de la durée par défaut de la config
+  tauxPro: number; // ∈ ]0, 1], défaut 1.0
+  justificatifId?: string; // id Drive ou local, géré par le layer storage
 }
 
 export type RecommandationFraisReels = "frais_reels" | "forfait_10" | "identique";

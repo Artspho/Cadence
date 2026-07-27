@@ -16,6 +16,13 @@ interface DashboardProps {
   sr: number;
   nht: number;
   sar: number | null;
+  /**
+   * Contradiction de périmètre non tranchée (cf. lib/profilHorsPerimetre.ts, motif
+   * `salaires_hors_a10_contradictoires`) : les montants ARE seraient calculés avec les mauvaises
+   * règles si le régime déclaré est celui qui est faux. On les masque au lieu de les afficher
+   * assortis d'un « peut-être » — un chiffre affiché est un chiffre auquel on se fie.
+   */
+  montantsNonFiables?: boolean;
 }
 
 // Exhaustif par construction : si une raison est ajoutée à RythmeRequis sans traiter son cas
@@ -63,7 +70,7 @@ function bandeauSeuilReadmission(seuilReadmission: SeuilReadmission, seuilHeures
   }
 }
 
-export function Dashboard({ prediction, serie, serieAVenir, fenetreDebut, dateCap, decompte, ajBrute, ajNette, sr, nht, sar }: DashboardProps) {
+export function Dashboard({ prediction, serie, serieAVenir, fenetreDebut, dateCap, decompte, ajBrute, ajNette, sr, nht, sar, montantsNonFiables = false }: DashboardProps) {
   const bandeauReadmission = bandeauSeuilReadmission(prediction.seuilReadmission, prediction.seuilHeures);
   const r = decompte.repartition;
   const cachets = r.cachets;
@@ -102,9 +109,19 @@ export function Dashboard({ prediction, serie, serieAVenir, fenetreDebut, dateCa
       <div className="grid md:grid-cols-3 gap-4">
         <div className="bg-surface border border-line rounded-card p-5">
           <p className="text-xs uppercase tracking-[.03em] text-muted mb-2">Allocation journalière estimée</p>
-          <p className="font-display text-3xl font-semibold tabular-nums tracking-tight">{ajBrute.brut.toFixed(2)} €</p>
-          <p className="text-sm text-muted mt-1">≈ {ajNette.net.toFixed(2)} € net / jour</p>
-          <p className="text-xs text-faint mt-2">Estimation indicative — {franceTravailConfig.meta.avertissement}</p>
+          {montantsNonFiables ? (
+            <>
+              <p className="font-display text-3xl font-semibold tabular-nums tracking-tight text-faint">— €</p>
+              <p className="text-sm text-red mt-1">Non fiable : deux saisies se contredisent</p>
+              <p className="text-xs text-faint mt-2">Corrige ton régime déclaré ou tes salaires hors Annexe 10 dans « Mon profil » pour retrouver ce montant.</p>
+            </>
+          ) : (
+            <>
+              <p className="font-display text-3xl font-semibold tabular-nums tracking-tight">{ajBrute.brut.toFixed(2)} €</p>
+              <p className="text-sm text-muted mt-1">≈ {ajNette.net.toFixed(2)} € net / jour</p>
+              <p className="text-xs text-faint mt-2">Estimation indicative — {franceTravailConfig.meta.avertissement}</p>
+            </>
+          )}
         </div>
 
         <div className="bg-surface border border-line rounded-card p-5">

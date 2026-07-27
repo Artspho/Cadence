@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { franceTravailConfig } from "../../config/franceTravailConfig";
 import { calculerBaseR, calculerFraisReels, genererTexteDeclaration } from "../fraisReels";
-import type { ConfigFraisReels, Depense, RevenuImposableArtistique } from "../../types/fraisReels";
+import type { BienAmorti, ConfigFraisReels, Depense, RevenuImposableArtistique } from "../../types/fraisReels";
 
 let compteur = 0;
 function depense(partiel: Partial<Depense> & Pick<Depense, "categorie" | "montantTotal">): Depense {
@@ -180,6 +180,30 @@ describe("Depense — statut justificatif et stockage Drive (structure, cf. éta
   });
 });
 
+describe("calculerFraisReels — intégration biensAmortis (Q4, amortissements multi-années)", () => {
+  function bien(partiel: Partial<BienAmorti> & Pick<BienAmorti, "prixHT" | "dateAchat" | "dureeAns">): BienAmorti {
+    return { id: "bien-1", designation: "Bien test", categorie: "instrument", tauxPro: 1, ...partiel };
+  }
+
+  it("sans biensAmortis : comportement identique à avant leur introduction (rétrocompatibilité totale)", () => {
+    const c = config({ profilFiscal: "artiste_exclusif", revenu: revenu({ salaireNetImposable: 10_000 }) });
+    const d = [depense({ categorie: "C7", montantTotal: 80 })];
+    const resultat = calculerFraisReels(d, c, franceTravailConfig);
+    expect(resultat.montantC.C7).toBe(80);
+    expect(resultat.amortissements).toBeUndefined();
+  });
+
+  it("avec biensAmortis + anneeImposition : C7 augmenté du montant exact de l'annuité déductible", () => {
+    const c = config({ profilFiscal: "artiste_exclusif", revenu: revenu({ salaireNetImposable: 10_000 }) });
+    const d = [depense({ categorie: "C7", montantTotal: 80 })];
+    const b = bien({ prixHT: 900, dateAchat: "2025-01-15", dureeAns: 3 }); // annuité pleine = 300
+    const resultat = calculerFraisReels(d, c, franceTravailConfig, [b], 2025);
+    expect(resultat.montantC.C7).toBe(380); // 80 (dépenses C7) + 300 (amortissement)
+    expect(resultat.amortissements?.totalDeductible).toBe(300);
+    expect(resultat.amortissements?.biensEnCours).toEqual([b]);
+  });
+});
+
 describe("genererTexteDeclaration", () => {
   const CARACTERES_INTERDITS = /[→×✅–—‘’“”]|[\u{1F300}-\u{1FAFF}]|[☀-➿]/u;
 
@@ -199,14 +223,26 @@ describe("genererTexteDeclaration", () => {
     expect(texte).not.toMatch(CARACTERES_INTERDITS);
   });
 
-  it("contient le total des frais réels et le montant du forfait 10% en comparaison", () => {
+  it("contient le total des frais réels", () => {
     const c = config({ profilFiscal: "artiste_exclusif", revenu: revenu({ salaireNetImposable: 10_000 }) });
     const resultat = calculerFraisReels([], c, franceTravailConfig);
     const texte = genererTexteDeclaration(resultat, c);
 
     expect(texte).toContain("TOTAL FRAIS REELS");
     expect(texte).toContain(resultat.totalFraisReels.toFixed(2));
-    expect(texte).toContain(resultat.forfait10Pct.toFixed(2));
+  });
+
+  // Le texte part tel quel dans la case libre d'impots.gouv.fr (et en page 3 du PDF) : l'arbitrage
+  // interne « frais réels vs abattement 10 % » n'a rien à y faire, il reste cantonné à l'UI.
+  it("ne mentionne NI le forfait 10% NI l'avantage : arbitrage interne, hors déclaration", () => {
+    const c = config({ profilFiscal: "artiste_exclusif", revenu: revenu({ salaireNetImposable: 10_000 }) });
+    const resultat = calculerFraisReels([], c, franceTravailConfig);
+    const texte = genererTexteDeclaration(resultat, c);
+
+    expect(texte).not.toMatch(/forfait 10\s*%?/i);
+    expect(texte).not.toMatch(/avantage/i);
+    expect(texte).not.toContain(resultat.forfait10Pct.toFixed(2));
+    expect(texte.trimEnd().endsWith(`TOTAL FRAIS REELS : ${resultat.totalFraisReels.toFixed(2)} €`)).toBe(true);
   });
 
   it("enseignant pur : aucune ligne A/B dans le texte généré (forfaits désactivés)", () => {
