@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { franceTravailConfig } from "../../config/franceTravailConfig";
 import { detecterAlertes } from "../alertes";
 import { contrat, profil } from "./testUtils";
+import { CONTRADICTION_HORS_A10 } from "../../content/contradictionHorsA10";
 
 function codes(alertes: ReturnType<typeof detecterAlertes>) {
   return alertes.map((a) => a.code);
@@ -98,6 +99,43 @@ describe("detecterAlertes", () => {
     expect(alertes.length).toBeGreaterThan(1);
     expect(codes(alertes)).toContain("plafond_enseignement");
     expect(codes(alertes)).not.toContain("situation_mixte");
+  });
+
+  // Verrou anti-divergence : le fait « contradiction » n'est plus rédigé que dans
+  // content/contradictionHorsA10.ts, partagé avec AvertissementContradictionHorsA10. Ce test échoue
+  // si quelqu'un réintroduit un libellé propre à l'alerte — c'est précisément ainsi que les deux
+  // rendus avaient fini par décrire différemment le même masquage.
+  it("l'alerte de contradiction lit ses textes à la source unique partagée avec le bandeau", () => {
+    const p = profil({ regimeDeclare: "annexe10_pur", salairesHorsAnnexe10PRA: 8000 });
+    const alerte = detecterAlertes(p, [contrat({ date: "2026-06-01", nbCachets: 10 })], [], franceTravailConfig, "2026-06-15").find(
+      (a) => a.code === "salaires_hors_a10_contradictoires",
+    )!;
+    expect(alerte.titre).toBe(CONTRADICTION_HORS_A10.titre);
+    expect(alerte.message).toBe(CONTRADICTION_HORS_A10.messageAlerte);
+    expect(alerte.actionSuggeree).toBe(CONTRADICTION_HORS_A10.action);
+  });
+
+  // Le champ `salairesHorsAnnexe10PRA` a longtemps été inatteignable depuis l'UI en première
+  // admission (section réservée à la réadmission, cf. MonProfil.tsx) : seule l'UI était en cause, la
+  // détection n'a jamais regardé `situation`. `situation` est écrite explicitement ici pour que ce
+  // soit vérifié, et non hérité du défaut de la fabrique `profil()`.
+  it("contradiction signalée en première admission comme en réadmission (même alerte, même texte)", () => {
+    const contrats = [contrat({ date: "2026-06-01", nbCachets: 10 })];
+    const alerteDe = (situation: "premiere_admission" | "readmission") =>
+      detecterAlertes(
+        profil({ situation, dateAnniversaire: "2026-12-31", regimeDeclare: "annexe10_pur", salairesHorsAnnexe10PRA: 8000 }),
+        contrats,
+        [],
+        franceTravailConfig,
+        "2026-06-15",
+      );
+
+    const premiereAdmission = alerteDe("premiere_admission");
+    expect(premiereAdmission[0].code).toBe("salaires_hors_a10_contradictoires");
+    expect(premiereAdmission[0].niveau).toBe("critique");
+
+    const readmission = alerteDe("readmission");
+    expect(readmission[0]).toEqual(premiereAdmission[0]);
   });
 
   it("anti-faux-positif : salaires hors A10 à 0 ne déclenche aucune alerte de périmètre", () => {

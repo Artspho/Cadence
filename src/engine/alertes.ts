@@ -11,6 +11,7 @@ import { calculerSerieDepuisContrats } from "./indemnisationMensuelle";
 import { calculerFenetreReference } from "./periodeReference";
 import { calculerStatutPrediction } from "./prediction";
 import { profilHorsPerimetre } from "../lib/profilHorsPerimetre";
+import { CONTRADICTION_HORS_A10 } from "../content/contradictionHorsA10";
 
 const SEUIL_APPROCHE_CUMUL_ENS_FORMATION = 0.9; // 90 % du plafond de 338 h : avertir avant d'y être
 
@@ -49,14 +50,19 @@ export function detecterAlertes(
   // ne sait pas laquelle des deux saisies est fausse, donc l'app reste utilisable et les autres
   // alertes gardent leur sens. L'alerte est en tête de liste et en `critique` — et le tableau de
   // bord masque les montants ARE tant que la contradiction dure (cf. App.tsx).
+  //
+  // Textes lus dans content/contradictionHorsA10.ts, partagés avec le bandeau dédié : le même fait
+  // n'est plus rédigé deux fois. L'alerte reste produite ici même quand le bandeau est affiché —
+  // elle alimente le compteur d'alertes critiques visible sur TOUS les onglets, y compris ceux sans
+  // bandeau (Contrats, Import PDF, Frais pro). C'est l'affichage du centre d'alertes qui évite la
+  // redite, pas la détection (cf. lib/alertesAffichage.ts).
   if (perimetre.motif === "salaires_hors_a10_contradictoires") {
     alertes.push({
       code: "salaires_hors_a10_contradictoires",
       niveau: "critique",
-      titre: "Deux saisies se contredisent",
-      message:
-        "Tu as déclaré relever uniquement de l'Annexe 10, mais tu as renseigné des salaires perçus hors Annexe 10 (technicien, régime général…). Ces deux informations ne peuvent pas être vraies en même temps : tant que c'est le cas, l'allocation estimée n'est pas fiable.",
-      actionSuggeree: "Ouvre « Mon profil » pour corriger l'une des deux : ton régime déclaré, ou le montant des salaires hors Annexe 10.",
+      titre: CONTRADICTION_HORS_A10.titre,
+      message: CONTRADICTION_HORS_A10.messageAlerte,
+      actionSuggeree: CONTRADICTION_HORS_A10.action,
     });
   }
 

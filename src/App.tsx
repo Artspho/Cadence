@@ -29,6 +29,7 @@ import { FraisReels } from "./components/fraisReels/FraisReels";
 import { dashboardEstVide } from "./lib/dashboardVide";
 import { perimetreBloquant, profilHorsPerimetre } from "./lib/profilHorsPerimetre";
 import { AvertissementContradictionHorsA10 } from "./components/AvertissementContradictionHorsA10";
+import { centreAlertesPourEcran } from "./lib/alertesAffichage";
 import { validerProfilPourEcriture } from "./lib/coherenceProfil";
 
 const dateDuJour = new Date().toISOString().slice(0, 10);
@@ -164,6 +165,10 @@ export default function App() {
   const perimetre = profilHorsPerimetre(profil);
   const contradictionHorsA10 = perimetre.motif === "salaires_hors_a10_contradictoires";
   const bandeauContradiction = contradictionHorsA10 ? <AvertissementContradictionHorsA10 onAllerVersProfil={() => setOnglet("profil")} /> : null;
+  // Le tableau de bord est le seul écran où le centre d'alertes et le bandeau coexistent : sans ce
+  // filtrage, la contradiction y serait écrite deux fois de suite (cf. lib/alertesAffichage.ts).
+  // L'alerte reste comptée par AlertCenterResume ci-dessous, sur tous les onglets.
+  const centreAlertes = centreAlertesPourEcran(calculs?.alertes ?? [], contradictionHorsA10);
 
   return (
     <div className="min-h-screen">
@@ -223,7 +228,7 @@ export default function App() {
             <DashboardVide onAllerVersContrats={() => setOnglet("contrats")} />
           ) : (
             <>
-              <AlertCenter alertes={calculs.alertes} />
+              {centreAlertes.afficherCentre && <AlertCenter alertes={centreAlertes.alertes} />}
               {bandeauContradiction}
               <Dashboard
                 montantsNonFiables={contradictionHorsA10}

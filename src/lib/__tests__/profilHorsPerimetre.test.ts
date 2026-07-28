@@ -94,6 +94,31 @@ describe("profilHorsPerimetre — contradiction salaires hors Annexe 10", () => 
     expect(p.regimeDeclare).toBeUndefined();
     expect(profilHorsPerimetre(p).motif).toBe("salaires_hors_a10_contradictoires");
   });
+
+  // `situation` écrit EXPLICITEMENT dans les deux cas : la fabrique `profil()` vaut
+  // "premiere_admission" par défaut, donc les tests ci-dessus couvraient déjà ce cas sans le dire —
+  // un lecteur ne pouvait pas le savoir sans ouvrir testUtils.ts, et un changement de défaut aurait
+  // silencieusement fait perdre la couverture. Le champ `salairesHorsAnnexe10PRA` est resté longtemps
+  // inatteignable en première admission depuis l'UI (il vivait dans une section réservée à la
+  // réadmission, cf. MonProfil.tsx) : la règle, elle, n'a jamais dépendu de `situation`.
+  it("contradiction détectée en PREMIÈRE ADMISSION (la règle ne dépend pas de `situation`)", () => {
+    const s = profilHorsPerimetre(profil({ situation: "premiere_admission", regimeDeclare: "annexe10_pur", salairesHorsAnnexe10PRA: 8000 }));
+    expect(s.horsPerimetre).toBe(true);
+    expect(s.motif).toBe("salaires_hors_a10_contradictoires");
+    expect(s.bloquant).toBe(false);
+  });
+
+  it("contradiction détectée en RÉADMISSION, exactement au même titre", () => {
+    const premiereAdmission = profilHorsPerimetre(profil({ situation: "premiere_admission", regimeDeclare: "annexe10_pur", salairesHorsAnnexe10PRA: 8000 }));
+    const readmission = profilHorsPerimetre(profil({ situation: "readmission", regimeDeclare: "annexe10_pur", salairesHorsAnnexe10PRA: 8000 }));
+    expect(readmission).toEqual(premiereAdmission);
+  });
+
+  it("anti-faux-positif conservé dans les deux situations : 0 € ne déclenche rien", () => {
+    for (const situation of ["premiere_admission", "readmission"] as const) {
+      expect(profilHorsPerimetre(profil({ situation, regimeDeclare: "annexe10_pur", salairesHorsAnnexe10PRA: 0 })).horsPerimetre).toBe(false);
+    }
+  });
 });
 
 describe("perimetreBloquant", () => {

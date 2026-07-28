@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { estPerime, franceTravailConfig, joursDepuisMiseAJourConfig } from "../config/franceTravailConfig";
 import { EMAIL_FEEDBACK, construireLienFeedback } from "../config/contact";
-import { regimeEffectif } from "../lib/profilHorsPerimetre";
+import { profilHorsPerimetre, regimeEffectif } from "../lib/profilHorsPerimetre";
+import { CONTRADICTION_HORS_A10 } from "../content/contradictionHorsA10";
 import { validerCoherenceProfil } from "../lib/coherenceProfil";
 import type { ResultatEcritureProfil } from "../lib/coherenceProfil";
 import type { Profil } from "../types";
@@ -207,6 +208,8 @@ export function MonProfil({ dateDuJour, profil, onModifierProfil }: MonProfilPro
           {regime !== "annexe10_pur" && (
             <p className="text-xs text-amber mt-2">Tant que c'est signalé, le tableau de bord, l'historique et le simulateur n'affichent aucune estimation.</p>
           )}
+
+          <SalairesHorsAnnexe10 profil={profil} onModifierProfil={onModifierProfil} />
         </div>
       </section>
 
@@ -245,7 +248,7 @@ export function MonProfil({ dateDuJour, profil, onModifierProfil }: MonProfilPro
           <li>Les alertes sont calculées à l'ouverture de l'app, pas envoyées de façon proactive (pas de backend).</li>
           <li>
             La franchise salaires est calculée selon la formule officielle (guide France Travail, page 14). Si tu n'as eu que des contrats Annexe 10, le calcul est complet. Si tu avais aussi des
-            contrats hors spectacle, renseigne le champ ci-dessus pour affiner.
+            contrats hors spectacle, renseigne le champ «&nbsp;Salaires hors Annexe 10 sur la période de référence&nbsp;» ci-dessus pour affiner.
           </li>
         </ul>
       </section>
@@ -262,6 +265,84 @@ export function MonProfil({ dateDuJour, profil, onModifierProfil }: MonProfilPro
   );
 }
 
+// Salaires perçus hors Annexe 10 sur la période de référence (Profil.salairesHorsAnnexe10PRA).
+//
+// Vit ici, dans la carte du régime déclaré, et NON dans « Mon indemnisation en cours » où il se
+// trouvait jusqu'au 2026-07-28 : cette section-là est réservée aux profils en réadmission, si bien
+// que le champ était inatteignable en première admission — un profil en première admission ne
+// pouvait créer la contradiction (et donc en être averti) que par import JSON manuel. Aucune raison
+// métier ne le limitait à la réadmission : ni `calculerFranchiseSalaires`
+// (engine/indemnisationMensuelle.ts) ni `profilHorsPerimetre` ne regardent `profil.situation`, et
+// contrairement à `dateAnniversairePrecedente`, le type ne le déclare pas propre à la réadmission
+// (cf. types/index.ts). C'était un effet de bord de son emplacement.
+//
+// Sa place ici est aussi la bonne pour l'utilisateur : les DEUX moitiés de la contradiction (le
+// régime déclaré juste au-dessus, ce montant) sont désormais côte à côte, ce que le bandeau promet
+// précisément (« corriger l'une des deux »).
+//
+// Formulaire à part avec son propre bouton, pour deux raisons : les trois boutons de régime
+// enregistrent au clic (rien à valider), et le champ ne doit surtout PAS être écrit à deux endroits
+// à la fois — deux `useState` initialisés au montage sur la même donnée, et le formulaire enregistré
+// en second réécrirait sa valeur périmée par-dessus l'autre.
+function SalairesHorsAnnexe10({ profil, onModifierProfil }: { profil: Profil; onModifierProfil: OnModifierProfil }) {
+  const enregistre = profil.salairesHorsAnnexe10PRA?.toString() ?? "";
+  const [saisie, setSaisie] = useState(enregistre);
+  const [erreur, setErreur] = useState<string | null>(null);
+
+  const modifie = saisie.trim() !== enregistre;
+  // Même règle que le bandeau et l'alerte, lue à sa source unique — jamais un second `> 0` recopié.
+  const contradiction = profilHorsPerimetre(profil).motif === "salaires_hors_a10_contradictoires";
+
+  function enregistrer() {
+    if (!modifie) return;
+    const vide = saisie.trim() === "";
+    const valeur = vide ? null : Number(saisie);
+    if (valeur !== null && !Number.isFinite(valeur)) {
+      setErreur("Montant illisible : saisis un nombre, ou laisse le champ vide.");
+      return;
+    }
+    const resultat = onModifierProfil({ ...profil, salairesHorsAnnexe10PRA: valeur });
+    setErreur(resultat.ok ? null : resultat.erreur);
+  }
+
+  return (
+    <div className="border-t border-line mt-5 pt-5">
+      <label className="block text-xs uppercase tracking-[.03em] text-muted mb-2" htmlFor="profil-salaires-hors-a10">
+        Salaires hors Annexe 10 sur la période de référence (€)
+      </label>
+      {contradiction && (
+        <p className="inline-flex items-center gap-2 text-xs font-medium px-2.5 py-1 mb-2 rounded-full bg-red/15 text-red">
+          <span aria-hidden>●</span>
+          {CONTRADICTION_HORS_A10.titre}
+        </p>
+      )}
+      <input
+        id="profil-salaires-hors-a10"
+        type="number"
+        min={0}
+        placeholder="0 si tu n'as eu que des contrats spectacle"
+        value={saisie}
+        onChange={(e) => {
+          setSaisie(e.target.value);
+          setErreur(null);
+        }}
+        className={`w-full bg-surface-2 border rounded-lg px-3 py-2 text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-mint ${contradiction ? "border-red/40" : "border-line"}`}
+      />
+      <p className="text-xs text-faint mt-1">
+        Salaires bruts totaux des contrats hors spectacle (régime général, Annexe 8…) sur ta période de référence. Laisse vide si tu n'en as pas eu. Sert au calcul de la franchise salaires.
+      </p>
+      {erreur && <p className="text-xs text-red mt-2">{erreur}</p>}
+      <button
+        onClick={enregistrer}
+        disabled={!modifie}
+        className="mt-3 w-full bg-mint text-bg font-medium rounded-lg py-2 disabled:opacity-40 disabled:cursor-not-allowed transition-opacity"
+      >
+        Enregistrer
+      </button>
+    </div>
+  );
+}
+
 // Paramètres de l'ouverture de droits en cours (Profil.ouvertureDroits) + historique d'AJ réelle
 // (Profil.ajReelleHistorique, déplacé ici depuis RevenusMensuels.tsx le 2026-07-25 : c'est une
 // caractéristique de l'ouverture de droits, pas du point de départ d'affichage du tableau mensuel).
@@ -273,11 +354,13 @@ function MonIndemnisationEnCours({ profil, onModifierProfil }: { profil: Profil;
   const [delaiAttenteInitial, setDelaiAttenteInitial] = useState(ouverture?.delaiAttenteInitial ?? 7);
   const [dateLimiteIndemnisation, setDateLimiteIndemnisation] = useState(ouverture?.dateLimiteIndemnisation ?? "");
   const [tauxPrelevementSource, setTauxPrelevementSource] = useState(ouverture?.tauxPrelevementSource?.toString() ?? "");
-  // dureeDroitsMois/salairesHorsAnnexe10PRA vivent sur Profil, pas ouvertureDroits (cf.
-  // types/index.ts) — composantes de la franchise salaires, connues indépendamment de la
-  // notification d'ouverture de droits elle-même.
+  // dureeDroitsMois vit sur Profil, pas ouvertureDroits (cf. types/index.ts) — composante de la
+  // franchise salaires, connue indépendamment de la notification d'ouverture de droits elle-même.
+  // L'autre composante, salairesHorsAnnexe10PRA, a quitté cette section le 2026-07-28 : elle est
+  // désormais saisie dans la carte du régime déclaré, atteignable en première admission comme en
+  // réadmission (cf. SalairesHorsAnnexe10 ci-dessus). Ne PAS la réintroduire ici : le `...profil`
+  // ci-dessous en préserve la valeur, alors qu'un second état local finirait par l'écraser.
   const [dureeDroitsMois, setDureeDroitsMois] = useState(profil.dureeDroitsMois?.toString() ?? "");
-  const [salairesHorsAnnexe10PRA, setSalairesHorsAnnexe10PRA] = useState(profil.salairesHorsAnnexe10PRA?.toString() ?? "");
   const [erreur, setErreur] = useState<string | null>(null);
 
   function enregistrer() {
@@ -286,7 +369,6 @@ function MonIndemnisationEnCours({ profil, onModifierProfil }: { profil: Profil;
     const resultat = onModifierProfil({
       ...profil,
       dureeDroitsMois: dureeDroitsMois === "" ? undefined : (Number(dureeDroitsMois) as 12 | 6),
-      salairesHorsAnnexe10PRA: salairesHorsAnnexe10PRA.trim() === "" ? null : Number(salairesHorsAnnexe10PRA),
       ouvertureDroits: {
         dateOuverture,
         franchiseCPTotale,
@@ -387,22 +469,6 @@ function MonIndemnisationEnCours({ profil, onModifierProfil }: { profil: Profil;
             <option value="6">6 mois (clause de rattrapage)</option>
           </select>
           <p className="text-xs text-faint mt-1">Indiqué dans ta notification France Travail. Standard = 12 mois. Clause de rattrapage = 6 mois.</p>
-        </div>
-
-        <div>
-          <label className="block text-xs uppercase tracking-[.03em] text-muted mb-2" htmlFor="profil-salaires-hors-a10">
-            Salaires hors Annexe 10 sur la période de référence (€)
-          </label>
-          <input
-            id="profil-salaires-hors-a10"
-            type="number"
-            min={0}
-            placeholder="0 si tu n'as eu que des contrats spectacle"
-            value={salairesHorsAnnexe10PRA}
-            onChange={(e) => setSalairesHorsAnnexe10PRA(e.target.value)}
-            className="w-full bg-surface-2 border border-line rounded-lg px-3 py-2 text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-mint"
-          />
-          <p className="text-xs text-faint mt-1">Salaires bruts totaux des contrats hors spectacle (régime général, Annexe 8…) sur ta période de référence. Laisse vide si tu n'en as pas eu.</p>
         </div>
 
         <div>
