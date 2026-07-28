@@ -720,9 +720,11 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
   gros sera rejeté par la plateforme avant d'atteindre le code, sans message compréhensible pour
   l'utilisateur. **Non prouvé** : rien de tout ça n'a été exécuté sur Vercel, aucun déploiement n'a eu
   lieu.
-- 🔶 **`d3ebb36` n'est PAS fusionné dans `master`** — `master` est resté sur `2721778`. Tout le
-  chantier import IA (backend `59d129f` + écran de revue `d3ebb36`) vit sur la branche
-  `backend-api-import-ia`. Fusion à décider explicitement, pas encore faite.
+- 🔶 **RIEN du chantier import IA n'est fusionné dans `master`** — `master` est resté sur `2721778`.
+  Tout vit sur la branche `backend-api-import-ia`, dans cet ordre : `59d129f` (backend minimal),
+  `d3ebb36` (écran de revue sur fixtures), `45a54e1` + `362bbfd` (doc), `ecca2c8` (consentement),
+  `d4906d5` (point d'entrée réel), `4c6cebb` (prompt éprouvé + descriptions de schéma).
+  Fusion à décider explicitement, pas encore faite.
 - ✅ **`document_annotation_prompt` éprouvé sur documents réels (29/07/2026)** — le prompt d'extraction
   de `api/extract-document.ts` n'est plus une supposition : il a été mis au point par essais successifs
   dans le Document AI Playground de Mistral, sur **deux documents réels de Benoît** (une notification
@@ -797,17 +799,71 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
   Si l'on passe un jour sur une clé payante (~1 centime/document), **c'est cette mention qu'il faut
   corriger en premier** : annoncer un entraînement qui n'a plus lieu serait aussi faux que taire
   celui qui a lieu (devoir n°2, dans les deux sens).
+- ✅ **Consentement avant tout envoi + point d'entrée réel de l'import IA (29/07/2026, commits
+  `ecca2c8` puis `d4906d5`)** — le chemin est désormais complet et en ligne droite :
+  **dépôt → contrôles locaux → CONSENTEMENT → envoi → revue**. Pièces : `content/mentionEnvoiIA.ts`
+  (le texte, source unique, testé mot pour mot), `components/ConsentementEnvoiIA.tsx` (modale
+  bloquante, calquée sur `ConfirmationImport.tsx`), `lib/fichierImportIA.ts` (contrôles + base64),
+  `lib/extraireDocumentIA.ts` (l'appel réseau), `components/ImportDocumentIA.tsx` (le point d'entrée,
+  monté dans l'onglet « Import PDF » à côté du canal local, qui reste intouché).
+  **La garantie tient par construction, pas par discipline** : `extraireDocumentIA` n'est appelé
+  qu'à UN endroit du projet — le gestionnaire du bouton « Envoyer ce document » de la modale. Tant
+  que ce bouton n'est pas cliqué, zéro octet ne part (vérifié dans le navigateur : « Annuler »
+  produit zéro requête). Modale bloquante à CHAQUE envoi, **sans case « ne plus afficher »** : une
+  telle case recréerait le consentement unique en petits caractères que la décision du 28/07 exclut.
+  **Choix assumé : pas de réessai automatique.** En cas d'échec le fichier est oublié ; reprendre
+  passe par un nouveau dépôt, donc par un nouveau consentement. Un bouton « Réessayer » renverrait
+  le document sans repasser par la mention.
+  **Contrôles locaux avant la modale** (format PDF, non vide, ≤ 3 Mo) : refuser tôt ce qui
+  échouerait de toute façon, plutôt que faire consentir à un envoi condamné. Le plafond vient du
+  corps de requête Edge (~4 Mo) et du gonflement base64 d'un tiers. Le type MIME absent retombe sur
+  l'extension, mais l'extension ne l'emporte jamais sur un type qui dit autre chose.
+  **Deux fuites d'information corrigées** dans `extraireDocumentIA`, trouvées en relisant le chemin
+  ligne à ligne (le test du 404 passait, mais par chance) : `fetch` qui rejette affichait
+  « Failed to fetch », et un 200 dont le corps n'est pas du JSON affichait « Unexpected token '<' ».
+  Un 504 de proxy pouvait aussi révéler une adresse interne. Corrigé par liste blanche de statuts
+  (seul le 503 « clé absente » voit son message réaffiché, car « réessaie » y serait trompeur) plus
+  rejet de tout corps contenant des chevrons. Aucun de ces défauts n'a existé dans une version
+  livrée. Nuance de formulation conservée : le message de coupure réseau **ne prétend pas** que le
+  document n'a pas été transmis — une coupure peut survenir après l'envoi du corps.
+  Le bouton d'aperçu de la modale a été retiré de `RevueExtractionDemo.tsx` : une seule porte vers
+  la modale, et le vrai chemin est déjà sans danger à exercer en local.
+  **408 tests verts** (372 avant ces deux commits), `npm run typecheck` propre, `npm run build` OK.
+  ⚠️ **Aucun document ne peut partir en local** : `vite dev` ne sert pas les fonctions Vercel, donc
+  `POST /api/extract-document` répond 404. Un envoi réel exige un déploiement Vercel avec la clé.
+  Le code est prêt, le robinet n'est pas ouvert.
+- 🔶 **Risque introduit avec le lexique du prompt, non corrigé : `etablissementAgree`.** Le lexique
+  cite « nom d'un établissement d'enseignement » comme marqueur d'activité pour
+  `contrat.type = "enseignement"`. Rien n'empêche le modèle d'enchaîner et de renseigner
+  `etablissementAgree: true` du seul fait qu'un établissement est nommé — alors qu'« agréé » est un
+  statut administratif précis, presque jamais écrit sur un bulletin, et que ce champ conditionne la
+  prise en compte des heures d'enseignement. Les `.describe()` de `etablissementAgree` et
+  `enRapportAvecMetier` sont aujourd'hui **neutres** (« Uniquement pertinent si type = enseignement ») :
+  ils n'ont pas le défaut corrigé sur `contrat.type`, mais ils ne protègent pas contre cette
+  déduction. À durcir d'une ligne (« ne jamais déduire l'agrément de la seule présence d'un nom
+  d'établissement ») quand un document d'enseignement réel sera disponible pour tester.
+- 🔶 **Deux affirmations du texte affiché à l'utilisateur ne sont pas vérifiées.** La mention de
+  consentement dit « Mistral AI (France, **hébergement UE**) » : personne n'a vérifié cette
+  affirmation dans les sessions qui l'ont écrite. Et l'usage des documents pour l'entraînement sur le
+  tier gratuit a été établi **par Benoît** (recherche web, 28/07/2026), non re-vérifié depuis. Ce sont
+  les deux phrases sur lesquelles un utilisateur décide s'il confie sa fiche de paie : à confirmer
+  avant d'ouvrir le canal à d'autres personnes que Benoît.
 
-**Prochaine action (chantier import IA)** : brancher `POST /api/extract-document` derrière l'écran de
-revue, qui est prêt et éprouvé sur fixtures (cf. `d3ebb36`). Deux prérequis **avant** tout document
-réel, même un test personnel : (1) la mention utilisateur affichée de façon **bloquante avant chaque
-envoi** — contrepartie de la décision du 28/07/2026 de rester sur le tier gratuit, cf. l'entrée ✅
-correspondante ci-dessus ; le DPA Mistral n'est **plus** un prérequis, cette lecture est périmée ;
-(2) corriger le brouillon
-`docs/files/ImportDocumentIA.jsx`, qui appelle Mistral directement depuis le navigateur avec la clé
-dans un `<input>` (cf. le 🔴 plus haut) — il doit appeler l'endpoint et ne jamais connaître la clé.
-Chantier indépendant utile en attendant : le CRUD des périodes assimilées (cf. la dette 🔴 ci-dessus),
-qui débloquerait la cible `periode_assimilee` de l'extraction.
+**Prochaine action (chantier import IA)** : **aligner le dialecte du schéma JSON envoyé à Mistral,
+puis faire le premier appel réel.** Concrètement : dans `api/extract-document.ts`, remplacer
+`zodToJsonSchema(extractionResultSchema, { target: "openApi3" })` par la forme qui a réellement
+fonctionné au Playground, soit `{ $refStrategy: "none" }` (JSON Schema draft-07, sans `$ref` interne
+ni `nullable` non standard) — cf. l'entrée 🔶 « Le schéma envoyé par l'app n'est pas celui qui a été
+testé ». C'est le seul segment du chemin que rien n'a encore validé, et le candidat le plus probable
+à un échec au premier envoi alors que tout marchait au Playground.
+Le reste du chemin est prêt et éprouvé : dépôt → contrôles → consentement → envoi → revue
+(`ecca2c8`, `d4906d5`), prompt et lexique validés sur documents réels (`4c6cebb`). Il n'y a plus de
+prérequis bloquant : la mention utilisateur existe et est bloquante, et le DPA n'en est plus un
+(décision du 28/07, lecture périmée à ne plus ressortir).
+Restent à faire, sans ordre imposé : corriger le brouillon `docs/files/ImportDocumentIA.jsx` qui
+appelle Mistral directement depuis le navigateur avec la clé dans un `<input>` (cf. le 🔴 plus haut) ;
+le CRUD des périodes assimilées, qui débloquerait la cible `periode_assimilee` (cf. la dette 🔴) ;
+vérifier les deux affirmations du texte de consentement (cf. le 🔶 correspondant).
 
 **Prochaines pistes** : voir les deux points 🔴 juste au-dessus (dette `PeriodeAssimilee` sans chemin
 d'écriture, bloquant DPA Mistral) et `docs/reprise.md` pour le détail. Chantier ouvert restant sur la franchise
