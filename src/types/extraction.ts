@@ -78,7 +78,21 @@ export const propositionContratSchema = z.object({
     nbJoursEEE: z.number().nullable().describe("Uniquement si territoire = eee_suisse_uk"),
     salaireBrut: z.number().describe("€ bruts AVANT abattement frais professionnels"),
     employeur: z.string(),
-    etablissementAgree: z.boolean().nullable().describe("Uniquement pertinent si type = enseignement"),
+    etablissementAgree: z
+      .boolean()
+      .nullable()
+      .describe(
+        "Uniquement pertinent si type = enseignement. NE JAMAIS DÉDUIRE true DE LA SEULE PRÉSENCE " +
+          "D'UN NOM D'ÉTABLISSEMENT D'ENSEIGNEMENT. « Agréé » est un statut administratif précis, " +
+          "presque jamais écrit noir sur blanc sur un bulletin de paie. Ne mets true QUE si le mot " +
+          "« agréé » ou « agrément » (ou une mention explicite équivalente, ex. « établissement agréé " +
+          "par l'État ») figure LITTÉRALEMENT dans le document à propos de cet établissement. Un nom " +
+          "seul — « Conservatoire à rayonnement régional de X », « École de musique Y », « Académie " +
+          "Z », un collège, une université — est un NOM, pas un agrément : null. Sans mention " +
+          "littérale du mot, null est la BONNE réponse et non un échec. Motif : ce champ conditionne " +
+          "(avec enRapportAvecMetier) la prise en compte des heures d'enseignement dans les 507 h — " +
+          "un true inventé gonflerait le décompte et afficherait un feu vert que l'utilisateur n'a pas."
+      ),
     enRapportAvecMetier: z.boolean().nullable().describe("Uniquement pertinent si type = enseignement"),
   }),
   confiance: z.record(niveauConfiance),

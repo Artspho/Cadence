@@ -170,6 +170,18 @@ BULLETIN DE PAIE / AEM
   contrat.territoire : laisse null sauf mention explicite d'un pays ou d'une zone. Un bulletin ne
   l'indique presque jamais — null est ici la BONNE réponse, pas un échec.
 
+  contrat.etablissementAgree — NE JAMAIS DÉDUIRE true DE LA SEULE PRÉSENCE D'UN NOM D'ÉTABLISSEMENT
+  D'ENSEIGNEMENT. « Agréé » est un statut administratif précis, presque jamais écrit noir sur blanc
+  sur un bulletin de paie. Ne mets true QUE si le mot « agréé » ou « agrément » (ou une mention
+  explicite équivalente, ex. « établissement agréé par l'État ») figure LITTÉRALEMENT dans le
+  document à propos de cet établissement.
+     • « Conservatoire à rayonnement régional de X », « École de musique Y », « Académie Z », un nom
+       de collège ou d'université : ce sont des NOMS, pas des agréments → null.
+     • Le mot n'apparaît pas → null. Ce null est la BONNE réponse, pas un échec.
+  Motif : ce champ conditionne (avec enRapportAvecMetier) la prise en compte des heures
+  d'enseignement dans les 507 h. Un true inventé y ferait entrer des heures qui n'y ont pas droit —
+  donc un compteur 507 h trop élevé, et un feu vert que l'utilisateur n'a pas.
+
 ════════ QUATRE ERREURS OBSERVÉES, À NE PAS REFAIRE ════════
 
 CAS 1 — allocation rangée au mauvais endroit
