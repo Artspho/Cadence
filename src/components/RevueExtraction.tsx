@@ -16,6 +16,7 @@ import { useState } from "react";
 import type { Contrat, DecompteHeuresResultat, Profil } from "../types";
 import type { ExtractionResult, Proposition } from "../types/extraction";
 import type { FranceTravailConfig } from "../config/franceTravailConfig";
+import { RAPPEL_DOCUMENT_ENVOYE } from "../content/mentionEnvoiIA";
 import type { ResultatEcritureProfil } from "../lib/coherenceProfil";
 import { contratDepuisProposition, evaluerExtraction, profilAvecProposition, type PropositionEvaluee, type StatutProposition } from "../lib/routageExtraction";
 import { ContractForm } from "./ContractForm";
@@ -29,6 +30,15 @@ interface RevueExtractionProps {
   onModifierProfil: (profil: Profil) => ResultatEcritureProfil;
   /** Bandeau affiché au-dessus de tout (ex. avertissement « extraction simulée » en développement). */
   bandeau?: React.ReactNode;
+  /**
+   * Vrai uniquement si ce résultat vient d'un document réellement envoyé au serveur. Affiche alors un
+   * rappel discret de l'envoi et de son destinataire — la mention principale, elle, a été montrée
+   * AVANT l'envoi (`ConsentementEnvoiIA.tsx`), pas ici : à ce stade il serait trop tard pour décider.
+   *
+   * Faux/absent pour une extraction simulée : écrire « ce document a été envoyé » alors que rien
+   * n'est parti serait une phrase fausse, quand bien même elle serait rassurante (devoir n°2).
+   */
+  documentEnvoye?: boolean;
 }
 
 type EtatCarte = "en_attente" | "applique" | "ecarte";
@@ -138,7 +148,7 @@ function formaterValeur(valeur: unknown): { texte: string; nonLu: boolean } {
   return { texte: String(valeur), nonLu: false };
 }
 
-export function RevueExtraction({ resultat, profil, config, decompteActuel, onAjouterContrat, onModifierProfil, bandeau }: RevueExtractionProps) {
+export function RevueExtraction({ resultat, profil, config, decompteActuel, onAjouterContrat, onModifierProfil, bandeau, documentEnvoye = false }: RevueExtractionProps) {
   const evaluees = evaluerExtraction(resultat);
   const [etats, setEtats] = useState<Record<number, EtatCarte>>({});
   const [erreurs, setErreurs] = useState<Record<number, string>>({});
@@ -189,6 +199,7 @@ export function RevueExtraction({ resultat, profil, config, decompteActuel, onAj
           Rien n'est enregistré tant que tu ne valides pas chaque proposition, une par une. Une extraction automatique peut se tromper : ce qui fait
           foi reste le document que tu as sous les yeux.
         </p>
+        {documentEnvoye && <p className="text-xs text-faint leading-relaxed border-t border-line pt-3">{RAPPEL_DOCUMENT_ENVOYE}</p>}
         {resultat.avertissementsGeneraux.length > 0 && (
           <ul className="text-sm text-amber space-y-1.5 border-t border-line pt-3">
             {resultat.avertissementsGeneraux.map((a, i) => (

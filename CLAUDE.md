@@ -723,16 +723,33 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 - 🔶 **`d3ebb36` n'est PAS fusionné dans `master`** — `master` est resté sur `2721778`. Tout le
   chantier import IA (backend `59d129f` + écran de revue `d3ebb36`) vit sur la branche
   `backend-api-import-ia`. Fusion à décider explicitement, pas encore faite.
-- 🔴 **Bloquant inchangé : aucun document réel tant que le DPA Mistral n'est pas vérifié/signé.** Tout
-  ce qui précède tourne sur des fixtures en dur, par construction. Le non-entraînement sur les données
-  du tier gratuit « Experiment » n'est **pas** confirmé (l'engagement contractuel trouvé est rattaché
-  aux abonnements payants) — à vérifier dans la console Mistral, sinon passer sur une clé payante
-  (~1 centime/document) avant le moindre document, y compris un test personnel.
+- ✅ **Décision produit assumée (28/07/2026, Benoît) : on reste sur le tier gratuit Mistral
+  « Experiment », où les documents envoyés PEUVENT servir à l'entraînement des modèles.** Ce n'était
+  auparavant listé ici que comme un **blocage** (« aucun document réel tant que le DPA Mistral n'est
+  pas vérifié/signé ») : cette lecture est **périmée, ne plus la ressortir**. C'est un arbitrage
+  explicite — la gratuité du canal IA contre cette contrepartie — et non un oubli ni un point resté
+  en suspens. Fait établi par recherche web sur la documentation officielle Mistral le 28/07/2026
+  (l'engagement de non-entraînement est rattaché aux offres payantes, pas au tier gratuit) ;
+  vérification faite **par Benoît**, pas re-vérifiée dans la session qui a écrit cette entrée — à
+  reconfirmer si les conditions de Mistral bougent, puisque c'est le texte affiché à l'utilisateur
+  qui deviendrait faux. **La contrepartie de la décision, non négociable : la mention doit être dite
+  à l'utilisateur en clair, dans l'UI, AVANT tout envoi — jamais dans des CGU cachées ni en petits
+  caractères après coup.** Texte exact retenu, à ne pas reformuler sans décision explicite :
+  > Import assisté par IA (Mistral) — ce document est envoyé aux serveurs de Mistral AI (France,
+  > hébergement UE) pour lecture automatique. Sur l'offre que nous utilisons actuellement, Mistral
+  > peut utiliser ce document pour entraîner ses modèles d'IA. Si tu préfères l'éviter, la saisie
+  > manuelle reste gratuite et ne quitte jamais ton appareil.
+
+  Si l'on passe un jour sur une clé payante (~1 centime/document), **c'est cette mention qu'il faut
+  corriger en premier** : annoncer un entraînement qui n'a plus lieu serait aussi faux que taire
+  celui qui a lieu (devoir n°2, dans les deux sens).
 
 **Prochaine action (chantier import IA)** : brancher `POST /api/extract-document` derrière l'écran de
 revue, qui est prêt et éprouvé sur fixtures (cf. `d3ebb36`). Deux prérequis **avant** tout document
-réel, même un test personnel : (1) DPA Mistral vérifié/signé et non-entraînement du tier gratuit
-« Experiment » confirmé dans la console, sinon clé payante ; (2) corriger le brouillon
+réel, même un test personnel : (1) la mention utilisateur affichée de façon **bloquante avant chaque
+envoi** — contrepartie de la décision du 28/07/2026 de rester sur le tier gratuit, cf. l'entrée ✅
+correspondante ci-dessus ; le DPA Mistral n'est **plus** un prérequis, cette lecture est périmée ;
+(2) corriger le brouillon
 `docs/files/ImportDocumentIA.jsx`, qui appelle Mistral directement depuis le navigateur avec la clé
 dans un `<input>` (cf. le 🔴 plus haut) — il doit appeler l'endpoint et ne jamais connaître la clé.
 Chantier indépendant utile en attendant : le CRUD des périodes assimilées (cf. la dette 🔴 ci-dessus),

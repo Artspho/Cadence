@@ -61,9 +61,16 @@ export function ImportBulletins({ profil, config, decompteActuel, onImporterCont
 
   return (
     <div className="space-y-6">
+      {/* La portée de cette promesse est volontairement explicite (« cet import-ci »). Formulée en
+          absolu (« aucun bulletin n'est envoyé sur un serveur »), elle devenait trompeuse dès qu'un
+          canal d'import assisté par IA — qui, lui, envoie le document — cohabiterait dans le même
+          onglet : l'utilisateur aurait lu une garantie générale là où elle ne vaut que pour ce
+          canal-ci. Le canal IA porte sa propre mention, bloquante et avant tout envoi
+          (`ConsentementEnvoiIA.tsx`). */}
       <p className="text-xs text-faint bg-surface-2 border border-line rounded-lg px-4 py-2.5">
-        Traitement 100 % local dans ton navigateur — aucun bulletin n'est envoyé sur un serveur. Rappel : la pièce qui fait foi auprès de France Travail est l'AEM, pas le bulletin de paie ; cet
-        import sert uniquement à ton suivi personnel.
+        Cet import-ci est traité 100 % localement dans ton navigateur : le bulletin que tu déposes ci-dessous ne quitte jamais ton appareil. (L'import
+        assisté par IA, lui, envoie le document à un serveur — il te le dit explicitement et te demande ton accord avant chaque envoi.) Rappel : la
+        pièce qui fait foi auprès de France Travail est l'AEM, pas le bulletin de paie ; cet import sert uniquement à ton suivi personnel.
       </p>
 
       {!extrait && (
