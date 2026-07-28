@@ -270,7 +270,43 @@ export async function extractDocument(pdfBase64: string): Promise<ExtractionResu
     );
   }
 
-  const schema = zodToJsonSchema(extractionResultSchema, { target: "openApi3" });
+  // Dialecte JSON Schema draft-07, sans `$ref` interne.
+  //
+  // Pourquoi cette forme : `{ target: "openApi3" }` (la forme d'avant) produit un
+  // dialecte OpenAPI 3 avec deux écarts au JSON Schema standard — 19 nullables
+  // écrits `"nullable": true`, et 5 `$ref` vers le pointeur profond
+  // `#/properties/propositions/items/anyOf/0/properties/confiance/additionalProperties`,
+  // que tous les validateurs ne résolvent pas.
+  //
+  // VÉRIFIÉ — comparaison exhaustive des deux schémas générés (29/07/2026) :
+  //   • 22 descriptions avant, 22 après, contenus rigoureusement identiques ;
+  //   • 55 champs obligatoires avant, 55 après, listes rigoureusement identiques,
+  //     et aucun champ ne devient obligatoire ;
+  //   • la nullabilité n'est pas perdue, elle est réécrite en branche `null` explicite
+  //     (`["boolean","null"]`, ou `anyOf[…, { type: "null" }]` pour les enums).
+  //   Ce changement ne perd donc aucune information.
+  //
+  // VÉRIFIÉ — appel réel à l'API Mistral (29/07/2026, PDF bidon sans aucune donnée
+  // personnelle, les deux dialectes envoyés tour à tour) : statut 200 dans les DEUX
+  // cas, et comportement identique (typeDocumentDetecte "non_reconnu", 0 proposition).
+  // Les trois points qui restaient en doute sont donc levés : Mistral accepte la clé
+  // racine `$schema`, le `const` sur le discriminant `cible` (là où openApi3 écrivait
+  // `enum: ["contrat"]`), et les `additionalProperties` libres (`confiance`,
+  // `info_seule.donnees`).
+  //
+  // À ne pas se raconter pour autant : ce changement n'a RIEN réparé. La forme
+  // openApi3 était acceptée elle aussi, et la crainte d'un rejet au premier envoi —
+  // héritée des notes du 28/07 — ne s'est pas matérialisée. On garde draft-07 parce
+  // que c'est du JSON Schema standard : lisible par n'importe quel validateur, et
+  // moins exposé si Mistral durcit un jour sa validation. Pas parce que l'autre
+  // forme cassait quelque chose.
+  //
+  // ⚠️ CE QUI RESTE NON VÉRIFIÉ, et qui est ailleurs : le comportement de ce chemin
+  // sur de VRAIS documents. Le prompt et le lexique ont été mis au point dans le
+  // Playground, et l'appel via l'app n'a été éprouvé que sur un PDF absurde, dont la
+  // bonne réponse était « rien à proposer ». Le premier document réel sera la
+  // première vraie épreuve du couple prompt + schéma.
+  const schema = zodToJsonSchema(extractionResultSchema, { $refStrategy: "none" });
 
   const response = await fetch("https://api.mistral.ai/v1/ocr", {
     method: "POST",
