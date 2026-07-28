@@ -213,7 +213,7 @@ export function MonProfil({ dateDuJour, profil, onModifierProfil }: MonProfilPro
         </div>
       </section>
 
-      {profil.situation === "readmission" && <MonIndemnisationEnCours profil={profil} onModifierProfil={onModifierProfil} />}
+      <MonIndemnisationEnCours profil={profil} onModifierProfil={onModifierProfil} />
 
       <div className={`rounded-card border p-5 text-sm ${perime ? "border-amber/30 bg-amber/5 text-amber" : "border-line bg-surface text-muted"}`}>
         {perime && (
@@ -386,12 +386,24 @@ function MonIndemnisationEnCours({ profil, onModifierProfil }: { profil: Profil;
 
   return (
     <section>
-      <h2 className="font-display text-lg font-medium mb-2">Mon indemnisation en cours</h2>
-      <div className="bg-surface border border-line rounded-card p-5 space-y-5">
-        <p className="text-sm text-muted">
-          Ces informations figurent sur ta notification d'ouverture de droits France Travail. Tu peux la retrouver dans ton espace personnel francetravail.fr → « Mes paiements » → « Mes
-          notifications ».
-        </p>
+      {/* Repliée tant qu'aucune notification n'est saisie, dépliée dès qu'il y en a une. La section
+          n'est PLUS conditionnée à `situation === "readmission"` (2026-07-28) : un premier admis qui
+          vient d'ouvrir ses premiers droits a exactement la même notification à saisir, et en était
+          privé — ainsi que de tout l'onglet « Revenus mensuels » qui en dépend. Le gating ne peut pas
+          porter sur `ouvertureDroits` lui-même (c'est la donnée que ce formulaire crée : il ne
+          s'afficherait jamais) ; d'où un simple pli, qui n'impose rien à qui n'a pas encore de droits
+          ouverts sans jamais bloquer qui en a. */}
+      <details open={Boolean(ouverture)} className="bg-surface border border-line rounded-card">
+        <summary className="cursor-pointer select-none list-none px-5 py-3 font-display text-lg font-medium flex items-center gap-2">
+          <span aria-hidden="true">▸</span>
+          Mon indemnisation en cours
+          {!ouverture && <span className="text-xs font-sans font-normal text-faint">— si tes droits sont déjà ouverts</span>}
+        </summary>
+        <div className="px-5 pb-5 pt-2 space-y-5">
+          <p className="text-sm text-muted">
+            Ces informations figurent sur ta notification d'ouverture de droits France Travail. Tu peux la retrouver dans ton espace personnel francetravail.fr → « Mes paiements » → « Mes
+            notifications ». Si tes droits ne sont pas encore ouverts, laisse cette section vide.
+          </p>
 
         <div>
           <label className="block text-xs uppercase tracking-[.03em] text-muted mb-2" htmlFor="profil-date-ouverture">
@@ -499,8 +511,9 @@ function MonIndemnisationEnCours({ profil, onModifierProfil }: { profil: Profil;
           Enregistrer
         </button>
 
-        <GestionAjReelle profil={profil} onModifierProfil={onModifierProfil} />
-      </div>
+          <GestionAjReelle profil={profil} onModifierProfil={onModifierProfil} />
+        </div>
+      </details>
     </section>
   );
 }

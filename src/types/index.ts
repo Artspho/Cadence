@@ -358,23 +358,30 @@ export interface MoisIndemnisationResultat {
   salairesContratsBruts: number;
 }
 
-// Mois de réadmission (transition entre deux droits) : `ouvertureDroits.dateOuverture` ne tombe
-// pas le 1er du mois calendaire, ce mois est donc partagé entre l'ancien et le nouveau droit.
-// Cadence n'a structurellement pas accès à l'ancien droit — jamais simulé, jamais un chiffre
+// Mois d'ouverture PARTIEL : `ouvertureDroits.dateOuverture` ne tombe pas le 1er du mois calendaire,
+// ce mois n'est donc indemnisé qu'en partie et n'est jamais simulé par le moteur — jamais un chiffre
 // deviné (devoir n°2), cf. engine/indemnisationMensuelle.ts (calculerSerieDepuisContrats).
-export interface MoisReadmissionNonCalcule {
+//
+// Nommé « ouverture_partielle » et non « readmission » depuis le 2026-07-28 : le déclencheur est
+// purement calendaire, il vaut donc aussi pour une PREMIÈRE admission ouverte en cours de mois, à qui
+// rien ne permet d'affirmer un partage entre deux droits (il n'y a pas de droit antérieur). Ce qui
+// change selon `Profil.situation` est la CAUSE du caractère partiel, portée par `messageTooltip`
+// (cf. content/moisOuverturePartielle.ts) — pas le calcul, identique dans les deux cas.
+export interface MoisOuverturePartielleNonCalcule {
   calculable: false;
-  type: "readmission";
+  type: "ouverture_partielle";
   moisLabel: string; // ISO "YYYY-MM"
+  /** Libellé affiché tel quel par RevenusMensuels.tsx (title + aria-label) — jamais reformulé côté
+   * UI, sinon les deux textes divergent (c'était le cas avant le 2026-07-28). */
   messageTooltip: string;
   // Toujours 0 (jamais calculé pour ce mois) — présent uniquement pour que RevenusMensuels.tsx
   // puisse itérer sur un seul tableau sans garde-fou spécifique à ce champ, cf. LigneSerieIndemnisation.
   salairesContratsBruts: number;
 }
 
-// Une ligne de la série mensuelle affichée : soit un mois normalement calculé, soit un mois de
-// réadmission non calculé — discriminées par `calculable`, cf. RevenusMensuels.tsx.
-export type LigneSerieIndemnisation = MoisIndemnisationResultat | MoisReadmissionNonCalcule;
+// Une ligne de la série mensuelle affichée : soit un mois normalement calculé, soit le mois
+// d'ouverture partiel non calculé — discriminées par `calculable`, cf. RevenusMensuels.tsx.
+export type LigneSerieIndemnisation = MoisIndemnisationResultat | MoisOuverturePartielleNonCalcule;
 
 // Résultat de `calculerSerieDepuisContrats` : `calculable: false` quand `Profil.ouvertureDroits`
 // est absent — la simulation entière est bloquée plutôt que de deviner un point de départ

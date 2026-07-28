@@ -780,6 +780,52 @@ cette session, aucune donnée réelle modifiée côté profil).
 - **Confusion de dossier OneDrive** (cf. tout en haut de ce document) — non résolue, l'utilisateur
   n'a répondu à aucune des deux questions posées.
 
+## Note de péremption (2026-07-28) — première admission : « Revenus mensuels » et « Mon indemnisation en cours » sont désormais accessibles
+
+Deux passages datés du **2026-07-24** de ce document sont **périmés** depuis ce chantier. Ils ne sont
+pas réécrits (ce document est un journal daté, on n'y refait pas l'histoire) : cette note fait
+autorité à leur place.
+
+**l.326-328 — « aucun écran ne permet encore de saisir `Profil.dureeDroitsMois` ni
+`Profil.salairesHorsAnnexe10PRA` […] uniquement accessibles via import JSON manuel »** : faux. Les
+deux champs se saisissent dans `MonProfil.tsx`. `salairesHorsAnnexe10PRA` a même quitté la section
+« Mon indemnisation en cours » le 2026-07-28 pour la carte du régime déclaré (commit `4c9cfff`), afin
+d'être atteignable en première admission — il ne l'était pas, et un profil en première admission ne
+pouvait donc créer la contradiction « A10 pur + salaires hors A10 » (ni en être averti) que par
+import JSON.
+
+**l.396-401 — « `RevenusMensuels.tsx` affiche un encart neutre […] quand
+`profil.situation === "premiere_admission"` — ce module n'a aucun sens avant l'ouverture des
+droits »** : le gate a été retiré. L'intention (« avant l'ouverture des droits ») était juste, mais
+`situation` en était un mauvais proxy : **un premier admis qui vient d'ouvrir ses PREMIERS droits est
+indemnisé, notification en main** — et se voyait pourtant refuser tout l'onglet. Le vrai prérequis est
+`Profil.ouvertureDroits` (les paramètres de la notification France Travail), déjà vérifié juste après
+par les gardes réelles du module (`!ouvertureDroits`, `!soldeDepart`, `ajReelleHistorique` vide) :
+aucune ne dépend de `situation`, et `calculerSerieDepuisContrats` ne l'a jamais lu. Aucun chiffre non
+fondé ne peut donc apparaître du fait de ce retrait. Les deux encarts d'attente ont été fusionnés en
+un message vrai dans les deux cas (droits ouverts mais notification non saisie / droits pas encore
+ouverts), Cadence ne pouvant pas distinguer ces deux situations.
+
+**Conséquences du même chantier :**
+- `MonIndemnisationEnCours` n'est plus conditionnée à `situation === "readmission"` : section toujours
+  rendue, dans un `<details>` replié tant qu'aucune notification n'est saisie, déplié sinon. Le gating
+  ne pouvait pas porter sur `ouvertureDroits` lui-même — c'est la donnée que ce formulaire crée, il ne
+  se serait jamais affiché (poule-œuf).
+- `MoisReadmissionNonCalcule` / `type: "readmission"` renommés `MoisOuverturePartielleNonCalcule` /
+  `type: "ouverture_partielle"` : le déclencheur est purement calendaire (`dateOuverture` pas le 1er du
+  mois), il vaut donc aussi en première admission, à qui on affirmait à tort un « partage entre deux
+  droits ». Le libellé dépend maintenant de `situation` — seul endroit où ce champ dit vraiment quelque
+  chose ici — et vit dans `content/moisOuverturePartielle.ts`. Le texte du cas réadmission est
+  inchangé au caractère près (vérifié par un test à chaîne littérale). Au passage : `messageTooltip`
+  était produit par le moteur mais **jamais lu**, l'UI ayant son propre texte codé en dur et différent
+  ; l'UI le consomme désormais, une seule source.
+
+**Piège de test à retenir** (deuxième occurrence en deux chantiers) : le test intitulé « mois de
+réadmission » ne fixait pas `situation` et tournait donc sur le défaut de la fabrique `profil()`
+(`premiere_admission`) — le concept qu'il annonçait n'a jamais été couvert. Même piège que sur
+`profilHorsPerimetre.test.ts`. **Toujours écrire `situation` explicitement** dans un test qui prétend
+dépendre d'elle.
+
 ## Fait (2026-07-26 : PAS, franchise salaires mensuelle, mois de réadmission, revenus contrats)
 
 Longue session, 14 commits, tous sur `C:\Users\benoi\cadence` (`2edb88e`→`502b495`), 159 tests

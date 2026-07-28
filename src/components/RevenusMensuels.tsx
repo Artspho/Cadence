@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import type { Contrat, MoisIndemnisationResultat, Profil, SoldeIndemnisationDepart } from "../types";
+import type { Contrat, LigneSerieIndemnisation, MoisIndemnisationResultat, MoisOuverturePartielleNonCalcule, Profil, SoldeIndemnisationDepart } from "../types";
 import type { FranceTravailConfig } from "../config/franceTravailConfig";
 import { calculerSerieDepuisContrats } from "../engine/indemnisationMensuelle";
 import { calculerJoursTravailes, calculerSerie } from "../engine/calculerSerie";
@@ -19,12 +19,13 @@ interface RevenusMensuelsProps {
 }
 
 export function RevenusMensuels({ profil, soldeDepart, contrats, config, onConfigurerSolde, onAllerVersProfil, dateDuJour }: RevenusMensuelsProps) {
-  // Première admission = pas encore indemnisé, en train de viser les 507 h d'ouverture — ce
-  // module (montants mensuels déjà versés) n'a aucun sens dans ce contexte, cf. docs/reprise.md.
-  if (profil.situation === "premiere_admission") {
-    return <PremiereAdmissionInfo />;
-  }
-
+  // Le seul vrai prérequis est `ouvertureDroits` — les paramètres de la notification France Travail.
+  // Ce module était auparavant fermé à tout profil `situation === "premiere_admission"` : un proxy de
+  // « pas encore indemnisé » qui excluait aussi le premier admis venant d'ouvrir ses PREMIERS droits,
+  // pourtant indemnisé et notification en main. `situation` décide de la fenêtre de référence
+  // (periodeReference.ts), jamais de l'état d'indemnisation ; ce moteur-ci ne l'a jamais lu.
+  // Aucun risque de chiffre inventé pour autant : les trois gardes ci-dessous (ouvertureDroits,
+  // soldeDepart, ajReelleHistorique non vide) sont les seules qui protégeaient réellement.
   if (!profil.ouvertureDroits) {
     return <OuvertureDroitsManquante onAllerVersProfil={onAllerVersProfil} />;
   }
@@ -41,21 +42,23 @@ export function RevenusMensuels({ profil, soldeDepart, contrats, config, onConfi
   );
 }
 
-function PremiereAdmissionInfo() {
-  return (
-    <div className="max-w-[640px] bg-surface border border-line rounded-card p-6 text-sm text-muted">
-      La simulation mensuelle sera disponible une fois tes droits ouverts. Pour l'instant, concentre-toi sur l'onglet Tableau de bord pour suivre tes heures.
-    </div>
-  );
-}
-
 // Bloque toute la simulation (devoir n°2 : pas de chiffre inventé) tant que
 // Profil.ouvertureDroits n'est pas renseigné — cf. engine/indemnisationMensuelle.ts,
 // calculerSerieDepuisContrats.
+//
+// Message unique volontairement : deux situations mènent ici — « mes droits sont ouverts mais je n'ai
+// pas encore saisi ma notification » et « mes droits ne sont pas encore ouverts » — et Cadence ne
+// peut PAS les distinguer (rien ne le lui dit, et `situation` ne le dit pas non plus, cf. plus haut).
+// Le texte est donc formulé pour être vrai dans les deux cas, plutôt que de supposer l'une des deux
+// et de se tromper la moitié du temps. Écran neutre, pas un blocage : l'onglet reste atteignable.
 function OuvertureDroitsManquante({ onAllerVersProfil }: { onAllerVersProfil: () => void }) {
   return (
-    <div className="max-w-[640px] bg-amber/10 border border-amber/30 rounded-card p-6 text-sm text-amber space-y-3">
-      <p>Complète la section « Mon indemnisation en cours » dans ton profil pour activer la simulation.</p>
+    <div className="max-w-[640px] bg-surface border border-line rounded-card p-6 text-sm text-muted space-y-3">
+      <p className="text-ink">Cette simulation a besoin des informations de ta notification d'ouverture de droits France Travail.</p>
+      <p>
+        Si tes droits sont déjà ouverts, renseigne-les dans « Mon profil » → « Mon indemnisation en cours ». S'ils ne le sont pas encore, la simulation s'activera d'elle-même une fois cette
+        notification reçue — en attendant, l'onglet Tableau de bord suit tes heures.
+      </p>
       <button onClick={onAllerVersProfil} className="text-sm bg-mint text-bg font-medium rounded-lg px-4 py-2">
         Aller à Mon profil →
       </button>
@@ -159,11 +162,11 @@ function SoldeRecap({ solde, onConfigurer }: { solde: SoldeIndemnisationDepart; 
   );
 }
 
-// Une ligne affichée du tableau — mois de réadmission ou mois normal, TOUJOURS calculée (plus
+// Une ligne affichée du tableau — mois d'ouverture partiel ou mois normal, TOUJOURS calculée (plus
 // aucun mois grisé/non calculé, cf. pivot documenté en tête de calculerSerie.ts). `estimation` est
 // vrai tant que la franchise CP OU le délai d'attente n'était pas encore intégralement épuisé à
 // l'ENTRÉE de ce mois (donc encore susceptible d'être affecté par l'incertitude du découpage
-// jour-mois du mois de réadmission, cf. `estReadmission`) — jamais un flou, un simple badge texte.
+// jour-mois du mois d'ouverture, cf. `messageOuverturePartielle`) — jamais un flou, un simple badge.
 interface LigneAffichage {
   moisLabel: string;
   heuresDuMois: number;
@@ -175,31 +178,35 @@ interface LigneAffichage {
   montantNet: number | null;
   salairesContratsBruts: number;
   estimation: boolean;
-  estReadmission: boolean;
+  /** Libellé du mois d'ouverture partiel, tel que produit par le moteur (source unique,
+   * content/moisOuverturePartielle.ts) — `null` sur un mois normal. Jamais reformulé ici. */
+  messageOuverturePartielle: string | null;
 }
 
-function construireLignesAffichage(profil: Profil, contrats: Contrat[], config: FranceTravailConfig, mois: (MoisIndemnisationResultat | { calculable: false; moisLabel: string; salairesContratsBruts: number })[], ouvertureDroits: NonNullable<Profil["ouvertureDroits"]>, tauxRenseigne: boolean): LigneAffichage[] {
-  const ligneReadmission = mois.find((m) => !m.calculable);
+function construireLignesAffichage(profil: Profil, contrats: Contrat[], config: FranceTravailConfig, mois: LigneSerieIndemnisation[], ouvertureDroits: NonNullable<Profil["ouvertureDroits"]>, tauxRenseigne: boolean): LigneAffichage[] {
+  const ligneOuverturePartielle = mois.find((m): m is MoisOuverturePartielleNonCalcule => !m.calculable);
   const moisCalcules = mois.filter((m): m is MoisIndemnisationResultat => m.calculable);
   const tauxPASFraction = (ouvertureDroits.tauxPrelevementSource ?? 0) / 100;
 
-  // Heures du mois de réadmission : pas exposées par calculerSerieDepuisContrats (mois jamais
+  // Heures du mois d'ouverture partiel : pas exposées par calculerSerieDepuisContrats (mois jamais
   // simulé par indemnisationMensuelle.ts, cf. Q1 dans ce fichier moteur) — recalculées ici
   // directement depuis les vrais contrats, même fonction que le pipeline existant
   // (repartirContratParMois), traitées comme un mois calendaire entier (approximation assumée,
   // cf. calculerSerie.ts).
-  const heuresReadmission = ligneReadmission
-    ? contrats.reduce((total, c) => total + repartirContratParMois(c, config).filter((part) => part.moisCle === ligneReadmission.moisLabel).reduce((s, part) => s + part.heures, 0), 0)
+  const heuresMoisOuverture = ligneOuverturePartielle
+    ? contrats.reduce((total, c) => total + repartirContratParMois(c, config).filter((part) => part.moisCle === ligneOuverturePartielle.moisLabel).reduce((s, part) => s + part.heures, 0), 0)
     : 0;
 
   const entrees = [
-    ...(ligneReadmission
+    ...(ligneOuverturePartielle
       ? [
           {
-            moisLabel: ligneReadmission.moisLabel,
-            joursDuMois: joursDansMois(ligneReadmission.moisLabel),
-            joursTravailes: calculerJoursTravailes([{ heures: heuresReadmission, cachets: 0 }], config),
-            heuresDuMois: heuresReadmission,
+            moisLabel: ligneOuverturePartielle.moisLabel,
+            joursDuMois: joursDansMois(ligneOuverturePartielle.moisLabel),
+            joursTravailes: calculerJoursTravailes([{ heures: heuresMoisOuverture, cachets: 0 }], config),
+            heuresDuMois: heuresMoisOuverture,
+            // Libellé produit par le moteur, transporté tel quel jusqu'à l'affichage.
+            messageOuverturePartielle: ligneOuverturePartielle.messageTooltip as string | null,
           },
         ]
       : []),
@@ -208,6 +215,7 @@ function construireLignesAffichage(profil: Profil, contrats: Contrat[], config: 
       joursDuMois: joursDansMois(m.moisLabel),
       joursTravailes: m.joursNonIndemnisables,
       heuresDuMois: m.heuresDuMois,
+      messageOuverturePartielle: null as string | null,
     })),
   ];
 
@@ -251,7 +259,7 @@ function construireLignesAffichage(profil: Profil, contrats: Contrat[], config: 
       montantNet,
       salairesContratsBruts: mCalculable?.salairesContratsBruts ?? 0,
       estimation,
-      estReadmission: !mCalculable,
+      messageOuverturePartielle: entree.messageOuverturePartielle,
     };
   });
 }
@@ -315,6 +323,11 @@ function TableauResultats({
 
   const desMoisEnEstimation = lignes.some((l) => l.estimation);
   const desMoisSansAj = lignes.some((l) => l.montant === null);
+  // Note de bas de tableau : reprend le libellé exact du mois d'ouverture partiel plutôt qu'une
+  // seconde rédaction — l'ancienne phrase affirmait « le découpage exact jour par jour entre l'ancien
+  // et le nouveau droit », faux pour une première admission (aucun droit antérieur). Absent s'il n'y
+  // a pas de mois partiel du tout (ouverture pile le 1er du mois), où la phrase n'avait rien à dire.
+  const messageMoisPartiel = lignes.find((l) => l.messageOuverturePartielle)?.messageOuverturePartielle ?? null;
 
   function revenuARE(l: LigneAffichage): number {
     if (l.montant === null) return 0;
@@ -356,8 +369,8 @@ function TableauResultats({
                   <td className="px-4 py-3">
                     <span className="inline-flex items-center gap-1.5">
                       {l.moisLabel}
-                      {l.estReadmission && (
-                        <span title="Mois de réadmission — partagé entre deux droits, traité ici comme un mois entier (approximation)." aria-label="Mois de réadmission" className="cursor-help">
+                      {l.messageOuverturePartielle && (
+                        <span title={l.messageOuverturePartielle} aria-label={l.messageOuverturePartielle} className="cursor-help">
                           ℹ️
                         </span>
                       )}
@@ -419,8 +432,8 @@ function TableauResultats({
         {desMoisEnEstimation && (
           <p className="text-faint">
             <strong className="text-ink font-medium">Estimation</strong> : basée sur la franchise congés payés et le délai d'attente indiqués sur ta notification France Travail (« Mon profil »).
-            Le mois de réadmission est traité comme un mois entier — le découpage exact jour par jour entre l'ancien et le nouveau droit n'est pas reconstituable par Cadence, ce qui rend ce
-            mois-là (et les suivants tant que franchise/délai ne sont pas épuisés) approximatif. Montant exact disponible en Premium (upload de ton relevé France Travail, analyse IA).
+            {messageMoisPartiel ? ` ${messageMoisPartiel} Ce mois-là, et les suivants tant que franchise/délai ne sont pas épuisés, restent approximatifs.` : ""} Montant exact disponible en
+            Premium (upload de ton relevé France Travail, analyse IA).
           </p>
         )}
         {!tauxRenseigne && <p className="text-amber">Renseigne ton taux PAS dans le profil pour voir le montant réellement viré.</p>}

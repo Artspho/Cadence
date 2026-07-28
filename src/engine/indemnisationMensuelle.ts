@@ -18,6 +18,7 @@ import type { FranceTravailConfig } from "../config/franceTravailConfig";
 import { bornesDuMois, joursDansMois, moisCle, moisSuivant } from "./dateUtils";
 import { getAjReelleAt } from "./ajReelleUtils";
 import { repartirContratParMois } from "./decoupageMensuel";
+import { messageMoisOuverturePartielle } from "../content/moisOuverturePartielle";
 
 const FRANCHISE_SALAIRES_NON_CERTIFIEE: FranchiseSalairesResultat = {
   valeur: null,
@@ -64,11 +65,12 @@ function calculerMontantMensuel(joursIndemnises: number, debutDuMoisISO: string,
 // la DGFIP. Vérifie sur impots.gouv.fr ou ton dernier relevé France Travail et corrige-le dans le
 // profil si besoin." Pas encore câblée dans `alertes.ts`.
 //
-// Q3 — Affichage du mois de transition (RevenusMensuels.tsx) : DÉCISION — une ligne grisée non
-// calculée, avec un tooltip : "Mois de réadmission — le calcul est partagé entre deux droits.
-// Consulte ton relevé France Travail pour le montant exact." Aucun montant affiché sur cette
-// ligne, aucun cumul dans les totaux. La ligne reste présente (pas retirée du tableau) pour que la
-// chronologie mois par mois reste continue, sans trou silencieux.
+// Q3 — Affichage du mois de transition (RevenusMensuels.tsx) : DÉCISION — une ligne non calculée par
+// ce moteur, avec un tooltip expliquant pourquoi. Le texte vit dans
+// content/moisOuverturePartielle.ts et dépend de l'existence d'un droit antérieur (réadmission) ou
+// non (première admission ouverte en cours de mois) — cf. `MoisOuverturePartielleNonCalcule`. La
+// ligne reste présente (pas retirée du tableau) pour que la chronologie mois par mois reste
+// continue, sans trou silencieux.
 //
 // Q1 et Q3 sont désormais câblés (cf. `calculerSerieDepuisContrats` plus bas et
 // `LigneSerieIndemnisation` dans types/index.ts). Q2 (alerte taux PAS multi-années) reste à
@@ -221,11 +223,13 @@ export function calculerSerieDepuisContrats(
   const moisOuverture = moisCle(ouvertureDroits.dateOuverture);
   const moisAffichageDebut = moisCle(soldeDepart.dateDepart);
 
-  // Mois de réadmission (Q1, cf. commentaire "Mois de transition" plus haut) : dateOuverture ne
-  // tombe pas le 1er du mois calendaire -> ce mois est partagé avec l'ancien droit, jamais
-  // simulé. La simulation réelle démarre au mois suivant.
-  const estMoisReadmission = ouvertureDroits.dateOuverture !== bornesDuMois(moisOuverture).debut;
-  const moisDebutCalcul = estMoisReadmission ? moisSuivant(moisOuverture) : moisOuverture;
+  // Mois d'ouverture PARTIEL (Q1, cf. commentaire "Mois de transition" plus haut) : dateOuverture ne
+  // tombe pas le 1er du mois calendaire -> ce mois n'est indemnisé qu'en partie, jamais simulé. La
+  // simulation réelle démarre au mois suivant. Critère purement calendaire, valable en réadmission
+  // (mois partagé avec l'ancien droit) comme en première admission (jours antérieurs à l'ouverture,
+  // non indemnisables) — seul le libellé distingue les deux, cf. messageMoisOuverturePartielle.
+  const moisOuverturePartiel = ouvertureDroits.dateOuverture !== bornesDuMois(moisOuverture).debut;
+  const moisDebutCalcul = moisOuverturePartiel ? moisSuivant(moisOuverture) : moisOuverture;
 
   const heuresParMois = new Map<string, number>();
   // Salaires bruts des contrats attribués à chaque mois (repartirContratParMois prorate déjà
@@ -286,22 +290,24 @@ export function calculerSerieDepuisContrats(
       salairesContratsBruts: salairesParMois.get(resultat.moisLabel) ?? 0,
     }));
 
-  // Ligne "mois de réadmission" (Q3) : seulement si ce mois entre dans la plage affichée
-  // (dateDepart peut être choisi après lui, auquel cas il ne doit jamais apparaître).
-  const ligneReadmission: LigneSerieIndemnisation[] =
-    estMoisReadmission && moisOuverture >= moisAffichageDebut
+  // Ligne du mois d'ouverture partiel (Q3) : seulement si ce mois entre dans la plage affichée
+  // (dateDepart peut être choisi après lui, auquel cas il ne doit jamais apparaître). `situation` est
+  // lu ICI et nulle part ailleurs dans ce moteur : uniquement pour dire s'il existe un droit
+  // antérieur avec lequel le mois est partagé — le calcul, lui, est identique dans les deux cas.
+  const ligneOuverturePartielle: LigneSerieIndemnisation[] =
+    moisOuverturePartiel && moisOuverture >= moisAffichageDebut
       ? [
           {
             calculable: false,
-            type: "readmission",
+            type: "ouverture_partielle",
             moisLabel: moisOuverture,
-            messageTooltip: "Mois de réadmission — le calcul est partagé entre deux droits. Consulte ton relevé France Travail pour le montant exact.",
+            messageTooltip: messageMoisOuverturePartielle(profil.situation === "readmission"),
             salairesContratsBruts: 0,
           },
         ]
       : [];
 
-  return { calculable: true, mois: [...ligneReadmission, ...resultatsAffiches] };
+  return { calculable: true, mois: [...ligneOuverturePartielle, ...resultatsAffiches] };
 }
 
 // Cherche la valeur historique la plus récente dont la date d'effet est ≤ la date cible — null si

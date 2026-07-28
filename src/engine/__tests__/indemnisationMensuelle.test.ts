@@ -3,6 +3,7 @@ import { franceTravailConfig } from "../../config/franceTravailConfig";
 import { calculerFranchiseSalaires, calculerMoisIndemnisation, calculerSerieDepuisContrats, calculerSerieIndemnisation } from "../indemnisationMensuelle";
 import type { FranchiseSalairesResultat, MoisIndemnisationEntree, SoldeIndemnisation } from "../../types";
 import { contrat, profil } from "./testUtils";
+import { MOIS_OUVERTURE_PARTIELLE } from "../../content/moisOuverturePartielle";
 
 describe("calculerMoisIndemnisation", () => {
   it("jours non indemnisables = floor(heures × 1,3 / 10), avant tout calcul de place disponible", () => {
@@ -293,14 +294,53 @@ describe("calculerSerieDepuisContrats", () => {
     expect(juin.joursNonIndemnisables).toBe(21); // floor(167 × 1,3 / 10) = floor(21,71) = 21
   });
 
-  it("dateOuverture le 18/01/2026 : premier élément de la série est le mois de réadmission non calculé", () => {
-    const p = profil({ ouvertureDroits: { dateOuverture: "2026-01-18", franchiseCPTotale: 0, delaiAttenteInitial: 0 } });
+  // ── Mois d'ouverture PARTIEL (ex-« mois de réadmission ») ──────────────────────────────────────
+  // Renommé `type: "ouverture_partielle"` le 2026-07-28 : le déclencheur est purement calendaire
+  // (dateOuverture pas le 1er du mois), il vaut donc aussi en première admission, où affirmer un
+  // partage « entre deux droits » serait faux. Seul le libellé dépend de `situation`.
+  //
+  // ATTENTION à l'historique de ce bloc : le test d'origine s'appelait « mois de réadmission » mais
+  // ne fixait PAS `situation` — il tournait donc sur le défaut de la fabrique `profil()`, c'est-à-dire
+  // "premiere_admission". Le concept qu'il prétendait couvrir (mois partagé avec un droit antérieur)
+  // n'était en réalité jamais testé. `situation` est désormais explicite dans chacun des cas.
+  it("réadmission, dateOuverture le 18/01/2026 : premier élément = mois d'ouverture partiel non calculé, message de partage entre deux droits", () => {
+    const p = profil({ situation: "readmission", ouvertureDroits: { dateOuverture: "2026-01-18", franchiseCPTotale: 0, delaiAttenteInitial: 0 } });
     const resultat = calculerSerieDepuisContrats(p, { dateDepart: "2026-01-01" }, [], "2026-02-28", franceTravailConfig);
     if (!resultat.calculable) throw new Error("devrait être calculable");
-    expect(resultat.mois.map((m) => m.moisLabel)).toEqual(["2026-01", "2026-02"]); // janvier (réadmission) puis février calculé normalement
+    expect(resultat.mois.map((m) => m.moisLabel)).toEqual(["2026-01", "2026-02"]); // janvier partiel puis février calculé normalement
     const premier = resultat.mois[0];
-    if (premier.calculable) throw new Error("janvier devrait être un mois de réadmission non calculable");
-    expect(premier.type).toBe("readmission");
+    if (premier.calculable) throw new Error("janvier devrait être le mois d'ouverture partiel, non calculable");
+    expect(premier.type).toBe("ouverture_partielle");
+    // Chaîne littérale volontairement (pas la constante) : verrou de non-régression sur le texte
+    // RÉELLEMENT affiché à un réadmis, qui ne devait pas bouger dans ce chantier.
+    expect(premier.messageTooltip).toBe("Mois de réadmission — partagé entre deux droits, traité ici comme un mois entier (approximation).");
+    expect(premier.messageTooltip).toBe(MOIS_OUVERTURE_PARTIELLE.avecDroitAnterieur);
+  });
+
+  it("PREMIÈRE ADMISSION, dateOuverture le 18/01/2026 : même mois partiel, mais un message qui n'invente aucun droit antérieur", () => {
+    const p = profil({ situation: "premiere_admission", ouvertureDroits: { dateOuverture: "2026-01-18", franchiseCPTotale: 0, delaiAttenteInitial: 0 } });
+    const resultat = calculerSerieDepuisContrats(p, { dateDepart: "2026-01-01" }, [], "2026-02-28", franceTravailConfig);
+    if (!resultat.calculable) throw new Error("devrait être calculable");
+    const premier = resultat.mois[0];
+    if (premier.calculable) throw new Error("janvier devrait être le mois d'ouverture partiel, non calculable");
+    expect(premier.type).toBe("ouverture_partielle");
+    expect(premier.messageTooltip).toBe(MOIS_OUVERTURE_PARTIELLE.sansDroitAnterieur);
+    expect(premier.messageTooltip).not.toMatch(/réadmission|deux droits/i); // jamais un droit antérieur qui n'existe pas
+  });
+
+  it("le CALCUL du mois d'ouverture partiel est identique dans les deux situations — seul le libellé change", () => {
+    const ouvertureDroits = { dateOuverture: "2026-01-18", franchiseCPTotale: 5, delaiAttenteInitial: 7 };
+    const contrats = [contrat({ dateDebut: "2026-02-03", date: "2026-02-03", type: "artiste", typeRemuneration: "cachet", nbCachets: 8, salaireBrut: 2400 })];
+    const serie = (situation: "premiere_admission" | "readmission") =>
+      calculerSerieDepuisContrats(profil({ situation, ouvertureDroits }), { dateDepart: "2026-01-01" }, contrats, "2026-03-31", franceTravailConfig);
+
+    const premiereAdmission = serie("premiere_admission");
+    const readmission = serie("readmission");
+    if (!premiereAdmission.calculable || !readmission.calculable) throw new Error("les deux devraient être calculables");
+
+    // Tout est identique hors messageTooltip : mêmes mois, mêmes jours, mêmes montants.
+    const sansMessage = (r: typeof premiereAdmission) => JSON.stringify(r.mois.map((m) => (m.calculable ? m : { ...m, messageTooltip: "<libellé>" })));
+    expect(sansMessage(premiereAdmission)).toBe(sansMessage(readmission));
   });
 
   it("dateOuverture le 01/02/2026 : aucun mois de transition, la série commence normalement en février", () => {
