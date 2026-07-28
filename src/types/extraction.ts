@@ -56,8 +56,15 @@ export const propositionContratSchema = z.object({
       .enum(["artiste", "enseignement", "formation", "ptp"])
       .nullable()
       .describe(
-        "Nullable : un bulletin de paie n'indique presque jamais artiste vs enseignement. " +
-          "Ne jamais deviner — laisser null plutôt qu'inventer."
+        "Nature de l'ACTIVITÉ, pas le statut administratif. À renseigner quand le document décrit " +
+          "l'activité elle-même : cachets de représentation, concert, spectacle, enregistrement → " +
+          "« artiste » ; heures de cours, intervention pédagogique, établissement d'enseignement → " +
+          "« enseignement ». Reste null sur une simple ligne de statut ou de catégorie d'emploi " +
+          "(« Statut : Artiste », « Emploi : Artiste Musicien ») isolée, sans activité décrite : le " +
+          "statut administratif et la nature de l'activité ne coïncident pas toujours (des heures de " +
+          "cours peuvent être payées par un employeur du spectacle sous statut artiste). Ce champ " +
+          "décide des règles de décompte des 507 h et du plafond enseignement 70/120 h — ne jamais " +
+          "le deviner."
       ),
     typeRemuneration: z.enum(["cachet", "heures"]).nullable().describe(
       "Ne jamais convertir : si le document montre des heures, reste en heures."
@@ -89,7 +96,12 @@ export const propositionOuvertureDroitsSchema = z.object({
       .string()
       .nullable()
       .describe(
-        "Le document dit mot pour mot : « La date limite de votre indemnisation est le JJ/MM/AAAA »."
+        "Fin de la période d'indemnisation en cours. DEUX formulations équivalentes selon le " +
+          "document, confirmées identiques sur deux pièces réelles d'un même dossier : « La date " +
+          "limite de votre indemnisation est le JJ/MM/AAAA » (relevé de situation) et « … jusqu'à " +
+          "votre date anniversaire, soit le JJ/MM/AAAA inclus » (notification d'admission). Dans la " +
+          "seconde, c'est la DEUXIÈME date de la phrase — la première, celle de la fin de contrat, " +
+          "va dans dateAnniversaire."
       ),
     tauxPrelevementSource: z
       .number()
@@ -104,7 +116,18 @@ export const propositionOuvertureDroitsSchema = z.object({
 export const propositionProfilInfosSchema = z.object({
   cible: z.literal("profil_infos"),
   donnees: z.object({
-    dateAnniversaire: z.string().nullable(),
+    dateAnniversaire: z
+      .string()
+      .nullable()
+      .describe(
+        "Fin du dernier contrat de travail ayant OUVERT les droits. ⚠️ CE N'EST PAS une date de " +
+          "naissance, et ce n'est PAS la « date anniversaire » au sens de France Travail. Sur une " +
+          "notification, la phrase « … fin de votre contrat de travail du DATE_A ayant permis " +
+          "l'ouverture de vos droits jusqu'à votre date anniversaire, soit le DATE_B inclus » " +
+          "contient DEUX dates à un an d'écart : ce champ vaut DATE_A. DATE_B va dans " +
+          "dateLimiteIndemnisation. Erreur observée en test réel : DATE_B retenue ici, soit un an " +
+          "d'écart sur la borne qui détermine la fenêtre de référence et tout le décompte des 507 h."
+      ),
     dateNaissance: z.string().nullable().describe("Détermine le plafond enseignement 70/120h applicable."),
     dateAnniversairePrecedente: z
       .string()

@@ -723,6 +723,60 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 - 🔶 **`d3ebb36` n'est PAS fusionné dans `master`** — `master` est resté sur `2721778`. Tout le
   chantier import IA (backend `59d129f` + écran de revue `d3ebb36`) vit sur la branche
   `backend-api-import-ia`. Fusion à décider explicitement, pas encore faite.
+- ✅ **`document_annotation_prompt` éprouvé sur documents réels (29/07/2026)** — le prompt d'extraction
+  de `api/extract-document.ts` n'est plus une supposition : il a été mis au point par essais successifs
+  dans le Document AI Playground de Mistral, sur **deux documents réels de Benoît** (une notification
+  d'admission ARE et un bulletin de paie), plus une **confirmation croisée sur un relevé de situation**
+  du même dossier. Les libellés du lexique pour la notification sont désormais des **citations exactes**,
+  pas des formulations plausibles. Restent supposés : les libellés du relevé de situation, ceux de l'AEM,
+  et les formulations de `situation`/`dateNaissance`. Trois enseignements, chacun né d'une erreur
+  observée sur pièce :
+  (1) **`info_seule` était devenu un refuge.** L'ancien prompt listait littéralement « montants
+  bruts/nets du relevé » comme destination `info_seule`, ce qui y envoyait l'allocation journalière —
+  la cible `aj_reelle_historique` ne se remplissait jamais. Remplacé par un **test de citation** :
+  si la donnée correspond à un champ nommé ET que ses mots peuvent être cités, la cible structurée
+  est obligatoire ; sinon `info_seule`. La citation va dans `justification`, que l'écran de revue
+  affiche déjà — la règle est donc auditable à l'œil. Second blocage lié : `dateEffet` étant
+  obligatoire et rarement accolé au montant, le modèle n'avait aucune façon licite d'émettre la
+  proposition ; une règle de lecture explicite (la date d'effet est la date d'indemnisabilité
+  énoncée dans le même document) a levé l'impasse.
+  (2) **Piège de vocabulaire à un an d'écart, corrigé.** La phrase « … fin de votre contrat de
+  travail du DATE_A ayant permis l'ouverture de vos droits jusqu'à votre date anniversaire, soit le
+  DATE_B inclus » contient **deux dates et deux champs** : `dateAnniversaire` = DATE_A,
+  `dateLimiteIndemnisation` = DATE_B. Une version intermédiaire du prompt a retenu DATE_B dans
+  `dateAnniversaire` — un an d'écart sur la borne qui détermine la fenêtre de référence et donc tout
+  le décompte des 507 h. Cause de fond, **antérieure à l'IA et toujours vraie** : Cadence nomme
+  `dateAnniversaire` ce que France Travail appelle « fin de contrat de travail », tandis que France
+  Travail réserve « date anniversaire » à une date située douze mois plus tard ; et le mot a déjà deux
+  sens dans le code (`Exercice.dateAnniversaire` = « fin du cycle »). Le piège attend n'importe quel
+  lecteur, humain compris. Protégé à deux endroits : le prompt, et un `.describe()` explicite sur le
+  champ dans `src/types/extraction.ts` — les descriptions du schéma partent avec chaque champ à chaque
+  appel, là où un paragraphe de prompt peut se diluer.
+  (3) **`dateLimiteIndemnisation` a deux formulations, pas une.** « La date limite de votre
+  indemnisation est le X » (relevé de situation) et « jusqu'à votre date anniversaire, soit le X
+  inclus » (notification) portent la **même date** — vérifié sur deux pièces du même dossier
+  (17/01/2027 identique de part et d'autre). L'ancien `.describe()` disait « mot pour mot » une seule
+  de ces phrases : corrigé, sinon schéma et prompt divergeaient.
+  **Garde-fous vérifiés sur pièce, pas seulement énoncés** : sur le bulletin de paie, `type` et
+  `territoire` sont restés à `null`, aucun nombre de cachets n'a été déduit du montant brut, et
+  surtout le **NIR présent en clair dans le document est resté hors de l'extraction** — la règle
+  d'exclusion des données personnelles n'était jusque-là qu'une consigne non éprouvée.
+  **Arbitrages produit actés** : `contrat.type` ne se remplit que si le document décrit l'**activité**
+  (cachets de représentation, heures de cours), jamais sur une ligne « Statut » administrative isolée,
+  même portant le mot exact — statut et nature d'activité ne coïncident pas toujours, et ce champ
+  décide du plafond enseignement 70/120 h. `dureeDroitsMois` reste à la **saisie manuelle** : aucune
+  déduction depuis un intervalle de dates, même explicitement de douze mois.
+  **Non éprouvé** : le prompt n'a jamais tourné via `api/extract-document.ts` (uniquement dans le
+  Playground), donc l'appel réel de l'app reste à valider — cf. la note sur le dialecte du schéma
+  ci-dessous.
+- 🔶 **Le schéma envoyé par l'app n'est pas celui qui a été testé.** `api/extract-document.ts` appelle
+  `zodToJsonSchema(..., { target: "openApi3" })`, qui produit un dialecte OpenAPI 3 : nullables écrits
+  `"nullable": true` (invalide en JSON Schema standard) et surtout **un `$ref` interne** pointant sur
+  `#/properties/propositions/items/anyOf/0/properties/confiance/additionalProperties`, un pointeur
+  profond que beaucoup de validateurs ne résolvent pas. Les essais du Playground ont été faits avec la
+  variante **draft-07 sans `$ref` ni `nullable`** (`{ $refStrategy: "none" }`). Conséquence : le prompt
+  et le lexique sont validés, **l'appel de l'app ne l'est pas**. À aligner avant le premier envoi réel,
+  sur la forme qui aura effectivement fonctionné.
 - ✅ **Décision produit assumée (28/07/2026, Benoît) : on reste sur le tier gratuit Mistral
   « Experiment », où les documents envoyés PEUVENT servir à l'entraînement des modèles.** Ce n'était
   auparavant listé ici que comme un **blocage** (« aucun document réel tant que le DPA Mistral n'est
