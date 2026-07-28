@@ -768,17 +768,36 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
   même portant le mot exact — statut et nature d'activité ne coïncident pas toujours, et ce champ
   décide du plafond enseignement 70/120 h. `dureeDroitsMois` reste à la **saisie manuelle** : aucune
   déduction depuis un intervalle de dates, même explicitement de douze mois.
-  **Non éprouvé** : le prompt n'a jamais tourné via `api/extract-document.ts` (uniquement dans le
-  Playground), donc l'appel réel de l'app reste à valider — cf. la note sur le dialecte du schéma
-  ci-dessous.
-- 🔶 **Le schéma envoyé par l'app n'est pas celui qui a été testé.** `api/extract-document.ts` appelle
-  `zodToJsonSchema(..., { target: "openApi3" })`, qui produit un dialecte OpenAPI 3 : nullables écrits
-  `"nullable": true` (invalide en JSON Schema standard) et surtout **un `$ref` interne** pointant sur
-  `#/properties/propositions/items/anyOf/0/properties/confiance/additionalProperties`, un pointeur
-  profond que beaucoup de validateurs ne résolvent pas. Les essais du Playground ont été faits avec la
-  variante **draft-07 sans `$ref` ni `nullable`** (`{ $refStrategy: "none" }`). Conséquence : le prompt
-  et le lexique sont validés, **l'appel de l'app ne l'est pas**. À aligner avant le premier envoi réel,
-  sur la forme qui aura effectivement fonctionné.
+  **Partiellement éprouvé depuis** : le prompt a tourné via `api/extract-document.ts` le 29/07/2026,
+  mais sur un PDF bidon uniquement (cf. l'entrée ✅ sur le dialecte). Sur pièces réelles, il n'a été
+  éprouvé que dans le Playground.
+- ✅ **Dialecte du schéma aligné, et premier appel réel à Mistral effectué (29/07/2026, commit
+  `80d4904`).** `api/extract-document.ts` envoie désormais
+  `zodToJsonSchema(..., { $refStrategy: "none" })` — JSON Schema draft-07, sans `$ref` interne ni
+  `nullable` non standard.
+  **Établi par test réel** : les DEUX dialectes sont acceptés par Mistral. Un PDF bidon a été envoyé
+  tour à tour avec `{ target: "openApi3" }` puis `{ $refStrategy: "none" }` → **statut 200 dans les
+  deux cas**, comportement identique (`typeDocumentDetecte: "non_reconnu"`, 0 proposition). Les trois
+  points qui restaient en doute sont levés : la clé racine `$schema`, le `const` sur le discriminant
+  `cible` (là où openApi3 écrivait `enum: ["contrat"]`), et les `additionalProperties` libres
+  (`confiance`, `info_seule.donnees`).
+  **La crainte héritée du 28/07 est DÉMENTIE — ne plus la ressortir** : le dialecte n'était pas « le
+  candidat le plus probable à un échec au premier envoi ». Ce changement n'a rien réparé. draft-07
+  est conservé parce que c'est du JSON Schema standard (lisible par tout validateur, moins exposé si
+  Mistral durcit sa validation), pas parce que l'autre forme cassait quelque chose.
+  **Vérifié hors réseau** : les deux formes décrivent les mêmes 55 champs obligatoires aux mêmes
+  chemins, avec 22 descriptions rigoureusement identiques, nullabilité conservée (réécrite en branche
+  `null` explicite). Aucune information perdue.
+  ⚠️ **DEUX limites à ne pas surinterpréter.**
+  1. Le test a porté sur un **PDF d'une page, texte inventé, sans aucune donnée exploitable** — la
+     bonne réponse était « rien à proposer », et c'est ce qui est sorti. Cela prouve que le schéma
+     est accepté et que la validation Zod est traversée, **pas** que l'extraction est juste. Aucun
+     bulletin de paie, AEM ni notification n'est passé par ce chemin ; le prompt n'a été éprouvé sur
+     pièces réelles que dans le Playground.
+  2. L'appel a été lancé par un **script Node temporaire appelant `extractDocument` directement**,
+     PAS par l'interface. Le segment **navigateur → `/api/extract-document` reste non exercé** :
+     vérifié le 29/07, `npm run dev` (Vite) ne sert pas les Vercel Functions et répond **404** sur
+     cette route. Ce segment ne sera validé qu'avec `vercel dev` ou un déploiement.
 - ✅ **Décision produit assumée (28/07/2026, Benoît) : on reste sur le tier gratuit Mistral
   « Experiment », où les documents envoyés PEUVENT servir à l'entraînement des modèles.** Ce n'était
   auparavant listé ici que comme un **blocage** (« aucun document réel tant que le DPA Mistral n'est
@@ -832,16 +851,18 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
   ⚠️ **Aucun document ne peut partir en local** : `vite dev` ne sert pas les fonctions Vercel, donc
   `POST /api/extract-document` répond 404. Un envoi réel exige un déploiement Vercel avec la clé.
   Le code est prêt, le robinet n'est pas ouvert.
-- 🔶 **Risque introduit avec le lexique du prompt, non corrigé : `etablissementAgree`.** Le lexique
-  cite « nom d'un établissement d'enseignement » comme marqueur d'activité pour
-  `contrat.type = "enseignement"`. Rien n'empêche le modèle d'enchaîner et de renseigner
-  `etablissementAgree: true` du seul fait qu'un établissement est nommé — alors qu'« agréé » est un
-  statut administratif précis, presque jamais écrit sur un bulletin, et que ce champ conditionne la
-  prise en compte des heures d'enseignement. Les `.describe()` de `etablissementAgree` et
-  `enRapportAvecMetier` sont aujourd'hui **neutres** (« Uniquement pertinent si type = enseignement ») :
-  ils n'ont pas le défaut corrigé sur `contrat.type`, mais ils ne protègent pas contre cette
-  déduction. À durcir d'une ligne (« ne jamais déduire l'agrément de la seule présence d'un nom
-  d'établissement ») quand un document d'enseignement réel sera disponible pour tester.
+- ✅ **`etablissementAgree` ne peut plus être déduit d'un nom d'établissement (29/07/2026, commit
+  `a934db2`).** Le risque décrit ici était réel : rien n'empêchait de conclure `true` de la seule
+  présence d'un nom de conservatoire ou d'école de musique, alors qu'« agréé » est un statut
+  administratif précis, presque jamais écrit sur un bulletin. La règle est désormais posée aux DEUX
+  endroits que le modèle reçoit — le lexique de `document_annotation_prompt` et le `.describe()` du
+  champ dans `src/types/extraction.ts` : `true` seulement si « agréé »/« agrément » figure
+  LITTÉRALEMENT à propos de cet établissement ; un nom d'établissement est un nom, pas un agrément ;
+  sinon `null`. Vérifié que la description atteint réellement le JSON Schema généré (888 caractères),
+  et pas seulement le code source.
+  🔶 **Reste ouvert** : `enRapportAvecMetier`, juste en dessous, garde sa description neutre
+  (« Uniquement pertinent si type = enseignement ») et a exactement la même faiblesse — c'est l'autre
+  moitié de la condition dans `decompteHeures.ts`. Prochain candidat évident.
 - 🔶 **Deux affirmations du texte affiché à l'utilisateur ne sont pas vérifiées.** La mention de
   consentement dit « Mistral AI (France, **hébergement UE**) » : personne n'a vérifié cette
   affirmation dans les sessions qui l'ont écrite. Et l'usage des documents pour l'entraînement sur le
@@ -849,20 +870,37 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
   les deux phrases sur lesquelles un utilisateur décide s'il confie sa fiche de paie : à confirmer
   avant d'ouvrir le canal à d'autres personnes que Benoît.
 
-**Prochaine action (chantier import IA)** : **aligner le dialecte du schéma JSON envoyé à Mistral,
-puis faire le premier appel réel.** Concrètement : dans `api/extract-document.ts`, remplacer
-`zodToJsonSchema(extractionResultSchema, { target: "openApi3" })` par la forme qui a réellement
-fonctionné au Playground, soit `{ $refStrategy: "none" }` (JSON Schema draft-07, sans `$ref` interne
-ni `nullable` non standard) — cf. l'entrée 🔶 « Le schéma envoyé par l'app n'est pas celui qui a été
-testé ». C'est le seul segment du chemin que rien n'a encore validé, et le candidat le plus probable
-à un échec au premier envoi alors que tout marchait au Playground.
-Le reste du chemin est prêt et éprouvé : dépôt → contrôles → consentement → envoi → revue
-(`ecca2c8`, `d4906d5`), prompt et lexique validés sur documents réels (`4c6cebb`). Il n'y a plus de
-prérequis bloquant : la mention utilisateur existe et est bloquante, et le DPA n'en est plus un
-(décision du 28/07, lecture périmée à ne plus ressortir).
-Restent à faire, sans ordre imposé : corriger le brouillon `docs/files/ImportDocumentIA.jsx` qui
-appelle Mistral directement depuis le navigateur avec la clé dans un `<input>` (cf. le 🔴 plus haut) ;
-le CRUD des périodes assimilées, qui débloquerait la cible `periode_assimilee` (cf. la dette 🔴) ;
+**Prochaine action (chantier import IA)** : **faire passer un premier VRAI document.** Le tuyau
+technique est éprouvé (cf. l'entrée ✅ sur le dialecte : 200 OK, deux dialectes acceptés, validation
+Zod traversée), mais uniquement sur un PDF sans donnée exploitable et sans passer par l'interface.
+La question ouverte est de savoir si le prompt et le lexique tiennent sur pièce réelle en passant par
+`api/extract-document.ts`, et non par le Playground.
+
+Trois chantiers, sans ordre imposé :
+
+(a) **Premier document réel via l'app.** Obstacle connu, vérifié le 29/07 : en local, `npm run dev`
+    (Vite) ne sert PAS les Vercel Functions — un POST sur `/api/extract-document` y répond 404, et
+    l'app afficherait un échec générique sans rapport avec l'extraction. Trois voies possibles :
+    `vercel dev` (CLI absent du PATH, demande une connexion de compte), un routage dev-only ajouté à
+    `vite.config.ts`, ou passer directement par le déploiement (cf. (c)).
+
+(b) **Les 5 types de documents non couverts**, à inventorier puis éprouver : contrat d'enseignement,
+    bulletin d'enseignement, taux d'imposition, AEM, bulletin d'artiste. À traiter avec ça :
+    **concevoir l'alerte AEM vs bulletin de paie** — l'AEM est la pièce qui fait foi pour France
+    Travail, le bulletin ne l'est pas, et rien n'avertit aujourd'hui l'utilisateur qui saisit l'un en
+    croyant valider l'autre.
+
+(c) **Déploiement Vercel preview** — c'est aussi ce qui validerait le segment navigateur → endpoint
+    resté non exercé (cf. (a)), et ce qui débloquerait l'installation PWA sur un vrai téléphone.
+
+Il n'y a plus de prérequis bloquant : le chemin dépôt → contrôles → consentement → envoi → revue est
+en place (`ecca2c8`, `d4906d5`), prompt et lexique validés sur documents réels au Playground
+(`4c6cebb`), la mention utilisateur existe et est bloquante, et le DPA n'en est plus un (décision du
+28/07, lecture périmée à ne plus ressortir).
+
+Restent à faire par ailleurs : corriger le brouillon `docs/files/ImportDocumentIA.jsx` qui appelle
+Mistral directement depuis le navigateur avec la clé dans un `<input>` (cf. le 🔴 plus haut) ; le
+CRUD des périodes assimilées, qui débloquerait la cible `periode_assimilee` (cf. la dette 🔴) ;
 vérifier les deux affirmations du texte de consentement (cf. le 🔶 correspondant).
 
 **Prochaines pistes** : voir les deux points 🔴 juste au-dessus (dette `PeriodeAssimilee` sans chemin
