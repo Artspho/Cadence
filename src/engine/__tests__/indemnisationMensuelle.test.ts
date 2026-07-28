@@ -311,9 +311,13 @@ describe("calculerSerieDepuisContrats", () => {
     const premier = resultat.mois[0];
     if (premier.calculable) throw new Error("janvier devrait être le mois d'ouverture partiel, non calculable");
     expect(premier.type).toBe("ouverture_partielle");
-    // Chaîne littérale volontairement (pas la constante) : verrou de non-régression sur le texte
-    // RÉELLEMENT affiché à un réadmis, qui ne devait pas bouger dans ce chantier.
-    expect(premier.messageTooltip).toBe("Mois de réadmission — partagé entre deux droits, traité ici comme un mois entier (approximation).");
+    // Chaîne littérale volontairement (pas la constante) : verrou de non-régression sur la
+    // description RÉELLEMENT affichée à un réadmis avant ce chantier. Elle n'a pas dérivé d'un
+    // caractère — elle reste le PRÉFIXE exact du libellé. Le seul ajout autorisé est le rappel du
+    // relevé officiel (2026-07-28), vérifié juste en dessous : un `toBe` strict interdirait
+    // désormais cet ajout, un simple `toContain` laisserait passer une réécriture du début.
+    expect(premier.messageTooltip.startsWith("Mois de réadmission — partagé entre deux droits, traité ici comme un mois entier (approximation).")).toBe(true);
+    expect(premier.messageTooltip).toContain("Consulte ton relevé France Travail pour le montant exact.");
     expect(premier.messageTooltip).toBe(MOIS_OUVERTURE_PARTIELLE.avecDroitAnterieur);
   });
 
@@ -326,6 +330,19 @@ describe("calculerSerieDepuisContrats", () => {
     expect(premier.type).toBe("ouverture_partielle");
     expect(premier.messageTooltip).toBe(MOIS_OUVERTURE_PARTIELLE.sansDroitAnterieur);
     expect(premier.messageTooltip).not.toMatch(/réadmission|deux droits/i); // jamais un droit antérieur qui n'existe pas
+    expect(premier.messageTooltip).toContain("Consulte ton relevé France Travail pour le montant exact.");
+  });
+
+  // Le rappel du document officiel ne doit jamais redevenir le privilège d'un seul des deux cas :
+  // c'est la seule indication GRATUITE de l'endroit où trouver le vrai chiffre d'un mois que Cadence
+  // ne sait pas simuler. Il n'avait jamais été affiché à personne avant le 2026-07-28 (il vivait dans
+  // un `messageTooltip` que l'UI ne lisait pas), d'où ce verrou explicite.
+  it("le rappel du relevé France Travail est présent dans les deux libellés, et une seule fois", () => {
+    for (const libelle of [MOIS_OUVERTURE_PARTIELLE.avecDroitAnterieur, MOIS_OUVERTURE_PARTIELLE.sansDroitAnterieur]) {
+      expect(libelle).toContain(MOIS_OUVERTURE_PARTIELLE.rappelReleve);
+      expect(libelle.split(MOIS_OUVERTURE_PARTIELLE.rappelReleve)).toHaveLength(2); // pas de doublon
+      expect(libelle.endsWith(MOIS_OUVERTURE_PARTIELLE.rappelReleve)).toBe(true); // toujours en fin, après la description
+    }
   });
 
   it("le CALCUL du mois d'ouverture partiel est identique dans les deux situations — seul le libellé change", () => {

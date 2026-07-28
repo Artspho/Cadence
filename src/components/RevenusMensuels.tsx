@@ -7,6 +7,7 @@ import { getAjReelleAt } from "../engine/ajReelleUtils";
 import { joursDansMois } from "../engine/dateUtils";
 import { repartirContratParMois } from "../engine/decoupageMensuel";
 import { calculerNetEstime } from "../engine/estimationPaie";
+import { descriptionMoisOuverturePartielle } from "../content/moisOuverturePartielle";
 
 interface RevenusMensuelsProps {
   profil: Profil;
@@ -323,11 +324,17 @@ function TableauResultats({
 
   const desMoisEnEstimation = lignes.some((l) => l.estimation);
   const desMoisSansAj = lignes.some((l) => l.montant === null);
-  // Note de bas de tableau : reprend le libellé exact du mois d'ouverture partiel plutôt qu'une
-  // seconde rédaction — l'ancienne phrase affirmait « le découpage exact jour par jour entre l'ancien
-  // et le nouveau droit », faux pour une première admission (aucun droit antérieur). Absent s'il n'y
-  // a pas de mois partiel du tout (ouverture pile le 1er du mois), où la phrase n'avait rien à dire.
-  const messageMoisPartiel = lignes.find((l) => l.messageOuverturePartielle)?.messageOuverturePartielle ?? null;
+  // Note de bas de tableau : reprend la DESCRIPTION du mois d'ouverture partiel plutôt qu'une seconde
+  // rédaction — l'ancienne phrase affirmait « le découpage exact jour par jour entre l'ancien et le
+  // nouveau droit », faux pour une première admission (aucun droit antérieur). Absente s'il n'y a pas
+  // de mois partiel du tout (ouverture pile le 1er du mois), où la phrase n'avait rien à dire.
+  //
+  // Description SEULE, pas le libellé complet du tooltip : la suite de ce paragraphe enchaîne sur le
+  // teaser Premium, avec lequel le rappel « consulte ton relevé France Travail » ferait doublon (cf.
+  // descriptionMoisOuverturePartielle). Même dérivation du booléen que le moteur
+  // (indemnisationMensuelle.ts, ligne d'ouverture partielle) : `situation === "readmission"` = il
+  // existe un droit antérieur, et rien d'autre.
+  const messageMoisPartiel = lignes.some((l) => l.messageOuverturePartielle) ? descriptionMoisOuverturePartielle(profil.situation === "readmission") : null;
 
   function revenuARE(l: LigneAffichage): number {
     if (l.montant === null) return 0;

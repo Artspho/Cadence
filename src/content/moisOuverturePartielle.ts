@@ -18,14 +18,47 @@
 // Travail ») que personne n'affichait, et un `title` codé en dur dans RevenusMensuels.tsx
 // (« …traité ici comme un mois entier ») qui était le seul réellement visible. C'est ce dernier qui
 // décrit correctement ce que l'utilisateur a sous les yeux (l'affichage recalcule bien ce mois comme
-// un mois entier) : il est donc conservé mot pour mot comme libellé de référence.
+// un mois entier) : sa description est donc reprise mot pour mot ci-dessous.
+//
+// En revanche le RAPPEL du relevé officiel, lui, n'existait que dans la version morte côté moteur —
+// donc jamais affiché à personne, ni en réadmission ni en première admission. Il est réintégré ici
+// (2026-07-28, sur demande explicite) : c'est la seule indication gratuite qui dit où trouver le vrai
+// chiffre d'un mois que Cadence ne sait pas simuler. Conséquence assumée : le libellé de réadmission
+// n'est plus identique au caractère près à celui d'avant le chantier — il est strictement augmenté
+// (la description d'origine reste son préfixe exact, ce que le test vérifie).
+const RAPPEL_RELEVE = "Consulte ton relevé France Travail pour le montant exact.";
+
+const descriptionAvecDroitAnterieur = "Mois de réadmission — partagé entre deux droits, traité ici comme un mois entier (approximation).";
+
+const descriptionSansDroitAnterieur =
+  "Mois d'ouverture de tes droits — traité ici comme un mois entier (approximation) : les jours qui précèdent l'ouverture ne sont pas indemnisables, et Cadence ne sait pas les distinguer.";
+
 export const MOIS_OUVERTURE_PARTIELLE = {
-  avecDroitAnterieur: "Mois de réadmission — partagé entre deux droits, traité ici comme un mois entier (approximation).",
-  sansDroitAnterieur:
-    "Mois d'ouverture de tes droits — traité ici comme un mois entier (approximation) : les jours qui précèdent l'ouverture ne sont pas indemnisables, et Cadence ne sait pas les distinguer.",
+  /** Rappel du document officiel, commun aux deux cas — jamais reformulé ailleurs. */
+  rappelReleve: RAPPEL_RELEVE,
+  /** Descriptions seules, sans le rappel : exposées pour les tests de non-régression. */
+  descriptionAvecDroitAnterieur,
+  descriptionSansDroitAnterieur,
+  avecDroitAnterieur: `${descriptionAvecDroitAnterieur} ${RAPPEL_RELEVE}`,
+  sansDroitAnterieur: `${descriptionSansDroitAnterieur} ${RAPPEL_RELEVE}`,
 } as const;
 
-/** Libellé du mois d'ouverture partiel selon qu'un droit antérieur existe (réadmission) ou non. */
+/**
+ * Libellé COMPLET (description + rappel du relevé) du mois d'ouverture partiel, selon qu'un droit
+ * antérieur existe (réadmission) ou non. Destiné au tooltip de la ligne concernée, qui est lu hors de
+ * tout contexte : il doit se suffire à lui-même, rappel compris.
+ */
 export function messageMoisOuverturePartielle(avecDroitAnterieur: boolean): string {
   return avecDroitAnterieur ? MOIS_OUVERTURE_PARTIELLE.avecDroitAnterieur : MOIS_OUVERTURE_PARTIELLE.sansDroitAnterieur;
+}
+
+/**
+ * Description SEULE, sans le rappel du relevé — pour la note de bas de tableau, qui enchaîne déjà sur
+ * la limite d'approximation puis sur le teaser Premium (« Montant exact disponible en Premium… »). Y
+ * répéter « Consulte ton relevé France Travail pour le montant exact » créerait un doublon de
+ * vocabulaire à 30 mots d'écart, et deux conseils en tension sur où trouver le montant exact. Le
+ * rappel reste porté par le tooltip, où il est seul et utile.
+ */
+export function descriptionMoisOuverturePartielle(avecDroitAnterieur: boolean): string {
+  return avecDroitAnterieur ? MOIS_OUVERTURE_PARTIELLE.descriptionAvecDroitAnterieur : MOIS_OUVERTURE_PARTIELLE.descriptionSansDroitAnterieur;
 }
