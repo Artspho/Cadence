@@ -5,7 +5,8 @@
  *
  * Reçoit un PDF en base64, l'envoie à Mistral Document AI (endpoint OCR avec
  * annotation structurée) pour extraction, renvoie un ExtractionResult (voir
- * extraction-schema.ts). NE PERSISTE RIEN côté serveur (stateless).
+ * src/types/extraction.ts, schéma partagé avec le front). NE PERSISTE RIEN côté
+ * serveur (stateless).
  *
  * Reconstruit le 28/07/2026 depuis la doc officielle Mistral :
  * - https://docs.mistral.ai/studio-api/document-processing/basic_ocr
@@ -25,10 +26,24 @@
  */
 
 import { zodToJsonSchema } from "zod-to-json-schema";
-import { extractionResultSchema, type ExtractionResult } from "./extraction-schema";
+// Schéma partagé avec le front (écran de revue) — source unique, cf. l'en-tête du fichier.
+import { extractionResultSchema, type ExtractionResult } from "../src/types/extraction";
+
+/**
+ * Runtime Edge (et non Node). Choix cohérent avec le code : le handler ci-dessous
+ * utilise déjà la signature web standard `(req: Request) => Promise<Response>`,
+ * qui est exactement celle du runtime Edge de Vercel. En runtime Node, Vercel
+ * attendrait `(req: VercelRequest, res: VercelResponse)`.
+ *
+ * ⚠️ Limite à garder en tête avant le premier vrai document : le corps d'une
+ * requête Edge est plafonné (~4 Mo sur Vercel). Un PDF en base64 pèse ~1,33× le
+ * fichier d'origine, donc au-delà d'environ 3 Mo de PDF la requête sera rejetée
+ * côté plateforme, avant même d'atteindre ce code. À traiter côté client
+ * (message clair, voire compression) quand on branchera l'appel réseau.
+ */
+export const config = { runtime: "edge" };
 
 const MISTRAL_MODEL = "mistral-ocr-latest";
-const MISTRAL_API_KEY = process.env.MISTRAL_API_KEY;
 
 // ⚠️ Pendant les tests (phase actuelle) : clé du tier gratuit "Experiment" de
 // La Plateforme (console.mistral.ai), aucune carte bancaire nécessaire.
@@ -93,14 +108,38 @@ Règles impératives :
 - N'extrais JAMAIS de coordonnées bancaires complètes, de numéro de sécurité sociale (NIR), ni
   d'adresse postale complète, même si présents dans le document — ignore-les entièrement.`;
 
+/**
+ * Erreur de configuration du serveur (clé API absente) — distincte d'un échec
+ * d'extraction. Elle ne dépend pas du document envoyé : le message peut donc
+ * être renvoyé tel quel au client sans risque de fuite de données personnelles.
+ */
+export class ConfigurationManquanteError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ConfigurationManquanteError";
+  }
+}
+
 export async function extractDocument(pdfBase64: string): Promise<ExtractionResult> {
+  // Garde explicite : sans cette vérification, une clé absente partait en
+  // `Bearer ` vide, Mistral répondait 401, et l'utilisateur voyait un 500
+  // générique « Réessaie » — alors que réessayer n'y changera rien.
+  const apiKey = process.env.MISTRAL_API_KEY;
+  if (!apiKey) {
+    throw new ConfigurationManquanteError(
+      "MISTRAL_API_KEY n'est pas définie côté serveur : l'import de document est " +
+        "indisponible. Aucun document n'a été envoyé. Définis la variable " +
+        "d'environnement (voir .env.example) puis redéploie."
+    );
+  }
+
   const schema = zodToJsonSchema(extractionResultSchema, { target: "openApi3" });
 
   const response = await fetch("https://api.mistral.ai/v1/ocr", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${MISTRAL_API_KEY ?? ""}`,
+      Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
       model: MISTRAL_MODEL,
@@ -160,10 +199,21 @@ export default async function handler(req: Request): Promise<Response> {
       headers: { "Content-Type": "application/json" },
     });
   } catch (err) {
-    // Ne jamais renvoyer le contenu du document dans un message d'erreur.
+    // Cas 1 : le serveur est mal configuré. Ce n'est pas un échec d'extraction,
+    // et réessayer ne servirait à rien — on le dit clairement (503 = service
+    // indisponible), avec un message qui ne contient aucune donnée du document.
+    if (err instanceof ConfigurationManquanteError) {
+      return new Response(JSON.stringify({ error: err.message }), {
+        status: 503,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    // Cas 2 : tout le reste. Ne jamais renvoyer le contenu du document dans un
+    // message d'erreur.
     return new Response(
       JSON.stringify({ error: "Échec de l'extraction. Réessaie ou saisis manuellement." }),
-      { status: 500 }
+      { status: 500, headers: { "Content-Type": "application/json" } }
     );
   }
 }

@@ -1,0 +1,342 @@
+/**
+ * Écran de revue des propositions d'extraction IA.
+ *
+ * Principe non négociable : RIEN n'est écrit sans un geste explicite de l'utilisateur, proposition
+ * par proposition. Il n'y a volontairement pas de bouton « tout appliquer » — une extraction IA
+ * n'est pas une source de vérité, c'est une aide à la saisie. Un contrat passe toujours par le
+ * formulaire complet (relecture champ par champ) ; les propositions de profil passent par
+ * `onModifierProfil`, qui revalide (forme Zod + cohérence) et refuse d'écrire un profil invalide.
+ *
+ * Toute la décision « cette proposition est-elle applicable sans risque ? » vit dans
+ * lib/routageExtraction.ts (pure et testée). Ce composant ne fait que l'afficher : aucune règle
+ * métier ne doit être dupliquée ici.
+ */
+
+import { useState } from "react";
+import type { Contrat, DecompteHeuresResultat, Profil } from "../types";
+import type { ExtractionResult, Proposition } from "../types/extraction";
+import type { FranceTravailConfig } from "../config/franceTravailConfig";
+import type { ResultatEcritureProfil } from "../lib/coherenceProfil";
+import { contratDepuisProposition, evaluerExtraction, profilAvecProposition, type PropositionEvaluee, type StatutProposition } from "../lib/routageExtraction";
+import { ContractForm } from "./ContractForm";
+
+interface RevueExtractionProps {
+  resultat: ExtractionResult;
+  profil: Profil;
+  config: FranceTravailConfig;
+  decompteActuel: DecompteHeuresResultat;
+  onAjouterContrat: (contrat: Omit<Contrat, "id">) => void;
+  onModifierProfil: (profil: Profil) => ResultatEcritureProfil;
+  /** Bandeau affiché au-dessus de tout (ex. avertissement « extraction simulée » en développement). */
+  bandeau?: React.ReactNode;
+}
+
+type EtatCarte = "en_attente" | "applique" | "ecarte";
+
+const LABEL_DOCUMENT: Record<ExtractionResult["typeDocumentDetecte"], string> = {
+  bulletin_paie: "Bulletin de paie",
+  aem: "AEM (Attestation d'Employeur Mensuelle)",
+  notification_admission: "Notification d'admission",
+  releve_situation: "Relevé de situation",
+  declaration_fiscale_annuelle: "Déclaration fiscale annuelle",
+  attestation_cpam: "Attestation CPAM",
+  non_reconnu: "Type de document non reconnu",
+};
+
+const LABEL_CONFIANCE: Record<"haute" | "moyenne" | "faible", string> = {
+  haute: "confiance haute",
+  moyenne: "à vérifier",
+  faible: "peu fiable",
+};
+
+const COULEUR_CONFIANCE: Record<"haute" | "moyenne" | "faible", string> = {
+  haute: "text-mint",
+  moyenne: "text-amber",
+  faible: "text-red",
+};
+
+const LABELS_CHAMPS: Record<Proposition["cible"], Record<string, string>> = {
+  contrat: {
+    dateDebut: "Date de début",
+    date: "Date de fin",
+    type: "Nature du contrat",
+    typeRemuneration: "Mode de rémunération",
+    territoire: "Territoire",
+    nbCachets: "Nombre de cachets",
+    nbHeures: "Nombre d'heures",
+    nbJoursEEE: "Jours travaillés (EEE)",
+    salaireBrut: "Salaire brut (€)",
+    employeur: "Employeur",
+    etablissementAgree: "Établissement agréé",
+    enRapportAvecMetier: "En rapport avec le métier",
+  },
+  profil_ouverture_droits: {
+    dateOuverture: "Date d'ouverture des droits",
+    franchiseCPTotale: "Franchise congés payés (jours)",
+    delaiAttenteInitial: "Délai d'attente (jours)",
+    dateLimiteIndemnisation: "Date limite d'indemnisation",
+    tauxPrelevementSource: "Prélèvement à la source (%)",
+  },
+  profil_infos: {
+    dateAnniversaire: "Date anniversaire",
+    dateNaissance: "Date de naissance",
+    dateAnniversairePrecedente: "Date anniversaire précédente",
+    situation: "Situation",
+    dureeDroitsMois: "Durée des droits (mois)",
+  },
+  periode_assimilee: { type: "Type de période", dateDebut: "Début", dateFin: "Fin" },
+  aj_reelle_historique: { dateEffet: "Date d'effet", valeur: "Montant (€)", natureMontant: "Nature du montant" },
+  info_seule: {},
+};
+
+/** Valeurs d'énumération rendues lisibles. Une valeur inconnue est affichée brute, jamais masquée. */
+export const LABELS_VALEURS: Record<string, string> = {
+  artiste: "Artiste",
+  enseignement: "Enseignement",
+  formation: "Formation",
+  ptp: "PTP",
+  cachet: "Cachets",
+  heures: "Heures",
+  france: "France",
+  eee_suisse_uk: "EEE / Suisse / Royaume-Uni",
+  premiere_admission: "Première admission",
+  readmission: "Réadmission",
+  maternite: "Maternité",
+  adoption: "Adoption",
+  accident_travail: "Accident du travail",
+  ald: "Affection de longue durée (ALD)",
+  suspension_contrat: "Suspension de contrat",
+  maladie_intercontrat: "Maladie intercontrat",
+  net: "Net",
+  brut: "Brut",
+  indetermine: "Indéterminé",
+};
+
+const STYLE_STATUT: Record<StatutProposition, { libelle: string; classe: string }> = {
+  revue_formulaire: { libelle: "À vérifier dans le formulaire", classe: "bg-mint/15 text-mint" },
+  applicable: { libelle: "Applicable", classe: "bg-mint/15 text-mint" },
+  information: { libelle: "Information", classe: "bg-surface-2 text-muted" },
+  non_applicable: { libelle: "Non applicable", classe: "bg-amber/15 text-amber" },
+};
+
+/**
+ * Rend lisible une clé de champ dont on n'a pas d'étiquette : uniquement le cas de `info_seule`,
+ * dont les clés sont produites librement par l'IA (« salaireDeReferenceOfficiel »). On se contente
+ * de séparer les mots — pas de traduction ni de reformulation, pour ne pas donner à croire que
+ * l'app a compris de quoi il s'agit. Les accents manquent donc parfois : c'est le texte de l'IA,
+ * pas un libellé de Cadence.
+ */
+function humaniserCle(cle: string): string {
+  const mots = cle.replace(/([a-z0-9])([A-Z])/g, "$1 $2").toLowerCase();
+  return mots.charAt(0).toUpperCase() + mots.slice(1);
+}
+
+function formaterValeur(valeur: unknown): { texte: string; nonLu: boolean } {
+  if (valeur === null || valeur === undefined || valeur === "") return { texte: "non lu dans le document", nonLu: true };
+  if (typeof valeur === "boolean") return { texte: valeur ? "Oui" : "Non", nonLu: false };
+  if (typeof valeur === "string") return { texte: LABELS_VALEURS[valeur] ?? valeur, nonLu: false };
+  return { texte: String(valeur), nonLu: false };
+}
+
+export function RevueExtraction({ resultat, profil, config, decompteActuel, onAjouterContrat, onModifierProfil, bandeau }: RevueExtractionProps) {
+  const evaluees = evaluerExtraction(resultat);
+  const [etats, setEtats] = useState<Record<number, EtatCarte>>({});
+  const [erreurs, setErreurs] = useState<Record<number, string>>({});
+  const [formulaireOuvert, setFormulaireOuvert] = useState<number | null>(null);
+
+  function appliquerAuProfil(index: number, proposition: Proposition) {
+    // Le candidat est construit sans effet de bord ; c'est onModifierProfil (App.tsx) qui décide
+    // s'il est écrit. Un refus laisse l'ancien profil intact et s'affiche sur la carte.
+    const candidat = profilAvecProposition(profil, proposition);
+    const ecriture = onModifierProfil(candidat);
+    if (!ecriture.ok) {
+      setErreurs((e) => ({ ...e, [index]: ecriture.erreur }));
+      return;
+    }
+    setErreurs((e) => {
+      const suite = { ...e };
+      delete suite[index];
+      return suite;
+    });
+    setEtats((s) => ({ ...s, [index]: "applique" }));
+  }
+
+  function enregistrerContrat(index: number, contrat: Omit<Contrat, "id">) {
+    onAjouterContrat(contrat);
+    setFormulaireOuvert(null);
+    setEtats((s) => ({ ...s, [index]: "applique" }));
+  }
+
+  const restantes = evaluees.filter((_, i) => (etats[i] ?? "en_attente") === "en_attente").length;
+
+  return (
+    <div className="space-y-6">
+      {bandeau}
+
+      <div className="bg-surface border border-line rounded-card p-5 space-y-3">
+        <div className="flex items-baseline justify-between flex-wrap gap-2">
+          <div>
+            <p className="text-xs uppercase tracking-[.03em] text-muted mb-1">Document détecté</p>
+            <h2 className="font-display text-lg font-semibold tracking-tight">{LABEL_DOCUMENT[resultat.typeDocumentDetecte]}</h2>
+          </div>
+          <p className="text-xs text-faint">
+            {resultat.propositions.length === 0
+              ? "Aucune proposition"
+              : `${resultat.propositions.length} proposition${resultat.propositions.length > 1 ? "s" : ""} · ${restantes} à traiter`}
+          </p>
+        </div>
+        <p className="text-xs text-faint leading-relaxed">
+          Rien n'est enregistré tant que tu ne valides pas chaque proposition, une par une. Une extraction automatique peut se tromper : ce qui fait
+          foi reste le document que tu as sous les yeux.
+        </p>
+        {resultat.avertissementsGeneraux.length > 0 && (
+          <ul className="text-sm text-amber space-y-1.5 border-t border-line pt-3">
+            {resultat.avertissementsGeneraux.map((a, i) => (
+              <li key={i} className="leading-relaxed">
+                ⚠ {a}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      {evaluees.map((evaluee, index) => (
+        <CarteProposition
+          key={index}
+          evaluee={evaluee}
+          etat={etats[index] ?? "en_attente"}
+          erreur={erreurs[index]}
+          formulaireOuvert={formulaireOuvert === index}
+          profil={profil}
+          config={config}
+          decompteActuel={decompteActuel}
+          onAppliquer={() => appliquerAuProfil(index, evaluee.proposition)}
+          onOuvrirFormulaire={() => setFormulaireOuvert(index)}
+          onFermerFormulaire={() => setFormulaireOuvert(null)}
+          onEnregistrerContrat={(contrat) => enregistrerContrat(index, contrat)}
+          onEcarter={() => setEtats((s) => ({ ...s, [index]: "ecarte" }))}
+        />
+      ))}
+    </div>
+  );
+}
+
+interface CartePropositionProps {
+  evaluee: PropositionEvaluee;
+  etat: EtatCarte;
+  erreur?: string;
+  formulaireOuvert: boolean;
+  profil: Profil;
+  config: FranceTravailConfig;
+  decompteActuel: DecompteHeuresResultat;
+  onAppliquer: () => void;
+  onOuvrirFormulaire: () => void;
+  onFermerFormulaire: () => void;
+  onEnregistrerContrat: (contrat: Omit<Contrat, "id">) => void;
+  onEcarter: () => void;
+}
+
+function CarteProposition({
+  evaluee,
+  etat,
+  erreur,
+  formulaireOuvert,
+  profil,
+  config,
+  decompteActuel,
+  onAppliquer,
+  onOuvrirFormulaire,
+  onFermerFormulaire,
+  onEnregistrerContrat,
+  onEcarter,
+}: CartePropositionProps) {
+  const { proposition, titre, statut, motif, avertissements } = evaluee;
+  const labels = LABELS_CHAMPS[proposition.cible];
+  const style = STYLE_STATUT[statut];
+  const traitee = etat !== "en_attente";
+
+  return (
+    <section className={`bg-surface border rounded-card p-5 space-y-4 transition-opacity ${traitee ? "border-line opacity-60" : "border-line"}`}>
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <h3 className="font-display text-base font-medium tracking-tight">{titre}</h3>
+          <p className="text-xs text-faint mt-1 leading-relaxed">{proposition.justification}</p>
+        </div>
+        <span className={`shrink-0 text-xs font-medium px-2.5 py-1 rounded-full ${etat === "applique" ? "bg-mint/15 text-mint" : etat === "ecarte" ? "bg-surface-2 text-faint" : style.classe}`}>
+          {etat === "applique" ? "Enregistré" : etat === "ecarte" ? "Écarté" : style.libelle}
+        </span>
+      </div>
+
+      <dl className="text-sm divide-y divide-line/60 border-y border-line/60">
+        {Object.entries(proposition.donnees).map(([champ, valeur]) => {
+          const { texte, nonLu } = formaterValeur(valeur);
+          const confiance = proposition.confiance[champ];
+          return (
+            <div key={champ} className="flex items-baseline justify-between gap-4 py-2">
+              <dt className="text-muted">{labels[champ] ?? humaniserCle(champ)}</dt>
+              <dd className="text-right flex items-baseline gap-2">
+                <span className={nonLu ? "text-faint italic" : "text-ink"}>{texte}</span>
+                {confiance && !nonLu && <span className={`text-xs ${COULEUR_CONFIANCE[confiance]}`}>· {LABEL_CONFIANCE[confiance]}</span>}
+              </dd>
+            </div>
+          );
+        })}
+      </dl>
+
+      {avertissements.length > 0 && (
+        <ul className="text-xs text-amber space-y-1.5">
+          {avertissements.map((a, i) => (
+            <li key={i} className="leading-relaxed">
+              ⚠ {a}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {motif && (
+        <p className={`text-xs leading-relaxed rounded-lg px-3 py-2.5 ${statut === "non_applicable" ? "bg-amber/10 text-amber" : "bg-surface-2 text-muted"}`}>{motif}</p>
+      )}
+
+      {erreur && (
+        <p className="text-xs text-red leading-relaxed bg-red/10 rounded-lg px-3 py-2.5">
+          Rien n'a été enregistré : {erreur}
+        </p>
+      )}
+
+      {!traitee && !formulaireOuvert && (
+        <div className="flex items-center gap-2 flex-wrap">
+          {statut === "applicable" && (
+            <button onClick={onAppliquer} className="bg-mint text-bg font-medium rounded-lg px-4 py-2 text-sm transition-opacity hover:opacity-90">
+              Enregistrer dans mon profil
+            </button>
+          )}
+          {statut === "revue_formulaire" && (
+            <button onClick={onOuvrirFormulaire} className="bg-mint text-bg font-medium rounded-lg px-4 py-2 text-sm transition-opacity hover:opacity-90">
+              Vérifier et enregistrer
+            </button>
+          )}
+          <button onClick={onEcarter} className="px-4 py-2 rounded-lg border border-line text-muted text-sm hover:text-ink transition-colors">
+            {statut === "applicable" || statut === "revue_formulaire" ? "Ignorer" : "J'ai noté"}
+          </button>
+        </div>
+      )}
+
+      {etat === "applique" && proposition.cible !== "contrat" && (
+        <p className="text-xs text-faint">Modifiable à tout moment dans « Mon profil ».</p>
+      )}
+
+      {formulaireOuvert && proposition.cible === "contrat" && (
+        <div className="pt-2">
+          <ContractForm
+            profil={profil}
+            config={config}
+            decompteActuel={decompteActuel}
+            valeurInitiale={contratDepuisProposition(proposition.donnees)}
+            onValider={onEnregistrerContrat}
+            onAnnuler={onFermerFormulaire}
+          />
+        </div>
+      )}
+    </section>
+  );
+}

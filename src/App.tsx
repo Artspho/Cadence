@@ -17,6 +17,9 @@ import { Dashboard } from "./components/Dashboard";
 import { ContractForm } from "./components/ContractForm";
 import { ContractList } from "./components/ContractList";
 import { ImportBulletins } from "./components/ImportBulletins";
+// Maquette de test de l'écran de revue IA (extractions simulées, bac à sable) — ne rend rien
+// hors développement, cf. RevueExtractionDemo.tsx.
+import { RevueExtractionDemo } from "./components/RevueExtractionDemo";
 import { AlertCenter } from "./components/AlertCenter";
 import { Historique } from "./components/Historique";
 import { Simulateur } from "./components/Simulateur";
@@ -255,7 +258,20 @@ export default function App() {
         )}
 
         {onglet === "import" && calculs && (
-          <ImportBulletins profil={profil} config={franceTravailConfig} decompteActuel={calculs.decompte} onImporterContrat={ajouterContrat} />
+          <div className="space-y-6">
+            <ImportBulletins profil={profil} config={franceTravailConfig} decompteActuel={calculs.decompte} onImporterContrat={ajouterContrat} />
+            {/* Chantier en cours : import IA premium. Replié par défaut, invisible en production
+                (double garde : `import.meta.env.DEV` ici ET dans le composant). Les extractions
+                sont simulées et le bac à sable n'écrit jamais dans les vraies données. */}
+            {import.meta.env.DEV && (
+              <details className="bg-surface border border-line rounded-card p-4">
+                <summary className="cursor-pointer text-sm text-muted">Maquette — revue des extractions IA (développement)</summary>
+                <div className="pt-4">
+                  <RevueExtractionDemo profilReel={profil} config={franceTravailConfig} decompteActuel={calculs.decompte} />
+                </div>
+              </details>
+            )}
+          </div>
         )}
 
         {onglet === "historique" &&

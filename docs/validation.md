@@ -199,3 +199,34 @@ résultat directement, cas #2 et #3 transformés en tests permanents (`areNette.
   « × 35/7 arrondi », soit une autre règle (proratisation, arrondi différent) s'applique. Ne pas
   remplacer 62,00 € par 61,55 € sans avoir d'abord compris l'écart — ce serait échanger une valeur
   qui colle aux deux cas validés contre une valeur qui n'a encore été confrontée à aucun cas.
+
+- **`Profil.ajReelleHistorique` ne dit pas si le montant est net ou brut** (relevé le 2026-07-28, en
+  écrivant l'écran de revue des extractions IA). Le type est `{ dateEffet, valeur }` : la nature du
+  montant est une **convention implicite**, tenue à deux endroits séparés qui doivent rester
+  d'accord — l'UI de saisie (`MonProfil.tsx`, libellé « Allocation journalière nette ») et le moteur
+  (`indemnisationMensuelle.ts`, qui applique le prélèvement à la source **sur** cette valeur, donc la
+  traite comme nette). Rien dans le type n'empêche d'y écrire un brut, et un brut y produirait des
+  montants mensuels gonflés sur toute la série (faux montant, devoir n°2). C'est précisément le piège
+  qu'ouvre l'extraction automatique : un relevé de situation dit « allocation brute », une
+  notification dit « allocation journalière nette ». **Protégé à cet endroit** :
+  `lib/routageExtraction.ts` refuse de router toute proposition dont `natureMontant ≠ "net"` (refus
+  côté évaluation ET exception côté écriture, 4 tests dédiés dans `routageExtraction.test.ts`).
+  **Reste vrai pour tout futur écrivain de ce champ.** Solution systémique en backlog, à ne faire que
+  si un autre appelant apparaît : porter la nature dans le type (`natureMontant: "net"`) avec
+  migration silencieuse des entrées existantes en `"net"` — la convention actuelle. Pas urgent tant
+  que les deux seuls écrivains sont la saisie manuelle et cet écran de revue.
+
+- **`PeriodeAssimilee` n'a aucun chemin d'écriture dans l'app** (relevé le 2026-07-28). `DonneesCadence.periodes`
+  est **lu** partout où ça compte (`periodeReference.ts`, `decompteHeures.ts`, `salaireReference.ts`,
+  `prediction.ts`, `cycles.ts`, `Simulateur.tsx`) mais **aucune UI ni aucun setter d'`App.tsx` ne
+  permet d'en créer une** : le tableau ne peut être peuplé que par un import JSON. Une maternité ou
+  un accident du travail — qui valent 5 h/jour au décompte des 507 h — est donc aujourd'hui
+  **inarrivable** par la saisie normale, ce qui sous-estime silencieusement le décompte pour qui est
+  concerné. Conséquence immédiate : la cible `periode_assimilee` du schéma d'extraction
+  (`src/types/extraction.ts`) est refusée par `routageExtraction.ts` faute de destination, avec un
+  message explicite plutôt qu'un abandon silencieux. **À construire** : CRUD des périodes assimilées
+  (formulaire + `ajouterPeriode`/`supprimerPeriode` dans `App.tsx`), après quoi le refus n°2 de
+  `routageExtraction.ts` pourra devenir un routage réel. ⚠️ Le piège déjà documenté reste entier :
+  `ald` et `maladie_intercontrat` ont des effets **opposés** sur le décompte et un simple avis
+  d'arrêt de travail CPAM ne permet pas de les distinguer — l'extraction ne doit jamais deviner ce
+  champ (cf. commentaire dans `src/types/extraction.ts`).

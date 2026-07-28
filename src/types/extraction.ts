@@ -1,6 +1,24 @@
 /**
- * api/extraction-schema.ts (v2 — corrigé après retour Claude Code du 28/07/2026)
+ * src/types/extraction.ts (v3 — déplacé depuis api/extraction-schema.ts le 28/07/2026)
  *
+ * CONTRAT PARTAGÉ entre le backend (api/extract-document.ts, qui valide la réponse
+ * de Mistral avec ce schéma) et le front (components/RevueExtraction.tsx, qui affiche
+ * les propositions et les route). Source UNIQUE, volontairement : si les deux côtés
+ * avaient chacun leur copie, une divergence silencieuse enverrait une valeur dans le
+ * mauvais champ — donc un chiffre faux à l'écran (devoir sacré n°2).
+ *
+ * Rangé dans `src/` et non dans `api/` parce que tsconfig.json n'inclut que `src` :
+ * dans l'autre sens, le programme TypeScript du navigateur aurait dû aller chercher un
+ * fichier de `api/`, ce qui brouille la frontière que tsconfig.api.json défend
+ * explicitement (le code navigateur ne doit pas voir les globals Node). Ce fichier
+ * n'utilise que Zod, aucun global Node : `api/` peut l'importer sans risque inverse.
+ *
+ * ⚠️ Ce n'est PAS le modèle de données de l'app (src/types/index.ts). C'est la forme
+ * de ce qu'une IA PROPOSE, avant revue humaine. Rien ici n'est écrit automatiquement.
+ * Volontairement pas ré-exporté depuis src/types/index.ts, pour que la distinction
+ * « proposition à valider » vs « donnée établie » reste visible à l'import.
+ *
+ * Corrections de la v2 (retour Claude Code du 28/07/2026) :
  * Corrections apportées suite à l'analyse de Claude Code contre le vrai
  * `src/types/index.ts` :
  * - `type` et `territoire` de propositionContratSchema passent en nullable

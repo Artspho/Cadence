@@ -1,0 +1,214 @@
+import { describe, expect, it } from "vitest";
+import type { Profil } from "../../types";
+import type { Proposition } from "../../types/extraction";
+import { contratDepuisProposition, evaluerExtraction, evaluerProposition, profilAvecProposition } from "../routageExtraction";
+import { extractionBulletinPaie, extractionNotificationAdmission, extractionReleveAvecRefus } from "../fixturesExtraction";
+
+const profilBase: Profil = {
+  dateNaissance: "1988-04-12",
+  dateAnniversaire: "2025-11-30",
+  situation: "readmission",
+};
+
+function propositionAj(natureMontant: "net" | "brut" | "indetermine", valeur = 60): Proposition {
+  return {
+    cible: "aj_reelle_historique",
+    donnees: { dateEffet: "2026-03-01", valeur, natureMontant },
+    confiance: { valeur: "haute" },
+    justification: "test",
+  };
+}
+
+describe("aj_reelle_historique — le champ de l'app attend une AJ NETTE", () => {
+  it("accepte un montant explicitement net", () => {
+    const evaluee = evaluerProposition(propositionAj("net"));
+    expect(evaluee.statut).toBe("applicable");
+  });
+
+  // Devoir n°2 : le moteur applique le prélèvement à la source SUR cette valeur. Y mettre un brut
+  // gonflerait tous les montants mensuels affichés.
+  it("refuse un montant brut", () => {
+    const evaluee = evaluerProposition(propositionAj("brut"));
+    expect(evaluee.statut).toBe("non_applicable");
+    expect(evaluee.motif).toMatch(/BRUTE/);
+  });
+
+  it("refuse un montant de nature indéterminée", () => {
+    const evaluee = evaluerProposition(propositionAj("indetermine"));
+    expect(evaluee.statut).toBe("non_applicable");
+  });
+
+  it("refuse d'écrire un montant non net même si l'évaluation est contournée", () => {
+    expect(() => profilAvecProposition(profilBase, propositionAj("brut"))).toThrow(/non net/);
+    expect(() => profilAvecProposition(profilBase, propositionAj("indetermine"))).toThrow(/non net/);
+  });
+
+  it("insère le montant net en gardant l'historique trié par date d'effet", () => {
+    const profil: Profil = { ...profilBase, ajReelleHistorique: [{ dateEffet: "2026-05-01", valeur: 55.02 }] };
+    const resultat = profilAvecProposition(profil, propositionAj("net", 54.55));
+    expect(resultat.ajReelleHistorique).toEqual([
+      { dateEffet: "2026-03-01", valeur: 54.55 },
+      { dateEffet: "2026-05-01", valeur: 55.02 },
+    ]);
+  });
+
+  it("remplace l'entrée existante de même date d'effet au lieu de la dupliquer", () => {
+    const profil: Profil = { ...profilBase, ajReelleHistorique: [{ dateEffet: "2026-03-01", valeur: 50 }] };
+    const resultat = profilAvecProposition(profil, propositionAj("net", 54.55));
+    expect(resultat.ajReelleHistorique).toEqual([{ dateEffet: "2026-03-01", valeur: 54.55 }]);
+  });
+});
+
+describe("profil_ouverture_droits — refus si un chiffre qui change les montants manque", () => {
+  const complete: Proposition = {
+    cible: "profil_ouverture_droits",
+    donnees: { dateOuverture: "2026-02-01", franchiseCPTotale: 12, delaiAttenteInitial: 7, dateLimiteIndemnisation: "2027-01-31", tauxPrelevementSource: 7.2 },
+    confiance: {},
+    justification: "test",
+  };
+
+  it("applique une notification complète", () => {
+    expect(evaluerProposition(complete).statut).toBe("applicable");
+    const resultat = profilAvecProposition(profilBase, complete);
+    expect(resultat.ouvertureDroits).toEqual({
+      dateOuverture: "2026-02-01",
+      franchiseCPTotale: 12,
+      delaiAttenteInitial: 7,
+      dateLimiteIndemnisation: "2027-01-31",
+      tauxPrelevementSource: 7.2,
+    });
+  });
+
+  // Mettre 0 par défaut décalerait les dates de versement : chiffre inventé, donc refus.
+  it.each([
+    ["franchiseCPTotale", { franchiseCPTotale: null }],
+    ["delaiAttenteInitial", { delaiAttenteInitial: null }],
+    ["dateOuverture", { dateOuverture: "" }],
+  ])("refuse quand %s manque", (_champ, remplacement) => {
+    const partielle = { ...complete, donnees: { ...complete.donnees, ...remplacement } } as Proposition;
+    const evaluee = evaluerProposition(partielle);
+    expect(evaluee.statut).toBe("non_applicable");
+    expect(() => profilAvecProposition(profilBase, partielle)).toThrow();
+  });
+
+  it("ne perd pas un taux déjà saisi quand le document n'en donne pas", () => {
+    const profil: Profil = {
+      ...profilBase,
+      ouvertureDroits: { dateOuverture: "2025-02-01", franchiseCPTotale: 5, delaiAttenteInitial: 7, tauxPrelevementSource: 3.1, dateLimiteIndemnisation: "2026-01-31" },
+    };
+    const sansTaux = { ...complete, donnees: { ...complete.donnees, tauxPrelevementSource: null, dateLimiteIndemnisation: null } } as Proposition;
+    const resultat = profilAvecProposition(profil, sansTaux);
+    expect(resultat.ouvertureDroits?.tauxPrelevementSource).toBe(3.1);
+    expect(resultat.ouvertureDroits?.dateLimiteIndemnisation).toBe("2026-01-31");
+  });
+});
+
+describe("profil_infos — un champ non lu n'efface jamais une valeur déjà saisie (devoir n°1)", () => {
+  it("ne modifie que les champs effectivement lus", () => {
+    const proposition: Proposition = {
+      cible: "profil_infos",
+      donnees: { dateAnniversaire: "2026-01-15", dateNaissance: null, dateAnniversairePrecedente: null, situation: null, dureeDroitsMois: null },
+      confiance: {},
+      justification: "test",
+    };
+    const resultat = profilAvecProposition(profilBase, proposition);
+    expect(resultat.dateAnniversaire).toBe("2026-01-15");
+    expect(resultat.dateNaissance).toBe("1988-04-12");
+    expect(resultat.situation).toBe("readmission");
+  });
+
+  it("n'a rien à appliquer si aucun champ n'a été lu", () => {
+    const proposition: Proposition = {
+      cible: "profil_infos",
+      donnees: { dateAnniversaire: null, dateNaissance: null, dateAnniversairePrecedente: null, situation: null, dureeDroitsMois: null },
+      confiance: {},
+      justification: "test",
+    };
+    expect(evaluerProposition(proposition).statut).toBe("non_applicable");
+  });
+});
+
+describe("periode_assimilee — aucune destination dans l'app aujourd'hui", () => {
+  it("n'est jamais appliquée et l'explique", () => {
+    const proposition: Proposition = {
+      cible: "periode_assimilee",
+      donnees: { type: "accident_travail", dateDebut: "2026-04-06", dateFin: "2026-04-24" },
+      confiance: {},
+      justification: "test",
+    };
+    const evaluee = evaluerProposition(proposition);
+    expect(evaluee.statut).toBe("non_applicable");
+    expect(evaluee.motif).toBeTruthy();
+    expect(() => profilAvecProposition(profilBase, proposition)).toThrow();
+  });
+});
+
+describe("contrat — toujours relu dans le formulaire, jamais appliqué directement", () => {
+  const proposition = extractionBulletinPaie.propositions[0] as Extract<Proposition, { cible: "contrat" }>;
+
+  it("passe par le formulaire", () => {
+    expect(evaluerProposition(proposition).statut).toBe("revue_formulaire");
+  });
+
+  it("signale chaque champ que le document n'indiquait pas, pour ne pas faire passer un défaut du formulaire pour une valeur lue", () => {
+    const { avertissements } = evaluerProposition(proposition);
+    expect(avertissements).toHaveLength(3);
+    expect(avertissements.join(" ")).toMatch(/Artiste/);
+    expect(avertissements.join(" ")).toMatch(/Cachets/);
+    expect(avertissements.join(" ")).toMatch(/France/);
+  });
+
+  it("convertit les champs non lus en `undefined` sans inventer de valeur", () => {
+    const valeurs = contratDepuisProposition(proposition.donnees);
+    expect(valeurs.type).toBeUndefined();
+    expect(valeurs.typeRemuneration).toBeUndefined();
+    expect(valeurs.territoire).toBeUndefined();
+    expect(valeurs.nbCachets).toBeUndefined();
+    expect(valeurs.salaireBrut).toBe(1420.5);
+    expect(valeurs.employeur).toBe("Compagnie du Exemple Fictif");
+    expect(valeurs.source).toBe("import_pdf");
+  });
+
+  it("ne s'applique pas au profil", () => {
+    expect(() => profilAvecProposition(profilBase, proposition)).toThrow();
+  });
+});
+
+describe("info_seule — jamais routée, jamais perdue", () => {
+  it("est signalée comme information avec un motif", () => {
+    const proposition: Proposition = {
+      cible: "info_seule",
+      donnees: { salaireDeReferenceOfficiel: 24800 },
+      confiance: { salaireDeReferenceOfficiel: "haute" },
+      justification: "test",
+    };
+    const evaluee = evaluerProposition(proposition);
+    expect(evaluee.statut).toBe("information");
+    expect(evaluee.motif).toBeTruthy();
+  });
+});
+
+describe("fixtures de démonstration — couvrent bien chaque branche", () => {
+  it("la notification est entièrement applicable, hors information", () => {
+    const statuts = evaluerExtraction(extractionNotificationAdmission).map((e) => e.statut);
+    expect(statuts).toEqual(["applicable", "applicable", "applicable", "information"]);
+  });
+
+  it("le relevé produit trois refus et une information", () => {
+    const statuts = evaluerExtraction(extractionReleveAvecRefus).map((e) => e.statut);
+    expect(statuts.filter((s) => s === "non_applicable")).toHaveLength(3);
+    expect(statuts.filter((s) => s === "information")).toHaveLength(1);
+  });
+
+  it("appliquer toute la notification produit un profil valide et complet", () => {
+    let profil = profilBase;
+    for (const evaluee of evaluerExtraction(extractionNotificationAdmission)) {
+      if (evaluee.statut === "applicable") profil = profilAvecProposition(profil, evaluee.proposition);
+    }
+    expect(profil.ouvertureDroits?.franchiseCPTotale).toBe(12);
+    expect(profil.ouvertureDroits?.delaiAttenteInitial).toBe(7);
+    expect(profil.dateAnniversaire).toBe("2026-01-15");
+    expect(profil.dureeDroitsMois).toBe(12);
+    expect(profil.ajReelleHistorique).toEqual([{ dateEffet: "2026-02-01", valeur: 54.55 }]);
+  });
+});
