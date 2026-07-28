@@ -1,0 +1,26 @@
+{
+  // Projet TypeScript des fonctions serverless (`api/`, convention Vercel Functions).
+  //
+  // Volontairement SÉPARÉ de tsconfig.json (qui ne couvre que `src`) plutôt que d'ajouter "api" à
+  // son `include` : le code navigateur ne doit pas voir les globals Node (`process`, `Buffer`…),
+  // sinon rien n'empêcherait un composant React d'en utiliser un et de casser au runtime. Les deux
+  // projets sont vérifiés séparément par le script `build` (cf. package.json).
+  //
+  // `lib` inclut DOM : les fonctions utilisent l'API Web standard (`Request`, `Response`, `fetch`),
+  // dont les types viennent de la lib DOM — c'est aussi ce qui rend le handler portable d'un
+  // hébergeur à l'autre (Vercel Edge, Cloudflare Workers, Deno…).
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "types": ["node"],
+    "strict": true,
+    "noEmit": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "noFallthroughCasesInSwitch": true
+  },
+  "include": ["api"]
+}

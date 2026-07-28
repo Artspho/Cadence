@@ -586,6 +586,74 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
   durée les deux devoirs sacrés (pas de perte de données, pas de chiffre faux). La config est
   actuellement datée « 2026.06 » (alignée sur la revalorisation SMIC du 1er juin 2026) — prochaine
   échéance connue : la revalorisation SMIC/PMSS du 1er janvier suivant.
+- ⬜ **Chantier import IA premium — analyse du périmètre de scan faite, aucun code produit
+  (28/07/2026).** Extension prévue de l'import PDF (aujourd'hui local/pdfjs) vers un import IA
+  premium via Mistral Document AI, routant vers des « propositions d'écriture » validées une par une
+  plutôt qu'un remplissage direct. Analyse du périmètre menée contre `src/types/index.ts` réel :
+  confirmation de `PeriodeAssimilee` (schéma inchangé, 6 variants) ; ajout au schéma d'extraction de
+  `ouvertureDroits.dateLimiteIndemnisation`, `ouvertureDroits.tauxPrelevementSource`,
+  `dureeDroitsMois`, `dateAnniversairePrecedente`, `situation`, `dateNaissance` ; correction du
+  nommage **AEM** (Attestation d'Employeur Mensuelle, pas « AER ») ; `type`/`territoire` du Contrat
+  passés nullable (un bulletin ne les indique presque jamais — les exiger forçait le modèle à
+  inventer, en contradiction avec sa propre règle « jamais de valeur inventée »). Exclus formellement
+  du périmètre de scan : `regimeDeclare` (doit rester auto-déclaré, cf. garde-fou situation mixte),
+  `salairesHorsAnnexe10PRA` seul (déclencherait l'alerte de contradiction), les constantes de config
+  (plafonds), `activiteHorsAnnexe10` (déprécié), `SoldeIndemnisationDepart.dateDepart` (choix
+  d'affichage, aucun document ne le porte). Le point brut/net sur `ajReelleHistorique` reste **non
+  résolu par design** : `calculerAJNette` est à sens unique (brut → net), exige un SJM indisponible
+  à la lecture d'un relevé, et est une estimation assumée — l'utiliser réintroduirait l'« AJ estimée »
+  que le champ interdit explicitement. Ne pas confondre avec `MontantMensuelResultat.montantNet`,
+  qui applique le prélèvement à la source, pas les cotisations. Documents V1 : bulletin de paie/AEM,
+  notification d'admission, relevé de situation, déclaration fiscale annuelle. V2 (aucune fixture
+  réelle disponible) : contrat signé, attestations CPAM, avis d'imposition, attestation Afdas/OPCO —
+  avec un piège identifié côté CPAM : `ald` et `maladie_intercontrat` ont des effets **opposés** sur
+  le décompte et un avis d'arrêt de travail ne permet pas de trancher, donc `info_seule` obligatoire,
+  jamais un type deviné. **Non-régression vérifiée dans le code avant tout développement** : l'import
+  local pdfjs (`lib/extractionBulletin.ts` → `ImportBulletins`, onglet « Import PDF ») reste un canal
+  intact et gratuit, et l'app n'a aujourd'hui **aucune authentification** (rien dans `package.json`
+  ni `src/`, hormis `lib/googleDriveAuth.ts` qui est opt-in dans le module frais réels) — `App.tsx`
+  ne pose aucun verrou global, donc une auth introduite plus tard peut rester cantonnée au clic
+  « Importer avec l'IA ». **Bloqué avant implémentation** : le projet n'a ni framework serverless ni
+  dossier `api/` (SPA statique Vite/PWA), or `MISTRAL_API_KEY` ne doit jamais atterrir dans le bundle
+  client — le choix de la plateforme d'hébergement est un prérequis, cf. §11.B du SPEC (backend/comptes
+  hors bêta) et le prérequis bloquant « comptes + paiement » de l'entrée premium. Références :
+  `docs/files/SPEC_annexe_IA_premium.md`, `docs/files/brief_claude_code_documents_premium.md`.
+- ✅ **Backend minimal en place (28/07/2026)** — première brique serveur du projet, sans auth ni base
+  de données (chantier séparé, à faire quand le gate premium sera construit). `api/extract-document.ts`
+  et `api/extraction-schema.ts` sortis de `docs/files/` vers `api/` (convention Vercel Functions,
+  endpoint `/api/extract-document`). Dépendances ajoutées : `zod-to-json-schema` (runtime) et
+  `@types/node` (dev). **Ces fichiers sont enfin type-checkés** via `tsconfig.api.json` — volontairement
+  SÉPARÉ de `tsconfig.json` : ce dernier a `"types": ["vitest/globals"]`, ce qui désactive le chargement
+  automatique des `@types` (donc `process` restait inconnu même avec `@types/node`), et surtout ajouter
+  `"node"` au projet principal rendrait `process`/`Buffer` visibles depuis le code React, où ils cassent
+  au runtime. Nouveau script `npm run typecheck` (= `tsc -b && tsc -p tsconfig.api.json`), les deux
+  projets sont vérifiés par `npm run build`. Vérifié : aucune trace de `mistral` ni de
+  `zodToJsonSchema` dans `dist/` — le code serveur ne fuit pas dans le bundle client.
+- 🔴 **À traiter en priorité au prochain chantier import IA — le composant brouillon contourne le
+  backend.** `docs/files/ImportDocumentIA.jsx` (et sa copie `docs/ImportDocumentIA.jsx`, de contenu
+  DIFFÉRENT) appelle `https://api.mistral.ai/v1/ocr` **directement depuis le navigateur**, avec la clé
+  saisie dans un `<input>` (`const [apiKey, setApiKey] = useState("")`). Câblé tel quel, ça rend
+  `api/extract-document.ts` inutile et expose la clé. Le composant doit appeler `POST /api/extract-document`
+  et ne jamais connaître la clé. Rappel de la règle : la variable doit s'appeler `MISTRAL_API_KEY`, JAMAIS
+  `VITE_MISTRAL_API_KEY` (Vite inline tout `VITE_*` dans le bundle client).
+- 🔶 **Contraintes Vercel connues, à trancher avant le premier déploiement** : (1) runtime Edge vs Node —
+  la signature `(req: Request): Promise<Response>` est celle de l'Edge, à forcer via
+  `export const config = { runtime: 'edge' }` ; le support de cette signature côté runtime Node n'est pas
+  vérifié. (2) Le PDF part en base64 dans le corps de requête, +33 % de volume, plafond Vercel ~4,5 Mo →
+  **plafond pratique ~3 Mo de PDF** (un bulletin passe, une notification scannée multi-pages peut coincer).
+  (3) L'OCR peut dépasser le timeout par défaut de 10 s (Node) — relevable via `maxDuration`, l'Edge
+  plafonnant vers 25 s. (4) Défaut de diagnostic laissé en place volontairement : si `MISTRAL_API_KEY` est
+  absente, `Bearer ${… ?? ""}` produit un 401 Mistral qui remonte en 500 générique « Échec de l'extraction ».
+- ⚠️ **`docs/cadence-export-2026-07-24.json` contient de VRAIES données personnelles** (date de naissance,
+  21 contrats réels, employeurs nommés) — ajouté à `.gitignore`, **jamais à committer** : un commit git
+  ne s'effface pas proprement. Anomalie repérée au passage dans ce fichier : `dateNaissance: "19994-06-09"`
+  (année à 5 chiffres) — à vérifier dans les données réelles, ça fausse le plafond enseignement 70/120 h.
+
+**Prochaine action (chantier import IA)** : écrire l'écran de revue des propositions d'extraction avec une
+fixture `ExtractionResult` en dur (aucun appel réseau, aucun document réel), pour valider l'UX et le
+routage des propositions vers `ajouterContrat` / `modifierProfil` — puis seulement ensuite brancher
+`POST /api/extract-document`. Avant tout document réel : DPA Mistral vérifié/signé et non-entraînement du
+tier gratuit « Experiment » confirmé dans la console, sinon clé payante.
 
 **Prochaines pistes** : voir les deux points 🔴 juste au-dessus (point 2 AJ brut/net, dossier
 OneDrive) et `docs/reprise.md` pour le détail. Chantier ouvert restant sur la franchise
