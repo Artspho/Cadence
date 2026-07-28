@@ -27,6 +27,14 @@ export const ENDPOINT_EXTRACTION = "/api/extract-document";
 const ECHEC_GENERIQUE = "L'extraction a échoué. Réessaie, ou saisis le document à la main.";
 const REPONSE_INATTENDUE =
   "Le service d'extraction a répondu quelque chose d'inattendu. Aucune proposition n'a été retenue — saisis le document à la main.";
+/**
+ * `fetch` rejette (hors ligne, connexion coupée, DNS). Formulation prudente à dessein : une coupure
+ * peut survenir APRÈS que le corps de la requête soit parti, donc on n'affirme pas « ton document
+ * n'a pas été transmis » — ce serait rassurant et potentiellement faux. On dit seulement ce qu'on
+ * sait : rien n'est revenu.
+ */
+const ECHEC_RESEAU =
+  "Le service d'extraction n'a pas pu être joint (connexion interrompue). Aucune proposition n'a été reçue — réessaie, ou saisis les informations à la main.";
 
 /**
  * Le SEUL statut dont on accepte de réafficher le message : le 503 que notre endpoint renvoie quand
@@ -68,17 +76,34 @@ async function lireMessageErreur(reponse: Response): Promise<string> {
 }
 
 export async function extraireDocumentIA(pdfBase64: string): Promise<ExtractionResult> {
-  const reponse = await fetch(ENDPOINT_EXTRACTION, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ pdfBase64 }),
-  });
+  // Cette fonction ne doit JAMAIS laisser échapper une erreur dont le message vient d'ailleurs que
+  // d'ici : son appelant (ImportDocumentIA.tsx) affiche `error.message` tel quel à l'utilisateur, en
+  // se fiant à cette garantie. D'où les deux enveloppes ci-dessous — sans elles, un « Failed to
+  // fetch » ou un « Unexpected token '<' » du moteur JS atterrirait à l'écran.
+  let reponse: Response;
+  try {
+    reponse = await fetch(ENDPOINT_EXTRACTION, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pdfBase64 }),
+    });
+  } catch {
+    throw new Error(ECHEC_RESEAU);
+  }
 
   if (!reponse.ok) {
     throw new Error(await lireMessageErreur(reponse));
   }
 
-  const brut = (await reponse.json()) as unknown;
+  // Un 200 ne garantit pas du JSON : une réécriture mal configurée, un portail captif ou un CDN
+  // peuvent répondre 200 avec une page HTML. `json()` lèverait alors une SyntaxError technique.
+  let brut: unknown;
+  try {
+    brut = (await reponse.json()) as unknown;
+  } catch {
+    throw new Error(REPONSE_INATTENDUE);
+  }
+
   const valide = extractionResultSchema.safeParse(brut);
   if (!valide.success) {
     throw new Error(REPONSE_INATTENDUE);

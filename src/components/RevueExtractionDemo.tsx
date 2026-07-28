@@ -25,7 +25,6 @@ import type { Contrat, DecompteHeuresResultat, Profil } from "../types";
 import type { FranceTravailConfig } from "../config/franceTravailConfig";
 import { validerProfilPourEcriture, type ResultatEcritureProfil } from "../lib/coherenceProfil";
 import { FIXTURES_EXTRACTION } from "../lib/fixturesExtraction";
-import { ConsentementEnvoiIA } from "./ConsentementEnvoiIA";
 import { LABELS_VALEURS, RevueExtraction } from "./RevueExtraction";
 
 interface RevueExtractionDemoProps {
@@ -45,9 +44,6 @@ function BancEssaiRevue({ profilReel, config, decompteActuel }: RevueExtractionD
   const [fixtureId, setFixtureId] = useState(FIXTURES_EXTRACTION[0].id);
   const [profilBacASable, setProfilBacASable] = useState<Profil>(profilReel);
   const [contratsBacASable, setContratsBacASable] = useState<Omit<Contrat, "id">[]>([]);
-  // Aperçu visuel de la modale de consentement. Aucun envoi possible depuis ici : le banc d'essai ne
-  // connaît pas `extraireDocumentIA` — « Envoyer ce document » ne fait que refermer l'aperçu.
-  const [apercuConsentement, setApercuConsentement] = useState(false);
 
   const fixture = FIXTURES_EXTRACTION.find((f) => f.id === fixtureId) ?? FIXTURES_EXTRACTION[0];
 
@@ -98,27 +94,12 @@ function BancEssaiRevue({ profilReel, config, decompteActuel }: RevueExtractionD
         <button onClick={reinitialiser} className="px-3 py-1.5 rounded-lg border border-line text-muted text-xs hover:text-ink transition-colors">
           Vider la copie de travail
         </button>
-        <button
-          onClick={() => setApercuConsentement(true)}
-          className="px-3 py-1.5 rounded-lg border border-line text-muted text-xs hover:text-ink transition-colors"
-        >
-          Voir la modale de consentement
-        </button>
       </div>
     </div>
   );
 
   return (
     <div className="space-y-6">
-      {apercuConsentement && (
-        <ConsentementEnvoiIA
-          nomFichier="notification-fictive.pdf"
-          enCours={false}
-          onAnnuler={() => setApercuConsentement(false)}
-          onConfirmer={() => setApercuConsentement(false)}
-        />
-      )}
-
       {/* `key` : remet à zéro l'état interne de l'écran de revue (cartes traitées, formulaire
           ouvert) quand on change de fixture — sinon une carte « Enregistré » resterait marquée
           comme telle sur l'extraction suivante. */}

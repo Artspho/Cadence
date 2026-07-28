@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MENTION_ENVOI_IA_INTEGRALE, MENTION_ENVOI_IA_PHRASES, RAPPEL_DOCUMENT_ENVOYE } from "../../content/mentionEnvoiIA";
+import { ANNONCE_CANAL_IA, MENTION_ENVOI_IA_INTEGRALE, MENTION_ENVOI_IA_PHRASES, RAPPEL_DOCUMENT_ENVOYE } from "../../content/mentionEnvoiIA";
 
 // Ce texte est la contrepartie d'une décision produit (rester sur le tier gratuit Mistral, où les
 // documents peuvent servir à l'entraînement), pas de la décoration. Ces tests existent pour qu'il ne
@@ -26,6 +26,25 @@ describe("mention d'envoi IA — le texte validé ne peut pas dériver", () => {
   it("propose l'alternative gratuite et locale", () => {
     expect(MENTION_ENVOI_IA_PHRASES[2]).toContain("la saisie manuelle reste gratuite");
     expect(MENTION_ENVOI_IA_PHRASES[2]).toContain("ne quitte jamais ton appareil");
+  });
+});
+
+describe("annonce du canal — ce que fait le bouton, avant même de choisir un fichier", () => {
+  it("dit que le document part vers un serveur", () => {
+    expect(ANNONCE_CANAL_IA).toContain("envoie ton document à un serveur");
+  });
+
+  it("annonce que l'accord est demandé à chaque envoi, pas une fois pour toutes", () => {
+    expect(ANNONCE_CANAL_IA).toContain("avant chaque envoi");
+    expect(ANNONCE_CANAL_IA).toContain("rien ne part sans ton accord");
+  });
+
+  // Elle annonce le détail, elle ne le remplace pas : le détail se lit d'un bloc dans la modale.
+  it("reste distincte de la mention de consentement et n'en est pas un extrait", () => {
+    expect(ANNONCE_CANAL_IA).not.toBe(MENTION_ENVOI_IA_INTEGRALE);
+    for (const phrase of MENTION_ENVOI_IA_PHRASES) {
+      expect(ANNONCE_CANAL_IA).not.toContain(phrase);
+    }
   });
 });
 

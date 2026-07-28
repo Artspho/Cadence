@@ -17,6 +17,7 @@ import { Dashboard } from "./components/Dashboard";
 import { ContractForm } from "./components/ContractForm";
 import { ContractList } from "./components/ContractList";
 import { ImportBulletins } from "./components/ImportBulletins";
+import { ImportDocumentIA } from "./components/ImportDocumentIA";
 // Maquette de test de l'écran de revue IA (extractions simulées, bac à sable) — ne rend rien
 // hors développement, cf. RevueExtractionDemo.tsx.
 import { RevueExtractionDemo } from "./components/RevueExtractionDemo";
@@ -260,6 +261,21 @@ export default function App() {
         {onglet === "import" && calculs && (
           <div className="space-y-6">
             <ImportBulletins profil={profil} config={franceTravailConfig} decompteActuel={calculs.decompte} onImporterContrat={ajouterContrat} />
+
+            {/* Deuxième canal, distinct du local ci-dessus : celui-ci envoie le document à un serveur.
+                Aucun état ni code partagé entre les deux — la seule chose commune est l'onglet.
+                L'accent visuel est ambre (et non menthe) parce que ce canal fait quitter l'appareil :
+                la couleur suit la conséquence, comme dans la modale de consentement. */}
+            <div className="border-t border-line pt-6">
+              <ImportDocumentIA
+                profil={profil}
+                config={franceTravailConfig}
+                decompteActuel={calculs.decompte}
+                onAjouterContrat={ajouterContrat}
+                onModifierProfil={modifierProfil}
+              />
+            </div>
+
             {/* Chantier en cours : import IA premium. Replié par défaut, invisible en production
                 (double garde : `import.meta.env.DEV` ici ET dans le composant). Les extractions
                 sont simulées et le bac à sable n'écrit jamais dans les vraies données. */}

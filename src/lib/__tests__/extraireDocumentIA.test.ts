@@ -104,3 +104,36 @@ describe("extraireDocumentIA — messages d'erreur honnêtes", () => {
     await expect(extraireDocumentIA("UERG")).rejects.toThrow(/saisis le document à la main/i);
   });
 });
+
+// ImportDocumentIA.tsx affiche `error.message` tel quel, en se fiant à cette garantie : tout ce qui
+// sort d'ici est un texte que NOUS avons rédigé. Ces deux cas sont ceux où un message technique du
+// moteur JavaScript arriverait à l'écran sans les enveloppes ajoutées dans extraireDocumentIA.
+describe("extraireDocumentIA — aucun message technique ne peut fuir vers l'utilisateur", () => {
+  it("traduit un échec réseau (hors ligne) en message lisible, sans « Failed to fetch »", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new TypeError("Failed to fetch");
+      })
+    );
+    await expect(extraireDocumentIA("UERG")).rejects.toThrow(/connexion interrompue/i);
+    await expect(extraireDocumentIA("UERG")).rejects.not.toThrow(/Failed to fetch/);
+  });
+
+  // Ne prétend pas que le document n'est pas parti : une coupure peut survenir après l'envoi du corps.
+  it("ne prétend pas, sur échec réseau, que le document n'a pas été transmis", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new TypeError("Failed to fetch");
+      })
+    );
+    await expect(extraireDocumentIA("UERG")).rejects.not.toThrow(/n'a pas été transmis|n'a pas été envoyé/);
+  });
+
+  it("traduit un 200 qui ne contient pas du JSON (page HTML d'un proxy) sans exposer la SyntaxError", async () => {
+    simulerReponse(200, null, true);
+    await expect(extraireDocumentIA("UERG")).rejects.toThrow(/inattendu/i);
+    await expect(extraireDocumentIA("UERG")).rejects.not.toThrow(/Unexpected token|JSON/);
+  });
+});

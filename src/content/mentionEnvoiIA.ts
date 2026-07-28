@@ -44,6 +44,15 @@ export const MENTION_ENVOI_IA_PHRASES = [
 export const RAPPEL_DOCUMENT_ENVOYE =
   "Ce document a été envoyé à Mistral AI (France, hébergement UE) pour lecture automatique. Sur l'offre que nous utilisons actuellement, il peut servir à entraîner leurs modèles d'IA.";
 
+/**
+ * Annonce du canal, affichée en permanence sur la zone de dépôt — AVANT même de choisir un fichier,
+ * pour que l'utilisateur sache ce que fait ce bouton avant de cliquer. Volontairement une phrase à
+ * elle seule, et non un extrait de `MENTION_ENVOI_IA_PHRASES` : cette liste ne doit jamais être
+ * montrée en partie (le détail se lit d'un bloc, dans la modale, au moment de décider).
+ */
+export const ANNONCE_CANAL_IA =
+  "Ce canal envoie ton document à un serveur pour le faire lire automatiquement. Le détail — destinataire, hébergement, usage — t'est présenté avant chaque envoi, et rien ne part sans ton accord.";
+
 /** Libellés des deux issues de la modale. L'annulation nomme l'alternative, elle ne dit pas « non ». */
 export const LIBELLE_ENVOYER = "Envoyer ce document";
 export const LIBELLE_ANNULER = "Annuler — saisir à la main";
