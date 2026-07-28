@@ -620,8 +620,9 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
   `docs/files/SPEC_annexe_IA_premium.md`, `docs/files/brief_claude_code_documents_premium.md`.
 - ✅ **Backend minimal en place (28/07/2026)** — première brique serveur du projet, sans auth ni base
   de données (chantier séparé, à faire quand le gate premium sera construit). `api/extract-document.ts`
-  et `api/extraction-schema.ts` sortis de `docs/files/` vers `api/` (convention Vercel Functions,
-  endpoint `/api/extract-document`). Dépendances ajoutées : `zod-to-json-schema` (runtime) et
+  et `src/types/extraction.ts` (ex-`api/extraction-schema.ts`, déplacé le 28/07/2026, cf. plus bas)
+  sortis de `docs/files/` vers `api/` (convention Vercel Functions, endpoint `/api/extract-document`).
+  Dépendances ajoutées : `zod-to-json-schema` (runtime) et
   `@types/node` (dev). **Ces fichiers sont enfin type-checkés** via `tsconfig.api.json` — volontairement
   SÉPARÉ de `tsconfig.json` : ce dernier a `"types": ["vitest/globals"]`, ce qui désactive le chargement
   automatique des `@types` (donc `process` restait inconnu même avec `@types/node`), et surtout ajouter
@@ -636,24 +637,106 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
   `api/extract-document.ts` inutile et expose la clé. Le composant doit appeler `POST /api/extract-document`
   et ne jamais connaître la clé. Rappel de la règle : la variable doit s'appeler `MISTRAL_API_KEY`, JAMAIS
   `VITE_MISTRAL_API_KEY` (Vite inline tout `VITE_*` dans le bundle client).
-- 🔶 **Contraintes Vercel connues, à trancher avant le premier déploiement** : (1) runtime Edge vs Node —
-  la signature `(req: Request): Promise<Response>` est celle de l'Edge, à forcer via
-  `export const config = { runtime: 'edge' }` ; le support de cette signature côté runtime Node n'est pas
-  vérifié. (2) Le PDF part en base64 dans le corps de requête, +33 % de volume, plafond Vercel ~4,5 Mo →
-  **plafond pratique ~3 Mo de PDF** (un bulletin passe, une notification scannée multi-pages peut coincer).
-  (3) L'OCR peut dépasser le timeout par défaut de 10 s (Node) — relevable via `maxDuration`, l'Edge
-  plafonnant vers 25 s. (4) Défaut de diagnostic laissé en place volontairement : si `MISTRAL_API_KEY` est
-  absente, `Bearer ${… ?? ""}` produit un 401 Mistral qui remonte en 500 générique « Échec de l'extraction ».
+- 🔶 **Contraintes Vercel restantes, à trancher avant le premier déploiement** — points (1) et (4)
+  de la liste initiale **résolus le 28/07/2026** (commit `d3ebb36`) : runtime Edge désormais forcé,
+  et clé absente diagnostiquée en 503 explicite au lieu d'un 500 générique. Restent ouverts :
+  (2) le PDF part en base64 dans le corps de requête, +33 % de volume, plafond Edge ~4 Mo →
+  **plafond pratique ~3 Mo de PDF** (un bulletin passe, une notification scannée multi-pages peut
+  coincer) — documenté en commentaire, **pas encore géré côté client**. (3) L'OCR peut dépasser le
+  timeout, l'Edge plafonnant vers 25 s — non mesuré, aucun appel réel n'a jamais eu lieu.
 - ⚠️ **`docs/cadence-export-2026-07-24.json` contient de VRAIES données personnelles** (date de naissance,
   21 contrats réels, employeurs nommés) — ajouté à `.gitignore`, **jamais à committer** : un commit git
   ne s'effface pas proprement. Anomalie repérée au passage dans ce fichier : `dateNaissance: "19994-06-09"`
   (année à 5 chiffres) — à vérifier dans les données réelles, ça fausse le plafond enseignement 70/120 h.
+- ✅ **Écran de revue des extractions IA construit sur fixtures (28/07/2026, commit `d3ebb36` sur
+  `backend-api-import-ia`)** — l'UX et le routage sont validés sans qu'aucun document réel ni aucun
+  appel réseau n'entre en jeu. `components/RevueExtraction.tsx` affiche une carte par proposition
+  (valeurs lues, confiance par champ, justification) ; **aucun bouton « tout appliquer »** : chaque
+  proposition demande un geste explicite, et un contrat passe toujours par `ContractForm` en
+  relecture champ par champ, jamais appliqué directement. Toute la décision « cette proposition
+  est-elle applicable sans risque ? » vit dans `lib/routageExtraction.ts` — pure, hors du composant,
+  **22 tests dédiés** (`lib/__tests__/routageExtraction.test.ts`). `lib/fixturesExtraction.ts` fournit
+  4 extractions simulées typées `ExtractionResult` (donc cassées à la compilation si le schéma
+  change) : notification complète, bulletin aux champs manquants, relevé à 3 refus, document non
+  reconnu. `components/RevueExtractionDemo.tsx` est le banc d'essai, rendu **uniquement si
+  `import.meta.env.DEV`** (garde dans le composant ET chez l'appelant `App.tsx`, onglet « Import
+  PDF », bloc replié) : les montants des fixtures sont fictifs, les montrer à un vrai utilisateur
+  serait le faux chiffre qu'interdit le devoir n°2. **Bac à sable** : les validations du banc d'essai
+  atterrissent dans une copie jetable du profil, jamais dans les vraies données — sans ça, un clic
+  sur « Enregistrer dans mon profil » aurait inscrit une AJ et une franchise inventées dans le vrai
+  profil (devoirs n°1 ET n°2) ; la validation appelée reste en revanche la vraie
+  (`validerProfilPourEcriture`). **Prouvé** : 372 tests verts (350 avant, +22), `npm run typecheck`
+  propre (src + api), `npm run build` OK ; vérifié dans le navigateur que chaque valeur de la
+  notification simulée atterrit dans le bon champ, que le **vrai `localStorage` est resté intact
+  après coup** (`cadence:v1:donnees` — franchise toujours à 0, `ajReelleHistorique` toujours absent,
+  3 contrats inchangés), que les trois refus s'affichent sans bouton d'enregistrement, et que les
+  fixtures sont **absentes du bundle de production** (recherche dans `dist/`). **Non prouvé** : aucun
+  test React sur ces composants (même limite 🔶 que le reste de l'UI) et le comportement face à une
+  vraie réponse Mistral reste inconnu — aucune n'a jamais été reçue.
+- ✅ **Schéma d'extraction déplacé `api/extraction-schema.ts` → `src/types/extraction.ts` (commit
+  `d3ebb36`)** — source **unique** partagée par le backend (qui valide la réponse Mistral avec ce
+  schéma) et le front (qui affiche et route les propositions). Deux copies auraient pu diverger en
+  silence, et une divergence ici envoie une valeur dans le mauvais champ, donc un chiffre faux. Rangé
+  dans `src/` et non dans `api/` parce que `tsconfig.json` n'inclut que `src` : dans l'autre sens, le
+  programme du navigateur aurait dû aller chercher un fichier de `api/`, ce qui brouille la frontière
+  que `tsconfig.api.json` défend (le code React ne doit pas voir `process`/`Buffer`). Le fichier
+  n'utilise que Zod, aucun global Node — `api/` peut donc l'importer sans risque inverse.
+  Volontairement **pas** ré-exporté depuis `src/types/index.ts` : la distinction « proposition à
+  valider » vs « donnée établie » doit rester visible à l'import.
+- ✅ **Refus de routage net/brut sur `ajReelleHistorique` (commit `d3ebb36`)** — le piège le plus
+  dangereux de l'extraction, fermé. Ce champ contient une AJ **nette** : c'est ce que dit l'UI de
+  saisie (`MonProfil.tsx`, « Allocation journalière nette ») et ce que suppose le moteur, qui applique
+  **ensuite** le prélèvement à la source dessus (`indemnisationMensuelle.ts`). Or un relevé de
+  situation dit « allocation brute » : y router ce brut aurait gonflé **tous** les montants mensuels
+  affichés. `lib/routageExtraction.ts` refuse donc toute proposition dont `natureMontant ≠ "net"`, à
+  l'évaluation **et** à l'écriture (exception si l'évaluation est contournée). Aucune conversion n'est
+  possible, conformément à ce qui était déjà acté plus haut : `calculerAJNette` est à sens unique,
+  exige un SJM absent du document, et est une estimation assumée. Deux autres refus structurels dans
+  le même fichier : `periode_assimilee` (pas de destination, cf. dette ci-dessous) et
+  `profil_ouverture_droits` incomplet (franchise ou délai d'attente manquants — mettre 0 « en
+  attendant » serait un chiffre inventé qui décale les dates de versement).
+- 🔴 **Dette tracée (`docs/validation.md`) : `PeriodeAssimilee` n'a aucun chemin d'écriture dans
+  l'app.** Problème **préexistant**, découvert en écrivant l'écran de revue (28/07/2026).
+  `DonneesCadence.periodes` est **lu** partout où ça compte (`periodeReference.ts`,
+  `decompteHeures.ts`, `salaireReference.ts`, `prediction.ts`, `cycles.ts`, `Simulateur.tsx`) mais
+  **aucune UI ni aucun setter d'`App.tsx` ne permet d'en créer une** — le tableau ne peut être peuplé
+  que par un import JSON. Une maternité ou un accident du travail, qui valent 5 h/jour au décompte des
+  507 h, est donc aujourd'hui **inarrivable par la saisie normale**, ce qui sous-estime silencieusement
+  le décompte pour qui est concerné. Conséquence immédiate : la cible `periode_assimilee` du schéma est
+  refusée faute de destination, avec un message explicite plutôt qu'un abandon silencieux. **À
+  construire** : CRUD des périodes (formulaire + `ajouterPeriode`/`supprimerPeriode` dans `App.tsx`),
+  après quoi ce refus devient un routage réel. Le piège CPAM déjà documenté reste entier : `ald` vs
+  `maladie_intercontrat`, effets opposés sur le décompte, jamais devinés depuis un arrêt de travail.
+- ✅ **Backend : runtime Edge déclaré + clé manquante diagnostiquée (commit `d3ebb36`)** —
+  `export const config = { runtime: "edge" }` ajouté dans `api/extract-document.ts`. Le handler
+  utilisait **déjà** la signature web standard (`(req: Request) => Promise<Response>`), qui est celle
+  d'Edge ; en runtime Node, Vercel attendrait `(req: VercelRequest, res: VercelResponse)`. Garde
+  explicite sur `MISTRAL_API_KEY` absente : erreur dédiée (`ConfigurationManquanteError`) → **503**
+  avec un message clair, au lieu du 500 « Réessaie » précédent, trompeur puisque réessayer n'y change
+  rien ; la clé est lue **par requête**, plus au chargement du module. `.env.example` documente
+  `MISTRAL_API_KEY` avec le piège rappelé : jamais `VITE_MISTRAL_API_KEY`, Vite inline tout `VITE_*`
+  dans le bundle client. **Reste à faire côté client** : le plafond de corps de requête Edge (~4 Mo,
+  soit **~3 Mo de PDF** en base64) n'est pour l'instant que documenté en commentaire — un PDF plus
+  gros sera rejeté par la plateforme avant d'atteindre le code, sans message compréhensible pour
+  l'utilisateur. **Non prouvé** : rien de tout ça n'a été exécuté sur Vercel, aucun déploiement n'a eu
+  lieu.
+- 🔶 **`d3ebb36` n'est PAS fusionné dans `master`** — `master` est resté sur `2721778`. Tout le
+  chantier import IA (backend `59d129f` + écran de revue `d3ebb36`) vit sur la branche
+  `backend-api-import-ia`. Fusion à décider explicitement, pas encore faite.
+- 🔴 **Bloquant inchangé : aucun document réel tant que le DPA Mistral n'est pas vérifié/signé.** Tout
+  ce qui précède tourne sur des fixtures en dur, par construction. Le non-entraînement sur les données
+  du tier gratuit « Experiment » n'est **pas** confirmé (l'engagement contractuel trouvé est rattaché
+  aux abonnements payants) — à vérifier dans la console Mistral, sinon passer sur une clé payante
+  (~1 centime/document) avant le moindre document, y compris un test personnel.
 
-**Prochaine action (chantier import IA)** : écrire l'écran de revue des propositions d'extraction avec une
-fixture `ExtractionResult` en dur (aucun appel réseau, aucun document réel), pour valider l'UX et le
-routage des propositions vers `ajouterContrat` / `modifierProfil` — puis seulement ensuite brancher
-`POST /api/extract-document`. Avant tout document réel : DPA Mistral vérifié/signé et non-entraînement du
-tier gratuit « Experiment » confirmé dans la console, sinon clé payante.
+**Prochaine action (chantier import IA)** : brancher `POST /api/extract-document` derrière l'écran de
+revue, qui est prêt et éprouvé sur fixtures (cf. `d3ebb36`). Deux prérequis **avant** tout document
+réel, même un test personnel : (1) DPA Mistral vérifié/signé et non-entraînement du tier gratuit
+« Experiment » confirmé dans la console, sinon clé payante ; (2) corriger le brouillon
+`docs/files/ImportDocumentIA.jsx`, qui appelle Mistral directement depuis le navigateur avec la clé
+dans un `<input>` (cf. le 🔴 plus haut) — il doit appeler l'endpoint et ne jamais connaître la clé.
+Chantier indépendant utile en attendant : le CRUD des périodes assimilées (cf. la dette 🔴 ci-dessus),
+qui débloquerait la cible `periode_assimilee` de l'extraction.
 
 **Prochaines pistes** : voir les deux points 🔴 juste au-dessus (point 2 AJ brut/net, dossier
 OneDrive) et `docs/reprise.md` pour le détail. Chantier ouvert restant sur la franchise
