@@ -738,8 +738,8 @@ dans un `<input>` (cf. le 🔴 plus haut) — il doit appeler l'endpoint et ne j
 Chantier indépendant utile en attendant : le CRUD des périodes assimilées (cf. la dette 🔴 ci-dessus),
 qui débloquerait la cible `periode_assimilee` de l'extraction.
 
-**Prochaines pistes** : voir les deux points 🔴 juste au-dessus (point 2 AJ brut/net, dossier
-OneDrive) et `docs/reprise.md` pour le détail. Chantier ouvert restant sur la franchise
+**Prochaines pistes** : voir les deux points 🔴 juste au-dessus (dette `PeriodeAssimilee` sans chemin
+d'écriture, bloquant DPA Mistral) et `docs/reprise.md` pour le détail. Chantier ouvert restant sur la franchise
 salaires : fournir de vrais SR/SJM à `calculerSerieDepuisContrats` (via
 `srSjmPourFranchiseSalaires`) quelque part dans l'app — le mécanisme de répartition mensuelle est
 déjà câblé et testé, seule la donnée réelle manque. Plus aucun ❌ confirmé par ailleurs dans la
