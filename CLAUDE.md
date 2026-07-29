@@ -663,11 +663,14 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
   `VITE_MISTRAL_API_KEY` (Vite inline tout `VITE_*` dans le bundle client).
 - 🔶 **Contraintes Vercel restantes, à trancher avant le premier déploiement** — points (1) et (4)
   de la liste initiale **résolus le 28/07/2026** (commit `d3ebb36`) : runtime Edge désormais forcé,
-  et clé absente diagnostiquée en 503 explicite au lieu d'un 500 générique. Restent ouverts :
-  (2) le PDF part en base64 dans le corps de requête, +33 % de volume, plafond Edge ~4 Mo →
-  **plafond pratique ~3 Mo de PDF** (un bulletin passe, une notification scannée multi-pages peut
-  coincer) — documenté en commentaire, **pas encore géré côté client**. (3) L'OCR peut dépasser le
-  timeout, l'Edge plafonnant vers 25 s — non mesuré, aucun appel réel n'a jamais eu lieu.
+  et clé absente diagnostiquée en 503 explicite au lieu d'un 500 générique. Point (2) — le PDF part
+  en base64 dans le corps de requête, +33 % de volume, plafond Edge ~4 Mo → **plafond pratique ~3 Mo
+  de PDF** — **résolu le 29/07/2026 (commit `ecca2c8`)** : `lib/fichierImportIA.ts` refuse le fichier
+  côté client avant la modale de consentement, avec un message qui donne la taille réelle, la limite,
+  et une alternative (réduire le document ou saisir à la main). Vérifié sur le fichier réel le
+  29/07/2026 (soir) : le contrôle existe bel et bien, ce n'est plus un commentaire mort — cette ligne
+  contredisait à tort l'entrée sur `ecca2c8` plus bas, corrigée ici. Reste ouvert : (3) l'OCR peut
+  dépasser le timeout, l'Edge plafonnant vers 25 s — non mesuré, aucun appel réel n'a jamais eu lieu.
 - ⚠️ **`docs/cadence-export-2026-07-24.json` contient de VRAIES données personnelles** (date de naissance,
   21 contrats réels, employeurs nommés) — ajouté à `.gitignore`, **jamais à committer** : un commit git
   ne s'effface pas proprement. Anomalie repérée au passage dans ce fichier : `dateNaissance: "19994-06-09"`
@@ -739,11 +742,11 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
   avec un message clair, au lieu du 500 « Réessaie » précédent, trompeur puisque réessayer n'y change
   rien ; la clé est lue **par requête**, plus au chargement du module. `.env.example` documente
   `MISTRAL_API_KEY` avec le piège rappelé : jamais `VITE_MISTRAL_API_KEY`, Vite inline tout `VITE_*`
-  dans le bundle client. **Reste à faire côté client** : le plafond de corps de requête Edge (~4 Mo,
-  soit **~3 Mo de PDF** en base64) n'est pour l'instant que documenté en commentaire — un PDF plus
-  gros sera rejeté par la plateforme avant d'atteindre le code, sans message compréhensible pour
-  l'utilisateur. **Non prouvé** : rien de tout ça n'a été exécuté sur Vercel, aucun déploiement n'a eu
-  lieu.
+  dans le bundle client. Le plafond de corps de requête Edge (~4 Mo, soit **~3 Mo de PDF** en base64)
+  — ✅ **géré côté client depuis le 29/07/2026 (commit `ecca2c8`)**, voir l'entrée correspondante
+  plus bas : ce paragraphe disait encore « pas encore géré » après coup, contradiction corrigée le
+  29/07/2026 (soir). **Non prouvé** : rien de tout ça n'a été exécuté sur Vercel, aucun déploiement
+  n'a eu lieu.
 - 🔶 **RIEN du chantier import IA n'est fusionné dans `master`** — `master` est resté sur `2721778`.
   Tout vit sur la branche `backend-api-import-ia`, dans cet ordre — **11 commits** : `59d129f`
   (backend minimal), `d3ebb36` (écran de revue sur fixtures), `45a54e1` + `362bbfd` (doc),
