@@ -901,13 +901,13 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
   les deux phrases sur lesquelles un utilisateur décide s'il confie sa fiche de paie : à confirmer
   avant d'ouvrir le canal à d'autres personnes que Benoît.
 
-**Prochaine action (29/07/2026, jour)** : **trancher le sort de la Phase 1 du chantier « saisie des
-périodes assimilées », écrite et verte mais NON COMMITTÉE.**
+**Prochaine action (29/07/2026, soir)** : **redemander à Benoît le TABLEAU DES 6 TYPES DE PÉRIODES**
+(guide France Travail) — sans lui, les trois points bloqués ci-dessous ne peuvent pas avancer.
 
-⚠️ **Quatre fichiers modifiés dans l'arbre de travail**, en attente de la relecture de Benoît :
-`src/engine/decompteHeures.ts`, `src/engine/salaireReference.ts` et leurs deux fichiers de tests.
-440 tests verts, `npm run typecheck` propre. Ils ne sont dans AUCUN commit — première chose à faire au
-prochain fil : soit committer, soit demander les corrections.
+✅ **Phase 1 du chantier « saisie des périodes assimilées » committée** (commit `a3f0f71`, branche
+`backend-api-import-ia`, après relecture et feu vert de Benoît). Les 4 fichiers
+(`src/engine/decompteHeures.ts`, `src/engine/salaireReference.ts` et leurs deux fichiers de tests)
+sont dans l'historique. 440 tests verts, `npm run typecheck` propre au moment du commit.
 
 Ce que la Phase 1 fait : **plus aucun jour n'est compté deux fois.** Un nouvel helper partagé
 `joursAssimilesHorsContrat` (exporté par `decompteHeures.ts`) compte les jours d'une période assimilée
