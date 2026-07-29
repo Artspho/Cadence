@@ -52,6 +52,56 @@ describe("calculerDecompteHeures", () => {
     expect(resultat.repartition.assimilees).toBe(500);
   });
 
+  describe("aucun jour compté deux fois : période assimilée chevauchant un contrat", () => {
+    // Le défaut corrigé le 29/07/2026. Sans exclusion, un jour couvert par un contrat ET par une
+    // période valait ses heures de contrat PLUS 5 h assimilées — un compteur 507 h gonflé, donc un
+    // faux feu vert. Maternité, adoption, ALD, AT et maladie inter-contrat sont par définition hors
+    // contrat : le chevauchement viole la condition réglementaire, l'exclure est conforme au guide.
+    const p = profil({ dateNaissance: "1990-01-01" });
+    const PERIODE_100J = periode({ type: "maternite", dateDebut: "2026-03-01", dateFin: "2026-06-08" });
+
+    it("un contrat d'un jour dans la période retire 5 h, et ses propres heures restent comptées", () => {
+      const contrats = [contrat({ date: "2026-04-10", typeRemuneration: "cachet", nbCachets: 1 })];
+      const resultat = calculerDecompteHeures(contrats, [PERIODE_100J], p, franceTravailConfig, FENETRE);
+      expect(resultat.repartition.assimilees).toBe(495); // 99 jours × 5 h, et non 100
+      expect(resultat.repartition.cachets).toBe(12); // le cachet lui-même compte toujours
+      // Le total ne double compte plus le 10 avril : 495 + 12, pas 500 + 12.
+      expect(resultat.total).toBe(507);
+    });
+
+    it("un contrat de plusieurs jours retire tous ses jours de chevauchement, sans doublon entre contrats", () => {
+      const contrats = [
+        contrat({ dateDebut: "2026-04-01", date: "2026-04-10", typeRemuneration: "heures", nbHeures: 20 }), // 10 jours dans la période
+        contrat({ dateDebut: "2026-04-05", date: "2026-04-12", typeRemuneration: "heures", nbHeures: 10 }), // chevauche le précédent : 2 jours neufs
+      ];
+      const resultat = calculerDecompteHeures(contrats, [PERIODE_100J], p, franceTravailConfig, FENETRE);
+      // 12 jours couverts au total (1er au 12 avril), comptés UNE fois : 88 jours × 5 h.
+      expect(resultat.repartition.assimilees).toBe(440);
+    });
+
+    it("un contrat hors de la période ne retire rien", () => {
+      const contrats = [contrat({ date: "2026-09-01", typeRemuneration: "cachet", nbCachets: 1 })];
+      const resultat = calculerDecompteHeures(contrats, [PERIODE_100J], p, franceTravailConfig, FENETRE);
+      expect(resultat.repartition.assimilees).toBe(500);
+    });
+
+    it("un contrat HORS FENÊTRE ne retire rien : il n'apporte aucune heure ici, donc aucun double compte à corriger", () => {
+      // Fenêtre 2026 ; contrat de décembre 2025 chevauchant… rien de la période, mais le principe
+      // compte : l'exclusion ne doit porter que sur les contrats qui alimentent CE décompte, sinon
+      // elle sous-compterait sans rien réparer.
+      const periodeDebutAnnee = periode({ type: "ald", dateDebut: "2026-01-01", dateFin: "2026-01-10" }); // 10 jours
+      const contrats = [contrat({ dateDebut: "2025-12-20", date: "2025-12-31", typeRemuneration: "heures", nbHeures: 10 })];
+      const resultat = calculerDecompteHeures(contrats, [periodeDebutAnnee], p, franceTravailConfig, FENETRE);
+      expect(resultat.repartition.assimilees).toBe(50);
+    });
+
+    it("la période est bornée par la fenêtre : les jours antérieurs ne comptent pas", () => {
+      const aCheval = periode({ type: "accident_travail", dateDebut: "2025-12-25", dateFin: "2026-01-05" }); // 5 jours dans la fenêtre
+      const resultat = calculerDecompteHeures([], [aCheval], p, franceTravailConfig, FENETRE);
+      expect(resultat.repartition.assimilees).toBe(25);
+    });
+  });
+
   it("le cumul enseignement + formation est plafonné à 338 h", () => {
     const p = profil({ dateNaissance: "1976-01-01" }); // plafond enseignement 120 h
     const contrats = [

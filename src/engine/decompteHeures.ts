@@ -8,7 +8,7 @@
 // du second. Ne jamais les fusionner.
 import type { Contrat, DecompteHeuresResultat, PeriodeAssimilee, Profil, RepartitionHeures } from "../types";
 import type { FranceTravailConfig } from "../config/franceTravailConfig";
-import { ageAuJour, dansIntervalle, joursChevauchement, moisCle } from "./dateUtils";
+import { ageAuJour, ajouterJours, dansIntervalle, moisCle } from "./dateUtils";
 
 export interface Fenetre {
   dateDebut: string;
@@ -46,11 +46,60 @@ export function heuresBrutesContrat(contrat: Contrat, config: FranceTravailConfi
   }
 }
 
-/** Heures apportées par les périodes assimilées (maternité, adoption, AT, ALD, suspension) qui chevauchent la fenêtre. Les maladies inter-contrat n'apportent aucune heure ici : elles n'agissent que sur la fenêtre (cf. periodeReference.ts). */
-function heuresAssimileesFenetre(periodes: PeriodeAssimilee[], fenetre: Fenetre, config: FranceTravailConfig): number {
+/**
+ * Jours d'une période assimilée retenus dans la fenêtre, **en excluant les jours déjà couverts par un
+ * contrat compté dans ce même décompte**.
+ *
+ * ════════ POURQUOI CETTE EXCLUSION (corrigé le 29/07/2026) ════════
+ *
+ * Sans elle, un jour couvert à la fois par un contrat et par une période assimilée était compté
+ * DEUX FOIS : une fois par ses heures de contrat, une fois par les 5 h/jour assimilées. Le compteur
+ * des 507 h s'en trouvait gonflé — donc un feu vert que l'utilisateur n'a pas (devoir sacré n°2).
+ *
+ * Ce n'est pas qu'une précaution : maternité, adoption, ALD, accident du travail et maladie
+ * inter-contrat sont **par définition hors contrat ou entre deux contrats** (guide France Travail).
+ * Un chevauchement viole donc la condition réglementaire elle-même — l'exclure est conforme au guide,
+ * pas un choix prudentiel de Cadence.
+ *
+ * Le défaut était LATENT jusqu'ici : aucun chemin d'écriture n'existe pour créer une période
+ * (`DonneesApp.periodes` ne peut être peuplé que par un import JSON), donc le tableau est vide en
+ * pratique. C'est l'écran de saisie à venir qui l'aurait armé — d'où cette correction AVANT lui.
+ *
+ * Périmètre de l'exclusion : les contrats **comptés dans cette fenêtre**, et eux seuls. C'est
+ * exactement l'ensemble qui apporte des heures ici, donc exactement celui qui peut produire un double
+ * compte. Un contrat hors fenêtre n'apporte aucune heure à ce décompte : exclure ses jours
+ * sous-compterait sans rien corriger.
+ *
+ * ⚠️ `suspension_contrat` est l'EXCEPTION NON TRAITÉE ICI. Elle se produit pendant un contrat actif
+ * par nature, donc elle chevauche forcément, et l'exclusion la ramène à 0 h — ce qui contredit la
+ * règle « 5 h/jour, comptent pour 507 h » (SPEC §  périodes assimilées). La bonne règle est une
+ * NON-CUMULATION dont il reste à trancher le sens (les 5 h/jour remplacent-elles les heures de
+ * contrat sur ces jours, ou l'inverse ?) : les deux choix diffèrent en direction et l'un exige de
+ * proratiser les heures de contrat au jour. En attendant, l'exclusion s'applique aussi à ce type,
+ * parce qu'elle sous-compte (direction prudente) au lieu de gonfler. À trancher AVANT d'ouvrir
+ * l'écran de saisie, sinon une suspension saisie n'ajouterait rien.
+ */
+export function joursAssimilesHorsContrat(periode: PeriodeAssimilee, fenetre: Fenetre, contratsComptes: Contrat[]): number {
+  const debut = periode.dateDebut > fenetre.dateDebut ? periode.dateDebut : fenetre.dateDebut;
+  const fin = periode.dateFin < fenetre.dateFin ? periode.dateFin : fenetre.dateFin;
+
+  // Parcours jour par jour plutôt qu'un calcul d'intervalles : une période dure des jours à des mois
+  // et les contrats sont peu nombreux, donc le coût est négligeable — et la lisibilité de la règle
+  // « ce jour est-il couvert par un contrat ? » vaut mieux ici qu'une arithmétique d'intersections
+  // dont les cas limites (contrats qui se chevauchent entre eux) se relisent mal.
+  // Comparaison de chaînes ISO (AAAA-MM-JJ) : ordre lexicographique = ordre chronologique.
+  let jours = 0;
+  for (let jour = debut; jour <= fin; jour = ajouterJours(jour, 1)) {
+    if (!contratsComptes.some((c) => dansIntervalle(jour, c.dateDebut, c.date))) jours += 1;
+  }
+  return jours;
+}
+
+/** Heures apportées par les périodes assimilées (maternité, adoption, AT, ALD, suspension) qui chevauchent la fenêtre, hors jours déjà couverts par un contrat. Les maladies inter-contrat n'apportent aucune heure ici : elles n'agissent que sur la fenêtre (cf. periodeReference.ts). */
+function heuresAssimileesFenetre(periodes: PeriodeAssimilee[], fenetre: Fenetre, contratsComptes: Contrat[], config: FranceTravailConfig): number {
   return periodes
     .filter((p) => p.type !== "maladie_intercontrat")
-    .reduce((total, p) => total + joursChevauchement(p.dateDebut, p.dateFin, fenetre.dateDebut, fenetre.dateFin) * config.heuresAssimileesParJour, 0);
+    .reduce((total, p) => total + joursAssimilesHorsContrat(p, fenetre, contratsComptes) * config.heuresAssimileesParJour, 0);
 }
 
 export function calculerDecompteHeures(
@@ -93,7 +142,7 @@ export function calculerDecompteHeures(
     }
   }
 
-  repartition.assimilees = heuresAssimileesFenetre(periodes, fenetre, config);
+  repartition.assimilees = heuresAssimileesFenetre(periodes, fenetre, contratsDansFenetre, config);
 
   // Plafond enseignement : dépend de l'âge à la date anniversaire (fin de fenêtre).
   const age = ageAuJour(profil.dateNaissance, fenetre.dateFin);
