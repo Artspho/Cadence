@@ -588,6 +588,10 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
   de la franchise salaires câblée (mécanisme complet, mais **pas encore branchée sur de vraies
   données** dans l'app — SR/SJM jamais fournis à `calculerSerieDepuisContrats`), colonnes « Revenus
   contrats »/« Revenu total ». 159 tests verts. Détail complet : `docs/reprise.md`.
+  ✅ **Branchement fait le 29/07/2026 (soir), commit `5446e33`** — voir l'entrée dédiée plus bas :
+  `TableauResultats` (`RevenusMensuels.tsx`) calcule maintenant SR/NHT/SJM réels et les transmet à
+  `calculerSerieDepuisContrats`. Ce paragraphe ne décrit donc plus l'état actuel, gardé pour
+  l'historique du chantier.
 - 🔴 **Point 2 non résolu (AJ brute vs nette)** : les relevés officiels disent « Allocation
   **brute** » pour la valeur que Cadence traite comme point de départ net dans
   `ajReelleHistorique` — écart potentiel ~5 % jamais réinvestigué. **Comparaison complète Cadence
@@ -986,20 +990,66 @@ décision de fusion des 12 commits dans `master`, et les deux corrections de `do
 (ligne ~24 « hors MVP » périmée sur la branche ; ligne ~334 décrit la zone de dépôt sans la
 checklist). On continue à construire en attendant.
 
-Restent à faire par ailleurs : corriger le brouillon `docs/files/ImportDocumentIA.jsx` qui appelle
-Mistral directement depuis le navigateur avec la clé dans un `<input>` (cf. le 🔴 plus haut) ;
-vérifier les deux affirmations du texte de consentement (cf. le 🔶 correspondant).
+✅ **Brouillons `docs/files/ImportDocumentIA.jsx` et `docs/ImportDocumentIA.jsx` supprimés le
+29/07/2026 (commit `8267880`)** — aucun des deux n'était importé dans `src/` (vérifié par grep avant
+suppression) ; `src/components/ImportDocumentIA.tsx` (le vrai composant, qui passe par
+`api/extract-document.ts`) n'a pas été touché. `npm run build` + tests toujours verts après coup. Le
+paragraphe qui suivait demandait encore de « corriger » ce brouillon — périmé, corrigé ici.
+Vérifier les deux affirmations du texte de consentement reste ouvert (cf. le 🔶 correspondant plus
+haut).
 
-**Prochaines pistes** : voir les deux points 🔴 juste au-dessus (dette `PeriodeAssimilee` sans chemin
-d'écriture, bloquant DPA Mistral) et `docs/reprise.md` pour le détail. Chantier ouvert restant sur la franchise
-salaires : fournir de vrais SR/SJM à `calculerSerieDepuisContrats` (via
-`srSjmPourFranchiseSalaires`) quelque part dans l'app — le mécanisme de répartition mensuelle est
-déjà câblé et testé, seule la donnée réelle manque. Plus aucun ❌ confirmé par ailleurs dans la
-liste, la cohérence de profil est tenue par construction, et tous les items §11.A sont désormais traités
-(transparence du calcul comprise). Sinon, sans urgence : les deux limites connues 🔶 ci-dessus, le
-`rythme_hors_limite` différé (backlog `docs/reprise.md`/`docs/validation.md`), l'installation
-réelle sur un vrai téléphone (PWA techniquement prête, dépend du déploiement bêta), alignement
-visuel fin sur `docs/maquette_dashboard.html`.
+✅ **SR/SJM réels branchés sur `calculerSerieDepuisContrats` (29/07/2026 soir, commit `5446e33`)** —
+dernier morceau du chantier franchise salaires évoqué ci-dessus. `RevenusMensuels.tsx` reçoit
+maintenant `periodes` en prop (cascade `App.tsx` → `RevenusMensuels` → `TableauResultats`) ;
+`TableauResultats` calcule `calculerFenetreReference` puis `calculerSalaireReference` (**exactement**
+la fenêtre d'`App.tsx:70-72`, pas une fenêtre inventée) puis `calculerSJM(sr, nht, config)`, et passe
+`{ srContrats: sr, sjm }` en 6ᵉ argument. **Garde ajoutée, décidée explicitement par Benoît avant
+codage** : si `profil.dateAnniversaire` est vide, cet argument reste `undefined` (repli sur
+`FRANCHISE_SALAIRES_NON_CERTIFIEE`, comportement historique) — sans elle, un profil dont
+`ouvertureDroits` est rempli mais `dateAnniversaire` encore vide (deux champs indépendants,
+remplissables séparément) aurait vu la fenêtre glisser avec `dateDuJour` au lieu de rester fixée à la
+PRA réelle qui a ouvert les droits, un SR qui aurait dérivé jour après jour. Vérifié en console
+navigateur avec les vrais modules du moteur (pas une simulation à côté) : `dateAnniversaire` renseignée
+→ `sr=8000`, `nht=600`, `sjm≈133,33`, franchise **calculée** (`valeur: 0`, pas `null`) ; `dateAnniversaire`
+vide → repli confirmé sur `{ valeur: null }`. **Point annexe repéré, non traité (hors périmètre
+demandé)** : l'UI (`RevenusMensuels.tsx:472-483`) n'affiche un message que si `valeur === null` ou
+`valeur > 0` — le cas `valeur === 0` (calculée mais nulle, comme dans le scénario de test ci-dessus)
+ne produit aucun texte, silencieux mais pas trompeur. 443 tests verts, `tsc -b` propre.
+
+**Prochaines pistes** : voir le point 🔴 juste au-dessus (dette `PeriodeAssimilee`, désormais
+résolue côté CRUD — cf. l'entrée Phase 3 plus haut — mais toujours bloquante pour le DPA Mistral tant
+que la Phase 2 n'a pas porté les conditions ALD/CPAM dans le modèle) et `docs/reprise.md` pour le
+détail. Le chantier franchise salaires est maintenant **terminé de bout en bout** (formule certifiée
++ répartition mensuelle + données réelles branchées), sous réserve du point annexe UI ci-dessus.
+Plus aucun ❌ confirmé par ailleurs dans la liste, la cohérence de profil est tenue par construction,
+et tous les items §11.A sont désormais traités (transparence du calcul comprise). Sinon, sans
+urgence : les deux limites connues 🔶 ci-dessus, le `rythme_hors_limite` différé (backlog
+`docs/reprise.md`/`docs/validation.md`), l'installation réelle sur un vrai téléphone (PWA
+techniquement prête, dépend du déploiement bêta), alignement visuel fin sur
+`docs/maquette_dashboard.html`.
+
+✅ **Quatre petits combles d'UI, trouvés en auditant "que se passe-t-il si l'utilisateur ne fournit
+que 3 documents ?" (29/07/2026 soir → 30/07/2026, commit `6f8024d`)** :
+- **A** — `tauxPrelevementSource` (`MonProfil.tsx`) était déjà saisissable, seul le texte d'aide
+  était corrigé : « tes relevés de situation France Travail » au lieu de « ton bulletin France
+  Travail », vocabulaire harmonisé avec le point D.
+- **B** — `ajReelleHistorique` (`GestionAjReelle`) : phrase ajoutée pour expliquer qu'une
+  revalorisation en cours de droits s'ajoute comme une nouvelle ligne, pas un remplacement.
+- **C** — Suggestion de pré-remplissage de `dateAnniversaire` depuis `dateLimiteIndemnisation`
+  quand la première est vide : **piège trouvé et évité avant de coder** — écrire directement via
+  `onModifierProfil` depuis `MonIndemnisationEnCours` aurait recréé exactement le problème déjà
+  documenté pour `salairesHorsAnnexe10PRA` (deux porteurs d'écriture sur le même champ, l'un
+  écrasant l'autre). La suggestion ne fait donc que pré-remplir le **brouillon local** de la
+  section « Ton profil » (`suggererDateAnniversaire` dans `MonProfil.tsx`) ; la persistance reste
+  derrière le bouton « Enregistrer » existant, avec son garde-fou de confirmation déjà en place
+  (`dateAnniversaireModifiee`). Vérifié en navigateur : accepter la suggestion ne touche pas
+  `localStorage` tant que « Enregistrer » n'est pas cliqué, et `ouvertureDroits` reste intact.
+- **D** — `ImportDocumentIA.tsx` : liste statique des 3 types de documents à préparer, ajoutée
+  avant la zone de dépôt. Distincte de `ChecklistDocuments` (déjà montée au-dessus des deux canaux
+  d'import) qui liste des champs manquants dynamiquement — les deux coexistent sans conflit, objets
+  différents.
+
+443 tests verts, `tsc -b` propre.
 
 ---
 
