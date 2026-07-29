@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { Contrat, Profil, SoldeIndemnisationDepart } from "./types";
+import type { Contrat, PeriodeAssimilee, Profil, SoldeIndemnisationDepart } from "./types";
 import { franceTravailConfig } from "./config/franceTravailConfig";
-import { chargerDonnees, creerContrat, exporterJSON, importerJSON, sauvegarderDonnees, type DonneesApp } from "./storage/localStorageAdapter";
+import { chargerDonnees, creerContrat, creerPeriode, exporterJSON, importerJSON, sauvegarderDonnees, type DonneesApp } from "./storage/localStorageAdapter";
 import { calculerFenetreReference } from "./engine/periodeReference";
 import { calculerDecompteHeures } from "./engine/decompteHeures";
 import { calculerSalaireReference } from "./engine/salaireReference";
@@ -99,6 +99,14 @@ export default function App() {
 
   function supprimerContrat(id: string) {
     setDonnees((d) => (d ? { ...d, contrats: d.contrats.filter((c) => c.id !== id) } : d));
+  }
+
+  function ajouterPeriode(partiel: Omit<PeriodeAssimilee, "id">) {
+    setDonnees((d) => (d ? { ...d, periodes: [...d.periodes, creerPeriode(partiel)] } : d));
+  }
+
+  function supprimerPeriode(id: string) {
+    setDonnees((d) => (d ? { ...d, periodes: d.periodes.filter((p) => p.id !== id) } : d));
   }
 
   function ajouterContratsRecurrents(contrats: Contrat[]) {
@@ -339,7 +347,9 @@ export default function App() {
             </div>
           ))}
 
-        {onglet === "profil" && <MonProfil dateDuJour={dateDuJour} profil={profil} onModifierProfil={modifierProfil} />}
+        {onglet === "profil" && (
+          <MonProfil dateDuJour={dateDuJour} profil={profil} onModifierProfil={modifierProfil} periodes={donnees.periodes} onAjouterPeriode={ajouterPeriode} onSupprimerPeriode={supprimerPeriode} />
+        )}
 
         {onglet === "fraisPro" && (
           <FraisReels profil={profil} soldeIndemnisationDepart={donnees.soldeIndemnisationDepart} contrats={donnees.contrats} config={franceTravailConfig} dateDuJour={dateDuJour} />

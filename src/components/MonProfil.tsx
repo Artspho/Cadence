@@ -5,7 +5,9 @@ import { profilHorsPerimetre, regimeEffectif } from "../lib/profilHorsPerimetre"
 import { CONTRADICTION_HORS_A10 } from "../content/contradictionHorsA10";
 import { validerCoherenceProfil } from "../lib/coherenceProfil";
 import type { ResultatEcritureProfil } from "../lib/coherenceProfil";
-import type { Profil } from "../types";
+import type { PeriodeAssimilee, Profil } from "../types";
+import { PeriodeForm } from "./PeriodeForm";
+import { PeriodeList } from "./PeriodeList";
 
 type OnModifierProfil = (profil: Profil) => ResultatEcritureProfil;
 
@@ -13,9 +15,13 @@ interface MonProfilProps {
   dateDuJour: string;
   profil: Profil;
   onModifierProfil: (profil: Profil) => ResultatEcritureProfil;
+  periodes: PeriodeAssimilee[];
+  onAjouterPeriode: (periode: Omit<PeriodeAssimilee, "id">) => void;
+  onSupprimerPeriode: (id: string) => void;
 }
 
-export function MonProfil({ dateDuJour, profil, onModifierProfil }: MonProfilProps) {
+export function MonProfil({ dateDuJour, profil, onModifierProfil, periodes, onAjouterPeriode, onSupprimerPeriode }: MonProfilProps) {
+  const [formPeriodeOuvert, setFormPeriodeOuvert] = useState(false);
   const jours = joursDepuisMiseAJourConfig(new Date(dateDuJour));
   // estPerime compare franceTravailConfig.meta.valableJusquau (un fait déclaré, jamais un
   // seuil de durée deviné) à dateDuJour — même fonction que TopBar.tsx, une seule source de
@@ -214,6 +220,30 @@ export function MonProfil({ dateDuJour, profil, onModifierProfil }: MonProfilPro
       </section>
 
       <MonIndemnisationEnCours profil={profil} onModifierProfil={onModifierProfil} />
+
+      <section>
+        <div className="flex items-center justify-between mb-2">
+          <h2 className="font-display text-lg font-medium">Périodes particulières</h2>
+          {!formPeriodeOuvert && (
+            <button type="button" onClick={() => setFormPeriodeOuvert(true)} className="text-sm bg-mint text-bg font-medium rounded-lg px-4 py-2">
+              Ajouter une période
+            </button>
+          )}
+        </div>
+        <p className="text-sm text-muted mb-3">Maternité, adoption, accident du travail, ALD, suspension de contrat ou maladie inter-contrat pendant la période de référence.</p>
+        {formPeriodeOuvert && (
+          <div className="mb-3">
+            <PeriodeForm
+              onValider={(periode) => {
+                onAjouterPeriode(periode);
+                setFormPeriodeOuvert(false);
+              }}
+              onAnnuler={() => setFormPeriodeOuvert(false)}
+            />
+          </div>
+        )}
+        <PeriodeList periodes={periodes} onSupprimer={onSupprimerPeriode} />
+      </section>
 
       <div className={`rounded-card border p-5 text-sm ${perime ? "border-amber/30 bg-amber/5 text-amber" : "border-line bg-surface text-muted"}`}>
         {perime && (
