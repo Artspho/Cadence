@@ -339,6 +339,7 @@ export default function App() {
               profil={profil}
               soldeDepart={donnees.soldeIndemnisationDepart}
               contrats={donnees.contrats}
+              periodes={donnees.periodes}
               config={franceTravailConfig}
               onConfigurerSolde={configurerSoldeIndemnisation}
               onAllerVersProfil={() => setOnglet("profil")}

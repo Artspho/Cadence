@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import type { Contrat, LigneSerieIndemnisation, MoisIndemnisationResultat, MoisOuverturePartielleNonCalcule, Profil, SoldeIndemnisationDepart } from "../types";
+import type { Contrat, LigneSerieIndemnisation, MoisIndemnisationResultat, MoisOuverturePartielleNonCalcule, PeriodeAssimilee, Profil, SoldeIndemnisationDepart } from "../types";
 import type { FranceTravailConfig } from "../config/franceTravailConfig";
 import { calculerSerieDepuisContrats } from "../engine/indemnisationMensuelle";
 import { calculerJoursTravailes, calculerSerie } from "../engine/calculerSerie";
@@ -7,19 +7,23 @@ import { getAjReelleAt } from "../engine/ajReelleUtils";
 import { joursDansMois } from "../engine/dateUtils";
 import { repartirContratParMois } from "../engine/decoupageMensuel";
 import { calculerNetEstime } from "../engine/estimationPaie";
+import { calculerFenetreReference } from "../engine/periodeReference";
+import { calculerSalaireReference } from "../engine/salaireReference";
+import { calculerSJM } from "../engine/areNette";
 import { descriptionMoisOuverturePartielle } from "../content/moisOuverturePartielle";
 
 interface RevenusMensuelsProps {
   profil: Profil;
   soldeDepart: SoldeIndemnisationDepart | null;
   contrats: Contrat[];
+  periodes: PeriodeAssimilee[];
   config: FranceTravailConfig;
   onConfigurerSolde: (solde: SoldeIndemnisationDepart) => void;
   onAllerVersProfil: () => void;
   dateDuJour: string;
 }
 
-export function RevenusMensuels({ profil, soldeDepart, contrats, config, onConfigurerSolde, onAllerVersProfil, dateDuJour }: RevenusMensuelsProps) {
+export function RevenusMensuels({ profil, soldeDepart, contrats, periodes, config, onConfigurerSolde, onAllerVersProfil, dateDuJour }: RevenusMensuelsProps) {
   // Le seul vrai prérequis est `ouvertureDroits` — les paramètres de la notification France Travail.
   // Ce module était auparavant fermé à tout profil `situation === "premiere_admission"` : un proxy de
   // « pas encore indemnisé » qui excluait aussi le premier admis venant d'ouvrir ses PREMIERS droits,
@@ -38,7 +42,7 @@ export function RevenusMensuels({ profil, soldeDepart, contrats, config, onConfi
   return (
     <div className="space-y-6 max-w-[900px]">
       <SoldeRecap solde={soldeDepart} onConfigurer={onConfigurerSolde} />
-      <TableauResultats profil={profil} soldeDepart={soldeDepart} contrats={contrats} config={config} dateDuJour={dateDuJour} />
+      <TableauResultats profil={profil} soldeDepart={soldeDepart} contrats={contrats} periodes={periodes} config={config} dateDuJour={dateDuJour} />
     </div>
   );
 }
@@ -269,16 +273,37 @@ function TableauResultats({
   profil,
   soldeDepart,
   contrats,
+  periodes,
   config,
   dateDuJour,
 }: {
   profil: Profil;
   soldeDepart: SoldeIndemnisationDepart;
   contrats: Contrat[];
+  periodes: PeriodeAssimilee[];
   config: FranceTravailConfig;
   dateDuJour: string;
 }) {
-  const resultat = useMemo(() => calculerSerieDepuisContrats(profil, soldeDepart, contrats, dateDuJour, config), [profil, soldeDepart, contrats, dateDuJour, config]);
+  // SR/SJM de la PRA qui a ouvert les droits en cours, pour la franchise salaires
+  // (calculerFranchiseSalaires). Fenêtre volontairement identique à celle d'App.tsx:70-72 (même
+  // calculerFenetreReference) — PAS une fenêtre inventée ici. Cette fenêtre ne coïncide avec la vraie
+  // PRA d'admission QUE si `profil.dateAnniversaire` est renseignée : sinon `calculerFenetreReference`
+  // retombe sur une fenêtre glissante finissant à `dateDuJour` (cf. periodeReference.ts), qui n'a pas
+  // de sens pour un total censé être fixé une fois pour toutes à l'ouverture des droits. D'où la garde
+  // ci-dessous : `srSjmPourFranchiseSalaires` reste `undefined` (franchise non certifiée, comportement
+  // historique) tant que cette date n'est pas connue, plutôt que de calculer un chiffre qui dériverait
+  // jour après jour.
+  const srSjmPourFranchiseSalaires = useMemo(() => {
+    if (!profil.dateAnniversaire) return undefined;
+    const fenetre = calculerFenetreReference(profil, contrats, periodes, config, dateDuJour);
+    const { sr, nht } = calculerSalaireReference(contrats, periodes, profil, config, fenetre);
+    return { srContrats: sr, sjm: calculerSJM(sr, nht, config) };
+  }, [profil, contrats, periodes, config, dateDuJour]);
+
+  const resultat = useMemo(
+    () => calculerSerieDepuisContrats(profil, soldeDepart, contrats, dateDuJour, config, srSjmPourFranchiseSalaires),
+    [profil, soldeDepart, contrats, dateDuJour, config, srSjmPourFranchiseSalaires],
+  );
 
   // Ne devrait pas arriver ici (RevenusMensuels bloque déjà plus haut sur ouvertureDroits absent),
   // gardé par exhaustivité du type — jamais un chiffre affiché sans point de départ réel.
