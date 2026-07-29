@@ -95,52 +95,131 @@ sacré n°2, au mot près.
 fichiers.** Bénéfice gratuit : une saisie manuelle éteint le badge exactement comme un import, ce qui
 est le comportement juste.
 
-### Les trois états, et une nuance de vocabulaire à trancher
+### Les trois états et leur vocabulaire (tranché le 29/07/2026)
 
-Les trois états demandés sont bien dérivables des données seules, par groupe de champs :
+Les trois états sont dérivables des données seules, par groupe de champs :
 
-| Champs du groupe | État | Lecture utilisateur |
+| Champs bloquants du groupe | État affiché | Lecture utilisateur |
 |---|---|---|
-| Aucun présent | **manquant** | « Ce document, je ne l'ai pas encore fourni » |
-| Certains présents, d'autres non | **incomplet** | « Il est passé, mais il n'a pas tout donné » |
-| Tous présents | **complet** | « Rien à faire ici » |
+| Aucun présent | **rien de renseigné** | « Ce document, je ne l'ai pas encore traité » |
+| Certains présents, au moins un manquant | **incomplète (N informations manquent)** | « Il est passé, mais il n'a pas tout donné » |
+| Tous présents | **complète** | « Rien à faire ici » |
 
-⚠️ **Une réserve sur le mot « fournie ».** Comme rien n'est tracé côté fichiers, l'app ne peut pas
-savoir *qu'un document a été fourni* — seulement que ses données sont là, qu'elles viennent d'un
-import ou du clavier. Écrire « Notification — fournie » serait donc une affirmation que l'app n'est
-pas en mesure de faire (mineure, mais c'est le même mécanisme que les faux feux verts).
+⚠️ **Le mot « fournie » est volontairement écarté.** Rien n'étant tracé côté fichiers, l'app ne peut
+pas savoir *qu'un document a été fourni* — seulement que ses données sont là, qu'elles viennent d'un
+import ou du clavier. Écrire « Notification — fournie » serait une affirmation qu'elle n'est pas en
+mesure de faire : même mécanisme que les faux feux verts, en plus discret. Le vocabulaire ne nomme
+donc que ce qui est observable. Décision de Benoît, 29/07/2026.
 
-**Proposition** : garder la structure à trois états, changer le vocabulaire pour qu'il ne parle que
-de ce que l'app observe réellement :
+### Deux poids de manque : bloquant vs précision
 
-- « Notification d'admission — **rien de renseigné** »
-- « Notification d'admission — **incomplète** (2 informations manquent) »
-- « Notification d'admission — **complète** »
+Sans cette distinction, l'état « complète » serait **inatteignable à vie** — le taux PAS peut
+légitimement ne pas figurer sur une notification, et la notification *précédente*, l'utilisateur ne
+l'a pas forcément gardée. Un badge qui ne passe jamais au vert, on apprend à l'ignorer, et il cesse
+alors de signaler les vrais manques.
 
-À trancher par Benoît : cette formulation, ou « fournie / fournie, incomplète / manquante » telle que
-demandée initialement. La structure ne change pas, seuls les mots.
+**La frontière n'est pas une question de confort. C'est un test contre le devoir sacré n°2 :**
 
-### Les cinq lignes de la checklist
+| Poids | Critère | Effet |
+|---|---|---|
+| **bloquant** | l'app **affiche un chiffre faux** ou ne calcule rien | compte dans « N informations manquent » ; empêche « complète » |
+| **précision** | l'app **dit qu'elle ne sait pas** — dégradation honnête | listé au dépliage seulement ; n'empêche pas « complète » |
+
+⚠️ Classer en « précision » exige la **preuve** que l'app se protège (mention, troncature,
+avertissement). Sans cette preuve, c'est bloquant. Cf. le cas `dateLimiteIndemnisation` ci-dessous,
+initialement mal classé.
+
+**Répartition complète — 6 bloquants, 2 précisions, 7 champs jamais réclamés.**
+
+| # | Manque bloquant | Champs | Sans lui |
+|---|---|---|---|
+| 1 | Paramètres d'ouverture de droits | `dateOuverture` + `franchiseCPTotale` + `delaiAttenteInitial` | Onglet Revenus vide |
+| 2 | Allocation journalière **nette** | `ajReelleHistorique` | Aucun montant mensuel |
+| 3 | Date de naissance | `dateNaissance` | Mauvais plafond enseignement (70/120 h) |
+| 4 | Date anniversaire (**réadmission seulement**) | `dateAnniversaire` | Fenêtre de référence fausse → tout le décompte |
+| 5 | **Date limite d'indemnisation** | `dateLimiteIndemnisation` | **Des mois hors droits s'affichent avec un montant** |
+| 6 | Au moins un contrat | ligne bulletins/AEM | Compteur 507 h à zéro |
+
+Les trois champs du n°1 ne peuvent pas manquer séparément : `Profil.ouvertureDroits` les exige tous
+les trois et le routage refuse d'en écrire un partiel. Un seul manque, donc, qui les nomme tous —
+trois cases basculant toujours ensemble donneraient l'illusion de trois vérifications indépendantes.
+
+| # | Précision | Preuve que la dégradation est honnête |
+|---|---|---|
+| 7 | Taux de prélèvement à la source | En-tête renommé « ≈ Montant (AJ relevé) » au lieu de « Montant net avant PAS » (`RevenusMensuels.tsx:364`) + avertissement ambre (`:446`) |
+| 8 | Date anniversaire précédente (réadmission) | Alerte `seuil_readmission_non_calculable` affichée |
+
+Champs **jamais réclamés**, chacun pour une raison vérifiée : `dureeDroitsMois` (retombe sur 12, et la
+franchise salaires qui le consomme n'est jamais active), `salairesHorsAnnexe10PRA` (indissociable de
+`regimeDeclare`, inutile en périmètre `annexe10_pur`), `situation` (garanti par le type — un manque
+qui ne peut jamais se déclencher est du code mort), `etablissementAgree`/`enRapportAvecMetier` (cf.
+ci-dessous), `contrat.type`/`territoire` (données du contrat, pas des cases séparées), `periodes`
+(aucune case d'arrivée, §6.2), `soldeIndemnisationDepart` (choix d'affichage).
+
+🔶 **`etablissementAgree` — hors checklist pour cette première version (décision du 29/07/2026).**
+C'est le seul cas limite : son absence fait **sous-compter** les heures d'enseignement, donc
+l'utilisateur peut se croire en retard alors qu'il ne l'est pas. Direction prudente — jamais un faux
+feu vert — donc pas urgent au sens du devoir n°2. Et ça se règle au niveau du **contrat individuel**,
+pas du dossier global : la bonne place serait une mention dans `DetailCalcul.tsx` un jour, pas une
+ligne de checklist. Amélioration future, pas une dette rouge.
+
+### Le cas `dateLimiteIndemnisation` — pourquoi il est bloquant
+
+Classé « précision » dans une première version de ce document, **à tort**. Vérification du
+29/07/2026 : son absence produit de vrais mois erronés à l'écran, sans aucune protection.
+
+- La borne dure de `calculerSerieDepuisContrats` est purement **sautée** quand le champ est absent
+  (`indemnisationMensuelle.ts:254`) ; la fin de série retombe alors sur `dateDuJour` (`:246`).
+- `RevenusMensuels.tsx` ne mentionne ce champ **nulle part** — ni troncature, ni avertissement.
+- Deux tests voisins du moteur le prouvent sur le **même profil**
+  (`indemnisationMensuelle.test.ts:372` et `:401`) : dernier mois simulé **2027-01** avec la date,
+  **2027-02** sans elle. Ce mois hors droits porte un montant calculé comme les autres, et l'écart
+  grossit avec le temps puisque la borne haute est la date du jour.
+- C'est la **régression signalée par Benoît le 26/07/2026**. Sans le champ, elle est intégralement de
+  retour.
+
+Classement tenable sans créer de badge rouge à vie : la donnée est toujours atteignable — le lexique,
+validé sur pièces réelles, la trouve sur la notification **et** sur le relevé, sous deux formulations
+équivalentes.
+
+### Les cinq lignes — dont deux seulement ont un statut calculable
 
 Ligne repliée par défaut ; le détail par donnée n'apparaît qu'en dépliant.
 
-| Ligne (document) | Données du groupe (visibles en dépliant) | Toujours requis ? |
+| Ligne (document) | Statut calculable ? | Contenu au dépliage |
 |---|---|---|
-| **Notification d'admission ARE** | dateOuverture, franchiseCPTotale, delaiAttenteInitial, dateLimiteIndemnisation, tauxPrelevementSource, AJ nette, dateNaissance, dateAnniversaire, situation, dureeDroitsMois | Oui, dès que les droits sont ouverts |
-| **Bulletins de paie ou AEM** | un contrat par mois travaillé de la période de référence | Oui |
-| **Relevé de situation** | recoupement ; dateLimiteIndemnisation si absente de la notification | Utile, pas indispensable |
-| **Attestation CPAM / maternité** | périodes assimilées | Seulement si concerné — **et sans effet aujourd'hui**, cf. §6.2 |
-| **Attestation de taux (PAS)** | tauxPrelevementSource, si absent de la notification | Seulement si le taux manque ailleurs |
+| **Notification d'admission ARE** | ✅ **oui, les trois états** | manques n°1 à 5 selon le cas |
+| **Bulletins de paie ou AEM** | 🔶 **partiel** — jamais « complète » | « N contrats renseignés » + la limite assumée |
+| **Relevé de situation** | ❌ non | Source alternative, et l'avertissement sur le montant BRUT |
+| **Attestation CPAM / maternité** | ❌ non | « Cadence ne sait pas encore enregistrer ces périodes » |
+| **Attestation de taux (PAS)** | ❌ non — **ligne affichée seulement si le taux manque** | Où le trouver |
 
-⚠️ Deux honnêtetés à ne pas omettre à l'écran :
+**Pourquoi trois lignes n'ont pas de statut** : elles ne portent **aucune donnée qui leur soit
+propre**. Tout ce qu'elles contiennent figure ailleurs (le relevé duplique la notification ; le taux
+est déjà réclamé au n°7 ; l'app ne peut pas savoir si quelqu'un a eu un arrêt de travail). Leur
+donner un badge aurait été inventer un statut. Leur rôle est d'être des **sources alternatives**, pas
+des cases à cocher.
 
-- **La ligne CPAM ne doit pas promettre ce qu'elle ne fait pas.** Tant que §6.2 n'est pas fait,
-  déposer une attestation CPAM ne produit rien d'applicable. La ligne doit le dire, ou ne pas exister.
-- **La ligne « bulletins » ne peut pas être « complète ».** L'app ne connaît pas la liste des mois
-  travaillés : elle ne peut pas distinguer « aucun contrat en mars » de « mars oublié ». Elle ne doit
-  donc jamais afficher « complet » ici — au mieux « N mois renseignés », à l'utilisateur de savoir si
-  c'est tout. Prétendre le contraire serait un faux feu vert sur le compteur 507 h, le plus grave de
-  tous.
+⚠️ **Trois honnêtetés à afficher telles quelles.** Ce ne sont pas des manques à combler : les taire
+serait pire que les dire. Chacune est verrouillée par un test, pour qu'une reformulation ne les fasse
+pas disparaître sans bruit.
+
+1. **La ligne « bulletins » ne peut JAMAIS être « complète ».** L'app ne connaît pas la liste des mois
+   travaillés : elle est structurellement incapable de distinguer « je n'ai pas travaillé en mars » de
+   « j'ai oublié mars ». Afficher « complet » ici serait un faux feu vert **sur le compteur 507 h
+   lui-même** — le plus grave possible. Elle affiche « N **contrats** renseignés » et non « N mois » :
+   un contrat peut couvrir plusieurs mois (une année scolaire d'enseignement en couvre dix), et
+   recompter les mois ici dupliquerait `engine/decoupageMensuel.ts` au risque d'en diverger en
+   silence. On n'affiche que ce que l'app sait sans calcul.
+2. **La ligne CPAM ne promet rien.** Tant que §6.2 n'est pas fait, déposer cette attestation ne
+   produit rien d'applicable, et la ligne le dit.
+3. **Le manque d'AJ nette renvoie vers la notification**, en avertissant qu'un relevé donne le plus
+   souvent le montant **BRUT**, inutilisable ici. Signalétique uniquement — aucune conversion, cf. §7.
+
+### Implémentation
+
+`src/lib/documentsRequis.ts` (commits `6615263` puis `02300ef`), fonction **pure et testée** : elle
+porte la vérité, l'affichage ne fait que la rendre. 25 tests dédiés.
 
 ---
 
@@ -336,11 +415,10 @@ document)** en découle directement — et elle est coûteuse : elle aurait fait
 
 ### Étapes, dans l'ordre
 
-1. ✅ **Ce document** — inventaire orienté besoins, zéro code.
-2. `lib/documentsRequis.ts` — fonction **pure et testée** : profil + contrats → liste des manques, aux
-   trois états du §4. Elle porte la vérité ; le JSX ne fait que l'afficher.
-3. La checklist dans l'espace dépôt, branchée sur (2). Lignes repliées, détail au dépliage, et les
-   deux honnêtetés du §4 (ligne CPAM sans promesse, ligne bulletins jamais « complète »).
+1. ✅ **Ce document** — inventaire orienté besoins, zéro code (commit `0c53dee`).
+2. ✅ **`lib/documentsRequis.ts`** — fonction pure et testée, 25 tests (commits `6615263`, `02300ef`).
+3. ⏳ La checklist dans l'espace dépôt (`ImportDocumentIA.tsx`), branchée sur (2). Lignes repliées,
+   détail au dépliage, et les trois honnêtetés du §4.
 4. **Trou 6.1** (déclaration fiscale) — section de lexique, **après** obtention d'un spécimen réel.
 5. **Trou 6.2** (CPAM) — chantier séparé, touche `engine/`, scopé et testé à part.
 
