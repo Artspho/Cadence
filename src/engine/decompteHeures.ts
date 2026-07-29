@@ -8,7 +8,7 @@
 // du second. Ne jamais les fusionner.
 import type { Contrat, DecompteHeuresResultat, PeriodeAssimilee, Profil, RepartitionHeures } from "../types";
 import type { FranceTravailConfig } from "../config/franceTravailConfig";
-import { ageAuJour, ajouterJours, dansIntervalle, moisCle } from "./dateUtils";
+import { ageAuJour, ajouterJours, dansIntervalle, joursChevauchement, moisCle } from "./dateUtils";
 
 export interface Fenetre {
   dateDebut: string;
@@ -70,14 +70,11 @@ export function heuresBrutesContrat(contrat: Contrat, config: FranceTravailConfi
  * compte. Un contrat hors fenêtre n'apporte aucune heure à ce décompte : exclure ses jours
  * sous-compterait sans rien corriger.
  *
- * ⚠️ `suspension_contrat` est l'EXCEPTION NON TRAITÉE ICI. Elle se produit pendant un contrat actif
- * par nature, donc elle chevauche forcément, et l'exclusion la ramène à 0 h — ce qui contredit la
- * règle « 5 h/jour, comptent pour 507 h » (SPEC §  périodes assimilées). La bonne règle est une
- * NON-CUMULATION dont il reste à trancher le sens (les 5 h/jour remplacent-elles les heures de
- * contrat sur ces jours, ou l'inverse ?) : les deux choix diffèrent en direction et l'un exige de
- * proratiser les heures de contrat au jour. En attendant, l'exclusion s'applique aussi à ce type,
- * parce qu'elle sous-compte (direction prudente) au lieu de gonfler. À trancher AVANT d'ouvrir
- * l'écran de saisie, sinon une suspension saisie n'ajouterait rien.
+ * `suspension_contrat` N'APPELLE PAS cette fonction (cf. `heuresAssimileesFenetre` ci-dessous) : ce
+ * type se produit par nature pendant un contrat actif, donc il chevauche toujours un contrat, et
+ * cette exclusion le ramènerait à 0 h — ce qui contredit la règle « 5 h/jour, comptent pour 507 h ».
+ * Confirmé par le tableau des 6 types de périodes (guide France Travail, 29/07/2026) : il compte
+ * toujours 5 h/jour, chevauchement ou non.
  */
 export function joursAssimilesHorsContrat(periode: PeriodeAssimilee, fenetre: Fenetre, contratsComptes: Contrat[]): number {
   const debut = periode.dateDebut > fenetre.dateDebut ? periode.dateDebut : fenetre.dateDebut;
@@ -95,11 +92,25 @@ export function joursAssimilesHorsContrat(periode: PeriodeAssimilee, fenetre: Fe
   return jours;
 }
 
-/** Heures apportées par les périodes assimilées (maternité, adoption, AT, ALD, suspension) qui chevauchent la fenêtre, hors jours déjà couverts par un contrat. Les maladies inter-contrat n'apportent aucune heure ici : elles n'agissent que sur la fenêtre (cf. periodeReference.ts). */
+/**
+ * Heures apportées par les périodes assimilées (maternité, adoption, AT, ALD, suspension) qui
+ * chevauchent la fenêtre. Les maladies inter-contrat n'apportent aucune heure ici : elles n'agissent
+ * que sur la fenêtre (cf. periodeReference.ts).
+ *
+ * `suspension_contrat` compte tous ses jours de chevauchement avec la fenêtre, SANS l'exclusion des
+ * jours sous contrat appliquée aux autres types (cf. `joursAssimilesHorsContrat` ci-dessus) : par
+ * nature elle se produit pendant un contrat actif, donc l'exclure la viderait toujours.
+ */
 function heuresAssimileesFenetre(periodes: PeriodeAssimilee[], fenetre: Fenetre, contratsComptes: Contrat[], config: FranceTravailConfig): number {
   return periodes
     .filter((p) => p.type !== "maladie_intercontrat")
-    .reduce((total, p) => total + joursAssimilesHorsContrat(p, fenetre, contratsComptes) * config.heuresAssimileesParJour, 0);
+    .reduce((total, p) => {
+      const jours =
+        p.type === "suspension_contrat"
+          ? joursChevauchement(p.dateDebut, p.dateFin, fenetre.dateDebut, fenetre.dateFin)
+          : joursAssimilesHorsContrat(p, fenetre, contratsComptes);
+      return total + jours * config.heuresAssimileesParJour;
+    }, 0);
 }
 
 export function calculerDecompteHeures(

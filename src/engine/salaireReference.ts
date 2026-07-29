@@ -12,10 +12,14 @@ import { calculerDecompteHeures, joursAssimilesHorsContrat, type Fenetre } from 
 /**
  * Types de périodes assimilées ouvrant droit à l'aménagement du SAR.
  *
- * ✅ VÉRIFIÉ au guide France Travail (p. 11-12, relecture du 29/07/2026) : maternité, adoption et ALD
- * sont les **trois seuls** types qui aménagent le salaire de référence. L'exclusion de
- * `accident_travail` et de `suspension_contrat` n'est donc PAS une supposition faute de mention — le
- * guide les énumère limitativement. Ne pas réintroduire ces deux types « par symétrie ».
+ * ✅ VÉRIFIÉ au guide France Travail (tableau des 6 types, 29/07/2026) : maternité, adoption et ALD
+ * aménagent le SAR ; `accident_travail` ne l'aménage pas. Ne pas réintroduire `accident_travail`
+ * « par symétrie ».
+ *
+ * // TODO: vérifier guide FT — `suspension_contrat` n'est PAS confirmé exclu du SAR (contrairement à
+ * ce qu'affirmait une version antérieure de ce commentaire). Le tableau des 6 types le marque ❓ « à
+ * vérifier », pas ✅ ni 🔴. En attendant, il reste hors de cet ensemble (statu quo), sans que ce soit
+ * un choix tranché.
  */
 const TYPES_OUVRANT_SAR = new Set(["maternite", "adoption", "ald"]);
 

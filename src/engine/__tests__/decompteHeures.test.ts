@@ -102,6 +102,34 @@ describe("calculerDecompteHeures", () => {
     });
   });
 
+  describe("suspension_contrat : exception à l'exclusion — compte toujours 5 h/jour", () => {
+    // suspension_contrat se produit PAR NATURE pendant un contrat actif (c'est tout son principe :
+    // le contrat existe mais est suspendu). L'exclusion posée pour maternité/adoption/ald/AT ne
+    // s'applique donc pas à lui : le guide FT dit qu'il compte 5 h/jour même en chevauchant un
+    // contrat. Confirmé par le tableau des 6 types (29/07/2026) — pas une supposition de logique.
+    const p = profil({ dateNaissance: "1990-01-01" });
+
+    it("suspension seule dans la fenêtre : 100 jours × 5 h = 500 h", () => {
+      const suspension = periode({ type: "suspension_contrat", dateDebut: "2026-03-01", dateFin: "2026-06-08" }); // 100 jours
+      const resultat = calculerDecompteHeures([], [suspension], p, franceTravailConfig, FENETRE);
+      expect(resultat.repartition.assimilees).toBe(500);
+    });
+
+    it("suspension chevauchant un contrat : les 5 h/jour restent comptées, pas exclues", () => {
+      const suspension = periode({ type: "suspension_contrat", dateDebut: "2026-03-01", dateFin: "2026-06-08" }); // 100 jours
+      const contrats = [contrat({ date: "2026-04-10", typeRemuneration: "cachet", nbCachets: 1 })]; // en plein dans la période
+      const resultat = calculerDecompteHeures(contrats, [suspension], p, franceTravailConfig, FENETRE);
+      expect(resultat.repartition.assimilees).toBe(500); // pas 495 : aucune exclusion pour ce type
+      expect(resultat.repartition.cachets).toBe(12); // le cachet compte aussi, normalement
+    });
+
+    it("suspension hors fenêtre : 0 h", () => {
+      const suspension = periode({ type: "suspension_contrat", dateDebut: "2025-01-01", dateFin: "2025-06-08" });
+      const resultat = calculerDecompteHeures([], [suspension], p, franceTravailConfig, FENETRE);
+      expect(resultat.repartition.assimilees).toBe(0);
+    });
+  });
+
   it("le cumul enseignement + formation est plafonné à 338 h", () => {
     const p = profil({ dateNaissance: "1976-01-01" }); // plafond enseignement 120 h
     const contrats = [
