@@ -250,19 +250,25 @@ trois fois (lexique, cas d'erreur, relecture finale). Ne jamais alléger ce pass
 
 ## 6. Les deux trous — chantiers découplés, à ne pas mélanger
 
-### 6.1 Déclaration fiscale annuelle — travail contenu
+### 6.1 Déclaration fiscale annuelle — ⬜ VOLONTAIREMENT NON COMBLÉ (décision du 29/07/2026)
 
-Le type est annoncé au modèle et présent dans l'énumération, mais **aucun libellé ne lui dit quoi en
-tirer**. Il détectera donc le type et ne produira rien d'exploitable, ou rangera tout en `info_seule`
-à l'aveugle.
+**Ce n'est pas une dette, c'est un abandon assumé.** Ne pas le rouvrir sans raison nouvelle.
 
-- **Nature du travail** : une section de lexique à ajouter, plus le renvoi vers `info_seule` pour ce
-  qui n'a pas de champ. Pas de code applicatif, pas de moteur.
-- **Champ réellement atteignable** : `tauxPrelevementSource` (le seul du §3 qu'une pièce fiscale
-  porte). Le reste (revenus déclarés, impôt) n'a **aucune** case d'arrivée dans Cadence et doit aller
-  en `info_seule` — ne pas créer de champ pour l'occasion.
-- ⚠️ **Préalable** : aucun spécimen réel n'a été lu. Les libellés doivent venir d'une vraie pièce,
-  pas d'une supposition (cf. §2).
+Le constat technique reste vrai : le type est annoncé au modèle et présent dans l'énumération, mais
+aucun libellé ne lui dit quoi en tirer. Ce qui a changé, c'est l'évaluation de ce que le combler
+rapporterait.
+
+- **Le seul champ atteignable est `tauxPrelevementSource`** — une **précision** (§4), pas un
+  bloquant, et qui a déjà **deux sources couvertes et validées sur pièces réelles** : la notification
+  et le relevé de situation. On écrirait donc une section de lexique pour offrir une *troisième*
+  source à un champ facultatif qui en a déjà deux qui fonctionnent.
+- Tout le reste d'une déclaration fiscale (revenus déclarés, impôt) n'a **aucune** case d'arrivée dans
+  Cadence, et ne doit pas en recevoir une pour l'occasion.
+- Le travail resterait contenu — mais *contenu* ne veut pas dire *utile*. Il exigerait quand même un
+  spécimen réel (§2) pour un gain quasi nul.
+
+Le type reste dans l'énumération : sa détection est inoffensive, et `info_seule` est la destination
+résiduelle prévue pour ce qu'on ne sait pas exploiter.
 
 ### 6.2 Attestation CPAM — chantier à part entière, touche `engine/`
 
@@ -275,10 +281,27 @@ Trou double, et le second est le vrai obstacle :
    mais **aucune fonction ne permet d'en créer une** : ni setter dans `App.tsx`, ni UI. Une extraction
    parfaite serait affichée sans pouvoir être appliquée.
 
-- **Nature du travail** : écrire la fonction d'écriture d'une `PeriodeAssimilee`, son setter, son UI
-  de saisie, et ses tests. Ça touche le décompte des 507 h — le calcul le plus sensible de l'app.
-- **À ne pas faire** : glisser ça dans la même étape que 6.1. Une ligne de prompt et une écriture
-  dans le moteur du 507 h ne se relisent pas avec la même exigence.
+**Découpage acté le 29/07/2026 — ce sont DEUX chantiers, et le plus important n'a rien à voir avec
+l'IA :**
+
+- **(a) L'app ne sait pas enregistrer une période assimilée. Du tout, par aucun moyen.** Pas seulement
+  depuis une extraction : ni setter, ni écran de saisie. Quelqu'un qui a eu un congé maternité, une
+  ALD ou un accident du travail **ne peut pas le déclarer à la main non plus**, alors que ces périodes
+  valent 5 h/jour dans les 507 h ou allongent la fenêtre de 365 j. C'est un manque **fonctionnel** de
+  l'app, indépendant de tout l'import IA, et il sous-compte silencieusement les heures de qui est
+  concerné. **Ne demande aucun spécimen**, se teste entièrement. → **prochaine étape du projet.**
+- **(b) L'IA ne sait pas lire une attestation CPAM** : aucune section de lexique, et le piège
+  `ald` / `maladie_intercontrat` (effets **opposés**) que l'extraction refuse déjà de deviner. Dépend
+  d'un spécimen réel, et sans objet tant que (a) n'existe pas. → **en attente, rien à faire.**
+
+⚠️ **(a) n'est PAS un simple formulaire.** Le moteur consomme déjà les périodes à trois endroits
+(`decompteHeures.ts` : 5 h/jour ; `periodeReference.ts` : allongement de la fenêtre ;
+`salaireReference.ts` : SAR, donc **le montant** de l'ARE), et il le fait **sans vérifier aucune
+condition**. Construire l'écran de saisie, c'est armer cette permissivité. Détail et ordre de travail
+dans le plan dédié — à traiter type par type contre le guide officiel, jamais par un setter générique.
+
+- **À ne pas faire** : glisser (a) ou (b) dans la même étape que 6.1. Une ligne de prompt et une
+  écriture dans le moteur du 507 h ne se relisent pas avec la même exigence.
 - **Conséquence en attendant** : déposer une attestation CPAM ne sert à rien. À dire à l'écran (§4).
 
 ---
@@ -417,10 +440,17 @@ document)** en découle directement — et elle est coûteuse : elle aurait fait
 
 1. ✅ **Ce document** — inventaire orienté besoins, zéro code (commit `0c53dee`).
 2. ✅ **`lib/documentsRequis.ts`** — fonction pure et testée, 25 tests (commits `6615263`, `02300ef`).
-3. ⏳ La checklist dans l'espace dépôt (`ImportDocumentIA.tsx`), branchée sur (2). Lignes repliées,
-   détail au dépliage, et les trois honnêtetés du §4.
-4. **Trou 6.1** (déclaration fiscale) — section de lexique, **après** obtention d'un spécimen réel.
-5. **Trou 6.2** (CPAM) — chantier séparé, touche `engine/`, scopé et testé à part.
+3. ✅ **La checklist dans l'espace dépôt** — rendue au-dessus des deux canaux dans `App.tsx` (et non
+   dans le bloc IA : l'information est neutre au canal), lignes repliées, détail au dépliage, les
+   trois honnêtetés du §4 (commit `8d613ae`).
+4. ⏳ **Saisie des périodes assimilées** — le (a) du §6.2. Prochaine étape du projet. Vérification par
+   type contre le guide officiel **avant** tout écran de saisie : le moteur les consomme déjà sans
+   condition, l'écran est ce qui armerait le risque.
+5. ⬜ **Déclaration fiscale (§6.1) — abandonnée**, pas en attente. Motif au §6.1.
+6. ⬜ **Lecture IA de la CPAM** — le (b) du §6.2, en attente d'un spécimen réel.
+7. ⬜ **Reporté en fin de projet par décision du 29/07/2026** : tout ce qui touche au déploiement et au
+   test réel — `vercel dev`, premier vrai document par l'endpoint, décision de fusion dans `master`,
+   corrections de `docs/SPEC.md`. On continue à construire en attendant.
 
 **Ne pas faire dans ces étapes** : toucher à la conversion brut/nette (§7), déduire
 `etablissementAgree` d'un nom (commit `a934db2`), ou créer un champ pour des données fiscales qui
