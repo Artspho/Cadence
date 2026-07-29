@@ -131,6 +131,15 @@ export function ImportDocumentIA({ profil, config, decompteActuel, onAjouterCont
         <p className="text-xs text-faint leading-relaxed mt-1">{ANNONCE_CANAL_IA}</p>
       </div>
 
+      <div className="bg-surface-2 border border-line rounded-lg px-4 py-3">
+        <p className="text-xs uppercase tracking-[.03em] text-muted mb-2">Documents à déposer</p>
+        <ul className="text-sm text-muted space-y-1 list-disc list-inside">
+          <li>Notification d'admission ARE (une fois, à l'ouverture de droits)</li>
+          <li>Relevé de situation France Travail (un par mois — contient ton taux PAS et ton allocation à jour)</li>
+          <li>Bulletins de paie (un par contrat, spectacle ou enseignement)</li>
+        </ul>
+      </div>
+
       <div
         onDragOver={(e) => {
           e.preventDefault();

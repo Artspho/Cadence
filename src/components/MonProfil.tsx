@@ -48,6 +48,17 @@ export function MonProfil({ dateDuJour, profil, onModifierProfil, periodes, onAj
     setErreurEcriture(null);
   }
 
+  // Pré-remplit le brouillon de CETTE section depuis la suggestion de MonIndemnisationEnCours —
+  // n'écrit jamais directement dans le profil (onModifierProfil), pour ne garder qu'une seule porte
+  // d'écriture sur `dateAnniversaire` : le bouton "Enregistrer" ci-dessous, comme pour toute autre
+  // modification de ce formulaire. Cf. le commentaire sur SalairesHorsAnnexe10 plus bas : deux
+  // porteurs d'écriture sur le même champ finissent par s'écraser l'un l'autre.
+  function suggererDateAnniversaire(date: string) {
+    setDateAnniversaireConnue(true);
+    setDateAnniversaire(date);
+    reinitialiserConfirmation();
+  }
+
   function enregistrer() {
     if (!peutEnregistrer) return;
     if (dateAnniversaireModifiee && !confirmationRequise) {
@@ -219,7 +230,7 @@ export function MonProfil({ dateDuJour, profil, onModifierProfil, periodes, onAj
         </div>
       </section>
 
-      <MonIndemnisationEnCours profil={profil} onModifierProfil={onModifierProfil} />
+      <MonIndemnisationEnCours profil={profil} onModifierProfil={onModifierProfil} onSuggestionDateAnniversaire={suggererDateAnniversaire} />
 
       <section>
         <div className="flex items-center justify-between mb-2">
@@ -377,13 +388,26 @@ function SalairesHorsAnnexe10({ profil, onModifierProfil }: { profil: Profil; on
 // (Profil.ajReelleHistorique, déplacé ici depuis RevenusMensuels.tsx le 2026-07-25 : c'est une
 // caractéristique de l'ouverture de droits, pas du point de départ d'affichage du tableau mensuel).
 // Consommés automatiquement mois par mois par calculerSerieDepuisContrats — jamais reconstruits.
-function MonIndemnisationEnCours({ profil, onModifierProfil }: { profil: Profil; onModifierProfil: OnModifierProfil }) {
+function MonIndemnisationEnCours({
+  profil,
+  onModifierProfil,
+  onSuggestionDateAnniversaire,
+}: {
+  profil: Profil;
+  onModifierProfil: OnModifierProfil;
+  onSuggestionDateAnniversaire: (date: string) => void;
+}) {
   const ouverture = profil.ouvertureDroits;
   const [dateOuverture, setDateOuverture] = useState(ouverture?.dateOuverture ?? "");
   const [franchiseCPTotale, setFranchiseCPTotale] = useState(ouverture?.franchiseCPTotale ?? 0);
   const [delaiAttenteInitial, setDelaiAttenteInitial] = useState(ouverture?.delaiAttenteInitial ?? 7);
   const [dateLimiteIndemnisation, setDateLimiteIndemnisation] = useState(ouverture?.dateLimiteIndemnisation ?? "");
   const [tauxPrelevementSource, setTauxPrelevementSource] = useState(ouverture?.tauxPrelevementSource?.toString() ?? "");
+  // Mémorise la dernière date acceptée pour ne pas réafficher la même suggestion en boucle après un
+  // clic — mais la refaire apparaître si `dateLimiteIndemnisation` change vers une autre valeur.
+  // `profil.dateAnniversaire` reste la source de vérité pour "déjà renseignée" : la suggestion accepte
+  // seulement de pré-remplir le brouillon de "Ton profil", elle n'écrit rien ici (cf. suggererDateAnniversaire).
+  const [dateSuggereeAcceptee, setDateSuggereeAcceptee] = useState<string | null>(null);
   // dureeDroitsMois vit sur Profil, pas ouvertureDroits (cf. types/index.ts) — composante de la
   // franchise salaires, connue indépendamment de la notification d'ouverture de droits elle-même.
   // L'autre composante, salairesHorsAnnexe10PRA, a quitté cette section le 2026-07-28 : elle est
@@ -494,6 +518,21 @@ function MonIndemnisationEnCours({ profil, onModifierProfil }: { profil: Profil;
             Sur ta notification, phrase « La date limite de votre indemnisation est le JJ/MM/AAAA ». Laisse vide si tu ne l'as pas sous la main — le suivi mensuel restera alors non borné dans le
             temps.
           </p>
+          {dateLimiteIndemnisation && !profil.dateAnniversaire && dateLimiteIndemnisation !== dateSuggereeAcceptee && (
+            <p className="text-xs rounded-lg px-3 py-2 mt-2 bg-teal/10 text-teal flex items-center justify-between gap-3 flex-wrap">
+              <span>Ta date anniversaire semble être le {dateLimiteIndemnisation.split("-").reverse().join("/")} — veux-tu la renseigner ?</span>
+              <button
+                type="button"
+                onClick={() => {
+                  setDateSuggereeAcceptee(dateLimiteIndemnisation);
+                  onSuggestionDateAnniversaire(dateLimiteIndemnisation);
+                }}
+                className="shrink-0 text-xs bg-teal text-bg font-medium rounded-lg px-3 py-1.5"
+              >
+                Oui, utiliser cette date
+              </button>
+            </p>
+          )}
         </div>
 
         <div>
@@ -528,7 +567,7 @@ function MonIndemnisationEnCours({ profil, onModifierProfil }: { profil: Profil;
             onChange={(e) => setTauxPrelevementSource(e.target.value)}
             className="w-full bg-surface-2 border border-line rounded-lg px-3 py-2 text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-mint"
           />
-          <p className="text-xs text-faint mt-1">Retrouve ton taux sur impots.gouv.fr ou sur ton bulletin France Travail.</p>
+          <p className="text-xs text-faint mt-1">Visible sur tes relevés de situation France Travail ou sur impots.gouv.fr.</p>
         </div>
 
         {erreur && <p className="text-xs text-red">{erreur}</p>}
@@ -575,6 +614,7 @@ function GestionAjReelle({ profil, onModifierProfil }: { profil: Profil; onModif
         <p className="text-xs text-faint mt-1">
           Indique l'allocation journalière nette figurant sur ta notification d'ouverture de droits France Travail (ligne « Allocation journalière nette »).
         </p>
+        <p className="text-xs text-faint mt-1">Si ton allocation journalière a été revalorisée en cours de droits, ajoute une nouvelle ligne avec la date d'effet — visible sur tes relevés de situation.</p>
       </div>
 
       {historique.length === 0 ? (
