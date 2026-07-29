@@ -901,12 +901,26 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
   les deux phrases sur lesquelles un utilisateur décide s'il confie sa fiche de paie : à confirmer
   avant d'ouvrir le canal à d'autres personnes que Benoît.
 
-**Prochaine action (29/07/2026, soir)** : le tableau des 6 types est arrivé et a débloqué la
-correction `suspension_contrat` (commit `8e2dd7a`). Il reste deux conditions d'éligibilité que le
-tableau ne couvrait pas — voir « Ce qui reste bloqué » ci-dessous : la **condition ALD** (ouverture de
-droits antérieure) réponse en attente de Benoît, et la condition « indemnisée par la SS » sur
-`maladie_intercontrat` = **Phase 2**. Prochain choix à faire avec Benoît : attendre la réponse ALD, ou
-enchaîner directement sur la Phase 2 pour `maladie_intercontrat` qui elle est déjà cadrée.
+**Prochaine action (29/07/2026, soir)** : la Phase 3 (écran de saisie) est committée. Il reste deux
+conditions d'éligibilité que le tableau des 6 types ne couvrait pas — voir « Ce qui reste bloqué »
+ci-dessous : la **condition ALD** (ouverture de droits antérieure) réponse en attente de Benoît, et la
+condition « indemnisée par la SS » sur `maladie_intercontrat` = **Phase 2**, toujours pas commencée.
+Prochain choix à faire avec Benoît : attendre la réponse ALD, ou enchaîner directement sur la Phase 2.
+
+✅ **Phase 3 committée** (commit `d664344`) : `ajouterPeriode`/`supprimerPeriode` dans `App.tsx`
+(pattern `ajouterContrat`/`supprimerContrat`), `PeriodeForm.tsx` (6 types, validation dateDebut ≤
+dateFin, avertissements ald/maladie_intercontrat), `PeriodeList.tsx` (confirmation navigateur,
+pattern suppression de série de contrats). **Écart avec le plan initial** (cf. ligne ci-dessous,
+écrite avant la décision finale) : la section vit dans **Mon profil**, pas dans l'onglet Contrats —
+décision explicite de Benoît au moment du cahier des charges, pas un oubli. Vérifié en navigateur par
+Benoît : ajout et suppression d'une période font bouger le total d'heures du Dashboard dans les deux
+sens. `engine/` inchangé, `PeriodeAssimilee` inchangé, schéma Zod déjà couvert (rien à faire côté
+Phase 1 du chantier storage). 443 tests verts, `tsc -b` propre.
+
+Effet de bord à garder en tête pour la suite : le refus n°2 de `routageExtraction.ts`
+(`periode_assimilee` toujours `non_applicable`, faute d'écran de saisie) n'a plus sa raison d'être
+technique — l'écran existe maintenant. Le débloquer (router une période extraite par l'IA vers
+`ajouterPeriode`) n'a pas été fait ici, ce n'était pas demandé, mais c'est désormais possible.
 
 ✅ **Phase 1 du chantier « saisie des périodes assimilées » committée** (commit `a3f0f71`, branche
 `backend-api-import-ia`, après relecture et feu vert de Benoît). Les 4 fichiers
@@ -959,12 +973,9 @@ conditions d'éligibilité d'une période. Deux points de la Phase 0 restent don
    lecture** de `chargerDonnees`, sinon un profil déjà enregistré serait rejeté et lu comme des
    « données perdues ».
 
-Suite du chantier, après la Phase 1 : **Phase 2** = porter les conditions dans le modèle de données ;
-**Phase 3** = `ajouterPeriode`/`supprimerPeriode` dans `App.tsx` + l'écran de saisie, dans l'onglet
-**Contrats** mais dans une **section visuellement distincte** (même pattern que le contrat récurrent,
-pas mélangé à la liste plate), avec la distinction `ald` vs `maladie_intercontrat` posée explicitement
-à l'utilisateur (effets opposés, l'extraction refuse déjà de la deviner). La Phase 3 débloquera le
-refus n°2 de `routageExtraction.ts`.
+Suite du chantier : **Phase 2** (restante) = porter les conditions ALD / « indemnisée par la SS » dans
+le modèle de données. **Phase 3** (committée, `d664344`) = `ajouterPeriode`/`supprimerPeriode` +
+l'écran de saisie — voir plus haut pour le détail et l'écart de placement (Mon profil, pas Contrats).
 
 **Reporté en fin de projet par décision explicite du 29/07** (ne pas le ressortir comme « prochaine
 action ») : `vercel dev`, faire passer un premier vrai document par `api/extract-document.ts`, la
