@@ -908,12 +908,6 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
   les deux phrases sur lesquelles un utilisateur décide s'il confie sa fiche de paie : à confirmer
   avant d'ouvrir le canal à d'autres personnes que Benoît.
 
-**Prochaine action (29/07/2026, soir)** : la Phase 3 (écran de saisie) est committée. Il reste deux
-conditions d'éligibilité que le tableau des 6 types ne couvrait pas — voir « Ce qui reste bloqué »
-ci-dessous : la **condition ALD** (ouverture de droits antérieure) réponse en attente de Benoît, et la
-condition « indemnisée par la SS » sur `maladie_intercontrat` = **Phase 2**, toujours pas commencée.
-Prochain choix à faire avec Benoît : attendre la réponse ALD, ou enchaîner directement sur la Phase 2.
-
 ✅ **Phase 3 committée** (commit `d664344`) : `ajouterPeriode`/`supprimerPeriode` dans `App.tsx`
 (pattern `ajouterContrat`/`supprimerContrat`), `PeriodeForm.tsx` (6 types, validation dateDebut ≤
 dateFin, avertissements ald/maladie_intercontrat), `PeriodeList.tsx` (confirmation navigateur,
@@ -1016,18 +1010,6 @@ demandé)** : l'UI (`RevenusMensuels.tsx:472-483`) n'affiche un message que si `
 `valeur > 0` — le cas `valeur === 0` (calculée mais nulle, comme dans le scénario de test ci-dessus)
 ne produit aucun texte, silencieux mais pas trompeur. 443 tests verts, `tsc -b` propre.
 
-**Prochaines pistes** : voir le point 🔴 juste au-dessus (dette `PeriodeAssimilee`, désormais
-résolue côté CRUD — cf. l'entrée Phase 3 plus haut — mais toujours bloquante pour le DPA Mistral tant
-que la Phase 2 n'a pas porté les conditions ALD/CPAM dans le modèle) et `docs/reprise.md` pour le
-détail. Le chantier franchise salaires est maintenant **terminé de bout en bout** (formule certifiée
-+ répartition mensuelle + données réelles branchées), sous réserve du point annexe UI ci-dessus.
-Plus aucun ❌ confirmé par ailleurs dans la liste, la cohérence de profil est tenue par construction,
-et tous les items §11.A sont désormais traités (transparence du calcul comprise). Sinon, sans
-urgence : les deux limites connues 🔶 ci-dessus, le `rythme_hors_limite` différé (backlog
-`docs/reprise.md`/`docs/validation.md`), l'installation réelle sur un vrai téléphone (PWA
-techniquement prête, dépend du déploiement bêta), alignement visuel fin sur
-`docs/maquette_dashboard.html`.
-
 ✅ **Quatre petits combles d'UI, trouvés en auditant "que se passe-t-il si l'utilisateur ne fournit
 que 3 documents ?" (29/07/2026 soir → 30/07/2026, commit `6f8024d`)** :
 - **A** — `tauxPrelevementSource` (`MonProfil.tsx`) était déjà saisissable, seul le texte d'aide
@@ -1050,6 +1032,55 @@ que 3 documents ?" (29/07/2026 soir → 30/07/2026, commit `6f8024d`)** :
   différents.
 
 443 tests verts, `tsc -b` propre.
+
+⚠️ **Import IA testé en production (30/07/2026) : échec silencieux sur un bulletin GHS-sPAIEctacle.**
+Bulletin de paie « Association du Festival de St Germain en Laye » (logiciel GHS-sPAIEctacle, format
+Artiste Musicien, 1 cachet isolé représentation, 175 € brut, période 28/06/2026). Résultat : texte
+brut extrait **vide** côté Mistral OCR — aucun champ lu automatiquement (salaire, cachets, dates,
+employeur). Le type « Artiste » a tout de même été reconnu et `ContractForm` s'est ouvert, mais tous
+les champs restaient vides — saisie manuelle obligatoire. Pas un chiffre faux (devoir n°2 tenu :
+rien n'a été inventé pour combler le vide), mais un échec d'extraction non diagnostiqué. Piste à
+investiguer : format PDF dense multi-colonnes, rendu possiblement vectoriel incompatible avec l'OCR
+Mistral — enrichir `document_annotation_prompt` avec des instructions spécifiques aux bulletins à
+colonnes multiples du spectacle vivant. Testés avec succès le même jour : notification ARE ✅, relevé
+de situation ✅ — l'échec semble propre à ce format de bulletin, pas au canal IA en général.
+
+## Backlog — to-do complète (30/07/2026)
+
+### Terminé cette session
+- ✅ Phases périodes assimilées (0, 1, 3)
+- ✅ Brouillons ImportDocumentIA supprimés
+- ✅ Garde-fou PDF > 3 Mo confirmé présent
+- ✅ SR/SJM branchés sur calculerSerieDepuisContrats
+- ✅ Gaps UI profil (taux PAS, ajReelleHistorique, dateAnniversaire, checklist docs IA)
+- ✅ Déploiement Vercel — app en ligne : cadence-faypc2dbg-benoit3.vercel.app
+- ✅ Test import IA production : notification ARE ✅, relevé de situation ✅, bulletin GHS ⚠️
+
+### À faire — priorité haute
+- ⬜ Améliorer prompt GHS-sPAIEctacle — OCR texte vide, saisie manuelle en fallback
+- ⬜ Tester relevé de situation juillet 2026 — vérifier enregistrement taux PAS
+- ⬜ Vérifier données réelles — import JSON + Dashboard vs notification France Travail
+- ⬜ PWA sur téléphone — installer et vérifier sur appareil réel
+- ⬜ Phase 2 périodes assimilées — conditions ALD (en attente source réglementaire)
+- ⬜ enRapportAvecMetier — description neutre dans le prompt IA, même faiblesse qu'etablissementAgree
+
+### À faire — priorité normale
+- ⬜ AJ brute vs nette — écart ~5%, jamais réinvestigué
+- ⬜ Comparaison complète Cadence vs 8 mois réels
+- ⬜ Reconfirmer mentions consentement Mistral (hébergement UE + entraînement)
+- ⬜ Production branch Vercel — pointer sur master explicitement dans les settings
+- ⬜ Inventaire annuel des documents réglementaires — lister tous les documents sources dont
+  dépendent les calculs de Cadence (guide France Travail intermittents, arrêtés SMIC, convention
+  d'assurance chômage, circulaires PMSS) avec leur date de publication et leur prochaine échéance
+  connue, et définir un processus de mise à jour annuel (au minimum : 1er janvier pour SMIC/PMSS,
+  et à chaque nouvelle convention d'assurance chômage). Objectif : garantir que
+  `franceTravailConfig.ts` reste à jour et que le bandeau « règles vérifiées au JJ/MM/AAAA » ne
+  vieillit pas silencieusement.
+
+### Post-bêta
+- ⬜ Refonte design (couleurs, placement onglets — à préciser)
+- ⬜ Renouvellement anticipé
+- ⬜ Module congés spectacle
 
 ---
 
