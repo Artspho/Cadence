@@ -901,8 +901,12 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
   les deux phrases sur lesquelles un utilisateur décide s'il confie sa fiche de paie : à confirmer
   avant d'ouvrir le canal à d'autres personnes que Benoît.
 
-**Prochaine action (29/07/2026, soir)** : **redemander à Benoît le TABLEAU DES 6 TYPES DE PÉRIODES**
-(guide France Travail) — sans lui, les trois points bloqués ci-dessous ne peuvent pas avancer.
+**Prochaine action (29/07/2026, soir)** : le tableau des 6 types est arrivé et a débloqué la
+correction `suspension_contrat` (commit `8e2dd7a`). Il reste deux conditions d'éligibilité que le
+tableau ne couvrait pas — voir « Ce qui reste bloqué » ci-dessous : la **condition ALD** (ouverture de
+droits antérieure) réponse en attente de Benoît, et la condition « indemnisée par la SS » sur
+`maladie_intercontrat` = **Phase 2**. Prochain choix à faire avec Benoît : attendre la réponse ALD, ou
+enchaîner directement sur la Phase 2 pour `maladie_intercontrat` qui elle est déjà cadrée.
 
 ✅ **Phase 1 du chantier « saisie des périodes assimilées » committée** (commit `a3f0f71`, branche
 `backend-api-import-ia`, après relecture et feu vert de Benoît). Les 4 fichiers
@@ -932,24 +936,28 @@ l'attendu changé en 99 — changer l'attendu aurait figé la contradiction dans
 maternité/adoption/ALD comme les trois seuls types qui aménagent le SR — vérifié par Benoît, pas
 supposé. Ne pas réintroduire `accident_travail` ni `suspension_contrat` « par symétrie ».
 
-**Ce qui reste bloqué, et par quoi** : Benoît a fait la Phase 0 de son côté (vrai guide) mais **le
-tableau des 6 types n'a jamais été collé dans le fil** — le message contenait un texte de
-substitution. Sans lui, trois choses ne peuvent pas avancer :
+**Tableau des 6 types de périodes reçu le 29/07/2026 (soir)** — croisé avec le code, résultat :
 
-1. la **condition ALD** (ouverture de droits antérieure requise) : ni vérifiée ni implémentée ;
+- `maternite` / `adoption` / `ald` / `accident_travail` : code déjà conforme au tableau (507h + SAR),
+  rien à faire.
+- `maladie_intercontrat` : ✅ **vérifié** que l'allongement de fenêtre est bien câblé
+  (`periodeReference.ts`, `joursAllongementMaladie` soustrait de la date de début) — rien à faire.
+- `suspension_contrat` : ✅ **corrigé** (commit `8e2dd7a`). Il compte désormais toujours 5 h/jour, y
+  compris en chevauchant un contrat (règle du guide, pas un double compte — ce type se produit par
+  nature pendant un contrat actif). Le SAR reste inchangé (hors de `TYPES_OUVRANT_SAR`) avec un
+  `// TODO` dans `salaireReference.ts` : le tableau marque ce point ❓ non confirmé, pas 🔴.
+  En corrigeant, une fausse certitude a aussi été retirée : un commentaire affirmait à tort que
+  l'exclusion de `suspension_contrat` du SAR était « ✅ VÉRIFIÉ » au guide.
+
+**Ce qui reste bloqué** : le tableau ne couvre que le comptage d'heures et le SAR — pas les
+conditions d'éligibilité d'une période. Deux points de la Phase 0 restent donc ouverts :
+
+1. la **condition ALD** (ouverture de droits antérieure requise) : ni vérifiée ni implémentée —
+   question posée à Benoît, réponse en attente ;
 2. la **condition « indemnisée par la SS »** sur `maladie_intercontrat` (SPEC §6.1) : aucun champ ne la
    porte → c'est la Phase 2, et ⚠️ toute nouvelle règle de cohérence doit rester **hors du schéma de
    lecture** de `chargerDonnees`, sinon un profil déjà enregistré serait rejeté et lu comme des
-   « données perdues » ;
-3. **`suspension_contrat`**, non tranché. Ce type chevauche un contrat **par nature**, donc l'exclusion
-   le ramène à 0 h, ce qui contredit « 5 h/jour, comptent pour 507 h ». La question à trancher n'est
-   pas « qui l'emporte ? » mais un **fait** : *les heures déclarées du contrat (recopiées d'un bulletin
-   ou d'une AEM) incluent-elles déjà les jours suspendus ?* Si elles les excluent, il n'y a aucun
-   double compte et le cumul d'origine était correct pour ce type. Si elles les incluent, il faut
-   choisir qui l'emporte — et faire gagner les 5 h/jour exigerait de proratiser les heures de contrat
-   **au jour**, alors que le moteur ne le fait qu'au mois. En attendant, l'exclusion s'applique aussi à
-   ce type (elle sous-compte au lieu de gonfler = direction prudente), et c'est écrit dans le code.
-   **À trancher avant d'ouvrir l'écran de saisie**, sinon une suspension saisie n'ajouterait rien.
+   « données perdues ».
 
 Suite du chantier, après la Phase 1 : **Phase 2** = porter les conditions dans le modèle de données ;
 **Phase 3** = `ajouterPeriode`/`supprimerPeriode` dans `App.tsx` + l'écran de saisie, dans l'onglet
