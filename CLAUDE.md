@@ -721,10 +721,13 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
   l'utilisateur. **Non prouvé** : rien de tout ça n'a été exécuté sur Vercel, aucun déploiement n'a eu
   lieu.
 - 🔶 **RIEN du chantier import IA n'est fusionné dans `master`** — `master` est resté sur `2721778`.
-  Tout vit sur la branche `backend-api-import-ia`, dans cet ordre : `59d129f` (backend minimal),
-  `d3ebb36` (écran de revue sur fixtures), `45a54e1` + `362bbfd` (doc), `ecca2c8` (consentement),
-  `d4906d5` (point d'entrée réel), `4c6cebb` (prompt éprouvé + descriptions de schéma).
-  Fusion à décider explicitement, pas encore faite.
+  Tout vit sur la branche `backend-api-import-ia`, dans cet ordre — **11 commits** : `59d129f`
+  (backend minimal), `d3ebb36` (écran de revue sur fixtures), `45a54e1` + `362bbfd` (doc),
+  `ecca2c8` (consentement), `d4906d5` (point d'entrée réel), `4c6cebb` (prompt éprouvé +
+  descriptions de schéma), `58d6525` (doc), `a934db2` (`etablissementAgree` non déductible),
+  `80d4904` (schéma en draft-07), `e05d604` (doc).
+  Fusion à décider explicitement, pas encore faite. Liste à revérifier avec
+  `git log --oneline master..backend-api-import-ia` avant de s'y fier.
 - ✅ **`document_annotation_prompt` éprouvé sur documents réels (29/07/2026)** — le prompt d'extraction
   de `api/extract-document.ts` n'est plus une supposition : il a été mis au point par essais successifs
   dans le Document AI Playground de Mistral, sur **deux documents réels de Benoît** (une notification
@@ -848,9 +851,13 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
   Le bouton d'aperçu de la modale a été retiré de `RevueExtractionDemo.tsx` : une seule porte vers
   la modale, et le vrai chemin est déjà sans danger à exercer en local.
   **408 tests verts** (372 avant ces deux commits), `npm run typecheck` propre, `npm run build` OK.
-  ⚠️ **Aucun document ne peut partir en local** : `vite dev` ne sert pas les fonctions Vercel, donc
-  `POST /api/extract-document` répond 404. Un envoi réel exige un déploiement Vercel avec la clé.
-  Le code est prêt, le robinet n'est pas ouvert.
+  ⚠️ **Aucun document ne peut partir en local *via l'app*** : `vite dev` ne sert pas les fonctions
+  Vercel, donc `POST /api/extract-document` répond 404. Le segment navigateur → endpoint reste donc
+  non exercé, et un envoi réel *depuis l'interface* exige un déploiement Vercel avec la clé (ou un
+  routage dev-only). En revanche un script Node appelant `extractDocument` **directement** contourne
+  l'endpoint et a bel et bien joint Mistral en local (cf. l'entrée ✅ sur le dialecte du schéma :
+  statut 200, PDF bidon sans donnée personnelle) — la formulation « rien ne peut partir » est donc
+  fausse au sens littéral depuis le 29/07/2026.
 - ✅ **`etablissementAgree` ne peut plus être déduit d'un nom d'établissement (29/07/2026, commit
   `a934db2`).** Le risque décrit ici était réel : rien n'empêchait de conclure `true` de la seule
   présence d'un nom de conservatoire ou d'école de musique, alors qu'« agréé » est un statut
