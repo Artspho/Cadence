@@ -16,6 +16,7 @@ import { Onboarding } from "./components/Onboarding";
 import { Dashboard } from "./components/Dashboard";
 import { ContractForm } from "./components/ContractForm";
 import { ContractList } from "./components/ContractList";
+import { ChecklistDocuments } from "./components/ChecklistDocuments";
 import { ImportBulletins } from "./components/ImportBulletins";
 import { ImportDocumentIA } from "./components/ImportDocumentIA";
 // Maquette de test de l'écran de revue IA (extractions simulées, bac à sable) — ne rend rien
@@ -260,6 +261,13 @@ export default function App() {
 
         {onglet === "import" && calculs && (
           <div className="space-y-6">
+            {/* AU-DESSUS des deux canaux, et volontairement pas dans l'un d'eux : savoir quel document
+                aller chercher précède le fait d'en déposer un, et cette information est NEUTRE au canal
+                — une saisie manuelle éteint un manque exactement comme un import (cf.
+                lib/documentsRequis.ts, qui ne lit que les données enregistrées). Rendue à l'intérieur
+                du bloc IA, elle se lisait comme une dépendance de l'IA, ce qu'elle n'est pas. */}
+            <ChecklistDocuments profil={profil} contrats={donnees.contrats} />
+
             <ImportBulletins profil={profil} config={franceTravailConfig} decompteActuel={calculs.decompte} onImporterContrat={ajouterContrat} />
 
             {/* Deuxième canal, distinct du local ci-dessus : celui-ci envoie le document à un serveur.
