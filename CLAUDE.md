@@ -95,6 +95,30 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 
 ## État actuel
 
+### Le plus récent d'abord — session du 29/07/2026 (jour)
+
+- ✅ **Chantier « checklist des documents à fournir » terminé, 3 étapes.** Nouveau document de
+  référence `docs/files/inventaire_donnees_et_documents.md` (remplace
+  `inventaire_documents_non_couverts.md`, conservé avec une bannière), orienté **besoins** et non
+  documents : il part des endroits où le code refuse de calculer. Puis `src/lib/documentsRequis.ts`
+  (pure, 25 tests) et `src/components/ChecklistDocuments.tsx`, rendu **au-dessus des deux canaux de
+  dépôt** dans `App.tsx`. Commits `0c53dee`, `6615263`, `02300ef`, `ad855bc`, `8d613ae`, `c1097d0`.
+- ✅ **Trois affirmations fausses corrigées** : AEM, bulletin artiste et bulletin enseignement
+  n'étaient pas « non couverts » mais « non **validés** sur pièce réelle » — ils sont codés. La
+  confusion aurait fait recoder de l'existant.
+- ✅ **`dateLimiteIndemnisation` reclassé BLOQUANT** (`02300ef`) : son absence fait afficher des mois
+  hors droits avec un montant, sans aucune protection compensatoire. Preuve par deux tests voisins du
+  moteur (`indemnisationMensuelle.test.ts:372` et `:401`) : dernier mois 2027-01 avec la date,
+  2027-02 sans elle. C'est la régression signalée le 26/07.
+- ⏳ **Phase 1 du chantier « périodes assimilées » écrite mais NON COMMITTÉE** — voir « Prochaine
+  action ». 440 tests verts, typecheck propre, 4 fichiers modifiés dans l'arbre de travail.
+- ⬜ **Décisions de périmètre du 29/07** : la lecture IA de la **déclaration fiscale est abandonnée**
+  (volontairement non comblée, pas une dette — motif au §6.1 de l'inventaire) ; **tout ce qui touche
+  au déploiement et au test réel est reporté en fin de projet** (`vercel dev`, premier vrai document
+  par l'endpoint, décision de fusion dans `master`, corrections de `docs/SPEC.md`).
+
+### Socle (antérieur)
+
 - ✅ Outillage (Vite/TS/Tailwind/Vitest) — compile et tourne.
 - ✅ `config/franceTravailConfig.ts` (valeurs sourcées + validation Zod).
 - ✅ `types/index.ts` (modèle complet, incl. `Profil.activiteHorsAnnexe10`).
@@ -877,37 +901,71 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
   les deux phrases sur lesquelles un utilisateur décide s'il confie sa fiche de paie : à confirmer
   avant d'ouvrir le canal à d'autres personnes que Benoît.
 
-**Prochaine action (chantier import IA)** : **faire passer un premier VRAI document.** Le tuyau
-technique est éprouvé (cf. l'entrée ✅ sur le dialecte : 200 OK, deux dialectes acceptés, validation
-Zod traversée), mais uniquement sur un PDF sans donnée exploitable et sans passer par l'interface.
-La question ouverte est de savoir si le prompt et le lexique tiennent sur pièce réelle en passant par
-`api/extract-document.ts`, et non par le Playground.
+**Prochaine action (29/07/2026, jour)** : **trancher le sort de la Phase 1 du chantier « saisie des
+périodes assimilées », écrite et verte mais NON COMMITTÉE.**
 
-Trois chantiers, sans ordre imposé :
+⚠️ **Quatre fichiers modifiés dans l'arbre de travail**, en attente de la relecture de Benoît :
+`src/engine/decompteHeures.ts`, `src/engine/salaireReference.ts` et leurs deux fichiers de tests.
+440 tests verts, `npm run typecheck` propre. Ils ne sont dans AUCUN commit — première chose à faire au
+prochain fil : soit committer, soit demander les corrections.
 
-(a) **Premier document réel via l'app.** Obstacle connu, vérifié le 29/07 : en local, `npm run dev`
-    (Vite) ne sert PAS les Vercel Functions — un POST sur `/api/extract-document` y répond 404, et
-    l'app afficherait un échec générique sans rapport avec l'extraction. Trois voies possibles :
-    `vercel dev` (CLI absent du PATH, demande une connexion de compte), un routage dev-only ajouté à
-    `vite.config.ts`, ou passer directement par le déploiement (cf. (c)).
+Ce que la Phase 1 fait : **plus aucun jour n'est compté deux fois.** Un nouvel helper partagé
+`joursAssimilesHorsContrat` (exporté par `decompteHeures.ts`) compte les jours d'une période assimilée
+dans la fenêtre **en sautant ceux déjà couverts par un contrat**. Deux défauts fermés d'un coup :
 
-(b) **Les 5 types de documents non couverts**, à inventorier puis éprouver : contrat d'enseignement,
-    bulletin d'enseignement, taux d'imposition, AEM, bulletin d'artiste. À traiter avec ça :
-    **concevoir l'alerte AEM vs bulletin de paie** — l'AEM est la pièce qui fait foi pour France
-    Travail, le bulletin ne l'est pas, et rien n'avertit aujourd'hui l'utilisateur qui saisit l'un en
-    croyant valider l'autre.
+- **compteur 507 h** (`decompteHeures.ts`) : un jour sous contrat valait ses heures **plus** 5 h
+  assimilées → compteur gonflé, donc faux feu vert ;
+- **montant** (`salaireReference.ts`) : un jour travaillé était soustrait du dénominateur du SAR, ce
+  qui **gonflait l'allocation**. Trouvé en vérifiant, hors du périmètre demandé, même cause racine.
+  L'exclusion y regarde **tous** les contrats de la fenêtre, **enseignement inclus** (la question est
+  « ce jour a-t-il été travaillé ? », pas « ce contrat alimente-t-il le SR ? »).
 
-(c) **Déploiement Vercel preview** — c'est aussi ce qui validerait le segment navigateur → endpoint
-    resté non exercé (cf. (a)), et ce qui débloquerait l'installation PWA sur un vrai téléphone.
+Défaut **latent** jusqu'ici, et c'est le cœur du raisonnement : sans chemin d'écriture, `periodes` est
+vide en pratique — **c'est l'écran de saisie à venir qui l'aurait armé.** D'où la correction du moteur
+AVANT l'écran, et non après.
 
-Il n'y a plus de prérequis bloquant : le chemin dépôt → contrôles → consentement → envoi → revue est
-en place (`ecca2c8`, `d4906d5`), prompt et lexique validés sur documents réels au Playground
-(`4c6cebb`), la mention utilisateur existe et est bloquante, et le DPA n'en est plus un (décision du
-28/07, lecture périmée à ne plus ressortir).
+Un test existant a échoué et c'était un vrai signal : la fixture du SAR posait un cachet le 01/06/2026
+en pleine maternité déclarée du 01/03 au 08/06. Le contrat a été **déplacé en septembre** plutôt que
+l'attendu changé en 99 — changer l'attendu aurait figé la contradiction dans le test de référence.
+
+`TYPES_OUVRANT_SAR` : le ⚠️ « supposition » a été retiré. Le guide (p. 11-12) énumère limitativement
+maternité/adoption/ALD comme les trois seuls types qui aménagent le SR — vérifié par Benoît, pas
+supposé. Ne pas réintroduire `accident_travail` ni `suspension_contrat` « par symétrie ».
+
+**Ce qui reste bloqué, et par quoi** : Benoît a fait la Phase 0 de son côté (vrai guide) mais **le
+tableau des 6 types n'a jamais été collé dans le fil** — le message contenait un texte de
+substitution. Sans lui, trois choses ne peuvent pas avancer :
+
+1. la **condition ALD** (ouverture de droits antérieure requise) : ni vérifiée ni implémentée ;
+2. la **condition « indemnisée par la SS »** sur `maladie_intercontrat` (SPEC §6.1) : aucun champ ne la
+   porte → c'est la Phase 2, et ⚠️ toute nouvelle règle de cohérence doit rester **hors du schéma de
+   lecture** de `chargerDonnees`, sinon un profil déjà enregistré serait rejeté et lu comme des
+   « données perdues » ;
+3. **`suspension_contrat`**, non tranché. Ce type chevauche un contrat **par nature**, donc l'exclusion
+   le ramène à 0 h, ce qui contredit « 5 h/jour, comptent pour 507 h ». La question à trancher n'est
+   pas « qui l'emporte ? » mais un **fait** : *les heures déclarées du contrat (recopiées d'un bulletin
+   ou d'une AEM) incluent-elles déjà les jours suspendus ?* Si elles les excluent, il n'y a aucun
+   double compte et le cumul d'origine était correct pour ce type. Si elles les incluent, il faut
+   choisir qui l'emporte — et faire gagner les 5 h/jour exigerait de proratiser les heures de contrat
+   **au jour**, alors que le moteur ne le fait qu'au mois. En attendant, l'exclusion s'applique aussi à
+   ce type (elle sous-compte au lieu de gonfler = direction prudente), et c'est écrit dans le code.
+   **À trancher avant d'ouvrir l'écran de saisie**, sinon une suspension saisie n'ajouterait rien.
+
+Suite du chantier, après la Phase 1 : **Phase 2** = porter les conditions dans le modèle de données ;
+**Phase 3** = `ajouterPeriode`/`supprimerPeriode` dans `App.tsx` + l'écran de saisie, dans l'onglet
+**Contrats** mais dans une **section visuellement distincte** (même pattern que le contrat récurrent,
+pas mélangé à la liste plate), avec la distinction `ald` vs `maladie_intercontrat` posée explicitement
+à l'utilisateur (effets opposés, l'extraction refuse déjà de la deviner). La Phase 3 débloquera le
+refus n°2 de `routageExtraction.ts`.
+
+**Reporté en fin de projet par décision explicite du 29/07** (ne pas le ressortir comme « prochaine
+action ») : `vercel dev`, faire passer un premier vrai document par `api/extract-document.ts`, la
+décision de fusion des 12 commits dans `master`, et les deux corrections de `docs/SPEC.md`
+(ligne ~24 « hors MVP » périmée sur la branche ; ligne ~334 décrit la zone de dépôt sans la
+checklist). On continue à construire en attendant.
 
 Restent à faire par ailleurs : corriger le brouillon `docs/files/ImportDocumentIA.jsx` qui appelle
-Mistral directement depuis le navigateur avec la clé dans un `<input>` (cf. le 🔴 plus haut) ; le
-CRUD des périodes assimilées, qui débloquerait la cible `periode_assimilee` (cf. la dette 🔴) ;
+Mistral directement depuis le navigateur avec la clé dans un `<input>` (cf. le 🔴 plus haut) ;
 vérifier les deux affirmations du texte de consentement (cf. le 🔶 correspondant).
 
 **Prochaines pistes** : voir les deux points 🔴 juste au-dessus (dette `PeriodeAssimilee` sans chemin
