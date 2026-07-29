@@ -113,11 +113,46 @@ describe("documentsRequis — précisions inatteignables non réclamées", () =>
     expect(libelles(l)).not.toContain("Taux de prélèvement à la source");
   });
 
-  it("ouvertureDroits présent mais incomplet -> les deux précisions apparaissent", () => {
+  it("ouvertureDroits présent mais incomplet -> les deux champs apparaissent", () => {
     const p = profil({ ouvertureDroits: { dateOuverture: "2026-02-05", franchiseCPTotale: 12, delaiAttenteInitial: 7 } });
     const l = ligne(documentsRequis(p, []), "notification_admission");
     expect(libelles(l)).toContain("Date limite de ton indemnisation");
     expect(libelles(l)).toContain("Taux de prélèvement à la source");
+  });
+});
+
+describe("documentsRequis — bloquant vs précision : la frontière est « l'app affiche-t-elle un chiffre faux ? »", () => {
+  const ouvertureSansDateLimite = { dateOuverture: "2026-02-05", franchiseCPTotale: 12, delaiAttenteInitial: 7, tauxPrelevementSource: 3.1 };
+
+  it("dateLimiteIndemnisation est BLOQUANTE : son absence produit de vrais mois erronés", () => {
+    // Vérifié le 29/07/2026 dans le moteur : la borne dure de calculerSerieDepuisContrats est sautée
+    // quand le champ est absent (indemnisationMensuelle.ts:254), la série retombe sur dateDuJour
+    // (:246), et RevenusMensuels.tsx ne mentionne ce champ nulle part — aucune troncature, aucun
+    // avertissement. Deux tests voisins du moteur le prouvent sur le même profil
+    // (indemnisationMensuelle.test.ts:372 et :401) : 2027-01 avec la date, 2027-02 sans elle, ce
+    // dernier mois portant un montant alors que les droits sont clos.
+    // Ce test verrouille le classement : le repasser en "precision" rendrait « complète » atteignable
+    // avec de faux montants à l'écran — devoir sacré n°2.
+    const p = profil({ ...profilComplet, ouvertureDroits: ouvertureSansDateLimite });
+    const l = ligne(documentsRequis(p, []), "notification_admission");
+    const manque = l.manques.find((m) => m.libelle === "Date limite de ton indemnisation");
+    expect(manque?.poids).toBe("bloquant");
+    expect(l.statut).toBe("incomplet");
+    expect(l.nbManquesBloquants).toBe(1);
+  });
+
+  it("le taux PAS est une PRÉCISION : l'app dégrade honnêtement et le dit", () => {
+    // Contraste vérifié : sans le taux, l'en-tête devient « ≈ Montant (AJ relevé) » au lieu de
+    // « Montant net avant PAS » (RevenusMensuels.tsx:364) et un avertissement ambre invite à le
+    // renseigner (:446). Aucun chiffre faux — d'où « précision », et « complète » reste atteignable.
+    const p = profil({
+      ...profilComplet,
+      ouvertureDroits: { dateOuverture: "2026-02-05", franchiseCPTotale: 12, delaiAttenteInitial: 7, dateLimiteIndemnisation: "2027-01-17" },
+    });
+    const l = ligne(documentsRequis(p, []), "notification_admission");
+    expect(l.manques.find((m) => m.libelle === "Taux de prélèvement à la source")?.poids).toBe("precision");
+    expect(l.statut).toBe("complet");
+    expect(l.nbManquesBloquants).toBe(0);
   });
 });
 

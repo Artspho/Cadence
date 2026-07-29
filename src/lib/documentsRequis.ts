@@ -182,8 +182,21 @@ function ligneNotification(profil: Profil | null): LigneDocument {
     },
     {
       libelle: "Date limite de ton indemnisation",
-      poids: "precision",
-      consequence: "Sans elle, le tableau mensuel n'est pas borné : des mois peuvent s'afficher au-delà de droits qui n'existent plus.",
+      // BLOQUANT, et pas « précision » comme dans une première version de ce fichier. Vérifié le
+      // 29/07/2026 : son absence produit de VRAIS mois erronés à l'écran, sans aucune protection
+      // compensatoire. La borne dure de `calculerSerieDepuisContrats` est purement sautée quand le
+      // champ est absent (indemnisationMensuelle.ts:254), la fin de série retombe alors sur
+      // `dateDuJour` (:246), et `RevenusMensuels.tsx` ne mentionne ce champ nulle part — ni
+      // troncature, ni avertissement. Deux tests voisins le prouvent sur le même profil
+      // (indemnisationMensuelle.test.ts:372 et :401) : dernier mois simulé 2027-01 avec la date,
+      // 2027-02 sans elle. Ce mois hors droits porte un montant calculé comme les autres, et l'écart
+      // grossit avec le temps puisque la borne haute est la date du jour.
+      // C'est la régression que Benoît avait lui-même signalée le 26/07/2026.
+      // Classement tenable : la donnée est toujours atteignable — le lexique, validé sur pièces
+      // réelles, la trouve sur la notification ET sur le relevé, sous deux formulations équivalentes.
+      poids: "bloquant",
+      consequence:
+        "Sans elle, le tableau mensuel n'est pas borné : des mois s'affichent avec un montant au-delà de droits qui n'existent plus. Elle figure sur ta notification et sur ton relevé de situation.",
       present: renseignee(ouverture?.dateLimiteIndemnisation),
       // Inatteignable tant que `ouvertureDroits` est absent : l'afficher ferait un faux manque
       // supplémentaire pour un trou déjà signalé par la première ligne.
@@ -191,8 +204,12 @@ function ligneNotification(profil: Profil | null): LigneDocument {
     },
     {
       libelle: "Taux de prélèvement à la source",
+      // Précision, et celle-ci est confirmée : l'app dégrade HONNÊTEMENT quand le taux manque. La
+      // colonne est renommée « ≈ Montant (AJ relevé) » au lieu de « Montant net avant PAS »
+      // (RevenusMensuels.tsx:364) et un avertissement ambre invite à le renseigner (:446). Aucun
+      // chiffre faux n'est affiché — c'est exactement ce qui la distingue de la date limite ci-dessus.
       poids: "precision",
-      consequence: "Sans lui, les montants mensuels restent bruts — aucun net n'est affiché.",
+      consequence: "Sans lui, les montants mensuels restent bruts — aucun net n'est affiché, et le tableau le signale.",
       present: ouverture?.tauxPrelevementSource != null,
       applicable: ouverture != null,
     },
