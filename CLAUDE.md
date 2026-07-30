@@ -1059,7 +1059,22 @@ de situation ✅ — l'échec semble propre à ce format de bulletin, pas au can
 ### À faire — priorité haute
 - ✅ Prompt GHS/sPAIEctacle — bulletins multi-colonnes couverts (commit 081a516)
 - ✅ Taux PAS depuis relevé de situation — enregistrement confirmé en prod (commits eb5a880 + d72ac18)
-- ⬜ Prompt relevé de situation — 469,26 € (total mensuel net) extrait à tort comme AJ journalière
+- ✅ Prompt relevé de situation — 469,26 € (total mensuel net) extrait à tort comme AJ journalière :
+  origine identifiée (`Relevé_de_situation_20260715.pdf` — le mot « Journalière(s) » dans l'en-tête
+  de colonne du tableau « Allocation d'Aide au Retour à l'Emploi » ne qualifie que la colonne
+  « Nb d'alloc. », pas les montants ; confirmé en croisant avec le relevé d'avril 20260414_3,
+  55,02 €/jour × 17 ≈ 935 € cohérent). Le vrai montant journalier n'est écrit qu'en toutes lettres
+  dans « INFORMATIONS SUR VOS DROITS » (« Allocation brute d'un montant journalier de X Euro […] »).
+  Correctif de lexique + CAS 5 ajoutés dans `api/extract-document.ts` (piège dédié + citation
+  obligatoire). **Validé en appel réel à l'API Mistral sur le document exact qui a produit le bug**
+  (31/07/2026, hors Playground — appel direct `extractDocument` avec la clé de `.env`) :
+  `aj_reelle_historique` correctement rempli à 55,02 € brut (justifié par la phrase « Allocation
+  brute d'un montant journalier de 55,02 Euro [...] »), la ligne du tableau (469,26 € net/9 jours)
+  correctement routée en `info_seule`, aucune sur-généralisation observée. Un second bug,
+  indépendant, a été découvert au passage : `info_seule.donnees` (schéma Zod scalaires uniquement)
+  rejetait un objet imbriqué que le modèle produisait pour les totaux de période, faisant échouer
+  toute l'extraction sur ce document. Corrigé par une règle de prompt exigeant des clés scalaires
+  à plat plutôt qu'un objet composite — revalidé, l'extraction passe désormais la validation Zod.
 - ⬜ Prompt relevé de situation — confiance "moyenne" sur taux PAS à renforcer
 - ⬜ Vérifier données réelles — import JSON + Dashboard vs notification France Travail
 - ⬜ PWA sur téléphone — installer et vérifier sur appareil réel

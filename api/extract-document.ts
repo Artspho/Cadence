@@ -90,6 +90,23 @@ NOTIFICATION D'ADMISSION ARE / RELEVÉ DE SITUATION
   « allocation brute », « montant brut journalier »
         → aj_reelle_historique : valeur, natureMontant = "brut"
 
+  ⚠️⚠️ PIÈGE — LA LIGNE "Allocation d'Aide au Retour à l'Emploi" DU TABLEAU N'EST JAMAIS L'AJ
+  JOURNALIÈRE
+  Un relevé de situation contient un tableau (« Allocations déjà versées » / « Allocations dues »)
+  avec une ligne « Allocation d'Aide au Retour à l'Emploi » et des colonnes du type :
+     Nb d'alloc. Journalière(s) | Montant Brut | Retraite Comp. | Impôt Revenu | Montant Net
+  Le mot « Journalière(s) » qualifie UNIQUEMENT la première colonne (nombre de jours indemnisés
+  sur la période) — il ne s'applique PAS aux montants des colonnes suivantes. Ces montants (Brut,
+  Retraite Comp., Impôt Revenu, Net) sont des TOTAUX DE PÉRIODE (souvent mensuels), jamais des
+  montants journaliers, même quand le mot « Journalière(s) » apparaît dans l'en-tête de la ligne ou
+  du tableau. → info_seule (cf. « totaux mensuels versés » ci-dessous), JAMAIS aj_reelle_historique.
+  Le vrai montant d'AJ journalière ne se trouve que dans une phrase en toutes lettres, du type :
+     « Allocation brute d'un montant journalier de X Euro tenant compte d'un Salaire Journalier
+       de Référence de Y Euro »
+  section « INFORMATIONS SUR VOS DROITS ». C'est CETTE phrase, et uniquement elle, qui alimente
+  aj_reelle_historique — jamais une ligne de tableau. Citation obligatoire de cette phrase (ou
+  équivalente) pour justifier toute proposition aj_reelle_historique issue d'un relevé de situation.
+
   RÈGLE DE LECTURE pour dateEffet (champ OBLIGATOIRE) : la date d'effet de l'allocation est la date
   à partir de laquelle le document dit que tu es indemnisable, énoncée DANS LE MÊME DOCUMENT. La
   reprendre n'est pas une invention, c'est la lecture normale du document — ne renonce jamais à la
@@ -142,6 +159,17 @@ NOTIFICATION D'ADMISSION ARE / RELEVÉ DE SITUATION
   salaire journalier de référence, salaire de référence, nombre d'heures retenues (NHT), nombre de
   jours travaillés et la période de référence associée (ex. « 57 jours travaillés dans la période
   du 24 mars 2025 au 17 janvier 2026 »), jours non indemnisés, totaux mensuels versés.
+
+  ⚠️ RÈGLE DE FORME pour info_seule.donnees : chaque valeur de cet objet DOIT être un SCALAIRE
+  (texte, nombre, booléen ou null) — JAMAIS un objet imbriqué, JAMAIS un tableau. Si un même
+  passage regroupe plusieurs montants (ex. la ligne « Allocation d'Aide au Retour à l'Emploi » :
+  brut, retraite complémentaire, impôt revenu, net, nombre de jours pour la période), NE LES
+  IMBRIQUE PAS sous une seule clé objet. Écris une clé scalaire À PLAT par valeur, avec un préfixe
+  commun explicite, par exemple :
+     totauxPeriodeMontantBrut, totauxPeriodeRetraiteComplementaire, totauxPeriodeImpotRevenu,
+     totauxPeriodeMontantNet, totauxPeriodeJoursIndemnises
+  (adapte les noms au contexte réel du document — l'important est : une clé = une valeur scalaire,
+  jamais un objet composite.)
 
 BULLETIN DE PAIE / AEM
 
@@ -207,7 +235,7 @@ BULLETIN DE PAIE / AEM
   d'enseignement dans les 507 h. Un true inventé y ferait entrer des heures qui n'y ont pas droit —
   donc un compteur 507 h trop élevé, et un feu vert que l'utilisateur n'a pas.
 
-════════ QUATRE ERREURS OBSERVÉES, À NE PAS REFAIRE ════════
+════════ CINQ ERREURS OBSERVÉES, À NE PAS REFAIRE ════════
 
 CAS 1 — allocation rangée au mauvais endroit
   mauvais : le document dit « Le montant de votre allocation journalière nette est de 53,81 euros »
@@ -235,6 +263,17 @@ CAS 4 — statut administratif pris pour une activité
   incorrect : contrat.type = "artiste" justifié par la seule ligne « Statut Artiste ».
   incorrect : un bulletin où seule une ligne « Statut » existe, sans activité décrite → type doit
               rester null.
+
+CAS 5 — total mensuel de la ligne "Allocation d'Aide au Retour à l'Emploi" pris pour l'AJ journalière
+  document : tableau avec la ligne « Allocation d'Aide au Retour à l'Emploi | 9 | 495,18 | 10,89 |
+             15,03 | 469,26 » sous des colonnes « Nb d'alloc. Journalière(s) | Montant Brut | ... |
+             Montant Net », et par ailleurs la phrase « Allocation brute d'un montant journalier de
+             55,02 Euro tenant compte d'un Salaire Journalier de Référence de 129,99 Euro ».
+  mauvais : aj_reelle_historique { valeur: 469.26, natureMontant: "net" }  (469,26 est un TOTAL sur
+            9 jours, pas un montant journalier : 469,26 / 9 ≈ 52 €, incohérent avec 55,02 €).
+  attendu : aj_reelle_historique { valeur: 55.02, natureMontant: "brut" }, justifié par la phrase
+            « Allocation brute d'un montant journalier de 55,02 Euro [...] » ; la ligne du tableau
+            va en info_seule (total de période), jamais en aj_reelle_historique.
 
 ════════ RÈGLES DE SÛRETÉ (elles priment sur tout le reste) ════════
 
@@ -267,7 +306,10 @@ barèmes), activiteHorsAnnexe10 (déprécié), la date de départ d'affichage (c
    document. Sinon, remets-le à null.
 5. Si tu as rempli contrat.type, vérifie que ta justification cite une ACTIVITÉ et non une simple
    ligne de statut.
-6. Vérifie que chaque « justification » contient une citation, et que tu n'as inscrit de confiance
+6. Si tu as rempli aj_reelle_historique depuis un relevé de situation, vérifie que ta justification
+   cite la phrase « Allocation brute/nette d'un montant journalier de … » — et non une ligne du
+   tableau « Allocations déjà versées ». Si la citation vient du tableau, remets en info_seule.
+7. Vérifie que chaque « justification » contient une citation, et que tu n'as inscrit de confiance
    que pour les champs effectivement renseignés.`;
 
 /**
