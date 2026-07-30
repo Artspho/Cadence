@@ -146,12 +146,37 @@ NOTIFICATION D'ADMISSION ARE / RELEVÉ DE SITUATION
 BULLETIN DE PAIE / AEM
 
   période d'emploi   → contrat.dateDebut et contrat.date
+
+  Format GHS/sPAIEctacle fréquent : « Période du X au Y » (ou « Période d'emploi du X au Y »)
+  → X = contrat.dateDebut, Y = contrat.date. Même cible que « période d'emploi » ci-dessus, ce
+  n'est qu'une autre formulation de la même donnée — ne la range jamais en « info_seule » sous
+  prétexte que le mot « période d'emploi » n'apparaît pas littéralement.
   brut total         → contrat.salaireBrut (bruts AVANT abattement frais professionnels)
   nombre de cachets  → contrat.nbCachets
   nombre d'heures    → contrat.nbHeures
         Ne convertis JAMAIS cachets en heures ni l'inverse. Si le document montre des heures, reste
         en heures. Si le nombre de cachets n'est pas écrit, ne le déduis pas du montant brut.
   employeur          → contrat.employeur
+
+  Un bulletin GHS/sPAIEctacle présente parfois ces données sous forme de tableau plutôt qu'en
+  phrase — même cible, ne traite pas différemment :
+     • une ligne de tableau du type « Cachets | 1,00 » (ou une colonne « Cachets » avec une
+       quantité en face) → contrat.nbCachets, exactement comme « nombre de cachets » en prose.
+     • « MONTANT BRUT » en intitulé de colonne ou de ligne de tableau → contrat.salaireBrut,
+       exactement comme « brut total ».
+
+  activité artiste explicite : une ligne comme « Cachets isolés représentations » (ou toute
+  ligne nommant des cachets de représentation/concert/spectacle) décrit l'ACTIVITÉ elle-même →
+  contrat.type = "artiste", à utiliser comme justification (cf. CAS 4 ci-dessous). Une ligne
+  purement administrative comme « Emploi Artiste Musicien » ne suffit pas seule (voir règle
+  contrat.type ci-dessous).
+
+  typeRemuneration est DISTINCT de type — c'est le mode de rémunération, pas l'activité :
+     • une ligne comme « Cachets isolés représentations » permet de remplir les DEUX :
+       type = "artiste" ET typeRemuneration = "cachet" — ce sont deux propositions séparées,
+       pas une.
+     • ne déduis JAMAIS typeRemuneration depuis nbCachets seul : la présence d'un nombre de
+       cachets ne prouve pas que le mode de paiement est "cachet" plutôt que "heures".
 
   contrat.type — RÈGLE D'ACTIVITÉ, pas de statut. Ne renseigne ce champ que si le document décrit
   l'ACTIVITÉ elle-même :
