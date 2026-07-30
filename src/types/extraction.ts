@@ -93,7 +93,22 @@ export const propositionContratSchema = z.object({
           "(avec enRapportAvecMetier) la prise en compte des heures d'enseignement dans les 507 h — " +
           "un true inventé gonflerait le décompte et afficherait un feu vert que l'utilisateur n'a pas."
       ),
-    enRapportAvecMetier: z.boolean().nullable().describe("Uniquement pertinent si type = enseignement"),
+    enRapportAvecMetier: z
+      .boolean()
+      .nullable()
+      .describe(
+        "Uniquement pertinent si type = enseignement. NE JAMAIS DÉDUIRE true DE LA SEULE " +
+          "PLAUSIBILITÉ DU CONTEXTE. « En rapport avec le métier » est une condition d'éligibilité " +
+          "précise, rarement énoncée en ces termes explicites sur un bulletin. Ne mets true QUE si " +
+          "le document mentionne LITTÉRALEMENT que l'enseignement est en rapport avec le métier ou " +
+          "l'activité artistique de l'intéressé. Un nom de matière, d'établissement ou de discipline " +
+          "qui semble musical ou artistique (ex. « Cours de piano », « Conservatoire de X », " +
+          "« Professeur de chant ») N'EST PAS une mention explicite du rapport avec le métier — ce " +
+          "sont des noms, pas une déclaration de rapport : null. Sans mention littérale, null est la " +
+          "BONNE réponse et non un échec. Motif : ce champ conditionne (avec etablissementAgree) la " +
+          "prise en compte des heures d'enseignement dans les 507 h — un true inventé gonflerait le " +
+          "décompte et afficherait un feu vert que l'utilisateur n'a pas."
+      ),
   }),
   confiance: z.record(niveauConfiance),
   justification: z.string().describe("Où dans le document cette info a été trouvée"),

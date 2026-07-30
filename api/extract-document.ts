@@ -274,6 +274,18 @@ BULLETIN DE PAIE / AEM
   d'enseignement dans les 507 h. Un true inventé y ferait entrer des heures qui n'y ont pas droit —
   donc un compteur 507 h trop élevé, et un feu vert que l'utilisateur n'a pas.
 
+  contrat.enRapportAvecMetier — NE JAMAIS DÉDUIRE true DE LA SEULE PLAUSIBILITÉ DU CONTEXTE. « En
+  rapport avec le métier » est une condition d'éligibilité précise, rarement énoncée en ces termes
+  explicites sur un bulletin. Ne mets true QUE si le document mentionne LITTÉRALEMENT que
+  l'enseignement est en rapport avec le métier ou l'activité artistique de l'intéressé.
+     • Un nom de matière, d'établissement ou de discipline qui semble musical ou artistique (ex.
+       « Cours de piano », « Conservatoire de X », « Professeur de chant ») N'EST PAS une mention
+       explicite du rapport avec le métier — ce sont des noms, pas une déclaration de rapport → null.
+     • La mention n'apparaît pas → null. Ce null est la BONNE réponse, pas un échec.
+  Motif : ce champ conditionne (avec etablissementAgree) la prise en compte des heures
+  d'enseignement dans les 507 h. Un true inventé y ferait entrer des heures qui n'y ont pas droit —
+  donc un compteur 507 h trop élevé, et un feu vert que l'utilisateur n'a pas.
+
 ════════ SIX ERREURS OBSERVÉES, À NE PAS REFAIRE ════════
 
 CAS 1 — allocation rangée au mauvais endroit
