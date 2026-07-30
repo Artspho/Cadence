@@ -1058,7 +1058,9 @@ de situation ✅ — l'échec semble propre à ce format de bulletin, pas au can
 
 ### À faire — priorité haute
 - ✅ Prompt GHS/sPAIEctacle — bulletins multi-colonnes couverts (commit 081a516)
-- ⬜ Tester relevé de situation juillet 2026 — vérifier enregistrement taux PAS
+- ✅ Taux PAS depuis relevé de situation — enregistrement confirmé en prod (commits eb5a880 + d72ac18)
+- ⬜ Prompt relevé de situation — 469,26 € (total mensuel net) extrait à tort comme AJ journalière
+- ⬜ Prompt relevé de situation — confiance "moyenne" sur taux PAS à renforcer
 - ⬜ Vérifier données réelles — import JSON + Dashboard vs notification France Travail
 - ⬜ PWA sur téléphone — installer et vérifier sur appareil réel
 - ⬜ Phase 2 périodes assimilées — conditions ALD (en attente source réglementaire)
