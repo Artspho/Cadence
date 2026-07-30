@@ -149,7 +149,7 @@ function formaterValeur(valeur: unknown): { texte: string; nonLu: boolean } {
 }
 
 export function RevueExtraction({ resultat, profil, config, decompteActuel, onAjouterContrat, onModifierProfil, bandeau, documentEnvoye = false }: RevueExtractionProps) {
-  const evaluees = evaluerExtraction(resultat);
+  const evaluees = evaluerExtraction(resultat, profil);
   const [etats, setEtats] = useState<Record<number, EtatCarte>>({});
   const [erreurs, setErreurs] = useState<Record<number, string>>({});
   const [formulaireOuvert, setFormulaireOuvert] = useState<number | null>(null);

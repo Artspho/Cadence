@@ -73,7 +73,7 @@ const DEFAUTS_FORMULAIRE_CONTRAT: { champ: "type" | "typeRemuneration" | "territ
   { champ: "territoire", libelle: "le territoire", defaut: "France" },
 ];
 
-export function evaluerProposition(proposition: Proposition): PropositionEvaluee {
+export function evaluerProposition(proposition: Proposition, profil: Profil): PropositionEvaluee {
   const titre = TITRES[proposition.cible];
 
   switch (proposition.cible) {
@@ -88,7 +88,12 @@ export function evaluerProposition(proposition: Proposition): PropositionEvaluee
     }
 
     case "profil_ouverture_droits": {
-      const { dateOuverture, franchiseCPTotale, delaiAttenteInitial } = proposition.donnees;
+      const { dateOuverture, franchiseCPTotale, delaiAttenteInitial, tauxPrelevementSource, dateLimiteIndemnisation } = proposition.donnees;
+      const baseDejaConnue = profil.ouvertureDroits !== undefined;
+      const champUtileSeul = tauxPrelevementSource !== null || dateLimiteIndemnisation !== null;
+      if (baseDejaConnue && champUtileSeul && !dateOuverture && franchiseCPTotale === null && delaiAttenteInitial === null) {
+        return { proposition, titre, statut: "applicable", avertissements: [] };
+      }
       const manquants: string[] = [];
       if (!dateOuverture) manquants.push("la date d'ouverture des droits");
       if (franchiseCPTotale === null) manquants.push("la franchise congés payés (en jours)");
@@ -169,8 +174,8 @@ export function evaluerProposition(proposition: Proposition): PropositionEvaluee
   }
 }
 
-export function evaluerExtraction(resultat: ExtractionResult): PropositionEvaluee[] {
-  return resultat.propositions.map(evaluerProposition);
+export function evaluerExtraction(resultat: ExtractionResult, profil: Profil): PropositionEvaluee[] {
+  return resultat.propositions.map((p) => evaluerProposition(p, profil));
 }
 
 /**
@@ -210,15 +215,18 @@ export function profilAvecProposition(profil: Profil, proposition: Proposition):
   switch (proposition.cible) {
     case "profil_ouverture_droits": {
       const d = proposition.donnees;
-      if (!d.dateOuverture || d.franchiseCPTotale === null || d.delaiAttenteInitial === null) {
+      const dateOuverture = d.dateOuverture || profil.ouvertureDroits?.dateOuverture;
+      const franchiseCPTotale = d.franchiseCPTotale ?? profil.ouvertureDroits?.franchiseCPTotale;
+      const delaiAttenteInitial = d.delaiAttenteInitial ?? profil.ouvertureDroits?.delaiAttenteInitial;
+      if (!dateOuverture || franchiseCPTotale == null || delaiAttenteInitial == null) {
         throw new Error("Proposition d'ouverture de droits incomplète : non applicable (cf. evaluerProposition).");
       }
       return {
         ...profil,
         ouvertureDroits: {
-          dateOuverture: d.dateOuverture,
-          franchiseCPTotale: d.franchiseCPTotale,
-          delaiAttenteInitial: d.delaiAttenteInitial,
+          dateOuverture,
+          franchiseCPTotale,
+          delaiAttenteInitial,
           // Champs optionnels : on ne remplace une valeur déjà saisie que si le document en donne une.
           tauxPrelevementSource: d.tauxPrelevementSource ?? profil.ouvertureDroits?.tauxPrelevementSource,
           dateLimiteIndemnisation: d.dateLimiteIndemnisation ?? profil.ouvertureDroits?.dateLimiteIndemnisation,

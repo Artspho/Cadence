@@ -21,20 +21,20 @@ function propositionAj(natureMontant: "net" | "brut" | "indetermine", valeur = 6
 
 describe("aj_reelle_historique — le champ de l'app attend une AJ NETTE", () => {
   it("accepte un montant explicitement net", () => {
-    const evaluee = evaluerProposition(propositionAj("net"));
+    const evaluee = evaluerProposition(propositionAj("net"), profilBase);
     expect(evaluee.statut).toBe("applicable");
   });
 
   // Devoir n°2 : le moteur applique le prélèvement à la source SUR cette valeur. Y mettre un brut
   // gonflerait tous les montants mensuels affichés.
   it("refuse un montant brut", () => {
-    const evaluee = evaluerProposition(propositionAj("brut"));
+    const evaluee = evaluerProposition(propositionAj("brut"), profilBase);
     expect(evaluee.statut).toBe("non_applicable");
     expect(evaluee.motif).toMatch(/BRUTE/);
   });
 
   it("refuse un montant de nature indéterminée", () => {
-    const evaluee = evaluerProposition(propositionAj("indetermine"));
+    const evaluee = evaluerProposition(propositionAj("indetermine"), profilBase);
     expect(evaluee.statut).toBe("non_applicable");
   });
 
@@ -68,7 +68,7 @@ describe("profil_ouverture_droits — refus si un chiffre qui change les montant
   };
 
   it("applique une notification complète", () => {
-    expect(evaluerProposition(complete).statut).toBe("applicable");
+    expect(evaluerProposition(complete, profilBase).statut).toBe("applicable");
     const resultat = profilAvecProposition(profilBase, complete);
     expect(resultat.ouvertureDroits).toEqual({
       dateOuverture: "2026-02-01",
@@ -86,7 +86,7 @@ describe("profil_ouverture_droits — refus si un chiffre qui change les montant
     ["dateOuverture", { dateOuverture: "" }],
   ])("refuse quand %s manque", (_champ, remplacement) => {
     const partielle = { ...complete, donnees: { ...complete.donnees, ...remplacement } } as Proposition;
-    const evaluee = evaluerProposition(partielle);
+    const evaluee = evaluerProposition(partielle, profilBase);
     expect(evaluee.statut).toBe("non_applicable");
     expect(() => profilAvecProposition(profilBase, partielle)).toThrow();
   });
@@ -100,6 +100,34 @@ describe("profil_ouverture_droits — refus si un chiffre qui change les montant
     const resultat = profilAvecProposition(profil, sansTaux);
     expect(resultat.ouvertureDroits?.tauxPrelevementSource).toBe(3.1);
     expect(resultat.ouvertureDroits?.dateLimiteIndemnisation).toBe("2026-01-31");
+  });
+
+  it("applicable si un champ utile est donné seul, quand ouvertureDroits existe déjà (ex. avis d'imposition seul)", () => {
+    const profil: Profil = {
+      ...profilBase,
+      ouvertureDroits: { dateOuverture: "2025-02-01", franchiseCPTotale: 5, delaiAttenteInitial: 7 },
+    };
+    const tauxSeul = {
+      ...complete,
+      donnees: { ...complete.donnees, dateOuverture: "", franchiseCPTotale: null, delaiAttenteInitial: null, dateLimiteIndemnisation: null, tauxPrelevementSource: 3.1 },
+    } as Proposition;
+    expect(evaluerProposition(tauxSeul, profil).statut).toBe("applicable");
+  });
+
+  it("récupère dateOuverture/franchiseCPTotale/delaiAttenteInitial du profil existant quand la proposition ne donne que tauxPrelevementSource", () => {
+    const profil: Profil = {
+      ...profilBase,
+      ouvertureDroits: { dateOuverture: "2025-02-01", franchiseCPTotale: 5, delaiAttenteInitial: 7 },
+    };
+    const tauxSeul = {
+      ...complete,
+      donnees: { ...complete.donnees, dateOuverture: "", franchiseCPTotale: null, delaiAttenteInitial: null, dateLimiteIndemnisation: null, tauxPrelevementSource: 3.1 },
+    } as Proposition;
+    const resultat = profilAvecProposition(profil, tauxSeul);
+    expect(resultat.ouvertureDroits?.dateOuverture).toBe("2025-02-01");
+    expect(resultat.ouvertureDroits?.franchiseCPTotale).toBe(5);
+    expect(resultat.ouvertureDroits?.delaiAttenteInitial).toBe(7);
+    expect(resultat.ouvertureDroits?.tauxPrelevementSource).toBe(3.1);
   });
 });
 
@@ -124,7 +152,7 @@ describe("profil_infos — un champ non lu n'efface jamais une valeur déjà sai
       confiance: {},
       justification: "test",
     };
-    expect(evaluerProposition(proposition).statut).toBe("non_applicable");
+    expect(evaluerProposition(proposition, profilBase).statut).toBe("non_applicable");
   });
 });
 
@@ -136,7 +164,7 @@ describe("periode_assimilee — aucune destination dans l'app aujourd'hui", () =
       confiance: {},
       justification: "test",
     };
-    const evaluee = evaluerProposition(proposition);
+    const evaluee = evaluerProposition(proposition, profilBase);
     expect(evaluee.statut).toBe("non_applicable");
     expect(evaluee.motif).toBeTruthy();
     expect(() => profilAvecProposition(profilBase, proposition)).toThrow();
@@ -147,11 +175,11 @@ describe("contrat — toujours relu dans le formulaire, jamais appliqué directe
   const proposition = extractionBulletinPaie.propositions[0] as Extract<Proposition, { cible: "contrat" }>;
 
   it("passe par le formulaire", () => {
-    expect(evaluerProposition(proposition).statut).toBe("revue_formulaire");
+    expect(evaluerProposition(proposition, profilBase).statut).toBe("revue_formulaire");
   });
 
   it("signale chaque champ que le document n'indiquait pas, pour ne pas faire passer un défaut du formulaire pour une valeur lue", () => {
-    const { avertissements } = evaluerProposition(proposition);
+    const { avertissements } = evaluerProposition(proposition, profilBase);
     expect(avertissements).toHaveLength(3);
     expect(avertissements.join(" ")).toMatch(/Artiste/);
     expect(avertissements.join(" ")).toMatch(/Cachets/);
@@ -182,7 +210,7 @@ describe("info_seule — jamais routée, jamais perdue", () => {
       confiance: { salaireDeReferenceOfficiel: "haute" },
       justification: "test",
     };
-    const evaluee = evaluerProposition(proposition);
+    const evaluee = evaluerProposition(proposition, profilBase);
     expect(evaluee.statut).toBe("information");
     expect(evaluee.motif).toBeTruthy();
   });
@@ -190,19 +218,19 @@ describe("info_seule — jamais routée, jamais perdue", () => {
 
 describe("fixtures de démonstration — couvrent bien chaque branche", () => {
   it("la notification est entièrement applicable, hors information", () => {
-    const statuts = evaluerExtraction(extractionNotificationAdmission).map((e) => e.statut);
+    const statuts = evaluerExtraction(extractionNotificationAdmission, profilBase).map((e) => e.statut);
     expect(statuts).toEqual(["applicable", "applicable", "applicable", "information"]);
   });
 
   it("le relevé produit trois refus et une information", () => {
-    const statuts = evaluerExtraction(extractionReleveAvecRefus).map((e) => e.statut);
+    const statuts = evaluerExtraction(extractionReleveAvecRefus, profilBase).map((e) => e.statut);
     expect(statuts.filter((s) => s === "non_applicable")).toHaveLength(3);
     expect(statuts.filter((s) => s === "information")).toHaveLength(1);
   });
 
   it("appliquer toute la notification produit un profil valide et complet", () => {
     let profil = profilBase;
-    for (const evaluee of evaluerExtraction(extractionNotificationAdmission)) {
+    for (const evaluee of evaluerExtraction(extractionNotificationAdmission, profilBase)) {
       if (evaluee.statut === "applicable") profil = profilAvecProposition(profil, evaluee.proposition);
     }
     expect(profil.ouvertureDroits?.franchiseCPTotale).toBe(12);
