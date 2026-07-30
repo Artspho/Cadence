@@ -1138,7 +1138,7 @@ de situation ✅ — l'échec semble propre à ce format de bulletin, pas au can
 
 ### Post-bêta
 - ⬜ Refonte design (couleurs, placement onglets — à préciser)
-- ⬜ Renouvellement anticipé
+- ⬜ Renouvellement anticipé (détail et prérequis dans docs/SPEC.md)
 - ⬜ Module congés spectacle
 
 ---
