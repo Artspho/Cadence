@@ -118,10 +118,49 @@ NOTIFICATION D'ADMISSION ARE / RELEVÉ DE SITUATION
         → profil_ouverture_droits.franchiseCPTotale = N   (un nombre de JOURS, pas un montant)
   « N jours de délai d'attente »
         → profil_ouverture_droits.delaiAttenteInitial = N  (presque toujours 7)
-  « taux de prélèvement à la source : X % »
+  « taux de prélèvement à la source : X % » / « Le montant de l'impôt sur le revenu prélevé à la
+  source est de M €, calculé sur la base d'un taux personnalisé de X % [...] »
         → profil_ouverture_droits.tauxPrelevementSource = X
         Le document peut MENTIONNER le prélèvement à la source sans donner de taux : dans ce cas,
         laisse null. La mention n'est pas un chiffre.
+
+  ⚠️⚠️ PIÈGE — LA PHRASE DU TAUX PAS NE CONTIENT JAMAIS DE DATE : LA DATE VIENT DE LA SECTION
+  Sur un relevé de situation, cette phrase apparaît une ou deux fois, une fois par section
+  « Situation au [date] » (le document peut aussi porter un titre global « RELEVE DE SITUATION DU
+  [date1] AU [date2] »). La phrase elle-même ne contient JAMAIS de date — ne cherche pas de date à
+  l'intérieur d'elle, et ne baisse pas ta confiance pour ce motif : une confiance "moyenne" par le
+  passé venait précisément de cette absence de date DANS LA PHRASE, alors que la date se lit juste
+  au-dessus, dans le titre de la section qui la contient.
+  Règle : la date d'effet du taux est celle de la section « Situation au [date] » qui contient
+  DIRECTEMENT la phrase du taux (celle qui la précède dans le document, sans autre titre de section
+  entre les deux). ⚠️ Ne confonds jamais cette section avec un titre de paragraphe voisin sans
+  rapport, par exemple « REGLEMENT DU [date] » (qui documente un virement bancaire, pas une section
+  « Situation au ») : s'il y a un autre titre entre la dernière section « Situation au [date] » et la
+  phrase du taux, remonte au dernier titre « Situation au [date] » rencontré, jamais à un autre type
+  de titre.
+  Si le document contient deux occurrences de cette phrase (donc deux sections « Situation au
+  [date] » distinctes), c'est un CAS NORMAL, pas une ambiguïté à fuir : traite chaque occurrence
+  séparément et cite, pour chacune, le nom exact de sa propre section — ne mélange jamais les deux
+  dans une même justification vague. Si le taux est identique dans les deux occurrences (cas
+  fréquent : même taux DGFIP sur toute la période), c'est une CONFIRMATION croisée qui AUGMENTE la
+  confiance (haute), jamais une raison de douter.
+  Pour profil_ouverture_droits.tauxPrelevementSource (un champ scalaire unique, pas historique) :
+  retiens le taux de la section « Situation au [date] » la PLUS RÉCENTE, confiance "haute", justifié
+  par la phrase ET le nom exact de cette section. ⚠️ « La plus récente » se détermine en COMPARANT
+  EXPLICITEMENT les deux dates elles-mêmes (jour/mois/année) — PAS en supposant que la première
+  section rencontrée en lisant le document est la plus ancienne ou la plus récente. Exemple : entre
+  « Situation au 28/06/2026 » et « Situation au 13/07/2026 », le 13/07/2026 est postérieur au
+  28/06/2026 (juillet après juin) → c'est la section « Situation au 13/07/2026 » qui est la plus
+  récente, même si elle apparaît plus loin dans le document. Si une autre section antérieure porte
+  une occurrence différente (rare, mais possible en cas de changement de taux DGFIP en cours de
+  période), ajoute-la en info_seule (clé scalaire à plat, ex. tauxPrelevementSourceSituationAu[date])
+  pour ne perdre aucune information — jamais une deuxième proposition profil_ouverture_droits.
+
+  ⚠️ GARDE-FOU — SI LA PHRASE N'EXISTE PAS : une section de paiement peut exister sans que la phrase
+  du taux personnalisé n'y figure (France Travail peut changer sa formulation ou la structure de son
+  courrier). Dans ce cas, NE DEVINE PAS et N'APPROXIME PAS de taux : range en info_seule avec une
+  justification explicite du type « mention du taux introuvable dans cette section, structure du
+  document possiblement modifiée depuis la dernière vérification du prompt (07/2026) ».
 
   dateLimiteIndemnisation — DEUX FORMULATIONS ÉQUIVALENTES, selon le document :
         « La date limite de votre indemnisation est le X »        (relevé de situation)
@@ -235,7 +274,7 @@ BULLETIN DE PAIE / AEM
   d'enseignement dans les 507 h. Un true inventé y ferait entrer des heures qui n'y ont pas droit —
   donc un compteur 507 h trop élevé, et un feu vert que l'utilisateur n'a pas.
 
-════════ CINQ ERREURS OBSERVÉES, À NE PAS REFAIRE ════════
+════════ SIX ERREURS OBSERVÉES, À NE PAS REFAIRE ════════
 
 CAS 1 — allocation rangée au mauvais endroit
   mauvais : le document dit « Le montant de votre allocation journalière nette est de 53,81 euros »
@@ -275,6 +314,19 @@ CAS 5 — total mensuel de la ligne "Allocation d'Aide au Retour à l'Emploi" pr
             « Allocation brute d'un montant journalier de 55,02 Euro [...] » ; la ligne du tableau
             va en info_seule (total de période), jamais en aj_reelle_historique.
 
+CAS 6 — taux PAS attribué à la mauvaise section (date confondue avec un titre voisin)
+  document : deux sections « Situation au 28/06/2026 » et « Situation au 13/07/2026 », chacune
+             suivie de la phrase « Le montant de l'impôt sur le revenu prélevé à la source est de
+             15,03 € [resp. 0,00 €], calculé sur la base d'un taux personnalisé de 3,10 % [...] » ;
+             entre les deux, un titre sans rapport « REGLEMENT DU 01/07/2026 » (un virement bancaire,
+             pas une section « Situation au »).
+  mauvais : justification citant « REGLEMENT DU 01/07/2026 » comme section d'origine du taux, ou
+            confiance "moyenne" faute de date dans la phrase elle-même.
+  attendu : profil_ouverture_droits.tauxPrelevementSource = 3.10, confiance "haute", justifié par la
+            phrase ET par le nom exact de la section « Situation au 13/07/2026 » (la plus récente des
+            deux) ; l'occurrence de « Situation au 28/06/2026 » (même taux, montant différent :
+            15,03 €) est une confirmation croisée, pas une source de doute.
+
 ════════ RÈGLES DE SÛRETÉ (elles priment sur tout le reste) ════════
 
 - Jamais de valeur inventée. Champ illisible ou absent → null s'il est nullable, sinon pas de
@@ -309,7 +361,11 @@ barèmes), activiteHorsAnnexe10 (déprécié), la date de départ d'affichage (c
 6. Si tu as rempli aj_reelle_historique depuis un relevé de situation, vérifie que ta justification
    cite la phrase « Allocation brute/nette d'un montant journalier de … » — et non une ligne du
    tableau « Allocations déjà versées ». Si la citation vient du tableau, remets en info_seule.
-7. Vérifie que chaque « justification » contient une citation, et que tu n'as inscrit de confiance
+7. Si tu as rempli tauxPrelevementSource, vérifie que ta justification nomme la section exacte
+   « Situation au [date] » dont provient la phrase — jamais un titre voisin sans rapport comme
+   « REGLEMENT DU [date] ». Si le document a deux occurrences de la phrase, vérifie que tu as bien
+   retenu celle de la section la plus récente pour le champ structuré.
+8. Vérifie que chaque « justification » contient une citation, et que tu n'as inscrit de confiance
    que pour les champs effectivement renseignés.`;
 
 /**

@@ -1075,7 +1075,22 @@ de situation ✅ — l'échec semble propre à ce format de bulletin, pas au can
   rejetait un objet imbriqué que le modèle produisait pour les totaux de période, faisant échouer
   toute l'extraction sur ce document. Corrigé par une règle de prompt exigeant des clés scalaires
   à plat plutôt qu'un objet composite — revalidé, l'extraction passe désormais la validation Zod.
-- ⬜ Prompt relevé de situation — confiance "moyenne" sur taux PAS à renforcer
+- ✅ Confiance "moyenne" sur le taux PAS — résolu (31/07/2026) : ajout d'une règle de date par
+  section (dateEffet du taux = date de la section "Situation au [date]" englobante, jamais extraite
+  de la phrase du taux qui n'en contient pas) + garde-fou anti-dérive de formulation (taux introuvable
+  → info_seule explicite plutôt qu'une approximation) + citation obligatoire section + phrase. Validé
+  en appel réel à l'API Mistral sur `Relevé_de_situation_20260715.pdf` (ses deux sections "Situation au
+  28/06" et "Situation au 13/07", même taux 3,10 % dans les deux) : confiance passée de "moyenne" à
+  "haute", valeur correcte, aucune confusion avec l'en-tête voisin "REGLEMENT DU 01/07/2026", les deux
+  occurrences correctement distinguées avec dates propres.
+- 🔶 Sélection de la section la plus récente comme valeur primaire du taux PAS — gap résiduel
+  documenté, non couvert par le fix ci-dessus : le prompt ne garantit pas de choisir systématiquement
+  la section la plus récente comme valeur "primaire" quand plusieurs sections coexistent — sur le
+  document testé, les deux sections portent le même taux donc le gap ne s'est jamais traduit par un
+  chiffre faux, mais un document où le taux change réellement entre deux sections (changement de taux
+  personnalisé DGFIP en cours de mois) pourrait révéler un choix de section incorrect comme valeur par
+  défaut. Aucun document réel ne montre encore ce cas — pas de correctif tant qu'on n'a pas de preuve
+  sur pièce.
 - ⬜ Vérifier données réelles — import JSON + Dashboard vs notification France Travail
 - ⬜ PWA sur téléphone — installer et vérifier sur appareil réel
 - ⬜ Phase 2 périodes assimilées — conditions ALD (en attente source réglementaire)
