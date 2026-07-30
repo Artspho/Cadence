@@ -1103,7 +1103,6 @@ de situation ✅ — l'échec semble propre à ce format de bulletin, pas au can
 - ⬜ Vérifier données réelles — import JSON + Dashboard vs notification France Travail
 - ⬜ PWA sur téléphone — installer et vérifier sur appareil réel
 - ⬜ Phase 2 périodes assimilées — conditions ALD (en attente source réglementaire)
-- ⬜ enRapportAvecMetier — description neutre dans le prompt IA, même faiblesse qu'etablissementAgree
 
 ### À faire — priorité normale
 - 🔴 Webview France Travail intégrée (idée révisée le 31/07/2026) — plutôt qu'une API introuvable
