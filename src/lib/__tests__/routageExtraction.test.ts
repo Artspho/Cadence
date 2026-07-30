@@ -129,6 +129,34 @@ describe("profil_ouverture_droits — refus si un chiffre qui change les montant
     expect(resultat.ouvertureDroits?.delaiAttenteInitial).toBe(7);
     expect(resultat.ouvertureDroits?.tauxPrelevementSource).toBe(3.1);
   });
+
+  it("applicable même si le relevé redonne dateOuverture en plus du taux, franchise/délai non redonnés", () => {
+    const profil: Profil = {
+      ...profilBase,
+      ouvertureDroits: { dateOuverture: "2026-01-18", franchiseCPTotale: 5, delaiAttenteInitial: 7 },
+    };
+    const releve = {
+      ...complete,
+      donnees: { ...complete.donnees, dateOuverture: "2026-01-18", franchiseCPTotale: null, delaiAttenteInitial: null, dateLimiteIndemnisation: null, tauxPrelevementSource: 3.1 },
+    } as Proposition;
+    expect(evaluerProposition(releve, profil).statut).toBe("applicable");
+  });
+
+  it("un relevé qui redonne dateOuverture met quand même à jour tauxPrelevementSource sans perdre franchise/délai", () => {
+    const profil: Profil = {
+      ...profilBase,
+      ouvertureDroits: { dateOuverture: "2026-01-18", franchiseCPTotale: 5, delaiAttenteInitial: 7 },
+    };
+    const releve = {
+      ...complete,
+      donnees: { ...complete.donnees, dateOuverture: "2026-01-18", franchiseCPTotale: null, delaiAttenteInitial: null, dateLimiteIndemnisation: null, tauxPrelevementSource: 3.1 },
+    } as Proposition;
+    const resultat = profilAvecProposition(profil, releve);
+    expect(resultat.ouvertureDroits?.dateOuverture).toBe("2026-01-18");
+    expect(resultat.ouvertureDroits?.franchiseCPTotale).toBe(5);
+    expect(resultat.ouvertureDroits?.delaiAttenteInitial).toBe(7);
+    expect(resultat.ouvertureDroits?.tauxPrelevementSource).toBe(3.1);
+  });
 });
 
 describe("profil_infos — un champ non lu n'efface jamais une valeur déjà saisie (devoir n°1)", () => {

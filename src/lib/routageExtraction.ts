@@ -91,7 +91,7 @@ export function evaluerProposition(proposition: Proposition, profil: Profil): Pr
       const { dateOuverture, franchiseCPTotale, delaiAttenteInitial, tauxPrelevementSource, dateLimiteIndemnisation } = proposition.donnees;
       const baseDejaConnue = profil.ouvertureDroits !== undefined;
       const champUtileSeul = tauxPrelevementSource !== null || dateLimiteIndemnisation !== null;
-      if (baseDejaConnue && champUtileSeul && !dateOuverture && franchiseCPTotale === null && delaiAttenteInitial === null) {
+      if (baseDejaConnue && champUtileSeul) {
         return { proposition, titre, statut: "applicable", avertissements: [] };
       }
       const manquants: string[] = [];
