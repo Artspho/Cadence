@@ -1082,6 +1082,18 @@ de situation ✅ — l'échec semble propre à ce format de bulletin, pas au can
 - ⬜ enRapportAvecMetier — description neutre dans le prompt IA, même faiblesse qu'etablissementAgree
 
 ### À faire — priorité normale
+- 🔴 Webview France Travail intégrée (idée révisée le 31/07/2026) — plutôt qu'une API introuvable
+  ou du scraping distant, l'idée était d'ouvrir une fenêtre de navigation DANS Cadence pour que
+  l'utilisateur se connecte lui-même à son espace France Travail (cookies/jeton chiffrés stockés
+  uniquement sur l'appareil). Point bloquant : FranceConnect interdit explicitement l'affichage de
+  sa mire de connexion en iframe/webview (FAQ officielle, anti-phishing) — une webview embarquée est
+  fonctionnellement équivalente à un iframe du point de vue de l'IdP, donc probablement inapplicable
+  pour les utilisateurs passant par FranceConnect (la voie recommandée par France Travail). Options
+  restantes : (a) connexion directe identifiant/mot de passe France Travail hors FranceConnect —
+  zone grise CGU, utilisateur seul garant de ses identifiants ; (b) navigateur système EXTERNE (pas
+  une webview intégrée) pour la connexion/téléchargement, retour dans Cadence pour déposer le
+  fichier — perd le "tout intégré" mais reste compatible FranceConnect et évite le terrain iframe.
+  À trancher : réorienter vers (b), ou abandonner si (a) est jugé trop fragile juridiquement/UX.
 - ⬜ AJ brute vs nette — écart ~5%, jamais réinvestigué
 - ⬜ Comparaison complète Cadence vs 8 mois réels
 - ⬜ Reconfirmer mentions consentement Mistral (hébergement UE + entraînement)
