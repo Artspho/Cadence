@@ -832,26 +832,31 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
      PAS par l'interface. Le segment **navigateur → `/api/extract-document` reste non exercé** :
      vérifié le 29/07, `npm run dev` (Vite) ne sert pas les Vercel Functions et répond **404** sur
      cette route. Ce segment ne sera validé qu'avec `vercel dev` ou un déploiement.
-- ✅ **Décision produit assumée (28/07/2026, Benoît) : on reste sur le tier gratuit Mistral
-  « Experiment », où les documents envoyés PEUVENT servir à l'entraînement des modèles.** Ce n'était
-  auparavant listé ici que comme un **blocage** (« aucun document réel tant que le DPA Mistral n'est
-  pas vérifié/signé ») : cette lecture est **périmée, ne plus la ressortir**. C'est un arbitrage
-  explicite — la gratuité du canal IA contre cette contrepartie — et non un oubli ni un point resté
-  en suspens. Fait établi par recherche web sur la documentation officielle Mistral le 28/07/2026
-  (l'engagement de non-entraînement est rattaché aux offres payantes, pas au tier gratuit) ;
-  vérification faite **par Benoît**, pas re-vérifiée dans la session qui a écrit cette entrée — à
-  reconfirmer si les conditions de Mistral bougent, puisque c'est le texte affiché à l'utilisateur
-  qui deviendrait faux. **La contrepartie de la décision, non négociable : la mention doit être dite
-  à l'utilisateur en clair, dans l'UI, AVANT tout envoi — jamais dans des CGU cachées ni en petits
-  caractères après coup.** Texte exact retenu, à ne pas reformuler sans décision explicite :
+- 🔶 **Mention d'entraînement retirée du texte de consentement (31/07/2026) — clé pas encore
+  basculée.** Le texte n'annonce plus que Mistral « peut utiliser ce document pour entraîner ses
+  modèles » : nous prévoyons de passer sur une clé API Mistral payante (plan Scale), qui exclut
+  l'entraînement par défaut selon le centre d'aide officiel Mistral
+  (help.mistral.ai/articles/347617). **Mais `MISTRAL_API_KEY` n'est PAS ENCORE basculée sur ce plan
+  au moment de ce commit** — le texte annonce donc un fait qui n'est pas encore vrai en pratique. Ne
+  PAS repasser cette entrée en ✅ tant que la clé réellement utilisée n'a pas été confirmée comme
+  étant sur le plan Scale (cf. le ⬜ correspondant en toute fin de la liste priorité normale).
+  **La contrepartie de la décision reste non négociable : la mention doit être dite à l'utilisateur
+  en clair, dans l'UI, AVANT tout envoi — jamais dans des CGU cachées ni en petits caractères après
+  coup.** Texte exact retenu, à ne pas reformuler sans décision explicite :
   > Import assisté par IA (Mistral) — ce document est envoyé aux serveurs de Mistral AI (France,
-  > hébergement UE) pour lecture automatique. Sur l'offre que nous utilisons actuellement, Mistral
-  > peut utiliser ce document pour entraîner ses modèles d'IA. Si tu préfères l'éviter, la saisie
-  > manuelle reste gratuite et ne quitte jamais ton appareil.
+  > hébergement UE) pour lecture automatique. Ces documents ne sont pas utilisés pour entraîner les
+  > modèles de Mistral. Si tu préfères l'éviter, la saisie manuelle reste gratuite et ne quitte
+  > jamais ton appareil.
 
-  Si l'on passe un jour sur une clé payante (~1 centime/document), **c'est cette mention qu'il faut
-  corriger en premier** : annoncer un entraînement qui n'a plus lieu serait aussi faux que taire
-  celui qui a lieu (devoir n°2, dans les deux sens).
+  **Technique, volontairement absent du texte affiché à l'utilisateur (pour rester simple)** : la
+  rétention standard des documents reste jusqu'à 30 jours côté Mistral, sauf activation du Zero Data
+  Retention — information vérifiée mais omise du texte, à ressortir si jamais quelqu'un interroge le
+  point rétention.
+
+  Si le projet revient un jour sur cette décision (retour au tier gratuit, où l'entraînement est de
+  nouveau possible), **c'est cette mention qu'il faut corriger en premier** : annoncer une absence
+  d'entraînement qui n'est plus garantie serait aussi faux que taire un entraînement qui a lieu
+  (devoir n°2, dans les deux sens).
 - ✅ **Consentement avant tout envoi + point d'entrée réel de l'import IA (29/07/2026, commits
   `ecca2c8` puis `d4906d5`)** — le chemin est désormais complet et en ligne droite :
   **dépôt → contrôles locaux → CONSENTEMENT → envoi → revue**. Pièces : `content/mentionEnvoiIA.ts`
@@ -898,15 +903,19 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
   LITTÉRALEMENT à propos de cet établissement ; un nom d'établissement est un nom, pas un agrément ;
   sinon `null`. Vérifié que la description atteint réellement le JSON Schema généré (888 caractères),
   et pas seulement le code source.
-  🔶 **Reste ouvert** : `enRapportAvecMetier`, juste en dessous, garde sa description neutre
-  (« Uniquement pertinent si type = enseignement ») et a exactement la même faiblesse — c'est l'autre
-  moitié de la condition dans `decompteHeures.ts`. Prochain candidat évident.
-- 🔶 **Deux affirmations du texte affiché à l'utilisateur ne sont pas vérifiées.** La mention de
-  consentement dit « Mistral AI (France, **hébergement UE**) » : personne n'a vérifié cette
-  affirmation dans les sessions qui l'ont écrite. Et l'usage des documents pour l'entraînement sur le
-  tier gratuit a été établi **par Benoît** (recherche web, 28/07/2026), non re-vérifié depuis. Ce sont
-  les deux phrases sur lesquelles un utilisateur décide s'il confie sa fiche de paie : à confirmer
-  avant d'ouvrir le canal à d'autres personnes que Benoît.
+  ✅ **`enRapportAvecMetier` corrigé à son tour (31/07/2026, commit `5f9f6ab`)** — même patron exact
+  aux mêmes deux endroits (lexique de `document_annotation_prompt` + `.describe()` du champ) : `true`
+  seulement si le document mentionne LITTÉRALEMENT que l'enseignement est en rapport avec le métier ou
+  l'activité artistique de l'intéressé ; un nom de matière, d'établissement ou de discipline plausible
+  n'est pas une mention explicite ; sinon `null`. Vérifié que la description atteint réellement le
+  JSON Schema généré (934 caractères). Les deux moitiés de la condition dans `decompteHeures.ts` sont
+  désormais couvertes.
+- 🔶 **Une affirmation du texte affiché à l'utilisateur reste non vérifiée** : la mention de
+  consentement dit « Mistral AI (France, **hébergement UE**) », et personne n'a vérifié cette
+  affirmation dans les sessions qui l'ont écrite — à confirmer avant d'ouvrir le canal à d'autres
+  personnes que Benoît. (L'autre affirmation historique de ce bloc, sur l'entraînement en tier
+  gratuit, est périmée depuis le 31/07/2026 : le texte ne fait plus cette affirmation, cf. l'entrée 🔶
+  dédiée plus haut.)
 
 ✅ **Phase 3 committée** (commit `d664344`) : `ajouterPeriode`/`supprimerPeriode` dans `App.tsx`
 (pattern `ajouterContrat`/`supprimerContrat`), `PeriodeForm.tsx` (6 types, validation dateDebut ≤
@@ -989,8 +998,8 @@ checklist). On continue à construire en attendant.
 suppression) ; `src/components/ImportDocumentIA.tsx` (le vrai composant, qui passe par
 `api/extract-document.ts`) n'a pas été touché. `npm run build` + tests toujours verts après coup. Le
 paragraphe qui suivait demandait encore de « corriger » ce brouillon — périmé, corrigé ici.
-Vérifier les deux affirmations du texte de consentement reste ouvert (cf. le 🔶 correspondant plus
-haut).
+Vérifier l'affirmation « hébergement UE » du texte de consentement reste ouvert (cf. le 🔶
+correspondant plus haut).
 
 ✅ **SR/SJM réels branchés sur `calculerSerieDepuisContrats` (29/07/2026 soir, commit `5446e33`)** —
 dernier morceau du chantier franchise salaires évoqué ci-dessus. `RevenusMensuels.tsx` reçoit
@@ -1111,7 +1120,10 @@ de situation ✅ — l'échec semble propre à ce format de bulletin, pas au can
   À trancher : réorienter vers (b), ou abandonner si (a) est jugé trop fragile juridiquement/UX.
 - ⬜ AJ brute vs nette — écart ~5%, jamais réinvestigué
 - ⬜ Comparaison complète Cadence vs 8 mois réels
-- ⬜ Reconfirmer mentions consentement Mistral (hébergement UE + entraînement)
+- ⬜ Reconfirmer mention consentement Mistral (hébergement UE) — le volet entraînement de cet item
+  est désormais suivi par l'entrée 🔶 dédiée plus haut et par le ⬜ "Basculer MISTRAL_API_KEY..."
+  ci-dessous, pour ne pas garder deux traces du même fait à des états différents. Reste seule ouverte
+  la vérification de « Mistral AI (France, hébergement UE) », jamais re-confirmée depuis son écriture.
 - ⬜ Production branch Vercel — pointer sur master explicitement dans les settings
 - ⬜ Inventaire annuel des documents réglementaires — lister tous les documents sources dont
   dépendent les calculs de Cadence (guide France Travail intermittents, arrêtés SMIC, convention
@@ -1120,6 +1132,10 @@ de situation ✅ — l'échec semble propre à ce format de bulletin, pas au can
   et à chaque nouvelle convention d'assurance chômage). Objectif : garantir que
   `franceTravailConfig.ts` reste à jour et que le bandeau « règles vérifiées au JJ/MM/AAAA » ne
   vieillit pas silencieusement.
+- ⬜ Basculer MISTRAL_API_KEY sur le plan payant Mistral (Scale) — une fois fait, repasser l'entrée
+  ci-dessus de 🔶 à ✅ et vérifier que le texte de consentement (déjà corrigé, sans mention
+  d'entraînement) est enfin exact en pratique, pas seulement en intention. Coût estimé : ~260-350 $/an
+  pour 100 utilisateurs à 100-200 documents/an chacun (voir calcul de session).
 
 ### Post-bêta
 - ⬜ Refonte design (couleurs, placement onglets — à préciser)

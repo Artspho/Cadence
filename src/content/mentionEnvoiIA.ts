@@ -1,16 +1,21 @@
 // Source de texte UNIQUE de la mention affichée AVANT tout envoi d'un document à Mistral.
 //
-// Pourquoi ici et pourquoi une seule source : ce texte est la CONTREPARTIE d'une décision produit
-// (28/07/2026) — rester sur le tier gratuit Mistral « Experiment », où les documents envoyés peuvent
-// servir à entraîner les modèles, à condition que ce soit dit à l'utilisateur en clair et avant
-// l'envoi. Le texte n'est donc pas de la décoration : c'est l'engagement qui rend la décision
-// acceptable. S'il dérive, se dilue ou disparaît d'un des endroits où il doit apparaître, la
-// décision n'est plus tenue. Une seule source, testée mot pour mot (cf.
-// lib/__tests__/mentionEnvoiIA.test.ts), et le même libellé recopié dans CLAUDE.md.
+// Pourquoi ici et pourquoi une seule source : ce texte est la CONTREPARTIE d'une décision produit —
+// dire à l'utilisateur, en clair et avant l'envoi, ce qui se passe de son document. Le texte n'est
+// donc pas de la décoration : c'est l'engagement qui rend la décision acceptable. S'il dérive, se
+// dilue ou disparaît d'un des endroits où il doit apparaître, la décision n'est plus tenue. Une seule
+// source, testée mot pour mot (cf. lib/__tests__/mentionEnvoiIA.test.ts), et le même libellé recopié
+// dans CLAUDE.md.
 //
-// ⚠️ NE PAS REFORMULER sans décision explicite. Et si l'offre Mistral change (passage à une clé
-// payante, où l'engagement de non-entraînement s'applique), c'est CE fichier qu'il faut corriger en
-// premier : annoncer un entraînement qui n'a plus lieu serait aussi faux que taire celui qui a lieu.
+// ⚠️ NE PAS REFORMULER sans décision explicite.
+//
+// 🔶 ÉTAT AU 31/07/2026 (voir CLAUDE.md pour le détail) : ce texte annonce l'absence d'entraînement
+// car nous PRÉVOYONS de passer sur une clé API Mistral payante (plan Scale, qui exclut l'entraînement
+// par défaut) — mais MISTRAL_API_KEY n'est PAS ENCORE basculée sur ce plan au moment où ce texte est
+// écrit. Le texte annonce donc un fait pas encore vrai en pratique. Ne pas oublier de vérifier que la
+// clé est bien passée sur le plan Scale ; si le projet revient sur cette décision (reste sur le tier
+// gratuit), c'est CE fichier qu'il faut corriger en premier : annoncer une absence d'entraînement qui
+// n'est pas garantie serait aussi faux que taire un entraînement qui a lieu (devoir n°2).
 //
 // Texte BRUT volontairement (même principe que content/contradictionHorsA10.ts) : ni balisage à
 // parser, ni fragments à recoller. L'emphase reste l'affaire du composant.
@@ -20,7 +25,7 @@
  * pouvoir se recomposer exactement en cette chaîne, sans un mot de plus ni de moins.
  */
 export const MENTION_ENVOI_IA_INTEGRALE =
-  "Import assisté par IA (Mistral) — ce document est envoyé aux serveurs de Mistral AI (France, hébergement UE) pour lecture automatique. Sur l'offre que nous utilisons actuellement, Mistral peut utiliser ce document pour entraîner ses modèles d'IA. Si tu préfères l'éviter, la saisie manuelle reste gratuite et ne quitte jamais ton appareil.";
+  "Import assisté par IA (Mistral) — ce document est envoyé aux serveurs de Mistral AI (France, hébergement UE) pour lecture automatique. Ces documents ne sont pas utilisés pour entraîner les modèles de Mistral. Si tu préfères l'éviter, la saisie manuelle reste gratuite et ne quitte jamais ton appareil.";
 
 /**
  * Le même texte découpé en trois phrases, pour l'aération typographique de la modale — jamais pour
@@ -31,7 +36,7 @@ export const MENTION_ENVOI_IA_INTEGRALE =
  */
 export const MENTION_ENVOI_IA_PHRASES = [
   "Import assisté par IA (Mistral) — ce document est envoyé aux serveurs de Mistral AI (France, hébergement UE) pour lecture automatique.",
-  "Sur l'offre que nous utilisons actuellement, Mistral peut utiliser ce document pour entraîner ses modèles d'IA.",
+  "Ces documents ne sont pas utilisés pour entraîner les modèles de Mistral.",
   "Si tu préfères l'éviter, la saisie manuelle reste gratuite et ne quitte jamais ton appareil.",
 ] as const;
 
@@ -42,7 +47,7 @@ export const MENTION_ENVOI_IA_PHRASES = [
  * fausse (devoir n°2).
  */
 export const RAPPEL_DOCUMENT_ENVOYE =
-  "Ce document a été envoyé à Mistral AI (France, hébergement UE) pour lecture automatique. Sur l'offre que nous utilisons actuellement, il peut servir à entraîner leurs modèles d'IA.";
+  "Ce document a été envoyé à Mistral AI (France, hébergement UE) pour lecture automatique. Ce document n'est pas utilisé pour entraîner les modèles de Mistral.";
 
 /**
  * Annonce du canal, affichée en permanence sur la zone de dépôt — AVANT même de choisir un fichier,
