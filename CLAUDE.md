@@ -1057,7 +1057,7 @@ de situation ✅ — l'échec semble propre à ce format de bulletin, pas au can
 - ✅ Test import IA production : notification ARE ✅, relevé de situation ✅, bulletin GHS ⚠️
 
 ### À faire — priorité haute
-- ⬜ Améliorer prompt GHS-sPAIEctacle — OCR texte vide, saisie manuelle en fallback
+- ✅ Prompt GHS/sPAIEctacle — bulletins multi-colonnes couverts (commit 081a516)
 - ⬜ Tester relevé de situation juillet 2026 — vérifier enregistrement taux PAS
 - ⬜ Vérifier données réelles — import JSON + Dashboard vs notification France Travail
 - ⬜ PWA sur téléphone — installer et vérifier sur appareil réel
