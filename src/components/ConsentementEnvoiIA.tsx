@@ -44,13 +44,16 @@ export function ConsentementEnvoiIA({ nomFichier, enCours, onAnnuler, onConfirme
         </h2>
 
         {/* La mention validée, en entier. Les trois phrases viennent d'une source unique et leur
-            concaténation est testée : impossible d'en afficher une version tronquée par accident. */}
+            concaténation est testée : impossible d'en afficher une version tronquée par accident.
+            Les trois reçoivent le même traitement typographique : la phrase [1] avait autrefois
+            sa propre boîte ambre quand elle portait l'annonce d'un entraînement (le risque réel),
+            mais le texte a changé de sens (cf. mentionEnvoiIA.ts) sans que l'habillage suive —
+            encadrer une phrase rassurante comme un avertissement contredisait son propre contenu,
+            et détonnait avec ConfirmationImport.tsx, l'autre porte bloquante de l'app, qui ne fait
+            jamais ce traitement sur ses paragraphes. */}
         <div id="corps-consentement-ia" className="space-y-3">
           <p className="text-sm text-muted leading-relaxed">{MENTION_ENVOI_IA_PHRASES[0]}</p>
-          {/* La phrase qui coûte : traitée comme telle, pas noyée dans le paragraphe. */}
-          <p className="text-sm text-ink leading-relaxed bg-amber/10 border border-amber/20 rounded-lg px-3 py-2.5">
-            {MENTION_ENVOI_IA_PHRASES[1]}
-          </p>
+          <p className="text-sm text-muted leading-relaxed">{MENTION_ENVOI_IA_PHRASES[1]}</p>
           <p className="text-sm text-muted leading-relaxed">{MENTION_ENVOI_IA_PHRASES[2]}</p>
         </div>
 
