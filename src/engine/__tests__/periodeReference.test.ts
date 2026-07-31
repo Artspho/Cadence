@@ -96,5 +96,30 @@ describe("calculerFenetreReference", () => {
       const fenetre = calculerFenetreReference(p, contrats, [], franceTravailConfig, "2026-06-01");
       expect(fenetre.seuilReadmission).toEqual({ calculable: false, raison: "hors_bornes", tranchesTentees: 1, dateAnniversairePrecedente: "2025-12-02" });
     });
+
+    it("borne plus proche que 365 j ET seuil déjà atteint dans la fenêtre naïve : la fenêtre de BASE elle-même est bornée, pas seulement son extension (corrigé le 31/07/2026, chantier renouvellement anticipé)", () => {
+      // AVANT ce correctif : dateDebutAllonge (dateFin - 364 j) ignorait la borne tant que le seuil
+      // était atteint dès la 1ʳᵉ itération (tranches=0, la borne n'est consultée que lors d'une
+      // tentative d'extension) — la fenêtre débordait alors AVANT la borne, gonflant SR/NHT avec des
+      // contrats déjà comptés pour le droit précédent. Cas réel qui a révélé le bug : Notification 2
+      // du 31/07/2026 (FCT 17/01/2026, ancien droit clos le 23/03/2025, soit ~300 j avant — moins de
+      // 365 j) — cf. engine/renouvellementAnticipe.test.ts, docs/validation.md Réel #1 ("~299 j").
+      const p = profil({ dateAnniversaire: "2026-01-17", situation: "readmission", dateAnniversairePrecedente: "2025-03-23" });
+      const contrats = [contrat({ date: "2026-01-17", typeRemuneration: "heures", nbHeures: 710 })]; // >= 507 h dès la fenêtre bornée
+      const fenetre = calculerFenetreReference(p, contrats, [], franceTravailConfig, "2026-01-17");
+      expect(fenetre.dateDebut).toBe("2025-03-24"); // borne + 1 jour, PAS dateFin - 364 (= 2025-01-18)
+      expect(fenetre.seuilReadmission).toEqual({ calculable: true, tranchesReadmission: 0, seuilHeuresAjuste: franceTravailConfig.seuilHeures });
+    });
+
+    it("même règle avec des dates et un volume d'heures totalement différents du cas réel (isole la règle générale, pas une coïncidence de calendrier)", () => {
+      // Aucun rapport avec le cas réel du 31/07/2026 (dates arbitraires, 5 mois d'écart au lieu de
+      // ~10, 600 h au lieu de 710) : si ce test passe pour des raisons différentes du précédent, la
+      // borne s'applique bien à la fenêtre de base en général, pas seulement pour ce calendrier précis.
+      const p = profil({ dateAnniversaire: "2026-08-01", situation: "readmission", dateAnniversairePrecedente: "2026-03-01" });
+      const contrats = [contrat({ date: "2026-08-01", typeRemuneration: "heures", nbHeures: 600 })]; // >= 507 h dès la fenêtre bornée
+      const fenetre = calculerFenetreReference(p, contrats, [], franceTravailConfig, "2026-08-01");
+      expect(fenetre.dateDebut).toBe("2026-03-02"); // borne + 1 jour, PAS dateFin - 364 (= 2025-08-02)
+      expect(fenetre.seuilReadmission).toEqual({ calculable: true, tranchesReadmission: 0, seuilHeuresAjuste: franceTravailConfig.seuilHeures });
+    });
   });
 });

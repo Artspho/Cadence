@@ -56,6 +56,23 @@ export function calculerFenetreReference(
   // est renseignée.
   const bourne = profil.dateAnniversairePrecedente && profil.dateAnniversairePrecedente.length > 0 ? profil.dateAnniversairePrecedente : null;
 
+  // Corrigé le 31/07/2026 (chantier renouvellement anticipé) : la borne doit s'appliquer À LA
+  // FENÊTRE DE BASE elle-même, pas seulement à l'extension par tranches ci-dessous. Texte officiel
+  // du simulateur France Travail (simucalcul.pole-emploi-services.fr, consulté le 31/07/2026) :
+  // « Cette période comprend les 365 jours précédant la dernière fin de contrat [...], DANS LA
+  // LIMITE de la dernière fin de contrat ayant servi à ouvrir un droit. » Quand le droit précédent
+  // s'est terminé il y a MOINS de 365 j (cas de toute demande de renouvellement anticipé, par
+  // construction — mais aussi de toute réadmission rapprochée), la fenêtre naïve dateFin-364
+  // déborde AVANT cette borne : sans ce correctif, une réadmission dont le seuil est déjà atteint
+  // dans la fenêtre naïve ressortait avec une fenêtre trop large (365 j) et un SR/NHT gonflés par
+  // des contrats déjà comptés pour le droit précédent — validé par le cas réel du 31/07/2026
+  // (Notification 2 : FCT 17/01/2026, fenêtre réelle 24/03/2025→17/01/2026, 299 j, PAS 365 j ; cf.
+  // engine/renouvellementAnticipe.test.ts, docs/validation.md Réel #1). Avant ce correctif, aucun
+  // test n'exerçait ce cas précis (seuil déjà atteint dans la fenêtre de base ET borne plus proche
+  // que 365 j) — cf. periodeReference.test.ts pour les cas déjà couverts (extension réussie,
+  // historique insuffisant, borne atteinte SANS succès).
+  const dateDebutBorne = bourne !== null && bourne >= dateDebutAllonge ? ajouterJours(bourne, 1) : dateDebutAllonge;
+
   // Réadmission : on étend par tranches de 30 j tant que le seuil ajusté n'est pas atteint. `trouve`
   // est mis à true UNIQUEMENT au moment du `break` de succès ; `borneAtteinte` UNIQUEMENT au moment
   // du `break` par la borne réelle. Si aucun des deux n'est mis à true, la sortie ne peut venir que
@@ -63,7 +80,7 @@ export function calculerFenetreReference(
   // validation.md : ne jamais déduire une issue du compteur de tranches par relecture implicite,
   // toujours un booléen explicite posé au point de sortie).
   let tranches = 0;
-  let dateDebutCourante = dateDebutAllonge;
+  let dateDebutCourante = dateDebutBorne;
   let seuilCourant = config.seuilHeures;
   let trouve = false;
   let borneAtteinte = false;
