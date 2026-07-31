@@ -8,13 +8,17 @@ Mémoire durable à consulter au démarrage : `CLAUDE.md`, `docs/SPEC.md`, `docs
 
 Deux devoirs sacrés : (1) ne jamais perdre les données ; (2) ne jamais afficher un chiffre faux (ni faux « feu vert » rassurant, ni faux « Bloqué », ni faux montant, ni fausse alerte, ni valeur sentinelle brute).
 
-État (mis à jour le 31/07/2026) : les deux devoirs sacrés sont tenus, la bêta a son socle.
-460 tests verts, `tsc --noEmit` propre. Dernier commit : `3b516dd` (interface de renouvellement
-anticipé, cf. CLAUDE.md § Backlog). Branches (`master`, `backend-api-import-ia`) synchronisées
-local + `origin` d'après l'utilisateur (rien en attente de push) — annoncé, pas vérifié par moi :
-aucun `push`/`fetch` vers `origin` n'est fait depuis Claude Code (pas d'identifiants configurés
-dans cet environnement ; c'est l'utilisateur qui pousse depuis son propre terminal). Tous les
-items §11.A du SPEC sont désormais traités.
+État (mis à jour le 31/07/2026, fin de session) : les deux devoirs sacrés sont tenus, la bêta a
+son socle. 467 tests verts, `tsc -b` propre. Dernier commit sur `master` : `9e56656` (fix
+`dateAnniversaire`, cf. « Fait » ci-dessous). `master` est 5 commits en avance sur `origin/master`
+— non poussés (Claude Code ne pousse jamais, par consigne explicite, quelle que soit la
+configuration des identifiants). Tous les items §11.A du SPEC sont désormais traités.
+
+**Point de vigilance immédiat pour la prochaine session** : le bug des 710h (cf. « Fait » ci-dessous)
+est corrigé côté code, mais l'utilisateur doit encore mettre à jour lui-même, dans « Ton profil »,
+`dateAnniversaire` (→ la prochaine échéance réelle) et `dateAnniversairePrecedente` (→ la FCT du
+droit en cours) — sans quoi le Dashboard réel continuera d'afficher l'ancien chiffre malgré le
+correctif. Vérifier au démarrage de la prochaine session si c'est fait.
 
 **⚠️ Point d'attention avant tout nouveau chantier — confusion de dossier non résolue** : il existe
 **deux copies** du projet sur cette machine : `C:\Users\benoi\cadence` (le vrai dépôt git, celui de
@@ -914,6 +918,24 @@ un champ structuré `natureMontant`), la saisie manuelle n'a aucune vérité ext
 l'utilisateur — seul lui sait ce que dit son document, Cadence ne peut que l'inviter à revérifier.
 Complète (ne remplace pas) le garde-fou déjà en place côté IA (`natureMontant ≠ "net"` refusé à
 l'écriture, commit `d3ebb36`), qui ne couvrait que ce canal.
+
+## Fait (2026-07-31, suite de session — bug des 710h corrigé, gel des exercices clos, filtre par année)
+
+**Bug réel signalé par l'utilisateur : le Dashboard affichait 710 h au compteur des 507 h — le NH exact d'une notification France Travail PASSÉE, pas la progression réelle du cycle en cours.** Diagnostic confirmé en rejouant le calcul avec les vraies données importées (`docs/cadence-import-complet.json`, 56 contrats) : `Profil.dateAnniversaire` doit porter la **prochaine échéance** du cycle en cours (cf. tous les tests de `prediction.ts`, le module qui alimente le Dashboard, et l'UI de `MonProfil.tsx`), jamais la FCT qui l'a ouvert. Mais `RenouvellementAnticipe.tsx:44` lisait `profil.dateAnniversaire` directement comme la FCT — cohérent avec un commentaire erroné écrit lors du chantier « renouvellement anticipé » (session précédente, 31/07 matin), qui affirmait à tort que c'était l'usage général du champ dans toute l'app. Résultat : une fois la date stockée dépassée par « aujourd'hui », `calculerFenetreReference`/`calculerStatutPrediction` recalculaient exactement la fenêtre rétrospective qui avait déjà produit le droit en cours (24/03/2025→17/01/2026), au lieu de la fenêtre prospective (18/01/2026→17/01/2027).
+
+**Correctif** : `RenouvellementAnticipe.tsx` dérive maintenant la FCT du droit en cours par `échéance − 12 mois` (nouvelle fonction `deriverFctRetenueActuelle`, `engine/renouvellementAnticipe.ts`) au lieu de lire `profil.dateAnniversaire` directement. Commentaires trompeurs réécrits dans `types/index.ts` et le composant. Aucun changement dans `periodeReference.ts`/`prediction.ts` — ces modules étaient corrects, seul le nouveau module de comparaison lisait le champ à l'envers. 3 nouveaux tests, dont une régression qui isole précisément le cas signalé (réadmission récente, contrats réels avant ET après la FCT retenue, l'ancien contrat de 720 h n'est jamais recompté même quand l'extension par tranches est tentée).
+
+**Cause racine côté données** : `docs/cadence-import-complet.json` avait été généré avec `dateAnniversaire = 2026-01-17` (la FCT) et `dateAnniversairePrecedente = 2025-03-23` (la borne de l'ANCIEN cycle, déjà résolu) — les deux valeurs étaient restées sur l'ancien cycle après avoir servi à valider le renouvellement anticipé, jamais mises à jour pour le nouveau cycle démarré le 18/01/2026. Corrigées dans le fichier : `dateAnniversaire = 2027-01-17`, `dateAnniversairePrecedente = 2026-01-17`. **L'utilisateur doit encore répercuter ces deux valeurs dans son profil réellement importé dans l'app (« Ton profil »)** — ce fichier JSON n'est qu'une source de référence, pas exécutée automatiquement.
+
+**Confirmé par l'utilisateur (vérification GUIDEINTERMITTENT.pdf + sources France Travail) : la règle des 70h/120h d'enseignement n'est pas conditionnelle, elle s'ajoute systématiquement au compteur des 507h dès `etablissementAgree` + `enRapportAvecMetier`, plafonnée selon l'âge.** Le moteur (`decompteHeures.ts`) appliquait déjà la bonne logique, aucun changement de code. Les 18 contrats « Commune de Levallois Perret » importés n'avaient ni l'un ni l'autre flag renseigné (0 h retenue jusque-là) — l'utilisateur a confirmé que les deux conditions sont remplies ; corrigé dans `docs/cadence-import-complet.json`. **Chiffre exact recalculé avec les vraies données, fenêtre en cours (18/01/2026→17/01/2027) : 588 h / 507 h** (504 h de cachets + 14 h de scène + 70 h d'enseignement plafonnées, 56 h excédentaires sur les 126 h déclarées sur la fenêtre).
+
+**Question tranchée avant tout code : les exercices clos (`Exercice.cloture: true`) n'étaient PAS protégés d'un recalcul silencieux.** `decouperExercices` (`engine/cycles.ts`) recalculait TOUT à chaque appel — y compris les cycles déjà clos — depuis les contrats/profil courants, sans aucun mécanisme de gel. Un import tardif ajoutant un contrat dans une période déjà close, ou une nouvelle FCT (réadmission), aurait changé silencieusement l'AJ affichée pour un cycle passé dans `Historique.tsx` — l'AJ affichée n'était d'ailleurs qu'une reconstruction de Cadence, jamais la valeur réellement notifiée (`ajReelleHistorique`). **Choix retenu (version hybride demandée par l'utilisateur, ni gel manuel ni nouveau schéma de stockage séparé)** : nouvelle fonction pure `fusionnerExercicesGeles` (`engine/cycles.ts`) — un exercice en cours reste toujours recalculé en direct ; un exercice qui vient de clôturer est calculé une fois puis placé dans `aGeler` ; un exercice déjà figé en storage n'est plus jamais recalculé, même si le recalcul frais donnerait un chiffre différent. Nouveau champ persistant `DonneesApp.exercicesGeles: Record<string, Exercice>` (`storage/localStorageAdapter.ts`, migration silencieuse `{}` par défaut pour un ancien export — devoir sacré n°1). `App.tsx` : le `useMemo` reste pur (calcule `aGeler` sans effet de bord), un `useEffect` dédié persiste les nouveaux gels. **Limite connue, signalée mais non résolue** : si `Profil.dateAnniversaire` change un jour suite à une vraie réadmission, la reconstruction rétroactive des cycles (déjà une limitation MVP documentée, backlog V3, cf. `cycles.ts`) peut ne plus retomber sur les mêmes `id` — les exercices déjà figés resteraient en storage (aucune perte, devoir n°1) mais pourraient ne plus apparaître dans la liste affichée. 4 nouveaux tests.
+
+**Nouvelle fonctionnalité : filtre par année dans `ContractList.tsx`.** Onglets « Toutes » + une pastille par année présente dans les contrats (année la plus récente sélectionnée par défaut, calculée une seule fois au montage pour ne pas faire sauter le filtre sous les pieds de l'utilisateur en cours de saisie). Une série récurrente n'est jamais coupée par le filtre : si un seul de ses contrats tombe dans l'année choisie, la série entière s'affiche. Vérifié en navigateur (dev server local, `npm run dev`), pas seulement par les tests.
+
+**Bilan tests** : 467 tests verts (460 en début de session + 7 nouveaux : 3 pour le bug dateAnniversaire, 4 pour le gel des exercices), `tsc -b` propre.
+
+**5 commits cette session** (`05108f5` → `9e56656`, + `ae8e7c8` pour `.claude/settings.json`), tous sur `master`, **rien poussé sur `origin`** (`git remote -v` montre un jeton dans l'URL — des identifiants de push existent bien dans cet environnement, contrairement à ce qu'affirmait une note antérieure de ce document ; Claude Code ne pousse quand même jamais vers `origin`, par consigne explicite de l'utilisateur, indépendamment de la présence d'identifiants).
 
 ## Ensuite (backlog)
 

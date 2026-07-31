@@ -95,7 +95,65 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 
 ## État actuel
 
-### Le plus récent d'abord — session du 31/07/2026
+### Le plus récent d'abord — suite du 31/07/2026 (bug des 710h, gel des exercices, filtre année)
+
+- ✅ **Bug réel corrigé : le Dashboard affichait 710 h au compteur des 507 h — le NH exact d'une
+  notification France Travail PASSÉE (24/03/2025→17/01/2026), pas la progression du cycle en
+  cours** (commit `9e56656`). Cause : `Profil.dateAnniversaire` doit porter la **prochaine
+  échéance** du cycle en cours (cf. tous les tests de `engine/prediction.ts`, module qui alimente
+  le Dashboard, et l'usage dans `MonProfil.tsx`), jamais la FCT qui l'a ouvert. Mais
+  `RenouvellementAnticipe.tsx:44` lisait `profil.dateAnniversaire` directement comme la FCT —
+  cohérent avec un commentaire erroné écrit lors du chantier « renouvellement anticipé » (session
+  du 31/07 matin, commit `3b516dd`), qui affirmait à tort que c'était l'usage général de ce champ
+  dans toute l'app. Une fois la date stockée dépassée par « aujourd'hui », le moteur recalculait
+  exactement la fenêtre rétrospective qui avait déjà produit le droit en cours — pas un bug de
+  calcul dans `periodeReference.ts`/`prediction.ts` (inchangés, corrects), un module de comparaison
+  qui lisait le champ à l'envers. **Corrigé** : `deriverFctRetenueActuelle` (nouvelle fonction,
+  `engine/renouvellementAnticipe.ts`) dérive la FCT par `échéance − 12 mois` au lieu de lire le
+  champ directement ; commentaires trompeurs réécrits dans `types/index.ts` et le composant. 3
+  nouveaux tests, dont une régression isolant précisément ce cas (réadmission récente, contrats
+  réels avant ET après la FCT retenue, ancien contrat de 720 h jamais recompté même en extension
+  par tranches). **Cause racine côté données** : `docs/cadence-import-complet.json` avait
+  `dateAnniversaire`/`dateAnniversairePrecedente` restés sur l'ancien cycle (jamais mis à jour
+  après le nouveau droit ouvert le 18/01/2026) — corrigé dans le fichier ; **l'utilisateur doit
+  encore répercuter ces deux valeurs dans son profil réellement importé dans l'app**.
+- ✅ **Règle enseignement 70h/120h confirmée par l'utilisateur** (GUIDEINTERMITTENT.pdf + sources
+  France Travail) : s'ajoute systématiquement au compteur des 507 h dès `etablissementAgree` +
+  `enRapportAvecMetier`, plafonnée selon l'âge — pas conditionnelle à un manque d'heures ailleurs.
+  `decompteHeures.ts` appliquait déjà la bonne logique, aucun changement de code. Les 18 contrats
+  « Commune de Levallois Perret » importés confirmés remplir les deux conditions (corrigé dans
+  `docs/cadence-import-complet.json`, qui n'avait ni l'un ni l'autre flag). **Chiffre exact
+  recalculé avec les vraies données, fenêtre en cours (18/01/2026→17/01/2027) : 588 h / 507 h**
+  (504 h cachets + 14 h scène + 70 h enseignement plafonnées, 56 h excédentaires sur 126 h
+  déclarées).
+- ✅ **Gel automatique des exercices clos** (commit `eaf21fa`) : `decouperExercices`
+  (`engine/cycles.ts`) recalculait TOUT à chaque appel, y compris les cycles déjà clos — un import
+  tardif ou une nouvelle FCT pouvait changer silencieusement l'AJ affichée pour un cycle passé
+  dans `Historique.tsx` (elle-même une reconstruction de Cadence, jamais la valeur réellement
+  notifiée). Nouvelle fonction pure `fusionnerExercicesGeles` : un exercice en cours reste toujours
+  recalculé en direct ; un exercice qui vient de clôturer est calculé une fois puis placé dans
+  `aGeler` ; un exercice déjà figé n'est plus jamais recalculé. Nouveau champ persistant
+  `DonneesApp.exercicesGeles: Record<string, Exercice>` (`storage/localStorageAdapter.ts`,
+  migration silencieuse `{}` par défaut, devoir sacré n°1). `App.tsx` : `useMemo` pur (calcule
+  `aGeler` sans effet de bord) + `useEffect` dédié pour la persistance. **Limite connue** : si
+  `dateAnniversaire` change un jour (vraie réadmission), la reconstruction rétroactive des cycles
+  (limitation MVP déjà documentée, backlog V3) peut ne plus retomber sur les mêmes `id` — aucune
+  perte de donnée, mais un exercice figé pourrait disparaître de la liste affichée. 4 nouveaux
+  tests.
+- ✅ **Filtre par année dans `ContractList.tsx`** (commit `c2ccf70`) : onglets « Toutes » + une
+  pastille par année présente dans les contrats, année la plus récente sélectionnée par défaut. Une
+  série récurrente n'est jamais coupée par le filtre (affichée entière dès qu'un seul de ses
+  contrats tombe dans l'année choisie). Vérifié en navigateur, pas seulement par les tests.
+- ✅ **`.claude/settings.json` créé** (commit `ae8e7c8`) : `defaultMode: "acceptEdits"` — évite la
+  confirmation à chaque édition de fichier ; les commandes bash sensibles restent soumises à
+  confirmation.
+
+Bilan : 467 tests verts (460 en début de session + 7 nouveaux), `tsc -b` propre. 5 commits sur
+`master` cette suite de session (`05108f5` → `9e56656`), rien poussé sur `origin` (des identifiants
+de push existent bien dans cet environnement — `git remote -v` — mais Claude Code ne pousse jamais
+vers `origin`, par consigne explicite, indépendamment de leur présence).
+
+### Session du 31/07/2026 (matin — renouvellement anticipé, styling, hébergement UE, inventaire)
 
 - ✅ **Habillage de `ConsentementEnvoiIA.tsx` désamorcé** (commit `91b5634`) : la phrase [1] a perdu
   sa boîte ambre dédiée — elle datait de quand cette phrase annonçait un entraînement réel (le
