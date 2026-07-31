@@ -1117,7 +1117,17 @@ de situation ✅ — l'échec semble propre à ce format de bulletin, pas au can
   une webview intégrée) pour la connexion/téléchargement, retour dans Cadence pour déposer le
   fichier — perd le "tout intégré" mais reste compatible FranceConnect et évite le terrain iframe.
   À trancher : réorienter vers (b), ou abandonner si (a) est jugé trop fragile juridiquement/UX.
-- ⬜ AJ brute vs nette — écart ~5%, jamais réinvestigué
+- ✅ **AJ brute vs nette — non reproduit, formule prouvée correcte (31/07/2026).** L'écart supposé
+  n'a jamais été un bug de calcul : `docs/validation.md` (Cas réel #1, notification FT du
+  03/02/2026) montre `calculerAJNette` appliqué à l'AJ brute réelle (55,02 €) donnant 53,81 € net —
+  exactement le net réellement notifié, 0,00 € d'écart. Le commentaire déjà présent dans
+  `config/franceTravailConfig.ts` (l.63-68, commit `a62e9b1` du 24/07) précisait même l'écart réel
+  (~2,2 %, pas ~5 %), validé « à l'euro près » sur fév-juin 2026 — cette entrée de backlog n'avait
+  simplement jamais été mise à jour en conséquence (péremption documentaire, même famille que
+  celles nettoyées le 30/07). Résidu réel identifié à part : la provenance de la valeur saisie dans
+  `Profil.ajReelleHistorique` (rien n'empêchait de recopier une ligne « brute » d'un relevé dans le
+  champ « AJ nette » de `MonProfil.tsx`) — traité par un avertissement de plausibilité, pas un
+  nouveau champ déclaratif (commit `2d05f6d`, détail et justification dans `docs/reprise.md`).
 - ⬜ Comparaison complète Cadence vs 8 mois réels
 - ⬜ Reconfirmer mention consentement Mistral (hébergement UE) — le volet entraînement de cet item
   est désormais suivi par l'entrée 🔶 dédiée plus haut et par le ⬜ "Basculer MISTRAL_API_KEY..."
