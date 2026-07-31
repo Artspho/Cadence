@@ -8,7 +8,9 @@ dist-ssr
 .vscode/*
 !.vscode/extensions.json
 
-# Exports de données réelles (données personnelles : dates de naissance, contrats, employeurs).
-# Ne jamais committer — un commit git ne s'efface pas proprement ensuite.
+# Exports/imports de données réelles (données personnelles : dates de naissance, contrats,
+# employeurs). Ne jamais committer — un commit git ne s'efface pas proprement ensuite.
 cadence-export-*.json
 docs/cadence-export-*.json
+cadence-import-*.json
+docs/cadence-import-*.json
