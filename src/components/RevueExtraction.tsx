@@ -13,13 +13,14 @@
  */
 
 import { useState } from "react";
-import type { Contrat, DecompteHeuresResultat, Profil } from "../types";
+import type { Contrat, DecompteHeuresResultat, PeriodeAssimilee, Profil } from "../types";
 import type { ExtractionResult, Proposition } from "../types/extraction";
 import type { FranceTravailConfig } from "../config/franceTravailConfig";
 import { RAPPEL_DOCUMENT_ENVOYE } from "../content/mentionEnvoiIA";
 import type { ResultatEcritureProfil } from "../lib/coherenceProfil";
-import { contratDepuisProposition, evaluerExtraction, profilAvecProposition, type PropositionEvaluee, type StatutProposition } from "../lib/routageExtraction";
+import { contratDepuisProposition, evaluerExtraction, periodeDepuisProposition, profilAvecProposition, type PropositionEvaluee, type StatutProposition } from "../lib/routageExtraction";
 import { ContractForm } from "./ContractForm";
+import { PeriodeForm } from "./PeriodeForm";
 
 interface RevueExtractionProps {
   resultat: ExtractionResult;
@@ -27,6 +28,7 @@ interface RevueExtractionProps {
   config: FranceTravailConfig;
   decompteActuel: DecompteHeuresResultat;
   onAjouterContrat: (contrat: Omit<Contrat, "id">) => void;
+  onAjouterPeriode: (periode: Omit<PeriodeAssimilee, "id">) => void;
   onModifierProfil: (profil: Profil) => ResultatEcritureProfil;
   /** Bandeau affiché au-dessus de tout (ex. avertissement « extraction simulée » en développement). */
   bandeau?: React.ReactNode;
@@ -148,7 +150,7 @@ function formaterValeur(valeur: unknown): { texte: string; nonLu: boolean } {
   return { texte: String(valeur), nonLu: false };
 }
 
-export function RevueExtraction({ resultat, profil, config, decompteActuel, onAjouterContrat, onModifierProfil, bandeau, documentEnvoye = false }: RevueExtractionProps) {
+export function RevueExtraction({ resultat, profil, config, decompteActuel, onAjouterContrat, onAjouterPeriode, onModifierProfil, bandeau, documentEnvoye = false }: RevueExtractionProps) {
   const evaluees = evaluerExtraction(resultat, profil);
   const [etats, setEtats] = useState<Record<number, EtatCarte>>({});
   const [erreurs, setErreurs] = useState<Record<number, string>>({});
@@ -173,6 +175,12 @@ export function RevueExtraction({ resultat, profil, config, decompteActuel, onAj
 
   function enregistrerContrat(index: number, contrat: Omit<Contrat, "id">) {
     onAjouterContrat(contrat);
+    setFormulaireOuvert(null);
+    setEtats((s) => ({ ...s, [index]: "applique" }));
+  }
+
+  function enregistrerPeriode(index: number, periode: Omit<PeriodeAssimilee, "id">) {
+    onAjouterPeriode(periode);
     setFormulaireOuvert(null);
     setEtats((s) => ({ ...s, [index]: "applique" }));
   }
@@ -225,6 +233,7 @@ export function RevueExtraction({ resultat, profil, config, decompteActuel, onAj
           onOuvrirFormulaire={() => setFormulaireOuvert(index)}
           onFermerFormulaire={() => setFormulaireOuvert(null)}
           onEnregistrerContrat={(contrat) => enregistrerContrat(index, contrat)}
+          onEnregistrerPeriode={(periode) => enregistrerPeriode(index, periode)}
           onEcarter={() => setEtats((s) => ({ ...s, [index]: "ecarte" }))}
         />
       ))}
@@ -244,6 +253,7 @@ interface CartePropositionProps {
   onOuvrirFormulaire: () => void;
   onFermerFormulaire: () => void;
   onEnregistrerContrat: (contrat: Omit<Contrat, "id">) => void;
+  onEnregistrerPeriode: (periode: Omit<PeriodeAssimilee, "id">) => void;
   onEcarter: () => void;
 }
 
@@ -259,6 +269,7 @@ function CarteProposition({
   onOuvrirFormulaire,
   onFermerFormulaire,
   onEnregistrerContrat,
+  onEnregistrerPeriode,
   onEcarter,
 }: CartePropositionProps) {
   const { proposition, titre, statut, motif, avertissements } = evaluee;
@@ -346,6 +357,12 @@ function CarteProposition({
             onValider={onEnregistrerContrat}
             onAnnuler={onFermerFormulaire}
           />
+        </div>
+      )}
+
+      {formulaireOuvert && proposition.cible === "periode_assimilee" && (
+        <div className="pt-2">
+          <PeriodeForm valeurInitiale={periodeDepuisProposition(proposition.donnees)} onValider={onEnregistrerPeriode} onAnnuler={onFermerFormulaire} />
         </div>
       )}
     </section>

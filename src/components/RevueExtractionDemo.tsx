@@ -21,7 +21,7 @@
  */
 
 import { useState } from "react";
-import type { Contrat, DecompteHeuresResultat, Profil } from "../types";
+import type { Contrat, DecompteHeuresResultat, PeriodeAssimilee, Profil } from "../types";
 import type { FranceTravailConfig } from "../config/franceTravailConfig";
 import { validerProfilPourEcriture, type ResultatEcritureProfil } from "../lib/coherenceProfil";
 import { FIXTURES_EXTRACTION } from "../lib/fixturesExtraction";
@@ -44,6 +44,7 @@ function BancEssaiRevue({ profilReel, config, decompteActuel }: RevueExtractionD
   const [fixtureId, setFixtureId] = useState(FIXTURES_EXTRACTION[0].id);
   const [profilBacASable, setProfilBacASable] = useState<Profil>(profilReel);
   const [contratsBacASable, setContratsBacASable] = useState<Omit<Contrat, "id">[]>([]);
+  const [periodesBacASable, setPeriodesBacASable] = useState<Omit<PeriodeAssimilee, "id">[]>([]);
 
   const fixture = FIXTURES_EXTRACTION.find((f) => f.id === fixtureId) ?? FIXTURES_EXTRACTION[0];
 
@@ -55,6 +56,7 @@ function BancEssaiRevue({ profilReel, config, decompteActuel }: RevueExtractionD
   function reinitialiser() {
     setProfilBacASable(profilReel);
     setContratsBacASable([]);
+    setPeriodesBacASable([]);
   }
 
   /** Même validation que la vraie écriture (App.tsx modifierProfil) — seule la destination diffère. */
@@ -110,11 +112,12 @@ function BancEssaiRevue({ profilReel, config, decompteActuel }: RevueExtractionD
         config={config}
         decompteActuel={decompteActuel}
         onAjouterContrat={(contrat) => setContratsBacASable((liste) => [...liste, contrat])}
+        onAjouterPeriode={(periode) => setPeriodesBacASable((liste) => [...liste, periode])}
         onModifierProfil={modifierProfilBacASable}
         bandeau={bandeau}
       />
 
-      <EtatBacASable profil={profilBacASable} contrats={contratsBacASable} />
+      <EtatBacASable profil={profilBacASable} contrats={contratsBacASable} periodes={periodesBacASable} />
     </div>
   );
 }
@@ -123,7 +126,7 @@ function BancEssaiRevue({ profilReel, config, decompteActuel }: RevueExtractionD
  * Montre où les propositions ont réellement atterri. C'est la preuve du routage : une valeur qui
  * s'affiche dans la mauvaise ligne ici s'afficherait dans le mauvais champ en production.
  */
-function EtatBacASable({ profil, contrats }: { profil: Profil; contrats: Omit<Contrat, "id">[] }) {
+function EtatBacASable({ profil, contrats, periodes }: { profil: Profil; contrats: Omit<Contrat, "id">[]; periodes: Omit<PeriodeAssimilee, "id">[] }) {
   const lignes: { libelle: string; valeur: string }[] = [
     { libelle: "Date anniversaire", valeur: profil.dateAnniversaire || "—" },
     { libelle: "Date de naissance", valeur: profil.dateNaissance || "—" },
@@ -163,6 +166,20 @@ function EtatBacASable({ profil, contrats }: { profil: Profil; contrats: Omit<Co
             {contrats.map((c, i) => (
               <li key={i} className="text-ink">
                 {c.dateDebut} → {c.date} · {c.employeur} · {c.salaireBrut} € · {c.type} / {c.typeRemuneration}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+      <div>
+        <p className="text-xs uppercase tracking-[.03em] text-muted mb-2">Périodes retenues ({periodes.length})</p>
+        {periodes.length === 0 ? (
+          <p className="text-sm text-faint">Aucune période validée dans cette copie de travail.</p>
+        ) : (
+          <ul className="text-sm space-y-1">
+            {periodes.map((p, i) => (
+              <li key={i} className="text-ink">
+                {p.dateDebut} → {p.dateFin} · {LABELS_VALEURS[p.type] ?? p.type}
               </li>
             ))}
           </ul>

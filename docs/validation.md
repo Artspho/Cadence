@@ -234,17 +234,18 @@ résultat directement, cas #2 et #3 transformés en tests permanents (`areNette.
   migration silencieuse des entrées existantes en `"net"` — la convention actuelle. Pas urgent tant
   que les deux seuls écrivains sont la saisie manuelle et cet écran de revue.
 
-- **`PeriodeAssimilee` n'a aucun chemin d'écriture dans l'app** (relevé le 2026-07-28). `DonneesCadence.periodes`
-  est **lu** partout où ça compte (`periodeReference.ts`, `decompteHeures.ts`, `salaireReference.ts`,
-  `prediction.ts`, `cycles.ts`, `Simulateur.tsx`) mais **aucune UI ni aucun setter d'`App.tsx` ne
-  permet d'en créer une** : le tableau ne peut être peuplé que par un import JSON. Une maternité ou
-  un accident du travail — qui valent 5 h/jour au décompte des 507 h — est donc aujourd'hui
-  **inarrivable** par la saisie normale, ce qui sous-estime silencieusement le décompte pour qui est
-  concerné. Conséquence immédiate : la cible `periode_assimilee` du schéma d'extraction
-  (`src/types/extraction.ts`) est refusée par `routageExtraction.ts` faute de destination, avec un
-  message explicite plutôt qu'un abandon silencieux. **À construire** : CRUD des périodes assimilées
-  (formulaire + `ajouterPeriode`/`supprimerPeriode` dans `App.tsx`), après quoi le refus n°2 de
-  `routageExtraction.ts` pourra devenir un routage réel. ⚠️ Le piège déjà documenté reste entier :
-  `ald` et `maladie_intercontrat` ont des effets **opposés** sur le décompte et un simple avis
-  d'arrêt de travail CPAM ne permet pas de les distinguer — l'extraction ne doit jamais deviner ce
-  champ (cf. commentaire dans `src/types/extraction.ts`).
+- ✅ **`PeriodeAssimilee` a un chemin d'écriture complet dans l'app** (relevé absent le 2026-07-28,
+  **construit le 2026-07-29**, commit `d664344` — cette note n'avait jamais été mise à jour depuis,
+  péremption documentaire pure). `PeriodeForm.tsx` + `PeriodeList.tsx`, câblés dans `MonProfil.tsx`
+  (section « Périodes particulières ») via `ajouterPeriode`/`supprimerPeriode` (`App.tsx`), persistés
+  par `storage/localStorageAdapter.ts`. Une maternité ou un accident du travail — qui valent 5 h/jour
+  au décompte des 507 h — sont donc bien saisissables normalement, en plus de l'import JSON.
+  **Routage de l'extraction IA câblé le 2026-07-31** : la cible `periode_assimilee` du schéma
+  d'extraction (`src/types/extraction.ts`) n'est plus refusée par `routageExtraction.ts` — traitée
+  en `revue_formulaire` (comme `contrat`), elle pré-remplit `PeriodeForm` sans jamais s'appliquer
+  directement. ⚠️ Le piège déjà documenté reste entier et reste protégé : `ald` et
+  `maladie_intercontrat` ont des effets **opposés** sur le décompte et un simple avis d'arrêt de
+  travail CPAM ne permet pas de les distinguer — le schéma d'extraction impose à l'IA de produire
+  `info_seule` plutôt que de deviner ce champ, et la revue en formulaire garde une confirmation
+  humaine systématique même quand l'IA propose un type avec confiance haute (cf. commentaire dans
+  `src/types/extraction.ts` et `routageExtraction.ts`).

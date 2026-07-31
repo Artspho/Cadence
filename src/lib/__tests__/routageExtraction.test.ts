@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Profil } from "../../types";
 import type { Proposition } from "../../types/extraction";
-import { contratDepuisProposition, evaluerExtraction, evaluerProposition, profilAvecProposition } from "../routageExtraction";
+import { contratDepuisProposition, evaluerExtraction, evaluerProposition, periodeDepuisProposition, profilAvecProposition } from "../routageExtraction";
 import { extractionBulletinPaie, extractionNotificationAdmission, extractionReleveAvecRefus } from "../fixturesExtraction";
 
 const profilBase: Profil = {
@@ -184,17 +184,26 @@ describe("profil_infos — un champ non lu n'efface jamais une valeur déjà sai
   });
 });
 
-describe("periode_assimilee — aucune destination dans l'app aujourd'hui", () => {
-  it("n'est jamais appliquée et l'explique", () => {
-    const proposition: Proposition = {
-      cible: "periode_assimilee",
-      donnees: { type: "accident_travail", dateDebut: "2026-04-06", dateFin: "2026-04-24" },
-      confiance: {},
-      justification: "test",
-    };
+describe("periode_assimilee — toujours relue dans PeriodeForm, jamais appliquée directement (CRUD + routage construits le 31/07/2026)", () => {
+  const proposition: Proposition = {
+    cible: "periode_assimilee",
+    donnees: { type: "accident_travail", dateDebut: "2026-04-06", dateFin: "2026-04-24" },
+    confiance: {},
+    justification: "test",
+  };
+
+  it("passe par le formulaire (comme contrat), jamais 'applicable' directement", () => {
     const evaluee = evaluerProposition(proposition, profilBase);
-    expect(evaluee.statut).toBe("non_applicable");
-    expect(evaluee.motif).toBeTruthy();
+    expect(evaluee.statut).toBe("revue_formulaire");
+    expect(evaluee.avertissements).toEqual([]); // type/dateDebut/dateFin non-nullables : rien à défaut
+  });
+
+  it("convertit les trois champs sans en inventer aucun (tous non-nullables dans le schéma)", () => {
+    const valeurs = periodeDepuisProposition(proposition.donnees);
+    expect(valeurs).toEqual({ type: "accident_travail", dateDebut: "2026-04-06", dateFin: "2026-04-24" });
+  });
+
+  it("ne s'applique pas directement au profil (periode_assimilee ne cible pas Profil)", () => {
     expect(() => profilAvecProposition(profilBase, proposition)).toThrow();
   });
 });
@@ -250,9 +259,10 @@ describe("fixtures de démonstration — couvrent bien chaque branche", () => {
     expect(statuts).toEqual(["applicable", "applicable", "applicable", "information"]);
   });
 
-  it("le relevé produit trois refus et une information", () => {
+  it("le relevé produit deux refus, une revue formulaire (periode_assimilee) et une information", () => {
     const statuts = evaluerExtraction(extractionReleveAvecRefus, profilBase).map((e) => e.statut);
-    expect(statuts.filter((s) => s === "non_applicable")).toHaveLength(3);
+    expect(statuts.filter((s) => s === "non_applicable")).toHaveLength(2);
+    expect(statuts.filter((s) => s === "revue_formulaire")).toHaveLength(1);
     expect(statuts.filter((s) => s === "information")).toHaveLength(1);
   });
 

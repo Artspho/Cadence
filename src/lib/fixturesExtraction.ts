@@ -109,8 +109,10 @@ export const extractionBulletinPaie: ExtractionResult = {
 };
 
 /**
- * Cas des refus : chaque proposition ici doit être affichée SANS être appliquée.
- * Sert à vérifier qu'aucune de ces trois situations ne peut produire un chiffre faux.
+ * Cas des refus (aj_reelle_historique, profil_ouverture_droits) + un cas de revue manuelle
+ * (periode_assimilee, routée vers PeriodeForm depuis le 31/07/2026) : chaque proposition ici doit
+ * être affichée sans jamais s'appliquer directement (statut "applicable"). Sert à vérifier
+ * qu'aucune de ces situations ne peut produire un chiffre faux ni un écrasement silencieux.
  */
 export const extractionReleveAvecRefus: ExtractionResult = {
   typeDocumentDetecte: "releve_situation",
@@ -123,14 +125,16 @@ export const extractionReleveAvecRefus: ExtractionResult = {
       justification: "Colonne « Allocation brute » du relevé — le document dit « brute », pas « nette ».",
     },
     {
-      // Refus n°2 : l'app n'a pas d'écran pour enregistrer une période assimilée.
+      // Revue manuelle (PAS un refus depuis le 31/07/2026) : routée vers PeriodeForm, pré-remplie,
+      // mais jamais appliquée directement — ald/maladie_intercontrat ayant des effets opposés sur
+      // le décompte, la confirmation humaine du type reste requise (cf. routageExtraction.ts).
       cible: "periode_assimilee",
       donnees: { type: "accident_travail", dateDebut: "2026-04-06", dateFin: "2026-04-24" },
       confiance: { type: "haute", dateDebut: "haute", dateFin: "haute" },
       justification: "Mention « accident du travail » avec dates de suspension, page 1.",
     },
     {
-      // Refus n°3 : ouverture de droits incomplète — franchise et délai absents.
+      // Refus n°2 : ouverture de droits incomplète — franchise et délai absents.
       cible: "profil_ouverture_droits",
       donnees: {
         dateOuverture: "2026-03-01",
@@ -166,6 +170,6 @@ export const extractionNonReconnue: ExtractionResult = {
 export const FIXTURES_EXTRACTION: { id: string; libelle: string; resultat: ExtractionResult }[] = [
   { id: "notification", libelle: "Notification d'admission (tout applicable)", resultat: extractionNotificationAdmission },
   { id: "bulletin", libelle: "Bulletin de paie (champs manquants)", resultat: extractionBulletinPaie },
-  { id: "releve", libelle: "Relevé de situation (3 refus)", resultat: extractionReleveAvecRefus },
+  { id: "releve", libelle: "Relevé de situation (2 refus + 1 à vérifier)", resultat: extractionReleveAvecRefus },
   { id: "non_reconnu", libelle: "Document non reconnu (rien à proposer)", resultat: extractionNonReconnue },
 ];

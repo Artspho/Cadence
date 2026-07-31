@@ -6,7 +6,7 @@
  * d'abord évaluée pour savoir si l'app a une case d'arrivée SÛRE pour elle. Quand la réponse est
  * non, on refuse d'appliquer et on l'explique, plutôt que d'écrire une valeur approchée.
  *
- * Les trois refus structurels (ne pas les « corriger » sans revalidation explicite) :
+ * Les deux refus structurels (ne pas les « corriger » sans revalidation explicite) :
  *
  * 1. `aj_reelle_historique` avec natureMontant ≠ "net". `Profil.ajReelleHistorique` contient une
  *    AJ NETTE : c'est ce que dit l'UI de saisie (MonProfil.tsx, « Allocation journalière nette »)
@@ -17,19 +17,21 @@
  *    sens unique, exige un SJM absent du document, et est elle-même documentée comme une
  *    estimation (or ajReelleHistorique interdit tout repli estimé).
  *
- * 2. `periode_assimilee` : la cible existe dans le schéma d'extraction, la case d'arrivée n'existe
- *    pas encore dans l'app. `DonneesCadence.periodes` est lu partout (fenêtre de référence,
- *    décompte des 507 h) mais aucune fonction ne permet d'en créer une (ni setter dans App.tsx,
- *    ni UI). Tant que ce n'est pas construit, la proposition est affichée sans être appliquée —
- *    jamais perdue en silence.
- *
- * 3. `profil_ouverture_droits` incomplet. `Profil.ouvertureDroits` exige franchiseCPTotale ET
+ * 2. `profil_ouverture_droits` incomplet. `Profil.ouvertureDroits` exige franchiseCPTotale ET
  *    delaiAttenteInitial (jours). Ces deux nombres décalent les dates de versement et donc les
  *    montants ; mettre 0 « en attendant » serait un chiffre inventé. Si le document ne les donne
  *    pas, on n'écrit rien et on affiche ce qui a été lu pour saisie manuelle.
+ *
+ * `periode_assimilee` n'est PLUS un refus depuis le 31/07/2026 (CRUD construit le 29/07/2026,
+ * commit `d664344` — `PeriodeForm`/`PeriodeList`/`ajouterPeriode` dans `App.tsx` ; le routage
+ * lui-même câblé le 31/07/2026, cf. `periodeDepuisProposition` ci-dessous). Traité en
+ * `revue_formulaire`, comme `contrat` : jamais appliqué directement, toujours relu dans
+ * `PeriodeForm` avant enregistrement — `ald` et `maladie_intercontrat` ayant des effets opposés sur
+ * le décompte (cf. `types/extraction.ts`), la confirmation humaine du type reste requise même
+ * quand l'IA en propose un avec confiance haute.
  */
 
-import type { Contrat, Profil } from "../types";
+import type { Contrat, PeriodeAssimilee, Profil } from "../types";
 import type { ExtractionResult, Proposition } from "../types/extraction";
 
 export type StatutProposition =
@@ -151,15 +153,14 @@ export function evaluerProposition(proposition: Proposition, profil: Profil): Pr
     }
 
     case "periode_assimilee":
-      return {
-        proposition,
-        titre,
-        statut: "non_applicable",
-        motif:
-          "Cadence ne sait pas encore enregistrer une période assimilée (maternité, accident du travail…) : " +
-          "l'écran de saisie n'existe pas. Les dates lues sont affichées ci-dessous pour que tu ne les perdes pas.",
-        avertissements: [],
-      };
+      // Type, dateDebut, dateFin sont tous les trois non-nullables dans le schéma d'extraction
+      // (cf. types/extraction.ts) : quand l'IA n'est pas sûre du type (ex. simple avis d'arrêt
+      // maladie non qualifié), elle doit produire "info_seule" plutôt qu'une proposition ici —
+      // donc rien à avertir sur un champ "non lu, valeur par défaut du formulaire" (contrairement à
+      // `contrat`, où type/typeRemuneration/territoire sont nullables). La confirmation humaine du
+      // type reste néanmoins requise (revue_formulaire, jamais "applicable") : la confiance
+      // par-champ affichée par RevueExtraction.tsx reste le signal si l'IA elle-même doute.
+      return { proposition, titre, statut: "revue_formulaire", avertissements: [] };
 
     case "info_seule":
       return {
@@ -199,6 +200,17 @@ export function contratDepuisProposition(donnees: Extract<Proposition, { cible: 
     enRapportAvecMetier: donnees.enRapportAvecMetier ?? undefined,
     source: "import_pdf",
   };
+}
+
+/**
+ * Convertit une proposition de période assimilée en valeurs initiales pour PeriodeForm. Les trois
+ * champs sont non-nullables dans le schéma d'extraction (cf. types/extraction.ts) : rien à replier
+ * sur `undefined` ici, contrairement à `contratDepuisProposition` — mais le type reste à confirmer
+ * par l'utilisateur dans le formulaire avant tout enregistrement (statut "revue_formulaire",
+ * jamais "applicable"), ald/maladie_intercontrat ayant des effets opposés sur le décompte.
+ */
+export function periodeDepuisProposition(donnees: Extract<Proposition, { cible: "periode_assimilee" }>["donnees"]): Partial<PeriodeAssimilee> {
+  return { type: donnees.type, dateDebut: donnees.dateDebut, dateFin: donnees.dateFin };
 }
 
 /**

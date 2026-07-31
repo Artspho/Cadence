@@ -20,7 +20,7 @@
  */
 
 import { useState } from "react";
-import type { Contrat, DecompteHeuresResultat, Profil } from "../types";
+import type { Contrat, DecompteHeuresResultat, PeriodeAssimilee, Profil } from "../types";
 import type { ExtractionResult } from "../types/extraction";
 import type { FranceTravailConfig } from "../config/franceTravailConfig";
 import { ANNONCE_CANAL_IA } from "../content/mentionEnvoiIA";
@@ -35,12 +35,13 @@ interface ImportDocumentIAProps {
   config: FranceTravailConfig;
   decompteActuel: DecompteHeuresResultat;
   onAjouterContrat: (contrat: Omit<Contrat, "id">) => void;
+  onAjouterPeriode: (periode: Omit<PeriodeAssimilee, "id">) => void;
   onModifierProfil: (profil: Profil) => ResultatEcritureProfil;
 }
 
 const ECHEC_INATTENDU = "L'envoi a échoué pour une raison inattendue. Réessaie, ou saisis les informations à la main.";
 
-export function ImportDocumentIA({ profil, config, decompteActuel, onAjouterContrat, onModifierProfil }: ImportDocumentIAProps) {
+export function ImportDocumentIA({ profil, config, decompteActuel, onAjouterContrat, onAjouterPeriode, onModifierProfil }: ImportDocumentIAProps) {
   /** Fichier choisi et validé, en attente du consentement. Non nul ⇒ la modale est ouverte. */
   const [fichierEnAttente, setFichierEnAttente] = useState<File | null>(null);
   const [envoiEnCours, setEnvoiEnCours] = useState(false);
@@ -111,6 +112,7 @@ export function ImportDocumentIA({ profil, config, decompteActuel, onAjouterCont
           config={config}
           decompteActuel={decompteActuel}
           onAjouterContrat={onAjouterContrat}
+          onAjouterPeriode={onAjouterPeriode}
           onModifierProfil={onModifierProfil}
           documentEnvoye
         />

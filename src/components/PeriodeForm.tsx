@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { PeriodeAssimilee, TypePeriode } from "../types";
 
 interface PeriodeFormProps {
+  valeurInitiale?: Partial<PeriodeAssimilee>;
   onValider: (periode: Omit<PeriodeAssimilee, "id">) => void;
   onAnnuler: () => void;
 }
@@ -15,10 +16,10 @@ const TYPES_PERIODE: { id: TypePeriode; label: string }[] = [
   { id: "maladie_intercontrat", label: "Maladie inter-contrat" },
 ];
 
-export function PeriodeForm({ onValider, onAnnuler }: PeriodeFormProps) {
-  const [type, setType] = useState<TypePeriode>("maternite");
-  const [dateDebut, setDateDebut] = useState("");
-  const [dateFin, setDateFin] = useState("");
+export function PeriodeForm({ valeurInitiale, onValider, onAnnuler }: PeriodeFormProps) {
+  const [type, setType] = useState<TypePeriode>(valeurInitiale?.type ?? "maternite");
+  const [dateDebut, setDateDebut] = useState(valeurInitiale?.dateDebut ?? "");
+  const [dateFin, setDateFin] = useState(valeurInitiale?.dateFin ?? "");
 
   const datesRenseignees = dateDebut.length > 0 && dateFin.length > 0;
   const datesInvalides = datesRenseignees && dateDebut > dateFin;
