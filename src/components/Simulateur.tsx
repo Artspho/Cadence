@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import type { Contrat, DecompteHeuresResultat, PeriodeAssimilee, Profil } from "../types";
 import type { FranceTravailConfig } from "../config/franceTravailConfig";
-import { calculerFenetreReference } from "../engine/periodeReference";
+import { calculerFenetreEnCours } from "../engine/periodeReference";
 import { calculerDecompteHeures } from "../engine/decompteHeures";
 import { calculerSalaireReference } from "../engine/salaireReference";
 import { calculerAJBrutePourFenetre } from "../engine/areBrute";
@@ -19,7 +19,9 @@ interface SimulateurProps {
 }
 
 function evaluer(profil: Profil, contrats: Contrat[], periodes: PeriodeAssimilee[], config: FranceTravailConfig, dateDuJour: string) {
-  const fenetre = calculerFenetreReference(profil, contrats, periodes, config, dateDuJour);
+  // calculerFenetreEnCours (pas calculerFenetreReference seule, cf. App.tsx même correctif du
+  // 31/07/2026) : la borne de réadmission du cycle en cours se dérive toujours de dateAnniversaire.
+  const fenetre = calculerFenetreEnCours(profil, contrats, periodes, config, dateDuJour);
   const decompte = calculerDecompteHeures(contrats, periodes, profil, config, fenetre);
   const { sr, sar, nht } = calculerSalaireReference(contrats, periodes, profil, config, fenetre);
   const ajBrute = calculerAJBrutePourFenetre(fenetre, decompte.total, sar ?? sr, nht, config);

@@ -34,6 +34,39 @@ describe("decouperExercices", () => {
     const p = profil({ dateAnniversaire: "" });
     expect(decouperExercices(p, [], [], franceTravailConfig, "2026-06-01")).toEqual([]);
   });
+
+  it("cycle précédent (i=1) borné par la vraie dateAnniversairePrecedente, pas par une soustraction calendaire de 12 mois (bug réel signalé le 31/07/2026 : Historique affichait un cycle 2025-01-18→2026-01-17 qui n'a jamais existé)", () => {
+    // Cas réel : droit en cours ouvert le 18/01/2026 (FCT 17/01/2026, prochaine échéance 17/01/2027).
+    // Le droit d'AVANT (renouvellement anticipé) a réellement duré 24/03/2025→17/01/2026 (~300 j, PAS
+    // 12 mois pleins) — dateAnniversairePrecedente (23/03/2025) porte la vraie borne.
+    const p = profil({ dateAnniversaire: "2027-01-17", dateAnniversairePrecedente: "2025-03-23", situation: "readmission", dateNaissance: "1990-01-01" });
+    const contrats = [
+      // AVANT la vraie borne (23/03/2025) : appartient à un cycle encore plus ancien, jamais compté
+      // dans le cycle précédent — la reconstruction calendaire naïve (2025-01-18→2026-01-17) l'aurait
+      // pourtant inclus à tort.
+      contrat({ date: "2025-01-20", nbCachets: 20 }), // 240 h, hors du vrai cycle précédent
+      // Dans le vrai cycle précédent (24/03/2025→17/01/2026).
+      contrat({ date: "2025-06-01", nbCachets: 50 }), // 600 h
+      // Cycle en cours (18/01/2026→17/01/2027).
+      contrat({ date: "2026-03-01", nbCachets: 10 }), // 120 h
+    ];
+
+    const exercices = decouperExercices(p, contrats, [], franceTravailConfig, "2026-07-31");
+    const precedent = exercices.find((e) => e.dateAnniversaire === "2026-01-17")!;
+
+    expect(precedent).toBeDefined();
+    expect(precedent.dateDebut).toBe("2025-03-24"); // borne + 1 j, PAS 2025-01-18 (soustraction calendaire naïve)
+    expect(precedent.heuresAtteintes).toBe(600); // uniquement le contrat du vrai cycle, jamais 600 + 240
+    expect(precedent.cloture).toBe(true);
+  });
+
+  it("cycle précédent (i=1) sans dateAnniversairePrecedente connue : comportement inchangé (reconstruction calendaire, cas le plus courant)", () => {
+    const p = profil({ dateAnniversaire: "2026-12-31", dateNaissance: "1990-01-01" });
+    const contrats = [contrat({ date: "2025-06-01", nbCachets: 50 })];
+    const exercices = decouperExercices(p, contrats, [], franceTravailConfig, "2026-06-01");
+    const precedent = exercices.find((e) => e.dateAnniversaire === "2025-12-31")!;
+    expect(precedent.dateDebut).toBe("2025-01-01"); // inchangé : reconstruction calendaire par défaut
+  });
 });
 
 // Bug réel corrigé le 31/07/2026 : decouperExercices seul recalcule TOUT à chaque appel, y compris

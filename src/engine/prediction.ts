@@ -6,7 +6,7 @@ import type { FranceTravailConfig } from "../config/franceTravailConfig";
 import { ajouterJours, dansIntervalle, diffJours } from "./dateUtils";
 import { calculerDecompteHeures } from "./decompteHeures";
 import type { Fenetre } from "./decompteHeures";
-import { calculerFenetreReference } from "./periodeReference";
+import { calculerFenetreEnCours } from "./periodeReference";
 
 const JOURS_PAR_MOIS = 30; // approximation volontaire pour un rythme "h/mois" lisible, pas une constante réglementaire
 const SEUIL_JOURS_ANNIVERSAIRE_IMMINENT = 30;
@@ -18,7 +18,15 @@ export function calculerStatutPrediction(
   config: FranceTravailConfig,
   dateDuJour: string,
 ): StatutPrediction {
-  const fenetre = calculerFenetreReference(profil, contrats, periodes, config, dateDuJour);
+  // calculerFenetreEnCours (pas calculerFenetreReference seule) : la borne de réadmission du cycle
+  // EN COURS doit toujours être dérivée de dateAnniversaire, jamais lue depuis
+  // dateAnniversairePrecedente tel quel — ce dernier reste réservé à sa vraie vocation historique
+  // (borner la reconstruction des cycles PASSÉS, cf. engine/cycles.ts). Bug réel corrigé le
+  // 31/07/2026 : lire le champ tel quel ici pouvait soit recompter les heures de l'ancien droit
+  // (si le champ portait une borne trop ancienne), soit produire une fenêtre invalide (si le champ
+  // avait été mis à jour pour la vocation historique de cycles.ts) — cf. periodeReference.ts,
+  // calculerFenetreEnCours pour le détail complet du conflit.
+  const fenetre = calculerFenetreEnCours(profil, contrats, periodes, config, dateDuJour);
   // Repli honnête : quand le seuil ajusté de réadmission n'est pas calculable (historique de
   // contrats insuffisant, cf. periodeReference.ts), on ne présente jamais le plafond de sécurité
   // de l'algorithme (ex. 1515 h) comme un vrai seuil — on retombe sur le seuil standard 507 h,

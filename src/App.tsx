@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { Contrat, PeriodeAssimilee, Profil, SoldeIndemnisationDepart } from "./types";
 import { franceTravailConfig } from "./config/franceTravailConfig";
 import { chargerDonnees, creerContrat, creerPeriode, exporterJSON, importerJSON, sauvegarderDonnees, type DonneesApp } from "./storage/localStorageAdapter";
-import { calculerFenetreReference } from "./engine/periodeReference";
+import { calculerFenetreEnCours } from "./engine/periodeReference";
 import { calculerDecompteHeures } from "./engine/decompteHeures";
 import { calculerSalaireReference } from "./engine/salaireReference";
 import { calculerAJBrutePourFenetre } from "./engine/areBrute";
@@ -67,7 +67,11 @@ export default function App() {
     const { contrats, periodes } = donnees;
     const config = franceTravailConfig;
 
-    const fenetre = calculerFenetreReference(profil, contrats, periodes, config, dateDuJour);
+    // calculerFenetreEnCours (pas calculerFenetreReference seule) : la borne de réadmission du cycle
+    // en cours doit toujours être dérivée de dateAnniversaire, jamais lue depuis
+    // dateAnniversairePrecedente tel quel — réservé à sa vraie vocation historique (cf. engine/cycles.ts,
+    // engine/periodeReference.ts pour le détail complet du conflit corrigé le 31/07/2026).
+    const fenetre = calculerFenetreEnCours(profil, contrats, periodes, config, dateDuJour);
     const decompte = calculerDecompteHeures(contrats, periodes, profil, config, fenetre);
     const { sr, sar, nht } = calculerSalaireReference(contrats, periodes, profil, config, fenetre);
     const ajBrute = calculerAJBrutePourFenetre(fenetre, decompte.total, sar ?? sr, nht, config);
@@ -135,6 +139,20 @@ export default function App() {
 
   function supprimerPeriode(id: string) {
     setDonnees((d) => (d ? { ...d, periodes: d.periodes.filter((p) => p.id !== id) } : d));
+  }
+
+  /**
+   * Efface le gel d'un exercice (cf. engine/cycles.ts, fusionnerExercicesGeles) — filet de
+   * rattrapage manuel pour un exercice figé à tort (bug réel signalé le 31/07/2026). Ne recalcule
+   * rien ici : au prochain rendu, `calculs.aGeler` le reproposera si toujours clos, et le useEffect
+   * ci-dessus le regèlera automatiquement avec les données actuelles.
+   */
+  function viderExerciceGele(id: string) {
+    setDonnees((d) => {
+      if (!d) return d;
+      const { [id]: _ignore, ...reste } = d.exercicesGeles;
+      return { ...d, exercicesGeles: reste };
+    });
   }
 
   function ajouterContratsRecurrents(contrats: Contrat[]) {
@@ -342,7 +360,7 @@ export default function App() {
           ) : (
             <div className="space-y-6">
               {bandeauContradiction}
-              <Historique exercices={calculs.exercices} />
+              <Historique exercices={calculs.exercices} onEffacerGel={viderExerciceGele} />
             </div>
           ))}
 

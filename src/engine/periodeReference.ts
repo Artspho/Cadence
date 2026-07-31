@@ -133,3 +133,48 @@ export function calculerFenetreReference(
   // jusqu'au bout), donc rien ne justifie de garder une fenêtre poussée sans validation.
   return { dateDebut: dateDebutAllonge, dateFin, joursAllongementMaladie, seuilReadmission: { calculable: false, raison: "historique_insuffisant", tranchesTentees: TRANCHES_MAX } };
 }
+
+/**
+ * FCT du droit actuellement en cours, déduite de `Profil.dateAnniversaire` (la PROCHAINE échéance,
+ * jamais la FCT elle-même, cf. types/index.ts) : échéance - 12 mois exactement, l'inverse de la
+ * Règle #2 (engine/renouvellementAnticipe.ts : NouveauDroitCalcule.dateAnniversaire = FCT retenue +
+ * 12 mois). Fiable car cette règle s'applique TOUJOURS à l'ouverture d'un droit (naturelle ou
+ * anticipée), quelle qu'ait été la durée réelle de la fenêtre qui l'a produite.
+ */
+export function deriverFctRetenueActuelle(dateAnniversaire: string, config: FranceTravailConfig): string {
+  return ajouterJours(dateAnniversaire, -config.periodeReferenceJours);
+}
+
+/**
+ * Fenêtre du CYCLE EN COURS (progression vers la prochaine échéance, ce que le Dashboard affiche) —
+ * à distinguer de `calculerFenetreReference` seule, qui accepte le `dateAnniversairePrecedente`
+ * du profil tel quel : utile pour une validation RÉTROSPECTIVE ponctuelle à une FCT choisie (cf.
+ * `engine/renouvellementAnticipe.ts`, qui construit son propre profil temporaire), mais PAS pour le
+ * suivi en direct.
+ *
+ * Bug réel corrigé le 31/07/2026 : `Profil.dateAnniversairePrecedente` a UNE seule signification
+ * possible à la fois, mais deux usages légitimes et INCOMPATIBLES le réclamaient :
+ *  1. `engine/cycles.ts` : reconstruire la vraie borne du cycle PASSÉ (ex. 23/03/2025 — la FCT qui a
+ *     ouvert le droit avant l'actuel). Une donnée historique, saisie une fois, qui ne bouge plus.
+ *  2. Le suivi du cycle EN COURS (ici) : borner la recherche par tranches pour ne jamais recompter
+ *     les heures déjà utilisées pour ouvrir le droit ACTUEL (ex. 17/01/2026 — la FCT du droit
+ *     actuel, PAS celle d'avant).
+ * Si le champ persisté sert au cas 1 (sa vraie vocation, cf. types/index.ts), l'utiliser tel quel
+ * ici recréerait exactement le bug d'origine (recomptage des heures de l'ancien droit) dès que la
+ * réadmission est un peu ancienne. La borne du cycle en cours est donc TOUJOURS dérivée de
+ * `dateAnniversaire` (`deriverFctRetenueActuelle`), jamais lue depuis `dateAnniversairePrecedente`
+ * — qui reste libre de porter sa vraie vocation historique, cf. `engine/cycles.ts`.
+ */
+export function calculerFenetreEnCours(
+  profil: Profil,
+  contrats: Contrat[],
+  periodes: PeriodeAssimilee[],
+  config: FranceTravailConfig,
+  dateDuJour: string,
+): FenetreReference {
+  if (!profil.dateAnniversaire || profil.situation !== "readmission") {
+    return calculerFenetreReference(profil, contrats, periodes, config, dateDuJour);
+  }
+  const profilCycleEnCours: Profil = { ...profil, dateAnniversairePrecedente: deriverFctRetenueActuelle(profil.dateAnniversaire, config) };
+  return calculerFenetreReference(profilCycleEnCours, contrats, periodes, config, dateDuJour);
+}

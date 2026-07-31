@@ -172,10 +172,13 @@ describe("detecterAlertes", () => {
     expect(alerte.actionSuggeree).toMatch(/rattrapage/i);
 
     // Message bien différent du cas historique_insuffisant (pas de bound connue) : jamais le
-    // même texte pour deux causes différentes (devoir n°2).
-    const pSansBorne = profil({ dateAnniversaire: "2027-01-17", situation: "readmission" });
+    // même texte pour deux causes différentes (devoir n°2). Mis à jour le 31/07/2026 (chantier
+    // calculerFenetreEnCours) : dès que dateAnniversaire est connue, la borne de réadmission du
+    // cycle en cours se déduit TOUJOURS d'elle (Règle #2, toujours vraie) — "historique_insuffisant"
+    // n'est donc plus atteignable que sans dateAnniversaire du tout (profil pas encore renseigné).
+    const pSansAnniversaire = profil({ dateAnniversaire: "", situation: "readmission" });
     const contratsSansBorne = [contrat({ date: "2026-01-27", nbCachets: 40 })];
-    const alerteSansBorne = detecterAlertes(pSansBorne, contratsSansBorne, [], franceTravailConfig, "2026-07-23").find((a) => a.code === "seuil_readmission_non_calculable")!;
+    const alerteSansBorne = detecterAlertes(pSansAnniversaire, contratsSansBorne, [], franceTravailConfig, "2026-07-23").find((a) => a.code === "seuil_readmission_non_calculable")!;
     expect(alerteSansBorne.message).not.toBe(alerte.message);
   });
 

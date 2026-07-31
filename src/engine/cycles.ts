@@ -3,10 +3,25 @@
 // de l'ancienneté 5 ans / 2535 h utile à la clause de rattrapage.
 //
 // Simplification MVP : seule la date anniversaire ACTUELLE est connue (le
-// modèle Profil ne conserve pas l'historique des ouvertures de droits
-// précédentes). Les cycles passés sont donc reconstruits par soustraction
-// calendaire de 12 mois successifs à partir de cette date, et non à partir
-// des vraies dates d'ouverture de droits historiques (cf. §10, backlog V3).
+// modèle Profil ne conserve pas l'historique COMPLET des ouvertures de droits
+// précédentes — seule la toute dernière, `dateAnniversairePrecedente`, l'est).
+// Les cycles PLUS anciens que celui-là (i >= 2) sont donc encore reconstruits
+// par soustraction calendaire de 12 mois successifs, et non à partir des
+// vraies dates d'ouverture de droits historiques (cf. §10, backlog V3).
+//
+// Bug réel corrigé le 31/07/2026 : pour le cycle immédiatement précédent
+// (i===1), cette reconstruction calendaire fabriquait un cycle qui n'a parfois
+// jamais existé — un renouvellement anticipé ou une extension de réadmission
+// peut avoir raccourci ou allongé ce cycle-là, sans que ce soit visible dans
+// une simple soustraction de 12 mois (cas réel : cycle réellement long de
+// ~300 j, reconstruit à tort comme 365 j pleins, avec des heures et une AJ qui
+// ne correspondent à rien de réel). Or `Profil.dateAnniversairePrecedente`
+// porte EXACTEMENT la vraie borne dont ce cycle a besoin (la FCT qui l'a
+// ouvert, cf. types/index.ts) — déjà saisie pour d'autres besoins (réadmission,
+// cf. periodeReference.ts). Quand elle est connue, elle remplace la
+// reconstruction calendaire pour ce seul cycle ; sinon, comportement inchangé
+// (reconstruction calendaire, cas le plus courant où le cycle précédent a
+// bien duré 12 mois pleins).
 import { addYears } from "date-fns";
 import type { Contrat, Exercice, PeriodeAssimilee, Profil } from "../types";
 import type { FranceTravailConfig } from "../config/franceTravailConfig";
@@ -28,7 +43,10 @@ export function decouperExercices(profil: Profil, contrats: Contrat[], periodes:
 
   for (let i = 0; i < CYCLES_MAX; i++) {
     const dateFin = toISO(addYears(toDate(profil.dateAnniversaire), -i));
-    const dateDebut = ajouterJours(toISO(addYears(toDate(profil.dateAnniversaire), -(i + 1))), 1);
+    const borneReelleConnue = i === 1 && Boolean(profil.dateAnniversairePrecedente);
+    const dateDebut = borneReelleConnue
+      ? ajouterJours(profil.dateAnniversairePrecedente!, 1)
+      : ajouterJours(toISO(addYears(toDate(profil.dateAnniversaire), -(i + 1))), 1);
 
     if (i > 0 && dateFin < earliestISO) break; // plus de données pertinentes au-delà
 

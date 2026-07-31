@@ -7,7 +7,7 @@ import { getAjReelleAt } from "../engine/ajReelleUtils";
 import { joursDansMois } from "../engine/dateUtils";
 import { repartirContratParMois } from "../engine/decoupageMensuel";
 import { calculerNetEstime } from "../engine/estimationPaie";
-import { calculerFenetreReference } from "../engine/periodeReference";
+import { calculerFenetreEnCours } from "../engine/periodeReference";
 import { calculerSalaireReference } from "../engine/salaireReference";
 import { calculerSJM } from "../engine/areNette";
 import { descriptionMoisOuverturePartielle } from "../content/moisOuverturePartielle";
@@ -286,16 +286,16 @@ function TableauResultats({
 }) {
   // SR/SJM de la PRA qui a ouvert les droits en cours, pour la franchise salaires
   // (calculerFranchiseSalaires). Fenêtre volontairement identique à celle d'App.tsx:70-72 (même
-  // calculerFenetreReference) — PAS une fenêtre inventée ici. Cette fenêtre ne coïncide avec la vraie
-  // PRA d'admission QUE si `profil.dateAnniversaire` est renseignée : sinon `calculerFenetreReference`
-  // retombe sur une fenêtre glissante finissant à `dateDuJour` (cf. periodeReference.ts), qui n'a pas
-  // de sens pour un total censé être fixé une fois pour toutes à l'ouverture des droits. D'où la garde
-  // ci-dessous : `srSjmPourFranchiseSalaires` reste `undefined` (franchise non certifiée, comportement
-  // historique) tant que cette date n'est pas connue, plutôt que de calculer un chiffre qui dériverait
-  // jour après jour.
+  // calculerFenetreEnCours — pas calculerFenetreReference seule, cf. son correctif du 31/07/2026) —
+  // PAS une fenêtre inventée ici. Cette fenêtre ne coïncide avec la vraie PRA d'admission QUE si
+  // `profil.dateAnniversaire` est renseignée : sinon `calculerFenetreEnCours` retombe sur une fenêtre
+  // glissante finissant à `dateDuJour` (cf. periodeReference.ts), qui n'a pas de sens pour un total
+  // censé être fixé une fois pour toutes à l'ouverture des droits. D'où la garde ci-dessous :
+  // `srSjmPourFranchiseSalaires` reste `undefined` (franchise non certifiée, comportement historique)
+  // tant que cette date n'est pas connue, plutôt que de calculer un chiffre qui dériverait jour après jour.
   const srSjmPourFranchiseSalaires = useMemo(() => {
     if (!profil.dateAnniversaire) return undefined;
-    const fenetre = calculerFenetreReference(profil, contrats, periodes, config, dateDuJour);
+    const fenetre = calculerFenetreEnCours(profil, contrats, periodes, config, dateDuJour);
     const { sr, sar, nht } = calculerSalaireReference(contrats, periodes, profil, config, fenetre);
     // Corrigé le 31/07/2026 (cf. App.tsx, même correctif) : SJM sur sar ?? sr, pas sur sr seul —
     // `srContrats` (utilisé par calculerFranchiseSalaires pour SR_total) reste lui le SR brut, c'est

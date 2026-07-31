@@ -10,7 +10,8 @@
 import { useState } from "react";
 import type { Contrat, PeriodeAssimilee, Profil } from "../types";
 import type { FranceTravailConfig } from "../config/franceTravailConfig";
-import { calculerRenouvellementAnticipe, deriverFctRetenueActuelle, type AncienDroit } from "../engine/renouvellementAnticipe";
+import { calculerRenouvellementAnticipe, type AncienDroit } from "../engine/renouvellementAnticipe";
+import { deriverFctRetenueActuelle } from "../engine/periodeReference";
 import { RENOUVELLEMENT_ANTICIPE } from "../content/renouvellementAnticipe";
 
 interface RenouvellementAnticipeProps {

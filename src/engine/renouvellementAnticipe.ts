@@ -96,23 +96,6 @@ export interface ComparaisonRenouvellementAnticipe {
 }
 
 /**
- * FCT du droit actuellement en cours, déduite de `Profil.dateAnniversaire`. Ce champ stocke la
- * PROCHAINE échéance (fin du cycle en cours) — celle vers laquelle le Dashboard fait progresser le
- * compteur des 507 h (cf. engine/prediction.ts, App.tsx, engine/cycles.ts, tous alignés et testés
- * sur cette lecture) — jamais la FCT elle-même. La FCT s'en déduit par l'inverse exact de la Règle
- * #2 ci-dessous (NouveauDroitCalcule.dateAnniversaire = FCT retenue + 12 mois) : cette règle
- * s'applique TOUJOURS à l'ouverture d'un droit (naturelle ou anticipée), quelle qu'ait été la durée
- * réelle de la fenêtre qui l'a produite — donc échéance - 12 mois exactement retombe toujours sur la
- * bonne FCT. Bug réel corrigé le 31/07/2026 : RenouvellementAnticipe.tsx utilisait directement
- * `profil.dateAnniversaire` comme FCT, ce qui recomptait la fenêtre RÉTROSPECTIVE déjà utilisée pour
- * ouvrir le droit en cours à la place de la progression réelle du cycle — cf. prediction.test.ts,
- * "cycle en cours après une réadmission récente".
- */
-export function deriverFctRetenueActuelle(dateAnniversaire: string, config: FranceTravailConfig): string {
-  return ajouterJours(dateAnniversaire, -config.periodeReferenceJours);
-}
-
-/**
  * Jours travaillés distincts dans une fenêtre — base de l'acquisition de la franchise CP (guide FT :
  * jours travaillés × 2,5 / 24). Compte chaque jour calendaire de la fenêtre couvert par AU MOINS un
  * contrat, TOUS TYPES CONFONDUS (contrairement à SR/NHT dans salaireReference.ts, qui excluent

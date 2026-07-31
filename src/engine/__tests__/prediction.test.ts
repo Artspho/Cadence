@@ -52,24 +52,32 @@ describe("calculerStatutPrediction", () => {
 
   it("réadmission avec historique de contrats trop court : retombe sur le seuil standard 507 h, jamais le plafond de sécurité gonflé (bug réel signalé par un testeur)", () => {
     // Scénario exact rapporté : réadmission, anniversaire 17/01/2027, un seul contrat ancien
-    // (27/01/2026, 480 h) — rien avant, donc l'algorithme d'extension de periodeReference.ts
-    // épuise ses 24 tentatives sans jamais trouver assez d'heures. Avant ce correctif, l'app
-    // affichait "480 / 1515 h" — 1515 étant le plafond de sécurité (507 + 24×42), pas un vrai seuil.
+    // (27/01/2026, 480 h) — rien avant. Mis à jour le 31/07/2026 (chantier calculerFenetreEnCours) :
+    // sans dateAnniversairePrecedente saisie, la borne de réadmission du cycle EN COURS se déduit
+    // désormais TOUJOURS de dateAnniversaire (17/01/2026 = 17/01/2027 - 12 mois, Règle #2, toujours
+    // vraie) — l'extension bute donc immédiatement dessus (hors_bornes, tranchesTentees: 0) au lieu
+    // d'épuiser 24 tentatives à l'aveugle (historique_insuffisant, l'ancien comportement quand la
+    // borne n'était lue que si l'utilisateur l'avait saisie). Dans les deux cas, jamais le plafond de
+    // sécurité gonflé (1515 h) : seuilHeures retombe sur 507 dès que calculable === false.
     const p = profil({ dateAnniversaire: "2027-01-17", situation: "readmission" });
     const contrats = [contrat({ date: "2026-01-27", nbCachets: 40 })]; // 480 h
     const resultat = calculerStatutPrediction(p, contrats, [], franceTravailConfig, "2026-07-23");
 
     expect(resultat.heuresActuelles).toBe(480);
     expect(resultat.seuilHeures).toBe(507); // jamais 1515
-    expect(resultat.seuilReadmission).toEqual({ calculable: false, raison: "historique_insuffisant", tranchesTentees: 24 });
+    expect(resultat.seuilReadmission).toEqual({ calculable: false, raison: "hors_bornes", tranchesTentees: 0, dateAnniversairePrecedente: "2026-01-17" });
   });
 
   it("cycle en cours après une réadmission récente : le compteur ne recompte jamais les heures de l'ancien droit (bug réel signalé le 31/07/2026 — Dashboard affichait 710 h, le NH exact de l'ancien droit, au lieu de la progression réelle)", () => {
     // Reproduit la forme du cas réel : réadmission dont le droit en cours a été ouvert par une FCT
     // récente (17/01/2026). `dateAnniversaire` porte la PROCHAINE échéance (17/01/2027, cf.
-    // types/index.ts) — jamais la FCT elle-même — et `dateAnniversairePrecedente` porte la FCT qui a
-    // ouvert CE droit (pas une borne plus ancienne laissée par un cycle précédent déjà résolu).
-    const p = profil({ dateAnniversaire: "2027-01-17", situation: "readmission", dateAnniversairePrecedente: "2026-01-17" });
+    // types/index.ts) — jamais la FCT elle-même. `dateAnniversairePrecedente` porte ici la VRAIE
+    // borne HISTORIQUE (23/03/2025 — la FCT qui a ouvert le droit d'AVANT le droit en cours, cf.
+    // engine/cycles.ts) et non la FCT du droit en cours (17/01/2026) : la borne de réadmission du
+    // cycle en cours ne doit PAS dépendre de cette valeur (calculerFenetreEnCours la dérive toujours
+    // de dateAnniversaire, cf. periodeReference.ts) — sans quoi elle laisserait justement l'extension
+    // remonter jusqu'à l'ancien droit d'avant, exactement le bug que cette dérivation corrige.
+    const p = profil({ dateAnniversaire: "2027-01-17", situation: "readmission", dateAnniversairePrecedente: "2025-03-23" });
     const contrats = [
       // Ancien droit (avant la FCT retenue) : gros volume, jamais recomptable pour CE cycle — s'il
       // fuitait dans le calcul, le total dépasserait très largement 507 h dès le premier contrat.
@@ -84,9 +92,9 @@ describe("calculerStatutPrediction", () => {
     // 720 seul (fenêtre rétrospective affichée par erreur à la place de la progression).
     expect(resultat.heuresActuelles).toBe(192);
     expect(resultat.dateAnniversaire).toBe("2027-01-17"); // la vraie échéance, pas la FCT
-    // Sous le seuil malgré l'ancien droit costaud : la tentative d'extension par tranches de
-    // periodeReference.ts est bien arrêtée à la FCT de CE droit (dateAnniversairePrecedente), pas
-    // autorisée à aller piocher les 720 h de l'ancien cycle pour combler l'écart.
+    // Sous le seuil malgré l'ancien droit costaud : la tentative d'extension par tranches est bien
+    // arrêtée à la FCT DÉRIVÉE du droit en cours (17/01/2026, PAS 23/03/2025 lu depuis
+    // dateAnniversairePrecedente) — jamais autorisée à aller piocher les 720 h de l'ancien cycle.
     expect(resultat.seuilReadmission).toEqual({ calculable: false, raison: "hors_bornes", tranchesTentees: 0, dateAnniversairePrecedente: "2026-01-17" });
     expect(resultat.niveau).not.toBe("securite");
   });

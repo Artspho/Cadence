@@ -8,7 +8,7 @@ import type { FranceTravailConfig } from "../config/franceTravailConfig";
 import { calculerDecompteHeures } from "./decompteHeures";
 import { moisCle } from "./dateUtils";
 import { calculerSerieDepuisContrats } from "./indemnisationMensuelle";
-import { calculerFenetreReference } from "./periodeReference";
+import { calculerFenetreEnCours } from "./periodeReference";
 import { calculerStatutPrediction } from "./prediction";
 import { profilHorsPerimetre } from "../lib/profilHorsPerimetre";
 import { CONTRADICTION_HORS_A10 } from "../content/contradictionHorsA10";
@@ -66,7 +66,9 @@ export function detecterAlertes(
     });
   }
 
-  const fenetre = calculerFenetreReference(profil, contrats, periodes, config, dateDuJour);
+  // calculerFenetreEnCours (pas calculerFenetreReference seule, cf. App.tsx même correctif du
+  // 31/07/2026) : la borne de réadmission du cycle en cours se dérive toujours de dateAnniversaire.
+  const fenetre = calculerFenetreEnCours(profil, contrats, periodes, config, dateDuJour);
   const decompte = calculerDecompteHeures(contrats, periodes, profil, config, fenetre);
   const prediction = calculerStatutPrediction(profil, contrats, periodes, config, dateDuJour);
 

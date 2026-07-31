@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { franceTravailConfig } from "../../config/franceTravailConfig";
-import { calculerFenetreReference } from "../periodeReference";
-import { diffJours } from "../dateUtils";
+import { calculerFenetreEnCours, calculerFenetreReference, deriverFctRetenueActuelle } from "../periodeReference";
+import { ajouterJours, diffJours } from "../dateUtils";
 import { contrat, periode, profil } from "./testUtils";
 
 describe("calculerFenetreReference", () => {
@@ -121,5 +121,53 @@ describe("calculerFenetreReference", () => {
       expect(fenetre.dateDebut).toBe("2026-03-02"); // borne + 1 jour, PAS dateFin - 364 (= 2025-08-02)
       expect(fenetre.seuilReadmission).toEqual({ calculable: true, tranchesReadmission: 0, seuilHeuresAjuste: franceTravailConfig.seuilHeures });
     });
+  });
+});
+
+// Bug réel corrigé le 31/07/2026 : RenouvellementAnticipe.tsx utilisait `profil.dateAnniversaire`
+// directement comme FCT du droit en cours, alors que ce champ porte la PROCHAINE échéance (cf.
+// types/index.ts, engine/prediction.ts) — ce qui recomptait à tort la fenêtre rétrospective déjà
+// utilisée pour ouvrir le droit en cours dès qu'une réadmission datait de plus de quelques mois.
+// Déplacé depuis renouvellementAnticipe.test.ts le 31/07/2026 quand la fonction a rejoint ce module.
+describe("deriverFctRetenueActuelle", () => {
+  it("retrouve la FCT du cas réel du 31/07/2026 à partir de la nouvelle date anniversaire (17/01/2026 + 12 mois = 17/01/2027)", () => {
+    expect(deriverFctRetenueActuelle("2027-01-17", franceTravailConfig)).toBe("2026-01-17");
+  });
+
+  it("inverse exacte de la Règle #2 (NouveauDroitCalcule.dateAnniversaire = FCT retenue + 12 mois)", () => {
+    const fct = "2025-03-23";
+    const echeance = ajouterJours(fct, franceTravailConfig.periodeReferenceJours);
+    expect(deriverFctRetenueActuelle(echeance, franceTravailConfig)).toBe(fct);
+  });
+});
+
+// Bug réel corrigé le 31/07/2026 : Profil.dateAnniversairePrecedente n'a qu'UNE signification
+// possible à la fois, mais deux usages légitimes et incompatibles le réclamaient — la vraie borne
+// historique du cycle PASSÉ (engine/cycles.ts) et la borne du cycle EN COURS (ici). calculerFenetreEnCours
+// dérive systématiquement cette dernière depuis dateAnniversaire, sans jamais lire
+// dateAnniversairePrecedente tel quel — qui reste libre de porter sa vraie vocation historique.
+describe("calculerFenetreEnCours", () => {
+  it("dérive la borne de réadmission depuis dateAnniversaire, ignore dateAnniversairePrecedente même s'il porte une valeur historique différente (plus ancienne)", () => {
+    // Cas réel du 31/07/2026 : droit en cours ouvert le 18/01/2026 (FCT 17/01/2026), prochaine
+    // échéance 17/01/2027. dateAnniversairePrecedente porte encore la VRAIE borne historique du
+    // cycle d'avant (23/03/2025, cf. engine/cycles.ts) — pas la FCT du droit en cours. Sans la
+    // dérivation, la fenêtre en cours pourrait recompter les heures de l'ancien droit (24/03/2025→
+    // 17/01/2026) si elle avait besoin d'étendre par tranches.
+    const p = profil({ dateAnniversaire: "2027-01-17", situation: "readmission", dateAnniversairePrecedente: "2025-03-23" });
+    // Volume qui ne peut être atteint qu'en recomptant les heures de l'ancien droit si la borne
+    // n'est pas dérivée correctement : un seul contrat, juste avant la FCT du droit en cours.
+    const contrats = [contrat({ date: "2025-06-01", nbCachets: 60 })]; // 720 h, avant la FCT du droit en cours (17/01/2026)
+    const fenetre = calculerFenetreEnCours(p, contrats, [], franceTravailConfig, "2026-07-31");
+    expect(fenetre.dateDebut).toBe("2026-01-18"); // borné à la FCT du droit en cours (17/01/2026) + 1 j
+    expect(fenetre.dateFin).toBe("2027-01-17");
+    // Le contrat de l'ancien droit (2025-06-01) n'entre jamais dans le décompte : la fenêtre ne
+    // remonte pas jusque-là, quelle que soit la valeur de dateAnniversairePrecedente.
+  });
+
+  it("première admission ou dateAnniversaire inconnue : identique à calculerFenetreReference (rien à dériver)", () => {
+    const p = profil({ dateAnniversaire: "", situation: "premiere_admission" });
+    const attendu = calculerFenetreReference(p, [], [], franceTravailConfig, "2026-06-01");
+    const obtenu = calculerFenetreEnCours(p, [], [], franceTravailConfig, "2026-06-01");
+    expect(obtenu).toEqual(attendu);
   });
 });
