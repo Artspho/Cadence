@@ -590,10 +590,21 @@ function MonIndemnisationEnCours({
 // Historique des taux d'AJ nette successifs (un utilisateur peut connaître plusieurs taux sur une
 // même période d'indemnisation, cf. types/index.ts). Aucun repli sur une AJ estimée : sans entrée
 // couvrant un mois donné, RevenusMensuels.tsx affiche honnêtement l'absence de montant pour ce mois.
+// Seuil de plausibilité pour le champ "AJ nette" ci-dessous : une AJ nette réelle ne peut pas
+// s'approcher du plafond de l'AJ BRUTE (config.are.plafond, 174,80 €) — au-delà de 60 €/j, la
+// CSG/CRDS s'ajoute toujours à la retraite complémentaire (cf. engine/areNette.ts), donc un net
+// est structurellement inférieur au brut dont il découle. Avertissement de plausibilité seulement
+// (pas un blocage, pas un champ `natureMontant` déclaratif qui déplacerait le risque sans le
+// réduire, cf. docs/reprise.md) : la valeur la plus probable en cas de dépassement est que
+// l'utilisateur a recopié la ligne « allocation brute » d'un relevé de situation au lieu de la
+// ligne « allocation journalière nette » de sa notification.
+const SEUIL_PLAUSIBILITE_AJ_NETTE = franceTravailConfig.are.plafond * 0.9;
+
 function GestionAjReelle({ profil, onModifierProfil }: { profil: Profil; onModifierProfil: OnModifierProfil }) {
   const historique = profil.ajReelleHistorique ?? [];
   const [dateEffet, setDateEffet] = useState("");
   const [valeur, setValeur] = useState("");
+  const valeurImplausible = valeur.trim() !== "" && Number(valeur) >= SEUIL_PLAUSIBILITE_AJ_NETTE;
 
   function ajouter() {
     if (!dateEffet || valeur.trim() === "") return;
@@ -679,6 +690,14 @@ function GestionAjReelle({ profil, onModifierProfil }: { profil: Profil; onModif
           + Ajouter une période
         </button>
       </div>
+
+      {valeurImplausible && (
+        <p className="text-xs rounded-lg px-3 py-2 bg-amber/10 text-amber">
+          Ce montant semble élevé pour une allocation <strong>nette</strong> — vérifie que tu n'as
+          pas recopié la ligne « allocation brute » d'un relevé de situation au lieu de la ligne
+          « allocation journalière nette » de ta notification d'ouverture de droits.
+        </p>
+      )}
     </div>
   );
 }

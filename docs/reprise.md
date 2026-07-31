@@ -866,6 +866,51 @@ verts, `tsc -b` propre à chaque étape. Détail complet dans l'historique git ;
 vérification) : champ PAS persistant, ligne de réadmission grisée avec tooltip exact, colonnes
 Revenus contrats/Revenu total avec total recalculé à la main (7403,50 € + 2100,00 € = 9503,50 €).
 
+## Fait (2026-07-31 : point 2 clos — AJ brute vs nette, garde-fou de plausibilité ajouté)
+
+**Formule confirmée correcte, écart non reproduit.** Le point 2 (« les relevés officiels disent
+« Allocation brute » pour la valeur que Cadence traite comme point de départ net dans
+`ajReelleHistorique` ») a été rouvert avec preuve plutôt que deviné. Deux éléments déjà présents
+dans le dépôt répondent exactement à la question posée, mais n'avaient jamais été reliés au
+backlog CLAUDE.md :
+- `docs/validation.md`, Cas réel #1 (notification FT du 03/02/2026) : `calculerAJNette` appliqué à
+  l'AJ brute réelle (55,02 €) donne 53,81 € net — exactement le net réellement notifié. Écart
+  0,00 €, marqué ✅ concordant.
+- `src/config/franceTravailConfig.ts` l.63-68 (commit `a62e9b1`, 2026-07-24) : commentaire déjà
+  écrit précisant que l'écart Allocation brute → Montant net social est de ~2,2 % (pas ~5 %),
+  validé « à l'euro près » sur fév-juin 2026 (plusieurs mois, pas un seul cas).
+
+**Conclusion : ce n'était plus un bug depuis le 24/07, seul le backlog CLAUDE.md n'avait pas été
+mis à jour** — même type de péremption documentaire que celles déjà nettoyées cette session-là (cf.
+note du 28/07 ci-dessus sur `RevenusMensuels.tsx`/`Mon indemnisation en cours`). Aucune modification
+d'`engine/areNette.ts` : le code n'est pas en cause, la formule est prouvée, l'observation
+d'origine (~5 %) était simplement imprécise.
+
+**Résidu traité séparément, sans nouveau champ déclaratif.** La vraie question qui restait ouverte
+n'est pas la formule mais la provenance de la valeur saisie dans `ajReelleHistorique` : rien
+n'empêche structurellement un utilisateur de recopier la ligne « allocation brute » d'un relevé de
+situation dans le champ « AJ nette » de `MonProfil.tsx` (`GestionAjReelle`), qui n'a qu'un libellé
+pour s'en prémunir. Option envisagée et écartée : ajouter un champ `natureMontant` déclaratif sur
+`Profil.ajReelleHistorique` (comme sur les propositions IA de `routageExtraction.ts`) — écartée
+parce qu'elle **déplace le risque sans le réduire** : rien n'empêcherait l'utilisateur de déclarer
+« net » un montant qui est en réalité un brut mal recopié, la nouvelle donnée serait aussi peu
+fiable que l'ancienne, avec une fausse impression de garantie en plus.
+
+**Choix retenu : avertissement de plausibilité, pas un blocage.** `GestionAjReelle` compare la
+valeur saisie à `SEUIL_PLAUSIBILITE_AJ_NETTE = franceTravailConfig.are.plafond * 0.9` (157,32 €) —
+au-delà de 60 €/j de brut, la CSG/CRDS s'ajoute toujours à la retraite complémentaire
+(`engine/areNette.ts`), donc un net réel reste structurellement sous le plafond de l'AJ **brute**
+(174,80 €) avec une marge confortable ; s'en approcher à 90 % est un signal fort de confusion,
+pas une zone grise légitime. Le seuil est dérivé de la config existante (`config.are.plafond`),
+aucune nouvelle valeur réglementaire inventée. Rendu en ambre (`bg-amber/10 text-amber`), même
+traitement que l'avertissement « historique vide » déjà présent dans le même composant — cohérent
+avec SPEC §8.1/§8.6 (alerte = ambre, jamais la couleur seule). Volontairement un avertissement, pas
+un refus d'enregistrement : contrairement au canal IA (où `lib/routageExtraction.ts` peut se fier à
+un champ structuré `natureMontant`), la saisie manuelle n'a aucune vérité externe à opposer à
+l'utilisateur — seul lui sait ce que dit son document, Cadence ne peut que l'inviter à revérifier.
+Complète (ne remplace pas) le garde-fou déjà en place côté IA (`natureMontant ≠ "net"` refusé à
+l'écriture, commit `d3ebb36`), qui ne couvrait que ce canal.
+
 ## Ensuite (backlog)
 
 - **Rythme mensuel requis fini mais absurde** (délai non nul mais minuscule → des milliers de
