@@ -910,12 +910,21 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
   n'est pas une mention explicite ; sinon `null`. Vérifié que la description atteint réellement le
   JSON Schema généré (934 caractères). Les deux moitiés de la condition dans `decompteHeures.ts` sont
   désormais couvertes.
-- 🔶 **Une affirmation du texte affiché à l'utilisateur reste non vérifiée** : la mention de
-  consentement dit « Mistral AI (France, **hébergement UE**) », et personne n'a vérifié cette
-  affirmation dans les sessions qui l'ont écrite — à confirmer avant d'ouvrir le canal à d'autres
-  personnes que Benoît. (L'autre affirmation historique de ce bloc, sur l'entraînement en tier
-  gratuit, est périmée depuis le 31/07/2026 : le texte ne fait plus cette affirmation, cf. l'entrée 🔶
-  dédiée plus haut.)
+- ✅ **Affirmation « hébergement UE » confirmée par source officielle (31/07/2026).** Source :
+  [help.mistral.ai — « Where do you store my data or my Organization's data? »](https://help.mistral.ai/en/articles/347629-where-do-you-store-my-data-or-my-organization-s-data),
+  consultée le 31/07/2026 : « By default, your data is hosted in the European Union. » — exactement
+  ce que dit la mention de consentement. **Nuance à garder, trouvée dans la même source, plus précise
+  que ce qui était supposé** : selon la fonctionnalité utilisée, une donnée peut être transférée
+  temporairement hors UE vers un sous-traitant listé dans l'onglet « Subprocessors » du Trust Center ;
+  dans ce cas Mistral applique les clauses contractuelles types de la Commission européenne (art. 46
+  RGPD) et exige des garanties de sécurité renforcées (zero data retention ou chiffrement) côté
+  sous-traitant. Les clients Enterprise peuvent désactiver ces transferts au niveau organisation.
+  « Hébergement UE » est donc vrai comme principe par défaut documenté par Mistral lui-même, pas une
+  garantie absolue à 100 % pour tous les usages — nuance déjà portée par le texte lui-même (aucune
+  garantie à 100 % n'y est promise), donc **`content/mentionEnvoiIA.ts` reste inchangé**, seule cette
+  entrée de documentation interne passe de 🔶 à ✅. (L'autre affirmation historique de ce bloc, sur
+  l'entraînement en tier gratuit, est périmée depuis le 31/07/2026 : le texte ne fait plus cette
+  affirmation, cf. l'entrée 🔶 dédiée plus haut.)
 
 ✅ **Phase 3 committée** (commit `d664344`) : `ajouterPeriode`/`supprimerPeriode` dans `App.tsx`
 (pattern `ajouterContrat`/`supprimerContrat`), `PeriodeForm.tsx` (6 types, validation dateDebut ≤
@@ -998,8 +1007,8 @@ checklist). On continue à construire en attendant.
 suppression) ; `src/components/ImportDocumentIA.tsx` (le vrai composant, qui passe par
 `api/extract-document.ts`) n'a pas été touché. `npm run build` + tests toujours verts après coup. Le
 paragraphe qui suivait demandait encore de « corriger » ce brouillon — périmé, corrigé ici.
-Vérifier l'affirmation « hébergement UE » du texte de consentement reste ouvert (cf. le 🔶
-correspondant plus haut).
+Vérifier l'affirmation « hébergement UE » du texte de consentement : ✅ fait le 31/07/2026 (cf.
+l'entrée dédiée plus haut).
 
 ✅ **SR/SJM réels branchés sur `calculerSerieDepuisContrats` (29/07/2026 soir, commit `5446e33`)** —
 dernier morceau du chantier franchise salaires évoqué ci-dessus. `RevenusMensuels.tsx` reçoit
@@ -1129,10 +1138,6 @@ de situation ✅ — l'échec semble propre à ce format de bulletin, pas au can
   champ « AJ nette » de `MonProfil.tsx`) — traité par un avertissement de plausibilité, pas un
   nouveau champ déclaratif (commit `2d05f6d`, détail et justification dans `docs/reprise.md`).
 - ⬜ Comparaison complète Cadence vs 8 mois réels
-- ⬜ Reconfirmer mention consentement Mistral (hébergement UE) — le volet entraînement de cet item
-  est désormais suivi par l'entrée 🔶 dédiée plus haut et par le ⬜ "Basculer MISTRAL_API_KEY..."
-  ci-dessous, pour ne pas garder deux traces du même fait à des états différents. Reste seule ouverte
-  la vérification de « Mistral AI (France, hébergement UE) », jamais re-confirmée depuis son écriture.
 - ⬜ Production branch Vercel — pointer sur master explicitement dans les settings
 - ⬜ Inventaire annuel des documents réglementaires — lister tous les documents sources dont
   dépendent les calculs de Cadence (guide France Travail intermittents, arrêtés SMIC, convention
