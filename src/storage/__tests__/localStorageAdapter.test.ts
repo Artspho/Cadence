@@ -15,6 +15,7 @@ describe("exporterJSON / importerJSON — round-trip", () => {
       contrats: [contrat({ date: "2026-06-01", nbCachets: 10 })],
       periodes: [periode({ type: "maternite", dateDebut: "2026-01-01", dateFin: "2026-02-01" })],
       soldeIndemnisationDepart: { dateDepart: "2026-02-01" },
+      exercicesGeles: { "exercice-2025-01-01-2025-12-31": { id: "exercice-2025-01-01-2025-12-31", dateDebut: "2025-01-01", dateAnniversaire: "2025-12-31", heuresAtteintes: 600, objectifAtteint: true, ajBrute: 55, ajNette: 53, cloture: true } },
     };
 
     const exporte = exporterJSON(donnees, DATE_EXPORT_FIXE);
@@ -24,7 +25,7 @@ describe("exporterJSON / importerJSON — round-trip", () => {
   });
 
   it("round-trip sur l'état vide (tout premier utilisateur de la bêta) : ne lève pas, redonne le même état", () => {
-    const donneesVides: DonneesApp = { profil: null, contrats: [], periodes: [], soldeIndemnisationDepart: null };
+    const donneesVides: DonneesApp = { profil: null, contrats: [], periodes: [], soldeIndemnisationDepart: null, exercicesGeles: {} };
 
     const exporte = exporterJSON(donneesVides, DATE_EXPORT_FIXE);
     expect(() => importerJSON(exporte)).not.toThrow();
@@ -32,7 +33,7 @@ describe("exporterJSON / importerJSON — round-trip", () => {
   });
 
   it("le fichier exporté porte un schemaVersion et un horodatage d'export", () => {
-    const exporte = JSON.parse(exporterJSON({ profil: null, contrats: [], periodes: [], soldeIndemnisationDepart: null }, DATE_EXPORT_FIXE));
+    const exporte = JSON.parse(exporterJSON({ profil: null, contrats: [], periodes: [], soldeIndemnisationDepart: null, exercicesGeles: {} }, DATE_EXPORT_FIXE));
     expect(exporte.schemaVersion).toBe(SCHEMA_VERSION_DONNEES);
     expect(exporte.exporteLe).toBe(DATE_EXPORT_FIXE.toISOString());
   });
@@ -47,6 +48,19 @@ describe("exporterJSON / importerJSON — round-trip", () => {
     });
     const reimporte = importerJSON(exportAncien);
     expect(reimporte.soldeIndemnisationDepart).toBeNull();
+  });
+
+  it("importe sans perte un export antérieur au gel des exercices clos (champ exercicesGeles absent) : retombe sur un état vide, jamais un échec", () => {
+    const exportAncien = JSON.stringify({
+      schemaVersion: SCHEMA_VERSION_DONNEES,
+      profil: profil({ dateAnniversaire: "2026-12-31" }),
+      contrats: [],
+      periodes: [],
+      soldeIndemnisationDepart: null,
+      // exercicesGeles : absent, comme un vrai export d'avant ce champ.
+    });
+    const reimporte = importerJSON(exportAncien);
+    expect(reimporte.exercicesGeles).toEqual({});
   });
 
   it("importe sans perte un export qui contient encore declarationsMensuelles (champ retiré le 2026-07-24, saisie manuelle remplacée par un calcul automatique depuis les contrats)", () => {

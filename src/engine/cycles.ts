@@ -60,3 +60,33 @@ export function decouperExercices(profil: Profil, contrats: Contrat[], periodes:
 
   return exercices;
 }
+
+/**
+ * Fige les exercices clos pour qu'un import ultérieur ou une nouvelle FCT ne les recalcule plus
+ * jamais (bug réel signalé le 31/07/2026 : `decouperExercices` recalculait TOUT à chaque rendu,
+ * y compris les cycles déjà clos — un contrat ajouté après coup dans une période déjà close, ou un
+ * simple changement de `Profil.dateAnniversaire`, changeait silencieusement l'AJ affichée pour un
+ * cycle passé, cf. Historique.tsx).
+ *
+ * Fonction pure (aucun accès storage ici, cf. SPEC.md §12) : App.tsx lui passe la sortie fraîche de
+ * `decouperExercices` et le figé déjà en storage (`DonneesApp.exercicesGeles`), et se charge lui-même
+ * de persister `aGeler` (effet de bord, hors de ce module).
+ *
+ * Règles, dans l'ordre :
+ * - déjà figé (id présent dans `exercicesGeles`) → on renvoie TOUJOURS la version figée, jamais la
+ *   version fraîchement recalculée, même si elle diffère (c'est précisément ce que "figé" veut dire).
+ * - pas encore figé mais `cloture` vient de passer à `true` → on garde la valeur fraîchement calculée
+ *   pour l'affichage immédiat, ET on la place dans `aGeler` pour que l'appelant la persiste une fois
+ *   pour toutes.
+ * - pas clos → toujours la valeur fraîche, recalculée à chaque appel (comportement inchangé).
+ */
+export function fusionnerExercicesGeles(exercicesCalcules: Exercice[], exercicesGeles: Record<string, Exercice>): { exercices: Exercice[]; aGeler: Exercice[] } {
+  const aGeler: Exercice[] = [];
+  const exercices = exercicesCalcules.map((exercice) => {
+    const gele = exercicesGeles[exercice.id];
+    if (gele) return gele;
+    if (exercice.cloture) aGeler.push(exercice);
+    return exercice;
+  });
+  return { exercices, aGeler };
+}

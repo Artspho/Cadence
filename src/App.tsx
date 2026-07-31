@@ -9,7 +9,7 @@ import { calculerAJBrutePourFenetre } from "./engine/areBrute";
 import { calculerAJNette, calculerSJM } from "./engine/areNette";
 import { calculerStatutPrediction, construireSerieAcquisition, construireSerieAVenir } from "./engine/prediction";
 import { detecterAlertes } from "./engine/alertes";
-import { decouperExercices } from "./engine/cycles";
+import { decouperExercices, fusionnerExercicesGeles } from "./engine/cycles";
 import { diffJours } from "./engine/dateUtils";
 import { TopBar, type Onglet } from "./components/TopBar";
 import { Onboarding } from "./components/Onboarding";
@@ -86,10 +86,30 @@ export default function App() {
     const serie = construireSerieAcquisition(profil, contrats, periodes, config, fenetre, dateCap);
     const serieAVenir = construireSerieAVenir(profil, contrats, periodes, config, fenetre, dateCap);
     const alertes = detecterAlertes(profil, contrats, periodes, config, dateDuJour, donnees.soldeIndemnisationDepart);
-    const exercices = decouperExercices(profil, contrats, periodes, config, dateDuJour);
+    const exercicesCalcules = decouperExercices(profil, contrats, periodes, config, dateDuJour);
+    // Un exercice déjà figé (donnees.exercicesGeles) n'est plus jamais recalculé — un import ou une
+    // nouvelle FCT ne doit plus changer silencieusement l'AJ affichée pour un cycle déjà clos (cf.
+    // engine/cycles.ts, fusionnerExercicesGeles). `aGeler` est persisté à part, dans le useEffect
+    // ci-dessous (ce useMemo reste une fonction pure, aucun effet de bord ici).
+    const { exercices, aGeler } = fusionnerExercicesGeles(exercicesCalcules, donnees.exercicesGeles);
 
-    return { fenetre, decompte, ajBrute, ajNette, prediction, dateCap, serie, serieAVenir, alertes, exercices, sr, nht, sar };
+    return { fenetre, decompte, ajBrute, ajNette, prediction, dateCap, serie, serieAVenir, alertes, exercices, aGeler, sr, nht, sar };
   }, [donnees]);
+
+  // Fige, une fois pour toutes, tout exercice qui vient de clôturer (cf. calculs.aGeler ci-dessus) —
+  // effet de bord volontairement séparé du useMemo pur : écrit dans `donnees.exercicesGeles`, ce qui
+  // déclenche l'auto-sauvegarde existante (useEffect ci-dessus) comme tout autre changement de
+  // `donnees`. Sans nouvel exercice à figer, `calculs.aGeler` est un tableau vide et ce useEffect ne
+  // touche jamais `donnees` (pas de boucle, pas d'écriture superflue).
+  useEffect(() => {
+    if (!calculs || calculs.aGeler.length === 0) return;
+    setDonnees((d) => {
+      if (!d) return d;
+      const nouveauxGeles = { ...d.exercicesGeles };
+      for (const exercice of calculs.aGeler) nouveauxGeles[exercice.id] = exercice;
+      return { ...d, exercicesGeles: nouveauxGeles };
+    });
+  }, [calculs?.aGeler]);
 
   if (!donnees) {
     return <div className="min-h-screen flex items-center justify-center text-muted">Chargement…</div>;

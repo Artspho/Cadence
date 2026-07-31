@@ -9,7 +9,7 @@ import {
 } from "../identiteDeclarativeStorage";
 
 const IDENTITE = { nom: "Zahra", prenom: "Benoît", profession: "Musicien intermittent du spectacle", adresse: "12 rue des Artistes, 13001 Marseille" };
-const DONNEES_VIDES: DonneesApp = { profil: null, contrats: [], periodes: [], soldeIndemnisationDepart: null };
+const DONNEES_VIDES: DonneesApp = { profil: null, contrats: [], periodes: [], soldeIndemnisationDepart: null, exercicesGeles: {} };
 
 // L'environnement vitest du projet est `node` (cf. vite.config.ts) : pas de `window`. Stub mémoire
 // minimal plutôt que d'ajouter jsdom, qui n'est pas une dépendance du projet — ces tests portent sur
@@ -80,7 +80,7 @@ describe("isolation vis-à-vis de exporterJSON / importerJSON", () => {
     expect(exporte).not.toContain("Musicien");
     expect(exporte).not.toContain("rue des Artistes");
     expect(exporte).not.toContain("identite");
-    expect(Object.keys(JSON.parse(exporte))).toEqual(["schemaVersion", "exporteLe", "profil", "contrats", "periodes", "soldeIndemnisationDepart"]);
+    expect(Object.keys(JSON.parse(exporte))).toEqual(["schemaVersion", "exporteLe", "profil", "contrats", "periodes", "soldeIndemnisationDepart", "exercicesGeles"]);
   });
 
   it("importerJSON ignore une clé d'identité injectée dans le fichier importé", async () => {

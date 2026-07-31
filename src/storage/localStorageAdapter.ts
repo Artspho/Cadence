@@ -3,7 +3,7 @@
 // toucher aux composants : ceux-ci n'appellent jamais localStorage
 // directement, seulement les fonctions exportées ici.
 import { z } from "zod";
-import type { Contrat, PeriodeAssimilee, Profil, SoldeIndemnisationDepart } from "../types";
+import type { Contrat, Exercice, PeriodeAssimilee, Profil, SoldeIndemnisationDepart } from "../types";
 import { profilSchema, profilSchemaForme } from "../lib/coherenceProfil";
 
 const CLE_STOCKAGE = "cadence:v1:donnees";
@@ -22,9 +22,14 @@ export interface DonneesApp {
   contrats: Contrat[];
   periodes: PeriodeAssimilee[];
   soldeIndemnisationDepart: SoldeIndemnisationDepart | null;
+  // Exercices clos figés une fois pour toutes (cf. engine/cycles.ts, fusionnerExercicesGeles) —
+  // clé = Exercice.id. Un import ou une nouvelle FCT ne doit plus jamais changer l'AJ affichée pour
+  // un cycle déjà clos ; ce sont ces valeurs-là, et seulement elles, qu'Historique.tsx affiche pour
+  // un exercice figé, jamais une version recalculée à la volée.
+  exercicesGeles: Record<string, Exercice>;
 }
 
-const donneesVides: DonneesApp = { profil: null, contrats: [], periodes: [], soldeIndemnisationDepart: null };
+const donneesVides: DonneesApp = { profil: null, contrats: [], periodes: [], soldeIndemnisationDepart: null, exercicesGeles: {} };
 
 // Validation à la frontière (import JSON, lecture localStorage) : un
 // utilisateur peut importer un fichier corrompu ou modifié à la main.
@@ -59,6 +64,20 @@ const periodeSchema = z.object({
 // (délai/franchise CP) est simulé par le moteur depuis Profil.ouvertureDroits.
 const soldeIndemnisationDepartSchema = z.object({
   dateDepart: z.string(),
+});
+
+// Exercice figé (cf. engine/cycles.ts, fusionnerExercicesGeles) — mêmes champs que le type
+// Exercice, aucun champ recalculable n'est omis : une fois figé, il n'est plus jamais régénéré,
+// donc il doit déjà porter tout ce qu'Historique.tsx affiche.
+const exerciceSchema = z.object({
+  id: z.string(),
+  dateDebut: z.string(),
+  dateAnniversaire: z.string(),
+  heuresAtteintes: z.number(),
+  objectifAtteint: z.boolean(),
+  ajBrute: z.number().optional(),
+  ajNette: z.number().optional(),
+  cloture: z.boolean(),
 });
 
 // Migration silencieuse (2026-07-24) : un solde de départ configuré avant le passage de
@@ -150,6 +169,9 @@ const champsCommuns = {
   // docs/reprise.md. Un ancien export qui contient encore cette clé n'échoue pas pour autant —
   // Zod ignore silencieusement les clés inconnues.
   soldeIndemnisationDepart: soldeIndemnisationDepartSchema.nullable().default(null),
+  // .default({}) : un export antérieur à ce champ n'a jamais rien figé — état vide, jamais un
+  // échec de lecture (devoir sacré n°1, même principe que soldeIndemnisationDepart ci-dessus).
+  exercicesGeles: z.record(exerciceSchema).default({}),
 };
 const donneesAppSchemaLecture = z.object({ profil: profilSchemaForme.nullable(), ...champsCommuns });
 const donneesAppSchemaEcriture = z.object({ profil: profilSchema.nullable(), ...champsCommuns });
