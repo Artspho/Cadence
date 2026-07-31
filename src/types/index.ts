@@ -56,7 +56,13 @@ export interface PeriodeAssimilee {
 
 export interface Profil {
   dateNaissance: string; // ISO — plafond enseignement 70/120 h
-  dateAnniversaire: string; // ISO — fin du dernier contrat ouvrant les droits
+  // ISO — PROCHAINE échéance du droit en cours (fin du cycle de 365 j en cours, celle vers
+  // laquelle le Dashboard fait progresser le compteur des 507 h), PAS la FCT qui l'a ouvert.
+  // La FCT se déduit à la volée quand elle est nécessaire (engine/renouvellementAnticipe.ts,
+  // deriverFctRetenueActuelle : échéance - 12 mois exactement) plutôt que d'être stockée
+  // séparément — bug réel corrigé le 31/07/2026 : un module avait confondu les deux (cf.
+  // RenouvellementAnticipe.tsx, prediction.test.ts "cycle en cours après une réadmission récente").
+  dateAnniversaire: string;
   situation: "premiere_admission" | "readmission";
   alsaceMoselle?: boolean; // cotisation locale (AJ nette)
   baremeCSG?: "normal" | "reduit"; // taux CSG applicable

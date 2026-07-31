@@ -10,8 +10,7 @@
 import { useState } from "react";
 import type { Contrat, PeriodeAssimilee, Profil } from "../types";
 import type { FranceTravailConfig } from "../config/franceTravailConfig";
-import { calculerRenouvellementAnticipe, type AncienDroit } from "../engine/renouvellementAnticipe";
-import { ajouterJours } from "../engine/dateUtils";
+import { calculerRenouvellementAnticipe, deriverFctRetenueActuelle, type AncienDroit } from "../engine/renouvellementAnticipe";
 import { RENOUVELLEMENT_ANTICIPE } from "../content/renouvellementAnticipe";
 
 interface RenouvellementAnticipeProps {
@@ -30,10 +29,11 @@ export function RenouvellementAnticipe({ profil, contrats, periodes, config }: R
   const historique = profil.ajReelleHistorique ?? [];
   const derniereAJ = historique.length > 0 ? historique[historique.length - 1] : null;
 
-  // Cadence utilise `Profil.dateAnniversaire` comme la FCT retenue du droit en cours (cf.
-  // types/index.ts : "fin du dernier contrat ouvrant les droits") — pas comme la date anniversaire
-  // notifiée elle-même. Cette dernière n'a pas besoin d'être stockée séparément : elle se déduit par
-  // la même règle que le nouveau droit (FCT retenue + 12 mois), purement informative ici.
+  // `Profil.dateAnniversaire` stocke la PROCHAINE échéance du droit en cours (cf. types/index.ts,
+  // engine/prediction.ts) — c'est donc directement `ancien.dateAnniversaire` ("la date anniversaire
+  // actuellement notifiée"). La FCT qui a ouvert ce droit, elle, n'est jamais stockée séparément : on
+  // la déduit via `deriverFctRetenueActuelle` (échéance - 12 mois exactement, cf. sa doc pour la
+  // preuve de fiabilité de cette inversion).
   const donneesManquantes = !ouverture || !profil.dateAnniversaire || !derniereAJ;
 
   const comparaison =
@@ -41,8 +41,8 @@ export function RenouvellementAnticipe({ profil, contrats, periodes, config }: R
       ? (() => {
           const ancien: AncienDroit = {
             dateOuverture: ouverture.dateOuverture,
-            fctRetenue: profil.dateAnniversaire,
-            dateAnniversaire: ajouterJours(profil.dateAnniversaire, config.periodeReferenceJours),
+            fctRetenue: deriverFctRetenueActuelle(profil.dateAnniversaire, config),
+            dateAnniversaire: profil.dateAnniversaire,
             ajNette: derniereAJ.valeur,
             franchiseCPTotale: ouverture.franchiseCPTotale,
             delaiAttenteInitial: ouverture.delaiAttenteInitial,

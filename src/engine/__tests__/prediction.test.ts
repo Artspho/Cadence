@@ -64,6 +64,33 @@ describe("calculerStatutPrediction", () => {
     expect(resultat.seuilReadmission).toEqual({ calculable: false, raison: "historique_insuffisant", tranchesTentees: 24 });
   });
 
+  it("cycle en cours après une réadmission récente : le compteur ne recompte jamais les heures de l'ancien droit (bug réel signalé le 31/07/2026 — Dashboard affichait 710 h, le NH exact de l'ancien droit, au lieu de la progression réelle)", () => {
+    // Reproduit la forme du cas réel : réadmission dont le droit en cours a été ouvert par une FCT
+    // récente (17/01/2026). `dateAnniversaire` porte la PROCHAINE échéance (17/01/2027, cf.
+    // types/index.ts) — jamais la FCT elle-même — et `dateAnniversairePrecedente` porte la FCT qui a
+    // ouvert CE droit (pas une borne plus ancienne laissée par un cycle précédent déjà résolu).
+    const p = profil({ dateAnniversaire: "2027-01-17", situation: "readmission", dateAnniversairePrecedente: "2026-01-17" });
+    const contrats = [
+      // Ancien droit (avant la FCT retenue) : gros volume, jamais recomptable pour CE cycle — s'il
+      // fuitait dans le calcul, le total dépasserait très largement 507 h dès le premier contrat.
+      contrat({ date: "2025-06-01", nbCachets: 60 }), // 720 h, hors du cycle en cours
+      // Cycle en cours (après la FCT retenue) : seule cette progression doit compter.
+      contrat({ date: "2026-03-01", nbCachets: 10 }), // 120 h
+      contrat({ date: "2026-06-15", nbCachets: 6 }), // 72 h
+    ];
+    const resultat = calculerStatutPrediction(p, contrats, [], franceTravailConfig, "2026-07-31");
+
+    // 120 + 72 = 192 h : uniquement le cycle en cours, jamais 192 + 720 (fuite de l'ancien droit) ni
+    // 720 seul (fenêtre rétrospective affichée par erreur à la place de la progression).
+    expect(resultat.heuresActuelles).toBe(192);
+    expect(resultat.dateAnniversaire).toBe("2027-01-17"); // la vraie échéance, pas la FCT
+    // Sous le seuil malgré l'ancien droit costaud : la tentative d'extension par tranches de
+    // periodeReference.ts est bien arrêtée à la FCT de CE droit (dateAnniversairePrecedente), pas
+    // autorisée à aller piocher les 720 h de l'ancien cycle pour combler l'écart.
+    expect(resultat.seuilReadmission).toEqual({ calculable: false, raison: "hors_bornes", tranchesTentees: 0, dateAnniversairePrecedente: "2026-01-17" });
+    expect(resultat.niveau).not.toBe("securite");
+  });
+
   it("ne mute jamais les tableaux de contrats/périodes fournis (utilisable en simulation sans effet de bord)", () => {
     const p = profil({ dateAnniversaire: "2026-12-31" });
     const contrats = [contrat({ date: "2026-02-01", nbCachets: 20 })];

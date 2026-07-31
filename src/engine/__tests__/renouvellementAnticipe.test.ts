@@ -6,7 +6,14 @@ import { calculerSalaireReference } from "../salaireReference";
 import { calculerAJBrutePourFenetre } from "../areBrute";
 import { calculerAJNette, calculerSJM } from "../areNette";
 import { ajouterJours, diffJours } from "../dateUtils";
-import { calculerFranchiseCPAcquise, calculerJoursTravaillesFenetre, calculerRenouvellementAnticipe, delaiSeReapplique, type AncienDroit } from "../renouvellementAnticipe";
+import {
+  calculerFranchiseCPAcquise,
+  calculerJoursTravaillesFenetre,
+  calculerRenouvellementAnticipe,
+  delaiSeReapplique,
+  deriverFctRetenueActuelle,
+  type AncienDroit,
+} from "../renouvellementAnticipe";
 import { contrat, periode, profil } from "./testUtils";
 
 // Cas réel du 31/07/2026 (session Cadence, prompt produit) — deux notifications France Travail
@@ -217,5 +224,21 @@ describe("delaiSeReapplique", () => {
   it("se réapplique à 12 mois exactement ou plus de l'ouverture de l'ancien droit (cas D2)", () => {
     expect(delaiSeReapplique("2025-01-17", "2026-01-17", franceTravailConfig)).toBe(true); // exactement 365 j
     expect(delaiSeReapplique("2024-06-01", "2026-01-17", franceTravailConfig)).toBe(true); // ~19,5 mois
+  });
+});
+
+// Bug réel corrigé le 31/07/2026 : RenouvellementAnticipe.tsx utilisait `profil.dateAnniversaire`
+// directement comme FCT du droit en cours, alors que ce champ porte la PROCHAINE échéance (cf.
+// types/index.ts, engine/prediction.ts) — ce qui recomptait à tort la fenêtre rétrospective déjà
+// utilisée pour ouvrir le droit en cours dès qu'une réadmission datait de plus de quelques mois.
+describe("deriverFctRetenueActuelle", () => {
+  it("retrouve la FCT du cas réel du 31/07/2026 à partir de la nouvelle date anniversaire (17/01/2026 + 12 mois = 17/01/2027)", () => {
+    expect(deriverFctRetenueActuelle("2027-01-17", franceTravailConfig)).toBe("2026-01-17");
+  });
+
+  it("inverse exacte de la Règle #2 (NouveauDroitCalcule.dateAnniversaire = FCT retenue + 12 mois)", () => {
+    const fct = "2025-03-23";
+    const echeance = ajouterJours(fct, franceTravailConfig.periodeReferenceJours);
+    expect(deriverFctRetenueActuelle(echeance, franceTravailConfig)).toBe(fct);
   });
 });
