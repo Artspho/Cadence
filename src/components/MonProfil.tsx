@@ -5,10 +5,11 @@ import { profilHorsPerimetre, regimeEffectif } from "../lib/profilHorsPerimetre"
 import { CONTRADICTION_HORS_A10 } from "../content/contradictionHorsA10";
 import { validerCoherenceProfil } from "../lib/coherenceProfil";
 import type { ResultatEcritureProfil } from "../lib/coherenceProfil";
-import type { PeriodeAssimilee, Profil } from "../types";
+import type { Contrat, PeriodeAssimilee, Profil } from "../types";
 import { PeriodeForm } from "./PeriodeForm";
 import { PeriodeList } from "./PeriodeList";
 import { DocumentsUtiles } from "./DocumentsUtiles";
+import { RenouvellementAnticipe } from "./RenouvellementAnticipe";
 
 type OnModifierProfil = (profil: Profil) => ResultatEcritureProfil;
 
@@ -16,12 +17,13 @@ interface MonProfilProps {
   dateDuJour: string;
   profil: Profil;
   onModifierProfil: (profil: Profil) => ResultatEcritureProfil;
+  contrats: Contrat[];
   periodes: PeriodeAssimilee[];
   onAjouterPeriode: (periode: Omit<PeriodeAssimilee, "id">) => void;
   onSupprimerPeriode: (id: string) => void;
 }
 
-export function MonProfil({ dateDuJour, profil, onModifierProfil, periodes, onAjouterPeriode, onSupprimerPeriode }: MonProfilProps) {
+export function MonProfil({ dateDuJour, profil, onModifierProfil, contrats, periodes, onAjouterPeriode, onSupprimerPeriode }: MonProfilProps) {
   const [formPeriodeOuvert, setFormPeriodeOuvert] = useState(false);
   const jours = joursDepuisMiseAJourConfig(new Date(dateDuJour));
   // estPerime compare franceTravailConfig.meta.valableJusquau (un fait déclaré, jamais un
@@ -232,6 +234,8 @@ export function MonProfil({ dateDuJour, profil, onModifierProfil, periodes, onAj
       </section>
 
       <MonIndemnisationEnCours profil={profil} onModifierProfil={onModifierProfil} onSuggestionDateAnniversaire={suggererDateAnniversaire} />
+
+      <RenouvellementAnticipe profil={profil} contrats={contrats} periodes={periodes} config={franceTravailConfig} />
 
       <section>
         <div className="flex items-center justify-between mb-2">

@@ -97,6 +97,13 @@ export const franceTravailConfig = {
   // ── Différés & franchises (module « indemnisation mensuelle », V2) ──
   differesEtFranchises: {
     delaiAttenteJours: 7, // ✅ une fois par période de 12 mois
+    // ✅ Forme numérique explicite de la même règle que ci-dessus ("une fois par période de 12
+    // mois") — jusqu'ici seulement en commentaire, jamais câblée dans le moteur. Sert à décider si
+    // le délai d'attente se réapplique lors d'un renouvellement anticipé (cf.
+    // engine/renouvellementAnticipe.ts, delaiSeReapplique) : distincte de `periodeReferenceJours`
+    // (durée d'affiliation) bien que numériquement égale aujourd'hui — deux règles légales
+    // différentes qui pourraient diverger un jour, jamais partagées par appel à la même constante.
+    delaiAttentePeriodeReapplicationJours: 365,
     differeSpecifiquePlafondJours: 75, // ✅ (rarement applicable aux CDDU)
     franchiseCongesPayes: {
       tauxAcquisition: 2.5,
@@ -347,6 +354,7 @@ export const franceTravailConfigSchema = z.object({
   }),
   differesEtFranchises: z.object({
     delaiAttenteJours: z.number(),
+    delaiAttentePeriodeReapplicationJours: z.number(),
     differeSpecifiquePlafondJours: z.number(),
     franchiseCongesPayes: z.object({
       tauxAcquisition: z.number(),

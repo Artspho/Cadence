@@ -357,7 +357,15 @@ export default function App() {
           ))}
 
         {onglet === "profil" && (
-          <MonProfil dateDuJour={dateDuJour} profil={profil} onModifierProfil={modifierProfil} periodes={donnees.periodes} onAjouterPeriode={ajouterPeriode} onSupprimerPeriode={supprimerPeriode} />
+          <MonProfil
+            dateDuJour={dateDuJour}
+            profil={profil}
+            onModifierProfil={modifierProfil}
+            contrats={donnees.contrats}
+            periodes={donnees.periodes}
+            onAjouterPeriode={ajouterPeriode}
+            onSupprimerPeriode={supprimerPeriode}
+          />
         )}
 
         {onglet === "fraisPro" && (
