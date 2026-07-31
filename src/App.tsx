@@ -71,7 +71,15 @@ export default function App() {
     const decompte = calculerDecompteHeures(contrats, periodes, profil, config, fenetre);
     const { sr, sar, nht } = calculerSalaireReference(contrats, periodes, profil, config, fenetre);
     const ajBrute = calculerAJBrutePourFenetre(fenetre, decompte.total, sar ?? sr, nht, config);
-    const sjm = calculerSJM(sr, nht, config);
+    // Corrigé le 31/07/2026 (chantier renouvellement anticipé, cas E1) : le SJM (base des cotisations
+    // — retraite complémentaire, CSG/CRDS) doit être calculé sur le MÊME salaire retenu que l'AJ
+    // brute, `sar ?? sr` — jamais `sr` seul quand un SAR s'applique. Confirmé par le simulateur
+    // officiel France Travail (simucalcul.pole-emploi-services.fr, 31/07/2026) : il n'expose qu'un
+    // champ « salaire de référence » unique, utilisé identiquement partout en aval — pas de second
+    // calcul possible sur le SR brut une fois le SAR retenu. Avant ce correctif, la retraite
+    // complémentaire (et donc l'AJ nette) était sous-évaluée en présence d'un SAR, un faux "vert"
+    // (devoir sacré n°2) : SAR > SR par construction (même numérateur, dénominateur réduit).
+    const sjm = calculerSJM(sar ?? sr, nht, config);
     const ajNette = calculerAJNette(ajBrute.brut, sjm, profil, config);
     const prediction = calculerStatutPrediction(profil, contrats, periodes, config, dateDuJour);
     const dateCap = diffJours(dateDuJour, fenetre.dateFin) >= 0 ? dateDuJour : fenetre.dateFin;

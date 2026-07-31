@@ -41,7 +41,8 @@ export function decouperExercices(profil: Profil, contrats: Contrat[], periodes:
       const { sr, sar, nht } = calculerSalaireReference(contrats, periodes, profil, config, { dateDebut, dateFin });
       const resultatBrut = calculerAJBrute({ salaireRetenu: sar ?? sr, nht, config });
       ajBrute = resultatBrut.brut;
-      const sjm = calculerSJM(sr, nht, config);
+      // Corrigé le 31/07/2026 (cf. App.tsx, même correctif) : SJM sur sar ?? sr, pas sur sr seul.
+      const sjm = calculerSJM(sar ?? sr, nht, config);
       ajNette = calculerAJNette(resultatBrut.brut, sjm, profil, config).net;
     }
 

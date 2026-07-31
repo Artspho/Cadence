@@ -23,7 +23,9 @@ function evaluer(profil: Profil, contrats: Contrat[], periodes: PeriodeAssimilee
   const decompte = calculerDecompteHeures(contrats, periodes, profil, config, fenetre);
   const { sr, sar, nht } = calculerSalaireReference(contrats, periodes, profil, config, fenetre);
   const ajBrute = calculerAJBrutePourFenetre(fenetre, decompte.total, sar ?? sr, nht, config);
-  const sjm = calculerSJM(sr, nht, config);
+  // Corrigé le 31/07/2026 (cf. App.tsx, même correctif) : le SJM doit utiliser le même salaire
+  // retenu que l'AJ brute (sar ?? sr), jamais le SR brut seul quand un SAR s'applique.
+  const sjm = calculerSJM(sar ?? sr, nht, config);
   const ajNette = calculerAJNette(ajBrute.brut, sjm, profil, config);
   const prediction = calculerStatutPrediction(profil, contrats, periodes, config, dateDuJour);
   return { decompte, ajBrute, ajNette, prediction };

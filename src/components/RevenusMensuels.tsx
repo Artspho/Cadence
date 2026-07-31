@@ -296,8 +296,11 @@ function TableauResultats({
   const srSjmPourFranchiseSalaires = useMemo(() => {
     if (!profil.dateAnniversaire) return undefined;
     const fenetre = calculerFenetreReference(profil, contrats, periodes, config, dateDuJour);
-    const { sr, nht } = calculerSalaireReference(contrats, periodes, profil, config, fenetre);
-    return { srContrats: sr, sjm: calculerSJM(sr, nht, config) };
+    const { sr, sar, nht } = calculerSalaireReference(contrats, periodes, profil, config, fenetre);
+    // Corrigé le 31/07/2026 (cf. App.tsx, même correctif) : SJM sur sar ?? sr, pas sur sr seul —
+    // `srContrats` (utilisé par calculerFranchiseSalaires pour SR_total) reste lui le SR brut, c'est
+    // une grandeur distincte (cf. commentaire de calculerFranchiseSalaires, indemnisationMensuelle.ts).
+    return { srContrats: sr, sjm: calculerSJM(sar ?? sr, nht, config) };
   }, [profil, contrats, periodes, config, dateDuJour]);
 
   const resultat = useMemo(
