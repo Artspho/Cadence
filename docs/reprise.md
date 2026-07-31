@@ -8,9 +8,13 @@ Mémoire durable à consulter au démarrage : `CLAUDE.md`, `docs/SPEC.md`, `docs
 
 Deux devoirs sacrés : (1) ne jamais perdre les données ; (2) ne jamais afficher un chiffre faux (ni faux « feu vert » rassurant, ni faux « Bloqué », ni faux montant, ni fausse alerte, ni valeur sentinelle brute).
 
-État : les deux devoirs sacrés sont tenus, la bêta a son socle. 159 tests verts, `tsc -b` propre.
-Dernier commit : `502b495` (revenus contrats + revenu total par mois). Tous les items §11.A du
-SPEC sont désormais traités.
+État (mis à jour le 31/07/2026) : les deux devoirs sacrés sont tenus, la bêta a son socle.
+460 tests verts, `tsc --noEmit` propre. Dernier commit : `3b516dd` (interface de renouvellement
+anticipé, cf. CLAUDE.md § Backlog). Branches (`master`, `backend-api-import-ia`) synchronisées
+local + `origin` d'après l'utilisateur (rien en attente de push) — annoncé, pas vérifié par moi :
+aucun `push`/`fetch` vers `origin` n'est fait depuis Claude Code (pas d'identifiants configurés
+dans cet environnement ; c'est l'utilisateur qui pousse depuis son propre terminal). Tous les
+items §11.A du SPEC sont désormais traités.
 
 **⚠️ Point d'attention avant tout nouveau chantier — confusion de dossier non résolue** : il existe
 **deux copies** du projet sur cette machine : `C:\Users\benoi\cadence` (le vrai dépôt git, celui de

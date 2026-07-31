@@ -634,7 +634,12 @@ synchronisée à chaque commit. 5 commits locaux cette session, rien poussé sur
   l'historique du chantier.
 - 🔴 **Point 2 non résolu (AJ brute vs nette)** : les relevés officiels disent « Allocation
   **brute** » pour la valeur que Cadence traite comme point de départ net dans
-  `ajReelleHistorique` — écart potentiel ~5 % jamais réinvestigué. **Comparaison complète Cadence
+  `ajReelleHistorique` — écart potentiel ~5 % jamais réinvestigué. *(Mise à jour 31/07/2026 :
+  résolu — ce n'était pas un bug de calcul, la formule est prouvée correcte ; seul le backlog
+  n'avait jamais été mis à jour, même famille de péremption documentaire que l'hébergement UE
+  ci-dessus. Cf. l'entrée ✅ en tête de ce document, « Le plus récent d'abord — session du
+  31/07/2026 », et l'entrée ✅ du Backlog, « À faire — priorité normale », plus bas — celle-ci déjà
+  flippée en place, pas dupliquée ici.)* **Comparaison complète Cadence
   vs les 8 mois réels** toujours pas déroulée non plus (demande d'origine de l'utilisateur).
   **Confusion de dossier non résolue** : deux copies du projet existent (`C:\Users\benoi\cadence`,
   la vraie, vs `C:\Users\benoi\OneDrive\Bureau\cadence\cadence`, une ossature de tout début jamais
@@ -1193,7 +1198,20 @@ de situation ✅ — l'échec semble propre à ce format de bulletin, pas au can
 
 ### Post-bêta
 - ⬜ Refonte design (couleurs, placement onglets — à préciser)
-- ⬜ Renouvellement anticipé (détail et prérequis dans docs/SPEC.md)
+- ✅ **Renouvellement anticipé — comparaison ancien/nouveau droit** (commit `3b516dd`, 31/07/2026) :
+  prérequis bloquant du SPEC §11.B levé (règle sourcée et validée contre le simulateur officiel
+  France Travail + cas réel à deux notifications, cf. `docs/validation.md`). Moteur
+  `engine/renouvellementAnticipe.ts` (`calculerRenouvellementAnticipe`), réutilise tel quel le
+  moteur standard existant, aucune formule dupliquée ; écran `components/RenouvellementAnticipe.tsx`
+  dans `MonProfil.tsx` — simulation seulement, pas encore l'interface de demande elle-même
+  (formulaire, pièces à joindre : reste à construire, item distinct). **Zones grises assumées,
+  jamais chiffrées, avertissements textuels seulement — ne pas lire cette entrée comme « 100 %
+  résolu »** : risque de trop-perçu si la franchise congés payés de l'ancien droit n'était pas
+  épuisée (`tropPercuRisque` reste un booléen de prudence, `tropPercuChiffrable` toujours `false`,
+  aucun montant câblé) ; franchise salaires du nouveau droit non fiabilisée (non calculée par ce
+  module, avertissement affiché à la place). Détail complet (cas B1-E1 vérifiés simulateur, écart
+  non résolu à SR extrême, deux bugs pré-existants découverts et corrigés au passage) :
+  `docs/SPEC.md` §11.B, `docs/validation.md`.
 - ⬜ Module congés spectacle
 
 ---
