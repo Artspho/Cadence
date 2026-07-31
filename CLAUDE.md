@@ -95,7 +95,47 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 
 ## État actuel
 
-### Le plus récent d'abord — session du 29/07/2026 (jour)
+### Le plus récent d'abord — session du 31/07/2026
+
+- ✅ **Habillage de `ConsentementEnvoiIA.tsx` désamorcé** (commit `91b5634`) : la phrase [1] a perdu
+  sa boîte ambre dédiée — elle datait de quand cette phrase annonçait un entraînement réel (le
+  risque), et le texte a changé de sens (plus rassurant) sans que l'habillage suive. Les trois
+  phrases reçoivent désormais le même traitement neutre, cohérent avec `ConfirmationImport.tsx`
+  (l'autre modale bloquante de l'app, qui n'a jamais eu ce genre de boîte). Badge du haut et bouton
+  restent en ambre : justifié, la donnée quitte réellement l'appareil vers un tiers.
+- ✅ **Point 2 (AJ brute vs nette) clos avec preuve, pas deviné** (commits `2d05f6d`, `7bdb14a`) :
+  `areNette.ts` était déjà prouvé correct depuis le 24/07 (`config/franceTravailConfig.ts` l.63-68,
+  validé « à l'euro près » sur fév-juin 2026 ; reconfirmé via `docs/validation.md` Cas réel #1,
+  0,00 € d'écart) — seul le backlog n'avait jamais été mis à jour, péremption documentaire pure.
+  Résidu réel traité séparément : la provenance de la valeur saisie dans `ajReelleHistorique` en
+  saisie manuelle (rien n'empêchait de recopier une ligne « brute » d'un relevé dans le champ « AJ
+  nette »). Décision : pas de champ `natureMontant` déclaratif (déplacerait le risque sans le
+  réduire) — un avertissement de plausibilité dans `MonProfil.tsx` (`GestionAjReelle`) se déclenche
+  si la valeur dépasse 90 % du plafond ARE brut (`config.are.plafond`). Justification complète dans
+  `docs/reprise.md`.
+- ✅ **Hébergement UE de Mistral confirmé par source officielle** (commit `6b35861`) :
+  [help.mistral.ai — Where do you store my data or my Organization's data?](https://help.mistral.ai/en/articles/347629-where-do-you-store-my-data-or-my-organization-s-data),
+  consulté le 31/07/2026 — « By default, your data is hosted in the European Union. »
+  `content/mentionEnvoiIA.ts` **inchangé** (affirmation déjà exacte) : seule la doc interne
+  (🔶→✅) a changé, plus deux traces obsolètes nettoyées.
+- ✅ **Inventaire statique des documents utiles** (commit `f838092`) : `content/documentsUtiles.ts`
+  + `components/DocumentsUtiles.tsx`, rendu dans `MonProfil.tsx` juste avant « Périmètre du MVP ».
+  Volontairement distinct de la checklist **dynamique** déjà existante
+  (`ChecklistDocuments.tsx`/`lib/documentsRequis.ts`, onglet Import PDF) — celle-ci calcule ce qui
+  manque depuis les vraies données du profil ; celle-là est une référence à lire une fois, groupée
+  par situation (toujours utile / si tu enseignes / si arrêt maladie-maternité / si taux PAS
+  manquant), et couvre des documents absents de la checklist dynamique (contrat d'enseignement,
+  attestation CPAM avec pointeur vers la saisie manuelle réelle dans « Périodes particulières »).
+  Chaque composant renvoie explicitement vers l'autre pour éviter toute confusion. **Piste future
+  notée, non implémentée** : un suivi d'état « déposé / manquant » par document serait un doublon
+  avec la checklist dynamique — à envisager seulement si un besoin réel de fusionner les deux vues
+  apparaît.
+
+Branche `backend-api-import-ia`, recréée depuis `master` en début de session (`git checkout -B`,
+aucune perte — l'ancienne divergence sur le taux PAS était déjà résolue côté `master`) et restée
+synchronisée à chaque commit. 5 commits locaux cette session, rien poussé sur `origin`.
+
+### Session du 29/07/2026 (jour)
 
 - ✅ **Chantier « checklist des documents à fournir » terminé, 3 étapes.** Nouveau document de
   référence `docs/files/inventaire_donnees_et_documents.md` (remplace
