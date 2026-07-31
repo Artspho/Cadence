@@ -8,6 +8,7 @@ import type { ResultatEcritureProfil } from "../lib/coherenceProfil";
 import type { PeriodeAssimilee, Profil } from "../types";
 import { PeriodeForm } from "./PeriodeForm";
 import { PeriodeList } from "./PeriodeList";
+import { DocumentsUtiles } from "./DocumentsUtiles";
 
 type OnModifierProfil = (profil: Profil) => ResultatEcritureProfil;
 
@@ -265,6 +266,8 @@ export function MonProfil({ dateDuJour, profil, onModifierProfil, periodes, onAj
         Règles vérifiées au {franceTravailConfig.meta.dateEntreeVigueur} ({jours} jours) — {franceTravailConfig.meta.source}.
         {perime && ` Ces règles ont peut-être changé depuis le ${franceTravailConfig.meta.valableJusquau} : vérifie auprès de France Travail avant de t'y fier.`}
       </div>
+
+      <DocumentsUtiles />
 
       <section>
         <h2 className="font-display text-lg font-medium mb-2">Périmètre du MVP</h2>
