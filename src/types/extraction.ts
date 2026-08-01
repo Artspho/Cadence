@@ -252,6 +252,13 @@ export const extractionResultSchema = z.object({
     "attestation_cpam",
     "justificatif_declaration", // Justificatif de déclaration de situation mensuelle (actualisation) — ajouté 01/08/2026
     "non_reconnu",
+    // ⚠️ "contrat_enseignement" est délibérément PAS ajouté ici (préparation du 01/08/2026, cf.
+    // docs/files/inventaire_donnees_et_documents.md §8.2) : l'ajouter en dur créerait un type
+    // accepté sans aucune section de lexique pour le remplir dans document_annotation_prompt —
+    // une case morte. À activer seulement une fois un vrai contrat d'enseignement obtenu et lu,
+    // dans le même mouvement que l'écriture du lexique correspondant, jamais avant (même règle que
+    // pour l'AEM avant son spécimen). Réserver ce nom ici évite juste qu'un futur chantier en
+    // choisisse un autre par erreur.
   ]),
   propositions: z.array(propositionSchema),
   avertissementsGeneraux: z.array(z.string()),

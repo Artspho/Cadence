@@ -358,15 +358,48 @@ chercher sur une vraie pièce, **insuffisant pour coder** (cf. §2).
 
 ### 8.2 Contrat d'enseignement
 
+**Statut au 01/08/2026 : préparation seulement, aucun code d'extraction — pas de spécimen réel.**
+Même règle que pour l'AEM avant d'en obtenir un exemplaire (§8.1) : ne pas coder de lexique contre
+une mise en page supposée. Un lexique écrit sans pièce réelle a déjà causé des reprises ailleurs
+dans ce projet (formulations plausibles au lieu de citations exactes, corrigées après coup sur le
+lexique notification/relevé de situation le 29/07/2026) — ne pas répéter l'erreur ici alors qu'elle
+est déjà identifiée.
+
 - **Rôle** : seule source possible pour `etablissementAgree` et `enRapportAvecMetier`, aujourd'hui
   saisis à la main et jamais lus automatiquement.
-- **Champs utiles** : établissement (nom + statut si mentionné), volume horaire, taux horaire, dates
-  (souvent une année scolaire entière, pas un mois).
-- **Piège, déjà acté en règle** : un contrat d'enseignement ne prouve **pas** `etablissementAgree`.
-  La liste des établissements agréés est fixée par arrêté ; un contrat peut nommer un établissement
-  qui n'y figure pas. Règle identique à celle du bulletin (commit `a934db2`) : ne jamais déduire
-  `true` d'un nom d'établissement. Un `true` inventé ferait entrer des heures dans les 507 h et
-  afficherait un feu vert non mérité.
+- **Champs probables, TOUS « à confirmer sur pièce »** (déduits du domaine — `types/index.ts`,
+  `GUIDEINTERMITTENT.pdf` — pas d'un contrat réel lu) :
+  - Nom de l'établissement (conservatoire, école, association…) — **à confirmer** : présenté seul,
+    ou accompagné d'un statut/numéro d'agrément explicite ?
+  - Nature de l'enseignement (matière, niveau, public) — **à confirmer** : ce champ n'a pas de case
+    d'arrivée dans `Contrat` au-delà de `type: "enseignement"` lui-même ; probablement `info_seule`.
+  - Base horaire (volume prévu, hebdomadaire ou annuel) — **à confirmer** : un contrat d'enseignement
+    couvre souvent une année scolaire complète, pas un mois comme un bulletin — la conversion vers
+    des dates de contrat exploitables par Cadence reste à définir sur pièce, pas à deviner ici.
+  - Rémunération (taux horaire, ou montant total annuel) — **à confirmer** : selon le document, ça
+    peut être un taux horaire à multiplier, ou un montant global déjà calculé — aucune des deux formes
+    n'est supposée avant d'en avoir vu une.
+  - Dates (début/fin de contrat, souvent une année scolaire) — **à confirmer**.
+- **Piège, déjà acté en règle, à rappeler avant tout futur ajout de code** : un contrat
+  d'enseignement ne prouve **JAMAIS** `etablissementAgree` par le seul nom de l'établissement cité.
+  L'agrément est un statut administratif fixé par arrêté, quasi jamais écrit noir sur blanc sur un
+  contrat de travail — même un conservatoire réputé ne suffit pas à mettre `true`. Règle identique à
+  celle du bulletin (commit `a934db2`) : ne jamais déduire `true` d'un nom d'établissement seul. Un
+  `true` inventé ferait entrer des heures dans les 507 h et afficherait un feu vert non mérité.
+  **Ce champ restera très probablement `null` la majorité du temps, même avec un vrai document** —
+  c'est le comportement attendu et prudent, pas un signe d'échec du prompt le jour où il sera écrit.
+- **Préparation de l'énumération, PAS activée** : `contrat_enseignement` n'est **pas** ajouté à
+  `typeDocumentDetecte` dans `src/types/extraction.ts` (l'ajouter en dur créerait un type accepté
+  sans aucun lexique pour le remplir, une case morte). Un commentaire réservant le nom marque la
+  place prévue — à activer seulement une fois un spécimen réel obtenu et lu, dans le même mouvement
+  que l'écriture du lexique correspondant, jamais avant.
+- **Ce qu'il faudrait recevoir en premier** : idéalement un contrat d'enseignement représentatif de
+  la situation réelle de l'utilisateur (conservatoire ou école dans laquelle il enseigne
+  effectivement), plutôt qu'un contrat type générique — un vrai document, même caviardé des données
+  personnelles non nécessaires (nom, adresse), reste la seule base fiable pour écrire un lexique qui
+  cite plutôt que suppose. Si sa situation réelle ne correspond pas à un contrat annuel classique
+  (ex. interventions ponctuelles, plusieurs établissements), le signaler avant l'envoi : la forme du
+  document oriente directement la forme du lexique à écrire.
 
 ### 8.3 Bulletin de paie — enseignement
 
