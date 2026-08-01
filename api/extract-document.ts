@@ -59,7 +59,7 @@ const INSTRUCTIONS = `Tu es un extracteur de documents pour Cadence, une app d'a
 artistes-interprètes intermittents du spectacle (régime Annexe 10, France). Documents reçus :
 bulletin de paie, AEM (Attestation d'Employeur Mensuelle — la pièce qui fait foi, pas « l'AER »),
 notification d'admission ARE (France Travail), relevé de situation (France Travail), déclaration
-fiscale annuelle, attestation CPAM.
+fiscale annuelle, attestation CPAM, justificatif de déclaration de situation mensuelle (actualisation).
 
 Détecte le type du document, puis produis des propositions d'écriture vers les cibles du schéma.
 
@@ -287,6 +287,64 @@ BULLETIN DE PAIE / AEM
   d'enseignement dans les 507 h. Un true inventé y ferait entrer des heures qui n'y ont pas droit —
   donc un compteur 507 h trop élevé, et un feu vert que l'utilisateur n'a pas.
 
+JUSTIFICATIF DE DÉCLARATION DE SITUATION MENSUELLE (ACTUALISATION FRANCE TRAVAIL)
+
+  Document mensuel envoyé après chaque actualisation. Vérifié sur plusieurs pièces réelles
+  (01/08/2026) : titre « Justificatif de déclaration de situation mensuelle pour le mois de MOIS
+  ANNÉE », section « 1 - Activités » listant chaque activité déclarée dans un encadré séparé.
+
+  Pour CHAQUE encadré d'activité de la section « 1 - Activités », produis une proposition
+  « contrat » séparée (une par encadré, jamais une par document, jamais une par employeur) :
+
+     NOM DE L'EMPLOYEUR (en gras, première ligne de l'encadré)
+           → contrat.employeur
+     « Du JJ mois AAAA au JJ mois AAAA »
+           → contrat.dateDebut = première date, contrat.date = seconde date
+     « Vous avez travaillé Nh pour un montant de M € brut »
+           → contrat.typeRemuneration = "heures", contrat.nbHeures = N, contrat.salaireBrut = M
+     « Vous avez effectué N cachet(s) pour un montant de M € brut »
+           → contrat.typeRemuneration = "cachet", contrat.nbCachets = N, contrat.salaireBrut = M
+     Les deux formulations peuvent coexister dans le MÊME document pour des encadrés différents
+     (un contrat continu ET des cachets ponctuels le même mois) — ne convertis jamais l'une en
+     l'autre, chaque encadré garde son unité telle qu'écrite.
+
+  ⚠️⚠️ PIÈGE — « Activité pour un employeur depuis le DATE » N'EST PAS LA PÉRIODE DU MOIS
+  Chaque encadré peut porter une ligne « Activité pour un employeur depuis le DATE » : c'est la
+  date de la PREMIÈRE activité jamais déclarée avec cet employeur (une ancienneté de relation),
+  PAS la période travaillée ce mois-ci. Ne l'utilise JAMAIS pour contrat.dateDebut — cette date
+  vient uniquement de la ligne « Du X au Y ». Cette ligne « depuis le » n'est pas toujours présente
+  (elle peut manquer même pour un encadré du même employeur qu'un autre encadré qui l'a) : son
+  absence n'est jamais une erreur, ignore-la simplement si elle n'y est pas.
+
+  ⚠️⚠️ PIÈGE — LE MÊME EMPLOYEUR PEUT APPARAÎTRE PLUSIEURS FOIS DANS LE MÊME MOIS : NE JAMAIS FUSIONNER
+  Un même employeur (même nom exact) peut avoir plusieurs encadrés distincts dans la section
+  « 1 - Activités » d'un même document, avec des périodes différentes (ex. un cachet isolé le 1er
+  du mois, puis une semaine de représentations plus tard chez le même orchestre). Chaque encadré
+  est une activité INDÉPENDANTE : produis une proposition « contrat » par encadré, JAMAIS une seule
+  proposition qui additionnerait leurs heures/cachets ou leurs montants sous prétexte que
+  l'employeur est identique et le mois aussi. Fusionner ferait perdre les deux périodes réelles au
+  profit d'une période composite fausse.
+
+  ⚠️⚠️ PIÈGE — LE « TOTAL DES ACTIVITÉS » EN BAS DE SECTION MÉLANGE HEURES ET CACHETS
+  Le document se termine par un encadré « Total des activités » du type :
+     « N pour un employeur »
+     « H h (X h + Y cachet(s)) / M € »
+  Ce H (ex. « 153 h (21 h + 11cachet(s)) ») est un total D'AFFICHAGE qui convertit les cachets en
+  équivalent-heures pour donner un seul chiffre — ce n'est PAS une donnée d'un contrat individuel.
+  NE L'UTILISE JAMAIS pour remplir contrat.nbHeures ou contrat.nbCachets d'AUCUN encadré, même le
+  seul de la liste si le document n'a qu'une activité. Si tu ranges ce total quelque part, ce ne
+  peut être qu'en « info_seule », avec un nom de clé qui dit explicitement qu'il s'agit du total
+  du document entier (ex. totalActivitesMoisHeuresCachetsMelanges), jamais associé à un employeur
+  précis.
+
+  À ranger en « info_seule » si utile (aucun champ dédié dans le schéma) : le nombre total
+  d'activités déclarées, le total mixte ci-dessus. Les déclarations de la section
+  « 2 - Situations particulières » (« Vous avez déclaré ne pas avoir été en formation », etc.)
+  sont des NÉGATIONS — le document affirme qu'il ne s'est RIEN passé. Ne produis JAMAIS de
+  proposition periode_assimilee à partir d'une négation : seule une déclaration POSITIVE d'un
+  arrêt de travail, d'une formation ou d'un congé justifierait d'envisager cette cible, et ce
+  document-type ne contient par construction que des négations dans cette section.
+
 ════════ SIX ERREURS OBSERVÉES, À NE PAS REFAIRE ════════
 
 CAS 1 — allocation rangée au mauvais endroit
@@ -352,8 +410,10 @@ CAS 6 — taux PAS attribué à la mauvaise section (date confondue avec un titr
   choisir lui-même. Ne devine jamais ce champ.
 - « justification » contient toujours une citation du document.
 - Dates au format ISO (AAAA-MM-JJ).
-- N'extrais JAMAIS de coordonnées bancaires, de numéro de sécurité sociale (NIR), ni d'adresse
-  postale complète, même présents dans le document — ignore-les entièrement.
+- N'extrais JAMAIS de coordonnées bancaires, de numéro de sécurité sociale (NIR), d'identifiant
+  personnel France Travail (ex. « Identifiant : 10327776755 » en en-tête d'un justificatif de
+  déclaration), ni d'adresse postale complète, même présents dans le document — ignore-les
+  entièrement.
 
 JAMAIS À PROPOSER : regimeDeclare (auto-déclaré par l'utilisateur, jamais déduit d'un scan),
 salairesHorsAnnexe10PRA seul, toute constante réglementaire (plafonds enseignement/formation,
@@ -379,7 +439,11 @@ barèmes), activiteHorsAnnexe10 (déprécié), la date de départ d'affichage (c
    « REGLEMENT DU [date] ». Si le document a deux occurrences de la phrase, vérifie que tu as bien
    retenu celle de la section la plus récente pour le champ structuré.
 8. Vérifie que chaque « justification » contient une citation, et que tu n'as inscrit de confiance
-   que pour les champs effectivement renseignés.`;
+   que pour les champs effectivement renseignés.
+9. Sur un justificatif de déclaration mensuelle : compte les encadrés d'activité de la section
+   « 1 - Activités » et vérifie que tu as produit EXACTEMENT une proposition « contrat » par
+   encadré, y compris quand deux encadrés partagent le même employeur. Vérifie qu'aucun champ
+   contrat.nbHeures/nbCachets ne provient du « Total des activités » du bas de document.`;
 
 /**
  * Erreur de configuration du serveur (clé API absente) — distincte d'un échec

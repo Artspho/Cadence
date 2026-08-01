@@ -139,6 +139,7 @@ export function ImportDocumentIA({ profil, config, decompteActuel, onAjouterCont
           <li>Notification d'admission ARE (une fois, à l'ouverture de droits)</li>
           <li>Relevé de situation France Travail (un par mois — contient ton taux PAS et ton allocation à jour)</li>
           <li>Bulletins de paie (un par contrat, spectacle ou enseignement)</li>
+          <li>Justificatif de déclaration de situation mensuelle (le récapitulatif reçu après ton actualisation)</li>
         </ul>
       </div>
 

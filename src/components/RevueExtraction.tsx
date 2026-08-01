@@ -52,6 +52,7 @@ const LABEL_DOCUMENT: Record<ExtractionResult["typeDocumentDetecte"], string> = 
   releve_situation: "Relevé de situation",
   declaration_fiscale_annuelle: "Déclaration fiscale annuelle",
   attestation_cpam: "Attestation CPAM",
+  justificatif_declaration: "Justificatif de déclaration mensuelle",
   non_reconnu: "Type de document non reconnu",
 };
 

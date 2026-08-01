@@ -158,6 +158,90 @@ export const extractionReleveAvecRefus: ExtractionResult = {
   ],
 };
 
+/**
+ * Justificatif de déclaration de situation mensuelle (actualisation) — structure vérifiée sur
+ * plusieurs pièces réelles le 01/08/2026 (employeurs et montants ici FICTIFS, cf. avertissement en
+ * tête de fichier). Exerce le piège le plus important de ce type de document : le MÊME employeur
+ * apparaît deux fois dans le mois (une fois en cachet isolé, une fois sur une semaine) — deux
+ * propositions "contrat" distinctes, jamais fusionnées. Le total mixte heures+cachets du bas de
+ * document est rangé en "info_seule", jamais recopié dans un nbHeures/nbCachets individuel.
+ */
+export const extractionJustificatifDeclaration: ExtractionResult = {
+  typeDocumentDetecte: "justificatif_declaration",
+  propositions: [
+    {
+      cible: "contrat",
+      donnees: {
+        date: "2026-02-01",
+        dateDebut: "2026-02-01",
+        type: null,
+        typeRemuneration: "cachet",
+        territoire: null,
+        nbCachets: 1,
+        nbHeures: null,
+        nbJoursEEE: null,
+        salaireBrut: 181,
+        employeur: "Orchestre Fictif de la Vallée",
+        etablissementAgree: null,
+        enRapportAvecMetier: null,
+      },
+      confiance: { date: "haute", dateDebut: "haute", typeRemuneration: "haute", nbCachets: "haute", salaireBrut: "haute", employeur: "haute" },
+      justification: "Encadré « Orchestre Fictif de la Vallée — Du 01 février 2026 au 01 février 2026 — Vous avez effectué 1 cachet(s) pour un montant de 181,00 € brut ».",
+    },
+    {
+      // Même employeur que la proposition précédente, période DIFFÉRENTE plus tard dans le mois —
+      // doit rester une proposition séparée, jamais fusionnée avec la première.
+      cible: "contrat",
+      donnees: {
+        date: "2026-02-15",
+        dateDebut: "2026-02-10",
+        type: null,
+        typeRemuneration: "cachet",
+        territoire: null,
+        nbCachets: 6,
+        nbHeures: null,
+        nbJoursEEE: null,
+        salaireBrut: 829,
+        employeur: "Orchestre Fictif de la Vallée",
+        etablissementAgree: null,
+        enRapportAvecMetier: null,
+      },
+      confiance: { date: "haute", dateDebut: "haute", typeRemuneration: "haute", nbCachets: "haute", salaireBrut: "haute", employeur: "haute" },
+      justification: "Encadré « Orchestre Fictif de la Vallée — Du 10 février 2026 au 15 février 2026 — Vous avez effectué 6 cachet(s) pour un montant de 829,00 € brut ».",
+    },
+    {
+      cible: "contrat",
+      donnees: {
+        date: "2026-02-28",
+        dateDebut: "2026-02-01",
+        type: null,
+        typeRemuneration: "heures",
+        territoire: null,
+        nbCachets: null,
+        nbHeures: 21,
+        nbJoursEEE: null,
+        salaireBrut: 465,
+        employeur: "Commune Fictive de Test",
+        etablissementAgree: null,
+        enRapportAvecMetier: null,
+      },
+      confiance: { date: "haute", dateDebut: "haute", typeRemuneration: "haute", nbHeures: "haute", salaireBrut: "haute", employeur: "haute" },
+      justification: "Encadré « Commune Fictive de Test — Du 01 février 2026 au 28 février 2026 — Vous avez travaillé 21h pour un montant de 465,00 € brut ».",
+    },
+    {
+      // Total du bas de document : mélange heures et cachets (équivalent-heures), jamais réutilisé
+      // pour remplir un nbHeures/nbCachets individuel — cf. piège dédié dans api/extract-document.ts.
+      cible: "info_seule",
+      donnees: { totalActivitesMoisNombre: 3, totalActivitesMoisHeuresCachetsMelanges: "105 h (21 h + 7 cachet(s))", totalActivitesMoisMontantBrut: 1475 },
+      confiance: { totalActivitesMoisNombre: "haute", totalActivitesMoisMontantBrut: "haute" },
+      justification: "Encadré « Total des activités — 3 pour un employeur — 105 h (21 h + 7 cachet(s)) / 1475,00 € » en bas de document.",
+    },
+  ],
+  avertissementsGeneraux: [
+    "Ce document confirme des contrats généralement déjà saisis à la main : vérifie qu'aucune de ces propositions ne double un contrat que tu as déjà enregistré ce mois-ci avant de valider.",
+  ],
+};
+
 /** Cas dégradé : document non reconnu, rien à proposer. L'écran doit rester lisible et honnête. */
 export const extractionNonReconnue: ExtractionResult = {
   typeDocumentDetecte: "non_reconnu",
@@ -171,5 +255,6 @@ export const FIXTURES_EXTRACTION: { id: string; libelle: string; resultat: Extra
   { id: "notification", libelle: "Notification d'admission (tout applicable)", resultat: extractionNotificationAdmission },
   { id: "bulletin", libelle: "Bulletin de paie (champs manquants)", resultat: extractionBulletinPaie },
   { id: "releve", libelle: "Relevé de situation (2 refus + 1 à vérifier)", resultat: extractionReleveAvecRefus },
+  { id: "justificatif_declaration", libelle: "Justificatif de déclaration mensuelle (même employeur 2×, à ne pas fusionner)", resultat: extractionJustificatifDeclaration },
   { id: "non_reconnu", libelle: "Document non reconnu (rien à proposer)", resultat: extractionNonReconnue },
 ];

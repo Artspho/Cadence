@@ -44,9 +44,23 @@ import { z } from "zod";
 
 const niveauConfiance = z.enum(["haute", "moyenne", "faible"]);
 
-// ─── Cible 1 : Contrat (bulletin de paie / AEM) ────────────────────────────
+// ─── Cible 1 : Contrat (bulletin de paie / AEM / justificatif de déclaration) ──
 // Note de nommage : le document qui fait foi est l'AEM (Attestation
 // d'Employeur Mensuelle), pas "l'AER" — cf. SPEC §10 et §11.C.
+//
+// ⚠️ Risque de doublon, non traité ici (décision du 01/08/2026) : un
+// « justificatif de déclaration de situation mensuelle » (typeDocumentDetecte
+// "justificatif_declaration") arrive généralement APRÈS que l'utilisateur ait
+// déjà saisi ses contrats du mois à la main — il ne fait que confirmer une
+// déclaration déjà faite. Une proposition "contrat" issue de ce document peut
+// donc doublonner un contrat déjà enregistré (même employeur, période proche,
+// montant identique ou proche). Aucune détection de doublon n'est construite
+// dans ce schéma ni dans routageExtraction.ts : chaque proposition passe par
+// le formulaire de contrat comme n'importe quel bulletin, sans comparaison
+// aux contrats existants. Risque assumé pour ce premier chantier, pas
+// oublié — à traiter séparément (comparaison employeur + période + montant)
+// avant de considérer ce canal fiable pour un usage répété sans relecture
+// attentive de l'utilisateur à chaque import.
 export const propositionContratSchema = z.object({
   cible: z.literal("contrat"),
   donnees: z.object({
@@ -236,6 +250,7 @@ export const extractionResultSchema = z.object({
     "releve_situation",
     "declaration_fiscale_annuelle",
     "attestation_cpam",
+    "justificatif_declaration", // Justificatif de déclaration de situation mensuelle (actualisation) — ajouté 01/08/2026
     "non_reconnu",
   ]),
   propositions: z.array(propositionSchema),

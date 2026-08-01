@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Profil } from "../../types";
 import type { Proposition } from "../../types/extraction";
 import { contratDepuisProposition, evaluerExtraction, evaluerProposition, periodeDepuisProposition, profilAvecProposition } from "../routageExtraction";
-import { extractionBulletinPaie, extractionNotificationAdmission, extractionReleveAvecRefus } from "../fixturesExtraction";
+import { extractionBulletinPaie, extractionJustificatifDeclaration, extractionNotificationAdmission, extractionReleveAvecRefus } from "../fixturesExtraction";
 
 const profilBase: Profil = {
   dateNaissance: "1988-04-12",
@@ -276,5 +276,30 @@ describe("fixtures de démonstration — couvrent bien chaque branche", () => {
     expect(profil.dateAnniversaire).toBe("2026-01-15");
     expect(profil.dureeDroitsMois).toBe(12);
     expect(profil.ajReelleHistorique).toEqual([{ dateEffet: "2026-02-01", valeur: 54.55 }]);
+  });
+
+  // 01/08/2026 : le même employeur peut apparaître deux fois dans un justificatif de déclaration
+  // mensuelle (un cachet isolé, puis une semaine plus tard) — chaque encadré doit rester une
+  // proposition "contrat" indépendante, jamais fusionnée en une seule (cf. api/extract-document.ts).
+  it("justificatif de déclaration — le même employeur deux fois reste deux propositions distinctes, jamais fusionnées", () => {
+    const contrats = extractionJustificatifDeclaration.propositions.filter((p) => p.cible === "contrat");
+    expect(contrats).toHaveLength(3);
+    const memeEmployeur = contrats.filter((p) => p.donnees.employeur === "Orchestre Fictif de la Vallée");
+    expect(memeEmployeur).toHaveLength(2);
+    expect(memeEmployeur[0].donnees.dateDebut).not.toBe(memeEmployeur[1].donnees.dateDebut);
+    expect(memeEmployeur[0].donnees.nbCachets).not.toBe(memeEmployeur[1].donnees.nbCachets);
+
+    const statuts = evaluerExtraction(extractionJustificatifDeclaration, profilBase).map((e) => e.statut);
+    expect(statuts.filter((s) => s === "revue_formulaire")).toHaveLength(3); // une par encadré, pas une par employeur
+    expect(statuts.filter((s) => s === "information")).toHaveLength(1); // le total mixte, jamais un contrat
+  });
+
+  it("justificatif de déclaration — le total mixte du bas de document ne remplit aucun nbHeures/nbCachets individuel", () => {
+    for (const p of extractionJustificatifDeclaration.propositions) {
+      if (p.cible !== "contrat") continue;
+      // Chaque contrat individuel a soit nbHeures soit nbCachets, jamais les deux mélangés dans un
+      // seul champ composite comme le "105 h (21 h + 7 cachet(s))" du total.
+      expect(typeof p.donnees.nbHeures === "number" ? p.donnees.nbCachets : p.donnees.nbHeures).toBeNull();
+    }
   });
 });
