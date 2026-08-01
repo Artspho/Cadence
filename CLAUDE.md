@@ -95,7 +95,28 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 
 ## État actuel
 
-### Le plus récent d'abord — 01/08/2026 (fin de session : cycle de vie du contrat, bug heures+cachets moteur, fusion de branches close)
+### Le plus récent d'abord — 01/08/2026 (suite : historique de taux PAS, contrat d'enseignement re-confirmé, bug SR ~400k€ non reproduit)
+
+- ✅ **Historique de taux PAS daté** (`4cd3e66`) : `tauxPrelevementSource` (scalaire) devenait
+  rétroactif — un seul taux courant appliqué à tous les mois du tableau `RevenusMensuels.tsx`, y
+  compris les mois passés qui avaient un taux DGFIP différent (confirmé sur relevés réels de Benoît :
+  3,30 % mi-2025, 3,10 % dès fin 2025/2026). Remplacé par `tauxPrelevementSourceHistorique`, même
+  pattern que `ajReelleHistorique` (`getTauxPASAt`, `engine/ajReelleUtils.ts`). Migration silencieuse,
+  UI dédiée dans « Mon profil », pipeline d'extraction IA corrigé pour AJOUTER une entrée datée au
+  lieu d'écraser l'historique. 542 tests verts.
+- ✅ **Contrat d'enseignement re-vérifié** (même commit) : la décision (saisie manuelle uniquement,
+  cf. entrée du 01/08 ci-dessous) est confirmée par deux tests de régression explicites prouvant que
+  `ContractForm.tsx`/`decompteHeures.ts`/`salaireReference.ts` ne distinguent jamais selon
+  `Contrat.source` — rien à recoder, seulement à vérifier.
+- ⚠️ **Bug SR ~400 000 € — NON REPRODUIT, chantier NON FERMÉ** : Benoît a signalé un SR affiché
+  manifestement irréaliste. Investigation complète sur les données réelles (56 contrats) : aucune
+  reproduction (SR recalculé = 6 049 €, somme de toute la carrière = 25 593 €). Benoît n'a ni écran,
+  ni date, ni export du moment — possible bug ponctuel déjà résolu par un correctif de cette même
+  session (dédoublonnage heures+cachets). **Décision explicite de Benoît : ne pas investiguer plus
+  loin, ne rien corriger spéculativement.** Classé en point de vigilance (cf. `docs/reprise.md`,
+  `docs/SPEC.md` §11.B) — à rouvrir seulement si le chiffre réapparaît avec preuve (écran/date/export).
+
+### 01/08/2026 (fin de session : cycle de vie du contrat, bug heures+cachets moteur, fusion de branches close)
 
 - ✅ **Plan « cycle de vie du contrat » validé par Benoît avant code, implémenté en 2 commits**
   (`116b482`, `7c835de`) : `Contrat.statutVerification?: "a_verifier" | "confirme"` (défaut selon

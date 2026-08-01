@@ -20,6 +20,21 @@ jusqu'à `391ffce`), mais pas depuis. **À repousser en début de prochaine sess
 vrai manquement au devoir n°2 (cf. « Fait » ci-dessous).
 
 **Points de vigilance non résolus, non retouchés cette session — toujours à vérifier** :
+- **Bug SR ~400 000 € signalé, NON REPRODUIT, chantier NON FERMÉ** (01/08/2026) : Benoît a vu un SR
+  affiché manifestement irréaliste (~400 000 €). Investigation menée sur les 3 fichiers du moteur
+  concernés (`salaireReference.ts`/`decompteHeures.ts`/`periodeReference.ts`) et les 4 hypothèses
+  demandées (doublon, date aberrante, confusion mensuel/annuel, enseignement mal exclu), toutes
+  vérifiées avec preuve sur les données réelles disponibles (export du 31/07, 56 contrats) — SR
+  recalculé avec le vrai moteur = 6 049 €, somme de TOUS les contrats de toute la carrière =
+  25 593 €, aucun outlier. **Aucune reproduction obtenue.** Benoît confirme ne pas avoir d'écran, de
+  date ni d'export du moment où le chiffre est apparu, et pense qu'il s'agissait peut-être d'un bug
+  ponctuel déjà résolu par un correctif de cette session (ex. dédoublonnage heures+cachets,
+  `lib/correspondanceContrat.ts`, cf. « Fait » §4/§6 ci-dessous). Décision explicite : **ne pas
+  investiguer plus loin, ne rien corriger spéculativement (devoir n°2)** — cf. aussi l'écart
+  préexistant documenté dans `docs/SPEC.md` §11.B (formule A+B+C divergente à un SR ~400 000 €,
+  noté depuis le 31/07/2026, jamais rencontré à un SR réaliste). **Ne PAS rouvrir ce chantier sans
+  signal neuf** — seulement si le chiffre réapparaît, avec cette fois l'écran, la date, et si
+  possible un export JSON du moment.
 - `dateAnniversaire`/`dateAnniversairePrecedente` du profil réel de l'utilisateur : la note du
   31/07/2026 demandant de vérifier ces deux valeurs (`2027-01-17` et `2025-03-23`) n'a pas été
   reconfirmée explicitement cette session — à recontrôler, ne pas supposer que c'est fait.
