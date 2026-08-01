@@ -175,8 +175,105 @@ export function evaluerProposition(proposition: Proposition, profil: Profil): Pr
   }
 }
 
+type PropositionContrat = Extract<Proposition, { cible: "contrat" }>;
+
+/**
+ * Bug réel observé en production (01/08/2026, spécimen AEM) : le modèle peut décrire UN SEUL
+ * contrat physique (heures ET cachets coexistant sur le même document, cf. CAS 7 du prompt) par
+ * DEUX propositions "contrat" séparées au lieu d'une seule — chacune portant le MÊME `salaireBrut`.
+ * L'avertissement général généré disait déjà « même contrat », mais rien n'empêchait techniquement
+ * l'utilisateur de valider les deux cartes de revue, ce qui aurait compté 245 € deux fois dans le
+ * SR/NHT (devoir n°2). Une consigne de prompt plus explicite avait déjà été ajoutée avant ce test
+ * (« sur la MÊME proposition ») et n'a pas suffi à elle seule — ce garde-fou de routage ne dépend
+ * donc plus de l'obéissance du modèle à cette consigne.
+ *
+ * Détection volontairement STRICTE (conservatrice) : ne fusionne que deux propositions "contrat"
+ * partageant EXACTEMENT le même employeur, la même période (dateDebut + date) et le même
+ * salaireBrut, avec des `typeRemuneration` complémentaires (une "heures", une "cachet") portant
+ * chacune sa propre valeur (nbHeures / nbCachets) non nulle. Un critère plus large risquerait de
+ * fusionner deux contrats réellement distincts qui partageraient par coïncidence employeur et
+ * montant — pas acceptable non plus (perte d'information, devoir n°1).
+ *
+ * ⚠️ Ce que cette fusion NE règle PAS : `Contrat.typeRemuneration` reste un champ unique — le moteur
+ * (`engine/decompteHeures.ts`) ne lit que le champ correspondant (nbHeures si "heures", nbCachets si
+ * "cachet"), l'autre reste ignoré du décompte même une fois fusionné sur une seule proposition.
+ * Cette fusion élimine la duplication du SALAIRE ; elle ne tranche pas laquelle des deux unités doit
+ * compter pour les 507 h — la justification du contrat fusionné le signale explicitement, pour que
+ * la revue humaine (jamais une application directe, cf. "revue_formulaire") tranche en connaissance
+ * de cause.
+ */
+export function fusionnerContratsDupliques(propositions: Proposition[]): Proposition[] {
+  const consommes = new Set<number>();
+  const resultat: Proposition[] = [];
+
+  for (let i = 0; i < propositions.length; i++) {
+    if (consommes.has(i)) continue;
+    const p = propositions[i];
+    if (p.cible !== "contrat") {
+      resultat.push(p);
+      continue;
+    }
+
+    let indexDoublon = -1;
+    for (let j = i + 1; j < propositions.length; j++) {
+      if (consommes.has(j)) continue;
+      const q = propositions[j];
+      if (q.cible === "contrat" && sontUnContratDuplique(p, q)) {
+        indexDoublon = j;
+        break;
+      }
+    }
+
+    if (indexDoublon === -1) {
+      resultat.push(p);
+      continue;
+    }
+    consommes.add(indexDoublon);
+    resultat.push(fusionnerContrats(p, propositions[indexDoublon] as PropositionContrat));
+  }
+
+  return resultat;
+}
+
+function sontUnContratDuplique(a: PropositionContrat, b: PropositionContrat): boolean {
+  const memeContrat =
+    a.donnees.employeur === b.donnees.employeur && a.donnees.dateDebut === b.donnees.dateDebut && a.donnees.date === b.donnees.date && a.donnees.salaireBrut === b.donnees.salaireBrut;
+  if (!memeContrat) return false;
+
+  const typesRemuneration = new Set([a.donnees.typeRemuneration, b.donnees.typeRemuneration]);
+  const complementaires = typesRemuneration.has("heures") && typesRemuneration.has("cachet");
+  if (!complementaires) return false;
+
+  const proprietaireHeures = a.donnees.typeRemuneration === "heures" ? a : b;
+  const proprietaireCachets = a.donnees.typeRemuneration === "cachet" ? a : b;
+  return proprietaireHeures.donnees.nbHeures != null && proprietaireCachets.donnees.nbCachets != null;
+}
+
+function fusionnerContrats(a: PropositionContrat, b: PropositionContrat): PropositionContrat {
+  const proprietaireHeures = a.donnees.typeRemuneration === "heures" ? a : b;
+  const proprietaireCachets = a.donnees.typeRemuneration === "cachet" ? a : b;
+
+  return {
+    cible: "contrat",
+    donnees: {
+      ...a.donnees,
+      nbHeures: proprietaireHeures.donnees.nbHeures,
+      nbCachets: proprietaireCachets.donnees.nbCachets,
+      // Un seul salaireBrut compte pour ce contrat (identique sur les deux propositions d'origine,
+      // cf. sontUnContratDuplique) — jamais la somme des deux.
+      salaireBrut: a.donnees.salaireBrut,
+    },
+    confiance: { ...b.confiance, ...a.confiance },
+    justification:
+      `${a.justification} — Fusionné avec une seconde proposition détectée comme le même contrat ` +
+      `(heures et cachets coexistent sur ce document pour un seul salaire, jamais deux) : ${b.justification} ` +
+      `⚠️ Un seul des deux champs (nbHeures ou nbCachets) compte réellement dans le décompte des 507 h, ` +
+      `selon le mode de rémunération choisi ci-dessous — vérifie lequel est le bon avant d'enregistrer.`,
+  };
+}
+
 export function evaluerExtraction(resultat: ExtractionResult, profil: Profil): PropositionEvaluee[] {
-  return resultat.propositions.map((p) => evaluerProposition(p, profil));
+  return fusionnerContratsDupliques(resultat.propositions).map((p) => evaluerProposition(p, profil));
 }
 
 /**

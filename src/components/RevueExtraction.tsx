@@ -199,9 +199,13 @@ export function RevueExtraction({ resultat, profil, config, decompteActuel, onAj
             <h2 className="font-display text-lg font-semibold tracking-tight">{LABEL_DOCUMENT[resultat.typeDocumentDetecte]}</h2>
           </div>
           <p className="text-xs text-faint">
-            {resultat.propositions.length === 0
+            {/* evaluees.length, pas resultat.propositions.length : après fusionnerContratsDupliques
+                (routageExtraction.ts), le nombre de CARTES réellement affichées peut être inférieur
+                au nombre de propositions brutes renvoyées par le modèle — afficher le compte brut
+                ici serait incohérent avec ce qui est effectivement rendu en dessous. */}
+            {evaluees.length === 0
               ? "Aucune proposition"
-              : `${resultat.propositions.length} proposition${resultat.propositions.length > 1 ? "s" : ""} · ${restantes} à traiter`}
+              : `${evaluees.length} proposition${evaluees.length > 1 ? "s" : ""} · ${restantes} à traiter`}
           </p>
         </div>
         <p className="text-xs text-faint leading-relaxed">

@@ -145,6 +145,61 @@ export const extractionAemHeuresEtCachets: ExtractionResult = {
 };
 
 /**
+ * Même AEM que ci-dessus, mais dans la forme BRUTE réellement renvoyée par l'app déployée le
+ * 01/08/2026 (après le correctif CAS 7) : au lieu d'UNE proposition portant les deux champs, le
+ * modèle a produit DEUX propositions "contrat" distinctes — une "heures", une "cachet" — partageant
+ * le MÊME `salaireBrut: 245`. L'avertissement général confirmait déjà « même contrat », mais rien
+ * n'empêchait techniquement de valider les deux cartes de revue, ce qui aurait compté 245 € deux
+ * fois. Cette fixture fige le cas d'ENTRÉE de `fusionnerContratsDupliques` (cf.
+ * routageExtraction.ts) — la sortie attendue après fusion est structurellement identique à
+ * `extractionAemHeuresEtCachets` ci-dessus (un seul salaireBrut, les deux champs réunis).
+ */
+export const extractionAemDupliqueeHeuresCachets: ExtractionResult = {
+  typeDocumentDetecte: "aem",
+  propositions: [
+    {
+      cible: "contrat",
+      donnees: {
+        date: "2026-06-28",
+        dateDebut: "2026-06-26",
+        type: "artiste",
+        typeRemuneration: "heures",
+        territoire: null,
+        nbCachets: null,
+        nbHeures: 14,
+        nbJoursEEE: null,
+        salaireBrut: 245,
+        employeur: "Association Fictive du Festival de Test",
+        etablissementAgree: null,
+        enRapportAvecMetier: null,
+      },
+      confiance: { date: "haute", dateDebut: "haute", type: "haute", typeRemuneration: "haute", nbHeures: "haute", salaireBrut: "haute", employeur: "haute" },
+      justification: "« Nombre d'HEURES effectuées : 14 » ; « SALAIRES BRUTS 245,00 » ; employeur « Association Fictive du Festival de Test ».",
+    },
+    {
+      cible: "contrat",
+      donnees: {
+        date: "2026-06-28",
+        dateDebut: "2026-06-26",
+        type: "artiste",
+        typeRemuneration: "cachet",
+        territoire: null,
+        nbCachets: 3,
+        nbHeures: null,
+        nbJoursEEE: null,
+        salaireBrut: 245,
+        employeur: "Association Fictive du Festival de Test",
+        etablissementAgree: null,
+        enRapportAvecMetier: null,
+      },
+      confiance: { date: "haute", dateDebut: "haute", type: "haute", typeRemuneration: "haute", nbCachets: "haute", salaireBrut: "haute", employeur: "haute" },
+      justification: "« Nombre de CACHETS isolés 3 » ; « SALAIRES BRUTS 245,00 » ; employeur « Association Fictive du Festival de Test ».",
+    },
+  ],
+  avertissementsGeneraux: ["Les deux modes de rémunération (heures et cachets) sont présents et doivent être traités séparément pour le même contrat."],
+};
+
+/**
  * Cas des refus (aj_reelle_historique, profil_ouverture_droits) + un cas de revue manuelle
  * (periode_assimilee, routée vers PeriodeForm depuis le 31/07/2026) : chaque proposition ici doit
  * être affichée sans jamais s'appliquer directement (statut "applicable"). Sert à vérifier
@@ -291,6 +346,7 @@ export const FIXTURES_EXTRACTION: { id: string; libelle: string; resultat: Extra
   { id: "notification", libelle: "Notification d'admission (tout applicable)", resultat: extractionNotificationAdmission },
   { id: "bulletin", libelle: "Bulletin de paie (champs manquants)", resultat: extractionBulletinPaie },
   { id: "aem_heures_et_cachets", libelle: "AEM (heures ET cachets sur le même contrat)", resultat: extractionAemHeuresEtCachets },
+  { id: "aem_dupliquee", libelle: "AEM (bug réel : salaire dupliqué sur 2 propositions, avant fusion)", resultat: extractionAemDupliqueeHeuresCachets },
   { id: "releve", libelle: "Relevé de situation (2 refus + 1 à vérifier)", resultat: extractionReleveAvecRefus },
   { id: "justificatif_declaration", libelle: "Justificatif de déclaration mensuelle (même employeur 2×, à ne pas fusionner)", resultat: extractionJustificatifDeclaration },
   { id: "non_reconnu", libelle: "Document non reconnu (rien à proposer)", resultat: extractionNonReconnue },

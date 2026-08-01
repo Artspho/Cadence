@@ -1,8 +1,15 @@
 import { describe, expect, it } from "vitest";
 import type { Profil } from "../../types";
 import type { Proposition } from "../../types/extraction";
-import { contratDepuisProposition, evaluerExtraction, evaluerProposition, periodeDepuisProposition, profilAvecProposition } from "../routageExtraction";
-import { extractionAemHeuresEtCachets, extractionBulletinPaie, extractionJustificatifDeclaration, extractionNotificationAdmission, extractionReleveAvecRefus } from "../fixturesExtraction";
+import { contratDepuisProposition, evaluerExtraction, evaluerProposition, fusionnerContratsDupliques, periodeDepuisProposition, profilAvecProposition } from "../routageExtraction";
+import {
+  extractionAemDupliqueeHeuresCachets,
+  extractionAemHeuresEtCachets,
+  extractionBulletinPaie,
+  extractionJustificatifDeclaration,
+  extractionNotificationAdmission,
+  extractionReleveAvecRefus,
+} from "../fixturesExtraction";
 
 const profilBase: Profil = {
   dateNaissance: "1988-04-12",
@@ -245,6 +252,56 @@ describe("contrat — toujours relu dans le formulaire, jamais appliqué directe
     const valeurs = contratDepuisProposition(propositionMixte.donnees);
     expect(valeurs.nbHeures).toBe(14);
     expect(valeurs.nbCachets).toBe(3);
+  });
+});
+
+describe("fusionnerContratsDupliques — bug réel du 01/08/2026 : salaire dupliqué sur deux propositions", () => {
+  it("fusionne deux propositions du même contrat (heures + cachet, même salaire) en une seule", () => {
+    const fusionnees = fusionnerContratsDupliques(extractionAemDupliqueeHeuresCachets.propositions);
+    const contrats = fusionnees.filter((p) => p.cible === "contrat");
+    expect(contrats).toHaveLength(1);
+  });
+
+  it("ne compte le salaire qu'une seule fois après fusion, jamais la somme des deux propositions d'origine", () => {
+    const fusionnees = fusionnerContratsDupliques(extractionAemDupliqueeHeuresCachets.propositions) as Extract<Proposition, { cible: "contrat" }>[];
+    const totalSalaire = fusionnees.filter((p) => p.cible === "contrat").reduce((total, p) => total + p.donnees.salaireBrut, 0);
+    expect(totalSalaire).toBe(245); // pas 490 (245 × 2), le bug qu'aurait produit les deux propositions non fusionnées
+  });
+
+  it("conserve nbHeures ET nbCachets sur la proposition fusionnée, sans en perdre aucun", () => {
+    const [fusionnee] = fusionnerContratsDupliques(extractionAemDupliqueeHeuresCachets.propositions) as Extract<Proposition, { cible: "contrat" }>[];
+    expect(fusionnee.donnees.nbHeures).toBe(14);
+    expect(fusionnee.donnees.nbCachets).toBe(3);
+  });
+
+  it("signale dans la justification qu'un seul des deux champs compte réellement pour le décompte", () => {
+    const [fusionnee] = fusionnerContratsDupliques(extractionAemDupliqueeHeuresCachets.propositions) as Extract<Proposition, { cible: "contrat" }>[];
+    expect(fusionnee.justification).toMatch(/un seul des deux champs.*compte réellement/i);
+  });
+
+  it("bout en bout via evaluerExtraction : une seule carte de revue, pas deux, pour ce document", () => {
+    const evaluees = evaluerExtraction(extractionAemDupliqueeHeuresCachets, profilBase);
+    const contrats = evaluees.filter((e) => e.proposition.cible === "contrat");
+    expect(contrats).toHaveLength(1);
+  });
+
+  it("ne fusionne PAS deux contrats aux montants différents (pas un vrai doublon)", () => {
+    const [a, b] = extractionAemDupliqueeHeuresCachets.propositions as Extract<Proposition, { cible: "contrat" }>[];
+    const bMontantDifferent = { ...b, donnees: { ...b.donnees, salaireBrut: 300 } };
+    const fusionnees = fusionnerContratsDupliques([a, bMontantDifferent]);
+    expect(fusionnees.filter((p) => p.cible === "contrat")).toHaveLength(2);
+  });
+
+  it("ne fusionne PAS deux contrats d'employeurs différents, même mêmes dates et montant", () => {
+    const [a, b] = extractionAemDupliqueeHeuresCachets.propositions as Extract<Proposition, { cible: "contrat" }>[];
+    const bAutreEmployeur = { ...b, donnees: { ...b.donnees, employeur: "Un Autre Employeur Fictif" } };
+    const fusionnees = fusionnerContratsDupliques([a, bAutreEmployeur]);
+    expect(fusionnees.filter((p) => p.cible === "contrat")).toHaveLength(2);
+  });
+
+  it("laisse intacts des contrats normaux qui ne sont pas des doublons (aucun effet de bord)", () => {
+    const fusionnees = fusionnerContratsDupliques(extractionBulletinPaie.propositions);
+    expect(fusionnees).toEqual(extractionBulletinPaie.propositions);
   });
 });
 
