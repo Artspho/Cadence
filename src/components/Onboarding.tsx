@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { validerCoherenceProfil } from "../lib/coherenceProfil";
+import { DateNaissanceInput } from "./DateNaissanceInput";
 import type { Profil } from "../types";
 
 interface OnboardingProps {
@@ -45,16 +46,8 @@ export function Onboarding({ onTerminer }: OnboardingProps) {
 
       <div className="bg-surface border border-line rounded-card p-6 space-y-6">
         <div>
-          <label className="block text-xs uppercase tracking-[.03em] text-muted mb-2" htmlFor="date-naissance">
-            Date de naissance
-          </label>
-          <input
-            id="date-naissance"
-            type="date"
-            value={dateNaissance}
-            onChange={(e) => setDateNaissance(e.target.value)}
-            className="w-full bg-surface-2 border border-line rounded-lg px-3 py-2 text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-mint"
-          />
+          <span className="block text-xs uppercase tracking-[.03em] text-muted mb-2">Date de naissance</span>
+          <DateNaissanceInput value={dateNaissance} onChange={setDateNaissance} idPrefix="date-naissance" />
           <p className="text-xs text-faint mt-1">Sert à déterminer ton plafond d'heures d'enseignement (70 h avant 50 ans, 120 h après).</p>
         </div>
 

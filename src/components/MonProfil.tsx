@@ -10,6 +10,7 @@ import { PeriodeForm } from "./PeriodeForm";
 import { PeriodeList } from "./PeriodeList";
 import { DocumentsUtiles } from "./DocumentsUtiles";
 import { RenouvellementAnticipe } from "./RenouvellementAnticipe";
+import { DateNaissanceInput } from "./DateNaissanceInput";
 
 type OnModifierProfil = (profil: Profil) => ResultatEcritureProfil;
 
@@ -90,18 +91,14 @@ export function MonProfil({ dateDuJour, profil, onModifierProfil, contrats, peri
 
         <div className="bg-surface border border-line rounded-card p-5 space-y-5 mb-4">
           <div>
-            <label className="block text-xs uppercase tracking-[.03em] text-muted mb-2" htmlFor="profil-date-naissance">
-              Date de naissance
-            </label>
-            <input
-              id="profil-date-naissance"
-              type="date"
+            <span className="block text-xs uppercase tracking-[.03em] text-muted mb-2">Date de naissance</span>
+            <DateNaissanceInput
               value={dateNaissance}
-              onChange={(e) => {
-                setDateNaissance(e.target.value);
+              onChange={(v) => {
+                setDateNaissance(v);
                 reinitialiserConfirmation();
               }}
-              className="w-full bg-surface-2 border border-line rounded-lg px-3 py-2 text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-mint"
+              idPrefix="profil-date-naissance"
             />
           </div>
 
