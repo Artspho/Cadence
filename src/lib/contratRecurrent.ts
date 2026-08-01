@@ -51,6 +51,9 @@ export function genererContratsRecurrents(params: ParametresContratRecurrent, ge
         enRapportAvecMetier,
         source: "recurrent",
         recurrenceId,
+        // Anticipé, pas encore adossé à un document officiel — même défaut que la saisie manuelle
+        // (cf. storage/localStorageAdapter.ts, statutVerificationParDefaut).
+        statutVerification: "a_verifier",
       });
     }
     curseur = addMonths(curseur, 1);

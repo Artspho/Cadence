@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { SCHEMA_VERSION_DONNEES, exporterJSON, importerJSON, type DonneesApp } from "../localStorageAdapter";
+import { SCHEMA_VERSION_DONNEES, creerContrat, exporterJSON, importerJSON, type DonneesApp } from "../localStorageAdapter";
 import { contrat, periode, profil } from "../../engine/__tests__/testUtils";
 
 const DATE_EXPORT_FIXE = new Date("2026-07-20T10:00:00.000Z");
@@ -142,6 +142,30 @@ describe("exporterJSON / importerJSON — round-trip", () => {
     const reimporte = importerJSON(exportAncien);
     expect(reimporte.profil?.ajReelleHistorique).toBeUndefined();
     expect(reimporte.soldeIndemnisationDepart).toEqual({ dateDepart: "2026-02-01" });
+  });
+});
+
+// 01/08/2026 : un contrat saisi de mémoire (manuel/récurrent) n'est pas encore adossé à un document
+// officiel ; un contrat importé d'un vrai document (AEM/bulletin) EST déjà la confirmation.
+describe("creerContrat — statutVerification par défaut selon la provenance", () => {
+  it("un contrat manuel est 'a_verifier' par défaut", () => {
+    const c = creerContrat(contrat({ date: "2026-06-01", source: "manuel" }));
+    expect(c.statutVerification).toBe("a_verifier");
+  });
+
+  it("un contrat importé (PDF/IA) est 'confirme' par défaut — le document EST la confirmation", () => {
+    const c = creerContrat(contrat({ date: "2026-06-01", source: "import_pdf" }));
+    expect(c.statutVerification).toBe("confirme");
+  });
+
+  it("sans source renseignée, se comporte comme une saisie manuelle ('a_verifier')", () => {
+    const c = creerContrat(contrat({ date: "2026-06-01" }));
+    expect(c.statutVerification).toBe("a_verifier");
+  });
+
+  it("un statutVerification déjà fourni explicitement n'est jamais écrasé par le défaut", () => {
+    const c = creerContrat(contrat({ date: "2026-06-01", source: "manuel", statutVerification: "confirme" }));
+    expect(c.statutVerification).toBe("confirme");
   });
 });
 

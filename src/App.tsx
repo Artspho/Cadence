@@ -45,6 +45,10 @@ export default function App() {
   const [erreurImport, setErreurImport] = useState<string | null>(null);
   const [fichierEnAttenteImport, setFichierEnAttenteImport] = useState<File | null>(null);
   const [importEnCours, setImportEnCours] = useState(false);
+  // État d'édition d'un contrat (ContractList.tsx) remonté ici : le formulaire "Nouveau contrat"
+  // ci-dessous doit disparaître pendant une édition, sinon deux <ContractForm> coexistent avec les
+  // mêmes `id` de champs (bug trouvé en vérifiant dans le navigateur, 01/08/2026).
+  const [contratEnEdition, setContratEnEdition] = useState<Contrat | null>(null);
   const chargementTermine = useRef(false);
   const inputImportRef = useRef<HTMLInputElement>(null);
 
@@ -131,6 +135,18 @@ export default function App() {
 
   function supprimerContrat(id: string) {
     setDonnees((d) => (d ? { ...d, contrats: d.contrats.filter((c) => c.id !== id) } : d));
+  }
+
+  /**
+   * Remplace TOUS les champs d'un contrat existant (id inchangé) — n'existait pas avant le 01/08/2026
+   * (seuls ajouterContrat/supprimerContrat existaient). Deux appelants : l'édition libre depuis
+   * ContractList.tsx (préserve explicitement statutVerification, cf. son commentaire) et la
+   * confirmation de correspondance AEM depuis RevueExtraction.tsx (bascule statutVerification à
+   * "confirme" avec les valeurs du document) — chacun décide de statutVerification à l'appel, cette
+   * fonction ne fait que remplacer, aucune règle métier ici (même esprit que ajouterContrat).
+   */
+  function modifierContrat(id: string, nouveauContrat: Omit<Contrat, "id">) {
+    setDonnees((d) => (d ? { ...d, contrats: d.contrats.map((c) => (c.id === id ? { ...nouveauContrat, id } : c)) } : d));
   }
 
   function ajouterPeriode(partiel: Omit<PeriodeAssimilee, "id">) {
@@ -308,8 +324,22 @@ export default function App() {
 
         {onglet === "contrats" && calculs && (
           <div className="space-y-6">
-            <ContractForm profil={profil} config={franceTravailConfig} decompteActuel={calculs.decompte} onValider={ajouterContrat} onValiderRecurrent={ajouterContratsRecurrents} />
-            <ContractList contrats={donnees.contrats} config={franceTravailConfig} onSupprimer={supprimerContrat} onSupprimerSerie={supprimerSerie} />
+            {/* Masqué pendant une édition (cf. le commentaire sur contratEnEdition ci-dessus) : deux
+                <ContractForm> montés en même temps partageraient les mêmes `id` de champs. */}
+            {!contratEnEdition && (
+              <ContractForm profil={profil} config={franceTravailConfig} decompteActuel={calculs.decompte} onValider={ajouterContrat} onValiderRecurrent={ajouterContratsRecurrents} />
+            )}
+            <ContractList
+              profil={profil}
+              contrats={donnees.contrats}
+              config={franceTravailConfig}
+              decompteActuel={calculs.decompte}
+              onSupprimer={supprimerContrat}
+              onSupprimerSerie={supprimerSerie}
+              onModifierContrat={modifierContrat}
+              contratEnEdition={contratEnEdition}
+              onChangerContratEnEdition={setContratEnEdition}
+            />
           </div>
         )}
 

@@ -51,6 +51,7 @@ const contratSchema = z.object({
   enRapportAvecMetier: z.boolean().optional(),
   source: z.enum(["manuel", "import_pdf", "recurrent"]).optional(),
   recurrenceId: z.string().optional(),
+  statutVerification: z.enum(["a_verifier", "confirme"]).optional(),
 });
 
 const periodeSchema = z.object({
@@ -244,8 +245,21 @@ export function importerJSON(contenu: string): DonneesApp {
   return parse.data;
 }
 
+/**
+ * Statut de vérification par défaut à la CRÉATION d'un contrat, selon sa provenance (`source`) —
+ * jamais un choix de l'utilisateur dans le formulaire (cf. types/index.ts). Un document déjà lu
+ * (`import_pdf`) EST la confirmation ; une saisie de mémoire (`manuel`, ou `recurrent` — anticipée,
+ * pas encore adossée à un document) reste "a_verifier" jusqu'à preuve du contraire. Un
+ * `statutVerification` déjà fourni explicitement par l'appelant (ex. mise à jour d'un contrat
+ * existant) n'est jamais écrasé par ce défaut.
+ */
+function statutVerificationParDefaut(partiel: Omit<Contrat, "id">): "a_verifier" | "confirme" {
+  if (partiel.statutVerification) return partiel.statutVerification;
+  return partiel.source === "import_pdf" ? "confirme" : "a_verifier";
+}
+
 export function creerContrat(partiel: Omit<Contrat, "id">): Contrat {
-  return { id: crypto.randomUUID(), ...partiel };
+  return { id: crypto.randomUUID(), ...partiel, statutVerification: statutVerificationParDefaut(partiel) };
 }
 
 export function creerPeriode(partiel: Omit<PeriodeAssimilee, "id">): PeriodeAssimilee {

@@ -36,6 +36,15 @@ export interface Contrat {
   // supprimer ensemble dans ContractList.tsx. Absent = contrat saisi normalement, comportement
   // inchangé (champ optionnel, aucune migration requise).
   recurrenceId?: string;
+  // Cycle de vie du contrat (01/08/2026) : "a_verifier" = saisi de mémoire/anticipation, pas encore
+  // adossé à un document officiel (AEM/bulletin) ; "confirme" = les valeurs reflètent un document
+  // officiel lu (import IA/PDF, ou correspondance validée avec un contrat "a_verifier" existant,
+  // cf. lib/correspondanceContrat.ts). Défaut à la création selon `source` (creerContrat,
+  // storage/localStorageAdapter.ts) — jamais un choix de l'utilisateur dans le formulaire.
+  // ABSENT sur tout contrat déjà existant avant ce champ (jamais renseigné rétroactivement, devoir
+  // n°1) : une absence ne doit JAMAIS être lue comme l'un ou l'autre état par l'UI (devoir n°2) —
+  // seule une valeur explicite déclenche un affichage.
+  statutVerification?: "a_verifier" | "confirme";
 }
 
 // Périodes assimilées (5 h/jour) & événements affectant la période de référence
