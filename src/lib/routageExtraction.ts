@@ -33,6 +33,7 @@
 
 import type { Contrat, PeriodeAssimilee, Profil } from "../types";
 import type { ExtractionResult, Proposition } from "../types/extraction";
+import { trouverContratsCorrespondants } from "./correspondanceContrat";
 
 export type StatutProposition =
   /** Va dans le formulaire de contrat, pré-rempli, pour relecture champ par champ. Jamais direct. */
@@ -57,6 +58,13 @@ export interface PropositionEvaluee {
    * évite qu'une valeur par défaut soit lue comme une valeur extraite.
    */
   avertissements: string[];
+  /**
+   * Contrats "a_verifier" existants qui pourraient être LE MÊME contrat que celui-ci (même
+   * employeur, période proche/qui se recoupe, cf. lib/correspondanceContrat.ts) — uniquement pour
+   * `cible: "contrat"`, toujours vide sinon. Présence de candidats = RevueExtraction.tsx doit
+   * proposer une correspondance plutôt qu'une création directe (jamais choisie automatiquement).
+   */
+  correspondances?: Contrat[];
 }
 
 const TITRES: Record<Proposition["cible"], string> = {
@@ -75,7 +83,7 @@ const DEFAUTS_FORMULAIRE_CONTRAT: { champ: "type" | "typeRemuneration" | "territ
   { champ: "territoire", libelle: "le territoire", defaut: "France" },
 ];
 
-export function evaluerProposition(proposition: Proposition, profil: Profil): PropositionEvaluee {
+export function evaluerProposition(proposition: Proposition, profil: Profil, contratsExistants: Contrat[] = []): PropositionEvaluee {
   const titre = TITRES[proposition.cible];
 
   switch (proposition.cible) {
@@ -86,7 +94,11 @@ export function evaluerProposition(proposition: Proposition, profil: Profil): Pr
       const avertissements = DEFAUTS_FORMULAIRE_CONTRAT.filter((d) => proposition.donnees[d.champ] === null).map(
         (d) => `Le document n'indique pas ${d.libelle} : le formulaire propose « ${d.defaut} » par défaut. Vérifie ce champ avant d'enregistrer.`
       );
-      return { proposition, titre, statut: "revue_formulaire", avertissements };
+      const correspondances = trouverContratsCorrespondants(
+        { employeur: proposition.donnees.employeur, date: proposition.donnees.date, dateDebut: proposition.donnees.dateDebut ?? proposition.donnees.date, salaireBrut: proposition.donnees.salaireBrut },
+        contratsExistants
+      );
+      return { proposition, titre, statut: "revue_formulaire", avertissements, correspondances };
     }
 
     case "profil_ouverture_droits": {
@@ -273,8 +285,8 @@ function fusionnerContrats(a: PropositionContrat, b: PropositionContrat): Propos
   };
 }
 
-export function evaluerExtraction(resultat: ExtractionResult, profil: Profil): PropositionEvaluee[] {
-  return fusionnerContratsDupliques(resultat.propositions).map((p) => evaluerProposition(p, profil));
+export function evaluerExtraction(resultat: ExtractionResult, profil: Profil, contratsExistants: Contrat[] = []): PropositionEvaluee[] {
+  return fusionnerContratsDupliques(resultat.propositions).map((p) => evaluerProposition(p, profil, contratsExistants));
 }
 
 /**
@@ -297,6 +309,75 @@ export function contratDepuisProposition(donnees: Extract<Proposition, { cible: 
     etablissementAgree: donnees.etablissementAgree ?? undefined,
     enRapportAvecMetier: donnees.enRapportAvecMetier ?? undefined,
     source: "import_pdf",
+  };
+}
+
+/**
+ * Champs (parmi ceux du contrat) qui DIFFÉRERAIENT entre un contrat existant et les valeurs lues
+ * dans un document — pour l'écran « Ancien → Nouveau » avant confirmation d'une correspondance
+ * (cf. plan « cycle de vie du contrat », §3 : l'AEM fait foi, mais jamais silencieusement). Un champ
+ * non lu par le document (`null`) n'est jamais compté comme une divergence : la valeur existante
+ * n'est jamais présentée comme "sur le point de changer" pour un champ que le document ne dit pas.
+ */
+const CHAMPS_COMPARABLES: (keyof Contrat)[] = [
+  "date",
+  "dateDebut",
+  "type",
+  "typeRemuneration",
+  "territoire",
+  "nbCachets",
+  "nbHeures",
+  "nbJoursEEE",
+  "salaireBrut",
+  "employeur",
+  "etablissementAgree",
+  "enRapportAvecMetier",
+];
+
+export interface ChampDivergent {
+  champ: keyof Contrat;
+  ancien: unknown;
+  nouveau: unknown;
+}
+
+/** Divergences entre un contrat existant et ce qu'un document propose — jamais les champs non lus. */
+export function champsDivergents(existant: Contrat, proposition: Extract<Proposition, { cible: "contrat" }>["donnees"]): ChampDivergent[] {
+  const nouveau = contratDepuisProposition(proposition);
+  return CHAMPS_COMPARABLES.filter((champ) => nouveau[champ] !== undefined && nouveau[champ] !== existant[champ]).map((champ) => ({
+    champ,
+    ancien: existant[champ],
+    nouveau: nouveau[champ],
+  }));
+}
+
+/**
+ * Contrat existant mis à jour avec les valeurs du document, champ par champ — JAMAIS un spread
+ * aveugle de `contratDepuisProposition` (qui porte `undefined` sur chaque champ non lu : un spread
+ * l'écraserait sur la valeur déjà saisie, violant le devoir n°1). Même principe que
+ * `profilAvecProposition` : un champ non lu conserve la valeur déjà présente sur le contrat.
+ * `recurrenceId` est préservé tel quel — confirmé sans risque : `ContractList.tsx` regroupe les
+ * contrats d'une série uniquement par `recurrenceId`, jamais par `statutVerification` ni par les
+ * autres champs métier, donc les mettre à jour ne modifie ni le regroupement ni la suppression de
+ * la série (`supprimerSerie`, qui filtre uniquement sur `recurrenceId`).
+ */
+export function contratConfirmeDepuisCorrespondance(existant: Contrat, proposition: Extract<Proposition, { cible: "contrat" }>["donnees"]): Omit<Contrat, "id"> {
+  const nouveau = contratDepuisProposition(proposition);
+  return {
+    date: nouveau.date ?? existant.date,
+    dateDebut: nouveau.dateDebut ?? existant.dateDebut,
+    type: nouveau.type ?? existant.type,
+    typeRemuneration: nouveau.typeRemuneration ?? existant.typeRemuneration,
+    territoire: nouveau.territoire ?? existant.territoire,
+    nbCachets: nouveau.nbCachets ?? existant.nbCachets,
+    nbHeures: nouveau.nbHeures ?? existant.nbHeures,
+    nbJoursEEE: nouveau.nbJoursEEE ?? existant.nbJoursEEE,
+    salaireBrut: nouveau.salaireBrut ?? existant.salaireBrut,
+    employeur: nouveau.employeur ?? existant.employeur,
+    etablissementAgree: nouveau.etablissementAgree ?? existant.etablissementAgree,
+    enRapportAvecMetier: nouveau.enRapportAvecMetier ?? existant.enRapportAvecMetier,
+    source: "import_pdf",
+    recurrenceId: existant.recurrenceId,
+    statutVerification: "confirme",
   };
 }
 

@@ -18,7 +18,16 @@ import type { ExtractionResult, Proposition } from "../types/extraction";
 import type { FranceTravailConfig } from "../config/franceTravailConfig";
 import { RAPPEL_DOCUMENT_ENVOYE } from "../content/mentionEnvoiIA";
 import type { ResultatEcritureProfil } from "../lib/coherenceProfil";
-import { contratDepuisProposition, evaluerExtraction, periodeDepuisProposition, profilAvecProposition, type PropositionEvaluee, type StatutProposition } from "../lib/routageExtraction";
+import {
+  champsDivergents,
+  contratConfirmeDepuisCorrespondance,
+  contratDepuisProposition,
+  evaluerExtraction,
+  periodeDepuisProposition,
+  profilAvecProposition,
+  type PropositionEvaluee,
+  type StatutProposition,
+} from "../lib/routageExtraction";
 import { ContractForm } from "./ContractForm";
 import { PeriodeForm } from "./PeriodeForm";
 
@@ -30,6 +39,15 @@ interface RevueExtractionProps {
   onAjouterContrat: (contrat: Omit<Contrat, "id">) => void;
   onAjouterPeriode: (periode: Omit<PeriodeAssimilee, "id">) => void;
   onModifierProfil: (profil: Profil) => ResultatEcritureProfil;
+  /**
+   * Contrats déjà saisis, pour proposer une correspondance plutôt qu'une création systématique
+   * (cf. lib/correspondanceContrat.ts). Optionnel : absent (ex. bac à sable de développement, qui
+   * n'a pas d'identifiants réels) = aucune correspondance jamais recherchée, comportement inchangé.
+   */
+  contrats?: Contrat[];
+  /** Requis seulement si `contrats` est fourni — confirme une correspondance en mettant à jour le
+   * contrat existant désigné (cf. contratConfirmeDepuisCorrespondance). */
+  onModifierContrat?: (id: string, contrat: Omit<Contrat, "id">) => void;
   /** Bandeau affiché au-dessus de tout (ex. avertissement « extraction simulée » en développement). */
   bandeau?: React.ReactNode;
   /**
@@ -151,8 +169,20 @@ function formaterValeur(valeur: unknown): { texte: string; nonLu: boolean } {
   return { texte: String(valeur), nonLu: false };
 }
 
-export function RevueExtraction({ resultat, profil, config, decompteActuel, onAjouterContrat, onAjouterPeriode, onModifierProfil, bandeau, documentEnvoye = false }: RevueExtractionProps) {
-  const evaluees = evaluerExtraction(resultat, profil);
+export function RevueExtraction({
+  resultat,
+  profil,
+  config,
+  decompteActuel,
+  onAjouterContrat,
+  onAjouterPeriode,
+  onModifierProfil,
+  contrats = [],
+  onModifierContrat,
+  bandeau,
+  documentEnvoye = false,
+}: RevueExtractionProps) {
+  const evaluees = evaluerExtraction(resultat, profil, contrats);
   const [etats, setEtats] = useState<Record<number, EtatCarte>>({});
   const [erreurs, setErreurs] = useState<Record<number, string>>({});
   const [formulaireOuvert, setFormulaireOuvert] = useState<number | null>(null);
@@ -183,6 +213,17 @@ export function RevueExtraction({ resultat, profil, config, decompteActuel, onAj
   function enregistrerPeriode(index: number, periode: Omit<PeriodeAssimilee, "id">) {
     onAjouterPeriode(periode);
     setFormulaireOuvert(null);
+    setEtats((s) => ({ ...s, [index]: "applique" }));
+  }
+
+  /**
+   * Confirme qu'un contrat déjà saisi ("a_verifier") EST celui décrit par ce document — met à jour
+   * ses champs avec les valeurs officielles (contratConfirmeDepuisCorrespondance, jamais un spread
+   * aveugle) et le fait passer à "confirme". N'ajoute JAMAIS un nouveau contrat : c'est exactement
+   * ce qui évite le doublon (cf. plan « cycle de vie du contrat »).
+   */
+  function confirmerCorrespondance(index: number, existant: Contrat, proposition: Extract<Proposition, { cible: "contrat" }>) {
+    onModifierContrat?.(existant.id, contratConfirmeDepuisCorrespondance(existant, proposition.donnees));
     setEtats((s) => ({ ...s, [index]: "applique" }));
   }
 
@@ -239,6 +280,9 @@ export function RevueExtraction({ resultat, profil, config, decompteActuel, onAj
           onFermerFormulaire={() => setFormulaireOuvert(null)}
           onEnregistrerContrat={(contrat) => enregistrerContrat(index, contrat)}
           onEnregistrerPeriode={(periode) => enregistrerPeriode(index, periode)}
+          onConfirmerCorrespondance={(existant) => {
+            if (evaluee.proposition.cible === "contrat") confirmerCorrespondance(index, existant, evaluee.proposition);
+          }}
           onEcarter={() => setEtats((s) => ({ ...s, [index]: "ecarte" }))}
         />
       ))}
@@ -259,6 +303,7 @@ interface CartePropositionProps {
   onFermerFormulaire: () => void;
   onEnregistrerContrat: (contrat: Omit<Contrat, "id">) => void;
   onEnregistrerPeriode: (periode: Omit<PeriodeAssimilee, "id">) => void;
+  onConfirmerCorrespondance: (existant: Contrat) => void;
   onEcarter: () => void;
 }
 
@@ -275,12 +320,18 @@ function CarteProposition({
   onFermerFormulaire,
   onEnregistrerContrat,
   onEnregistrerPeriode,
+  onConfirmerCorrespondance,
   onEcarter,
 }: CartePropositionProps) {
-  const { proposition, titre, statut, motif, avertissements } = evaluee;
+  const { proposition, titre, statut, motif, avertissements, correspondances } = evaluee;
   const labels = LABELS_CHAMPS[proposition.cible];
   const style = STYLE_STATUT[statut];
   const traitee = etat !== "en_attente";
+  // Choix explicite de l'utilisateur d'ignorer les correspondances proposées et de traiter ce
+  // document comme un contrat séparé (cf. plan, §5 : jamais un choix automatique). Purement local à
+  // la carte — ne fait rien tant que rien n'est validé, donc pas besoin d'être suivi par le parent.
+  const [traiterCommeNouveau, setTraiterCommeNouveau] = useState(false);
+  const aDesCorrespondances = proposition.cible === "contrat" && (correspondances?.length ?? 0) > 0 && !traiterCommeNouveau;
 
   return (
     <section className={`bg-surface border rounded-card p-5 space-y-4 transition-opacity ${traitee ? "border-line opacity-60" : "border-line"}`}>
@@ -330,7 +381,46 @@ function CarteProposition({
         </p>
       )}
 
-      {!traitee && !formulaireOuvert && (
+      {!traitee && !formulaireOuvert && aDesCorrespondances && proposition.cible === "contrat" && (
+        <div className="space-y-3">
+          <p className="text-sm text-ink">Ce document semble correspondre à un contrat déjà saisi :</p>
+          {(correspondances ?? []).map((candidat) => {
+            const divergences = champsDivergents(candidat, proposition.donnees);
+            return (
+              <div key={candidat.id} className="border border-line rounded-lg p-3 space-y-2.5">
+                <p className="text-sm text-ink">
+                  {candidat.employeur} · {candidat.dateDebut} → {candidat.date} · {candidat.salaireBrut.toFixed(0)} € brut
+                  <span className="ml-2 text-xs font-normal px-2 py-0.5 rounded-full bg-surface-2 text-muted border border-line align-middle">AEM/bulletin en attente</span>
+                </p>
+                {divergences.length > 0 && (
+                  <ul className="text-xs text-muted space-y-1">
+                    {divergences.map((d) => {
+                      const ancien = formaterValeur(d.ancien).texte;
+                      const nouveau = formaterValeur(d.nouveau).texte;
+                      return (
+                        <li key={String(d.champ)}>
+                          {labels[d.champ] ?? humaniserCle(String(d.champ))} : <span className="text-faint">{ancien}</span> → <span className="text-ink font-medium">{nouveau}</span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+                <button
+                  onClick={() => onConfirmerCorrespondance(candidat)}
+                  className="bg-mint text-bg font-medium rounded-lg px-4 py-2 text-sm transition-opacity hover:opacity-90"
+                >
+                  Confirmer la correspondance avec ce contrat
+                </button>
+              </div>
+            );
+          })}
+          <button onClick={() => setTraiterCommeNouveau(true)} className="px-4 py-2 rounded-lg border border-line text-muted text-sm hover:text-ink transition-colors">
+            Aucun de ceux-ci — nouveau contrat séparé
+          </button>
+        </div>
+      )}
+
+      {!traitee && !formulaireOuvert && !aDesCorrespondances && (
         <div className="flex items-center gap-2 flex-wrap">
           {statut === "applicable" && (
             <button onClick={onAppliquer} className="bg-mint text-bg font-medium rounded-lg px-4 py-2 text-sm transition-opacity hover:opacity-90">

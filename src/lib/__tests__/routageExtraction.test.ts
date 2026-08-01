@@ -1,7 +1,17 @@
 import { describe, expect, it } from "vitest";
 import type { Profil } from "../../types";
 import type { Proposition } from "../../types/extraction";
-import { contratDepuisProposition, evaluerExtraction, evaluerProposition, fusionnerContratsDupliques, periodeDepuisProposition, profilAvecProposition } from "../routageExtraction";
+import { contrat } from "../../engine/__tests__/testUtils";
+import {
+  champsDivergents,
+  contratConfirmeDepuisCorrespondance,
+  contratDepuisProposition,
+  evaluerExtraction,
+  evaluerProposition,
+  fusionnerContratsDupliques,
+  periodeDepuisProposition,
+  profilAvecProposition,
+} from "../routageExtraction";
 import {
   extractionAemDupliqueeHeuresCachets,
   extractionAemHeuresEtCachets,
@@ -252,6 +262,109 @@ describe("contrat — toujours relu dans le formulaire, jamais appliqué directe
     const valeurs = contratDepuisProposition(propositionMixte.donnees);
     expect(valeurs.nbHeures).toBe(14);
     expect(valeurs.nbCachets).toBe(3);
+  });
+});
+
+// 01/08/2026 : plan "cycle de vie du contrat" — une proposition "contrat" issue d'un document
+// importé doit signaler les contrats "a_verifier" existants qui pourraient être le même contrat,
+// pour que RevueExtraction.tsx propose une correspondance plutôt qu'une création systématique.
+describe("evaluerProposition / evaluerExtraction — correspondances avec des contrats existants", () => {
+  const propositionContrat = extractionBulletinPaie.propositions[0] as Extract<Proposition, { cible: "contrat" }>;
+
+  it("sans contratsExistants (paramètre par défaut), correspondances est un tableau vide", () => {
+    const { correspondances } = evaluerProposition(propositionContrat, profilBase);
+    expect(correspondances).toEqual([]);
+  });
+
+  it("trouve un contrat 'a_verifier' existant qui correspond (même employeur, même mois)", () => {
+    const existant = contrat({
+      date: propositionContrat.donnees.date,
+      employeur: propositionContrat.donnees.employeur,
+      salaireBrut: propositionContrat.donnees.salaireBrut,
+      statutVerification: "a_verifier",
+    });
+    const { correspondances } = evaluerProposition(propositionContrat, profilBase, [existant]);
+    expect(correspondances).toEqual([existant]);
+  });
+
+  it("ne trouve rien pour les cibles autres que 'contrat'", () => {
+    const existant = contrat({ date: "2026-01-01", employeur: "Peu importe", statutVerification: "a_verifier" });
+    const { correspondances } = evaluerProposition(propositionAj("net"), profilBase, [existant]);
+    expect(correspondances).toBeUndefined();
+  });
+
+  it("evaluerExtraction propage contratsExistants à chaque proposition 'contrat'", () => {
+    const existant = contrat({
+      date: propositionContrat.donnees.date,
+      employeur: propositionContrat.donnees.employeur,
+      salaireBrut: propositionContrat.donnees.salaireBrut,
+      statutVerification: "a_verifier",
+    });
+    const evaluees = evaluerExtraction(extractionBulletinPaie, profilBase, [existant]);
+    const contratEvalue = evaluees.find((e) => e.proposition.cible === "contrat");
+    expect(contratEvalue?.correspondances).toEqual([existant]);
+  });
+});
+
+describe("champsDivergents — Ancien → Nouveau avant confirmation d'une correspondance", () => {
+  const propositionDonnees = (extractionBulletinPaie.propositions[0] as Extract<Proposition, { cible: "contrat" }>).donnees;
+
+  it("signale un champ dont la valeur diffère (ex. salaireBrut saisi à la main vs document)", () => {
+    const existant = contrat({ date: propositionDonnees.date, employeur: propositionDonnees.employeur, salaireBrut: 999 });
+    const divergences = champsDivergents(existant, propositionDonnees);
+    const salaire = divergences.find((d) => d.champ === "salaireBrut");
+    expect(salaire).toEqual({ champ: "salaireBrut", ancien: 999, nouveau: propositionDonnees.salaireBrut });
+  });
+
+  it("ne signale JAMAIS un champ que le document n'a pas lu (null), même si le contrat existant a une valeur", () => {
+    // extractionBulletinPaie a type/typeRemuneration/territoire à null (cf. fixturesExtraction.ts)
+    const existant = contrat({ date: propositionDonnees.date, employeur: propositionDonnees.employeur, salaireBrut: propositionDonnees.salaireBrut, type: "enseignement" });
+    const divergences = champsDivergents(existant, propositionDonnees);
+    expect(divergences.find((d) => d.champ === "type")).toBeUndefined();
+  });
+
+  it("ne signale rien quand tout correspond déjà", () => {
+    const existant = contrat({
+      date: propositionDonnees.date,
+      dateDebut: propositionDonnees.dateDebut ?? propositionDonnees.date,
+      employeur: propositionDonnees.employeur,
+      salaireBrut: propositionDonnees.salaireBrut,
+    });
+    expect(champsDivergents(existant, propositionDonnees)).toEqual([]);
+  });
+});
+
+describe("contratConfirmeDepuisCorrespondance — l'AEM fait foi, mais jamais silencieusement", () => {
+  const propositionDonnees = (extractionBulletinPaie.propositions[0] as Extract<Proposition, { cible: "contrat" }>).donnees;
+
+  it("remplace la valeur existante par celle du document quand le document en donne une", () => {
+    const existant = contrat({ date: propositionDonnees.date, employeur: propositionDonnees.employeur, salaireBrut: 999 });
+    const confirme = contratConfirmeDepuisCorrespondance(existant, propositionDonnees);
+    expect(confirme.salaireBrut).toBe(propositionDonnees.salaireBrut);
+  });
+
+  it("conserve la valeur existante pour un champ que le document ne lit pas (jamais un spread aveugle qui écraserait avec undefined)", () => {
+    const existant = contrat({ date: propositionDonnees.date, employeur: propositionDonnees.employeur, salaireBrut: propositionDonnees.salaireBrut, type: "enseignement" });
+    const confirme = contratConfirmeDepuisCorrespondance(existant, propositionDonnees);
+    expect(confirme.type).toBe("enseignement"); // le document ne lit pas `type` (null dans la fixture)
+  });
+
+  it("bascule statutVerification à 'confirme'", () => {
+    const existant = contrat({ date: propositionDonnees.date, employeur: propositionDonnees.employeur, salaireBrut: propositionDonnees.salaireBrut, statutVerification: "a_verifier" });
+    const confirme = contratConfirmeDepuisCorrespondance(existant, propositionDonnees);
+    expect(confirme.statutVerification).toBe("confirme");
+  });
+
+  it("préserve recurrenceId — confirmer un contrat de série récurrente ne le retire pas de sa série", () => {
+    const existant = contrat({ date: propositionDonnees.date, employeur: propositionDonnees.employeur, salaireBrut: propositionDonnees.salaireBrut, recurrenceId: "serie-test" });
+    const confirme = contratConfirmeDepuisCorrespondance(existant, propositionDonnees);
+    expect(confirme.recurrenceId).toBe("serie-test");
+  });
+
+  it("source devient 'import_pdf' — les valeurs actuelles viennent maintenant du document", () => {
+    const existant = contrat({ date: propositionDonnees.date, employeur: propositionDonnees.employeur, salaireBrut: propositionDonnees.salaireBrut, source: "manuel" });
+    const confirme = contratConfirmeDepuisCorrespondance(existant, propositionDonnees);
+    expect(confirme.source).toBe("import_pdf");
   });
 });
 

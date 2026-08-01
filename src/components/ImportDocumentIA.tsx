@@ -34,14 +34,16 @@ interface ImportDocumentIAProps {
   profil: Profil;
   config: FranceTravailConfig;
   decompteActuel: DecompteHeuresResultat;
+  contrats: Contrat[];
   onAjouterContrat: (contrat: Omit<Contrat, "id">) => void;
   onAjouterPeriode: (periode: Omit<PeriodeAssimilee, "id">) => void;
   onModifierProfil: (profil: Profil) => ResultatEcritureProfil;
+  onModifierContrat: (id: string, contrat: Omit<Contrat, "id">) => void;
 }
 
 const ECHEC_INATTENDU = "L'envoi a échoué pour une raison inattendue. Réessaie, ou saisis les informations à la main.";
 
-export function ImportDocumentIA({ profil, config, decompteActuel, onAjouterContrat, onAjouterPeriode, onModifierProfil }: ImportDocumentIAProps) {
+export function ImportDocumentIA({ profil, config, decompteActuel, contrats, onAjouterContrat, onAjouterPeriode, onModifierProfil, onModifierContrat }: ImportDocumentIAProps) {
   /** Fichier choisi et validé, en attente du consentement. Non nul ⇒ la modale est ouverte. */
   const [fichierEnAttente, setFichierEnAttente] = useState<File | null>(null);
   const [envoiEnCours, setEnvoiEnCours] = useState(false);
@@ -111,9 +113,11 @@ export function ImportDocumentIA({ profil, config, decompteActuel, onAjouterCont
           profil={profil}
           config={config}
           decompteActuel={decompteActuel}
+          contrats={contrats}
           onAjouterContrat={onAjouterContrat}
           onAjouterPeriode={onAjouterPeriode}
           onModifierProfil={onModifierProfil}
+          onModifierContrat={onModifierContrat}
           documentEnvoye
         />
       </div>

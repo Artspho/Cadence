@@ -363,9 +363,11 @@ export default function App() {
                 profil={profil}
                 config={franceTravailConfig}
                 decompteActuel={calculs.decompte}
+                contrats={donnees.contrats}
                 onAjouterContrat={ajouterContrat}
                 onAjouterPeriode={ajouterPeriode}
                 onModifierProfil={modifierProfil}
+                onModifierContrat={modifierContrat}
               />
             </div>
 
