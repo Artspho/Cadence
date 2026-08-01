@@ -10,9 +10,17 @@ interface HistoriqueProps {
    * Optionnel : absent, aucun bouton ne s'affiche (ex. écrans de simulation qui n'ont pas de storage).
    */
   onEffacerGel?: (id: string) => void;
+  /**
+   * Même contradiction de périmètre que Dashboard.tsx (cf. lib/profilHorsPerimetre.ts, motif
+   * `salaires_hors_a10_contradictoires`) : les montants ARE seraient calculés avec les mauvaises
+   * règles si le régime déclaré est celui qui est faux. On les masque au lieu de les afficher
+   * assortis d'un « peut-être » — un chiffre affiché est un chiffre auquel on se fie (devoir n°2).
+   * Le décompte d'heures n'est pas concerné : lui reste correct quel que soit le régime déclaré.
+   */
+  montantsNonFiables?: boolean;
 }
 
-export function Historique({ exercices, onEffacerGel }: HistoriqueProps) {
+export function Historique({ exercices, onEffacerGel, montantsNonFiables = false }: HistoriqueProps) {
   if (exercices.length === 0) {
     return (
       <p className="text-muted text-sm bg-surface border border-line rounded-card p-6 text-center">
@@ -48,8 +56,17 @@ export function Historique({ exercices, onEffacerGel }: HistoriqueProps) {
           </div>
           {exercice.ajBrute !== undefined && (
             <div className="text-right border-l border-line pl-4">
-              <p className="text-sm tabular-nums text-ink">{exercice.ajBrute.toFixed(2)} €</p>
-              <p className="text-xs text-muted tabular-nums">≈ {exercice.ajNette?.toFixed(2)} € net /j</p>
+              {montantsNonFiables ? (
+                <>
+                  <p className="text-sm tabular-nums text-faint">— €</p>
+                  <p className="text-xs text-red">Non fiable</p>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm tabular-nums text-ink">{exercice.ajBrute.toFixed(2)} €</p>
+                  <p className="text-xs text-muted tabular-nums">≈ {exercice.ajNette?.toFixed(2)} € net /j</p>
+                </>
+              )}
             </div>
           )}
           {exercice.cloture && onEffacerGel && (

@@ -360,7 +360,7 @@ export default function App() {
           ) : (
             <div className="space-y-6">
               {bandeauContradiction}
-              <Historique exercices={calculs.exercices} onEffacerGel={viderExerciceGele} />
+              <Historique exercices={calculs.exercices} onEffacerGel={viderExerciceGele} montantsNonFiables={contradictionHorsA10} />
             </div>
           ))}
 
@@ -371,7 +371,15 @@ export default function App() {
           ) : (
             <div className="space-y-6">
               {bandeauContradiction}
-              <Simulateur profil={profil} contrats={donnees.contrats} periodes={donnees.periodes} config={franceTravailConfig} dateDuJour={dateDuJour} decompteActuel={calculs.decompte} />
+              <Simulateur
+                profil={profil}
+                contrats={donnees.contrats}
+                periodes={donnees.periodes}
+                config={franceTravailConfig}
+                dateDuJour={dateDuJour}
+                decompteActuel={calculs.decompte}
+                montantsNonFiables={contradictionHorsA10}
+              />
             </div>
           ))}
 

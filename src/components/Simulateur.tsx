@@ -16,6 +16,13 @@ interface SimulateurProps {
   config: FranceTravailConfig;
   dateDuJour: string;
   decompteActuel: DecompteHeuresResultat;
+  /**
+   * Même contradiction de périmètre que Dashboard.tsx (cf. lib/profilHorsPerimetre.ts, motif
+   * `salaires_hors_a10_contradictoires`) : simuler un montant d'AJ sur des règles peut-être
+   * fausses serait pire que ne rien afficher — devoir sacré n°2. Le décompte d'heures (507 h)
+   * n'est pas concerné : il reste correct quel que soit le régime déclaré.
+   */
+  montantsNonFiables?: boolean;
 }
 
 function evaluer(profil: Profil, contrats: Contrat[], periodes: PeriodeAssimilee[], config: FranceTravailConfig, dateDuJour: string) {
@@ -33,7 +40,7 @@ function evaluer(profil: Profil, contrats: Contrat[], periodes: PeriodeAssimilee
   return { decompte, ajBrute, ajNette, prediction };
 }
 
-export function Simulateur({ profil, contrats, periodes, config, dateDuJour, decompteActuel }: SimulateurProps) {
+export function Simulateur({ profil, contrats, periodes, config, dateDuJour, decompteActuel, montantsNonFiables = false }: SimulateurProps) {
   const [contratSimule, setContratSimule] = useState<Omit<Contrat, "id"> | null>(null);
 
   const avant = useMemo(() => evaluer(profil, contrats, periodes, config, dateDuJour), [profil, contrats, periodes, config, dateDuJour]);
@@ -78,16 +85,25 @@ export function Simulateur({ profil, contrats, periodes, config, dateDuJour, dec
 
             <div className="bg-surface border border-line rounded-card p-5">
               <p className="text-xs uppercase tracking-[.03em] text-muted mb-1">Allocation journalière estimée</p>
-              <p className="font-display text-2xl tabular-nums">
-                {avant.ajBrute.brut.toFixed(2)} € <span className="text-muted text-base">→</span> {apres.ajBrute.brut.toFixed(2)} € brut
-              </p>
-              <p className={`text-sm ${deltaBrut >= 0 ? "text-mint" : "text-red"}`}>
-                {deltaBrut >= 0 ? "+" : ""}
-                {deltaBrut.toFixed(2)} € brut · {deltaNet >= 0 ? "+" : ""}
-                {deltaNet.toFixed(2)} € net (estimation)
-              </p>
-              {impactMontant && deltaBrut === 0 && (
-                <p className="text-xs text-faint mt-1">L'enseignement et la formation n'augmentent jamais ce montant, seulement le décompte des 507 h.</p>
+              {montantsNonFiables ? (
+                <>
+                  <p className="text-sm text-red">Non fiable : deux saisies se contredisent</p>
+                  <p className="text-xs text-faint mt-1">Corrige d'abord ta situation dans « Mon profil » pour simuler un montant fiable.</p>
+                </>
+              ) : (
+                <>
+                  <p className="font-display text-2xl tabular-nums">
+                    {avant.ajBrute.brut.toFixed(2)} € <span className="text-muted text-base">→</span> {apres.ajBrute.brut.toFixed(2)} € brut
+                  </p>
+                  <p className={`text-sm ${deltaBrut >= 0 ? "text-mint" : "text-red"}`}>
+                    {deltaBrut >= 0 ? "+" : ""}
+                    {deltaBrut.toFixed(2)} € brut · {deltaNet >= 0 ? "+" : ""}
+                    {deltaNet.toFixed(2)} € net (estimation)
+                  </p>
+                  {impactMontant && deltaBrut === 0 && (
+                    <p className="text-xs text-faint mt-1">L'enseignement et la formation n'augmentent jamais ce montant, seulement le décompte des 507 h.</p>
+                  )}
+                </>
               )}
             </div>
           </>
