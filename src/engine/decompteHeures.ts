@@ -24,25 +24,42 @@ export function heuresBrutesContrat(contrat: Contrat, config: FranceTravailConfi
   if (contrat.territoire === "eee_suisse_uk") {
     return { categorie: "eee", heures: (contrat.nbJoursEEE ?? 0) * config.heuresParJourEEE };
   }
+
+  // Heures directes ET cachets convertis comptent ENSEMBLE quand les deux champs sont renseignés
+  // sur le MÊME contrat — jamais un choix exclusif entre les deux selon `typeRemuneration`. Confirmé
+  // sur pièce réelle le 01/08/2026 (AEM GHS sPAIEctacle : 14 h de répétition + 3 cachets de
+  // représentation sur la même attestation, les deux comptent pour les 507 h) et par Benoît, qui
+  // connaît la règle réelle : un contrat peut porter seulement des cachets, seulement des heures,
+  // ou les deux à la fois. `typeRemuneration` n'est donc PAS un discriminant qui exclut l'autre
+  // champ — juste une indication (mode de rémunération principal) qui ne change plus le calcul ici.
+  // Avant ce correctif, un ternaire sur `typeRemuneration` ne retenait que l'un des deux champs et
+  // ignorait l'autre en silence — sous-comptant un contrat mixte, un vrai bug de calcul (le total
+  // heuresPour507 ET le NHT du montant ARE en dépendent, cf. salaireReference.ts).
+  // Un contrat qui n'a que l'un des deux (l'autre `null`) se comporte exactement comme avant :
+  // `?? 0` neutralise le champ absent, aucune régression sur le cas non-mixte.
+  const heuresCombinees = (contrat.nbHeures ?? 0) + (contrat.nbCachets ?? 0) * config.heuresParCachet;
+
   switch (contrat.type) {
     case "ptp":
-      return { categorie: "ptp", heures: contrat.nbHeures ?? 0 };
+      return { categorie: "ptp", heures: contrat.nbHeures ?? 0 }; // PTP : jamais de cachets (1 h = 1 h), règle produit distincte
     case "enseignement": {
       const conditionsRemplies = Boolean(contrat.etablissementAgree) && Boolean(contrat.enRapportAvecMetier);
-      if (!conditionsRemplies) return { categorie: "enseignementBrut", heures: 0 };
-      const heures = contrat.typeRemuneration === "cachet" ? (contrat.nbCachets ?? 0) * config.heuresParCachet : contrat.nbHeures ?? 0;
-      return { categorie: "enseignementBrut", heures };
+      return { categorie: "enseignementBrut", heures: conditionsRemplies ? heuresCombinees : 0 };
     }
-    case "formation": {
-      const heures = contrat.typeRemuneration === "cachet" ? (contrat.nbCachets ?? 0) * config.heuresParCachet : contrat.nbHeures ?? 0;
-      return { categorie: "formationBrut", heures };
-    }
+    case "formation":
+      return { categorie: "formationBrut", heures: heuresCombinees };
     case "artiste":
     default:
-      if (contrat.typeRemuneration === "cachet") {
-        return { categorie: "cachets", heures: (contrat.nbCachets ?? 0) * config.heuresParCachet };
-      }
-      return { categorie: "heuresScene", heures: contrat.nbHeures ?? 0 };
+      // ⚠️ Limite connue, documentée, PAS une erreur de calcul : le total ci-dessus (heuresCombinees)
+      // est toujours correct, mais quand les DEUX champs sont renseignés, il est attribué en entier
+      // à UNE SEULE des deux catégories d'affichage (repartition.cachets OU .heuresScene, cf.
+      // calculerDecompteHeures) selon `typeRemuneration` — la répartition VISUELLE du Dashboard peut
+      // donc sous-représenter l'une des deux natures d'heures. Le TOTAL et le NHT ne sont jamais
+      // affectés : les deux somment cachets + heuresScene de toute façon (cf. calculerDecompteHeures,
+      // salaireReference.ts). À scinder en deux contributions séparées si la répartition visuelle
+      // devient elle-même un besoin réel — pas fait ici pour limiter le risque de ce correctif aux
+      // 5 points d'appel existants de cette fonction.
+      return contrat.typeRemuneration === "cachet" ? { categorie: "cachets", heures: heuresCombinees } : { categorie: "heuresScene", heures: heuresCombinees };
   }
 }
 
@@ -147,9 +164,12 @@ export function calculerDecompteHeures(
     } else {
       repartition[categorie] += heures;
     }
-    if (contrat.territoire !== "eee_suisse_uk" && contrat.typeRemuneration === "cachet" && contrat.type !== "enseignement" && contrat.type !== "formation") {
+    // nbCachets != null plutôt que typeRemuneration === "cachet" : un contrat mixte (heures ET
+    // cachets, cf. heuresBrutesContrat ci-dessus) doit compter ses cachets pour l'alerte
+    // plafond_cachets_mois même si typeRemuneration vaut "heures" pour ce contrat.
+    if (contrat.territoire !== "eee_suisse_uk" && contrat.nbCachets != null && contrat.type !== "enseignement" && contrat.type !== "formation") {
       const cle = moisCle(contrat.date);
-      cachetsParMois[cle] = (cachetsParMois[cle] ?? 0) + (contrat.nbCachets ?? 0);
+      cachetsParMois[cle] = (cachetsParMois[cle] ?? 0) + contrat.nbCachets;
     }
   }
 

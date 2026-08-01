@@ -20,6 +20,45 @@ describe("calculerDecompteHeures", () => {
     expect(resultat.total).toBeGreaterThanOrEqual(franceTravailConfig.seuilHeures);
   });
 
+  // Bug réel trouvé le 01/08/2026 (spécimen AEM réel, GHS sPAIEctacle) : un ternaire sur
+  // typeRemuneration ne retenait que l'un des deux champs (nbHeures OU nbCachets converti) et
+  // ignorait l'autre en silence dès qu'un contrat portait les deux — un vrai sous-comptage, pas
+  // une question d'affichage. Confirmé par Benoît : un contrat peut porter seulement des cachets,
+  // seulement des heures, ou les deux à la fois (ex. heures de répétition + cachets de
+  // représentation sur la même AEM), et les deux doivent alors compter.
+  describe("contrat mixte : heures ET cachets renseignés sur le même contrat comptent tous les deux", () => {
+    it("14 h directes + 3 cachets (12 h/cachet) = 50 h, jamais seulement 14 ou seulement 36", () => {
+      const p = profil({ dateNaissance: "1990-01-01" });
+      const contrats = [contrat({ date: "2026-06-28", dateDebut: "2026-06-26", type: "artiste", typeRemuneration: "heures", nbHeures: 14, nbCachets: 3 })];
+      const resultat = calculerDecompteHeures(contrats, [], p, franceTravailConfig, FENETRE);
+      expect(resultat.total).toBe(50);
+    });
+
+    it("le total ne dépend pas de la valeur de typeRemuneration quand les deux champs sont renseignés", () => {
+      const p = profil({ dateNaissance: "1990-01-01" });
+      const base = { date: "2026-06-28", type: "artiste" as const, nbHeures: 14, nbCachets: 3 };
+      const totalModeHeures = calculerDecompteHeures([contrat({ ...base, typeRemuneration: "heures" })], [], p, franceTravailConfig, FENETRE).total;
+      const totalModeCachet = calculerDecompteHeures([contrat({ ...base, typeRemuneration: "cachet" })], [], p, franceTravailConfig, FENETRE).total;
+      expect(totalModeHeures).toBe(50);
+      expect(totalModeCachet).toBe(50);
+    });
+
+    it("un contrat mixte compte ses cachets pour l'alerte plafond_cachets_mois même si typeRemuneration vaut « heures »", () => {
+      const p = profil({ dateNaissance: "1990-01-01" });
+      const contrats = [contrat({ date: "2026-06-28", type: "artiste", typeRemuneration: "heures", nbHeures: 14, nbCachets: 30 })];
+      const resultat = calculerDecompteHeures(contrats, [], p, franceTravailConfig, FENETRE);
+      expect(resultat.cachetsParMois["2026-06"]).toBe(30);
+    });
+
+    it("un contrat non-mixte (un seul champ renseigné) se comporte exactement comme avant — aucune régression", () => {
+      const p = profil({ dateNaissance: "1990-01-01" });
+      const seulementCachets = calculerDecompteHeures([contrat({ date: "2026-06-28", type: "artiste", typeRemuneration: "cachet", nbCachets: 3 })], [], p, franceTravailConfig, FENETRE).total;
+      const seulementHeures = calculerDecompteHeures([contrat({ date: "2026-06-28", type: "artiste", typeRemuneration: "heures", nbHeures: 14 })], [], p, franceTravailConfig, FENETRE).total;
+      expect(seulementCachets).toBe(36); // 3 × 12
+      expect(seulementHeures).toBe(14);
+    });
+  });
+
   it("90 h d'enseignement sont plafonnées à 70 h avant 50 ans", () => {
     const p = profil({ dateNaissance: "1990-01-01" });
     const contrats = [contrat({ date: "2026-06-01", type: "enseignement", typeRemuneration: "heures", nbHeures: 90, etablissementAgree: true, enRapportAvecMetier: true })];

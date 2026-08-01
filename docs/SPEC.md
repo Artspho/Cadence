@@ -263,7 +263,7 @@ export interface BulletinExtrait {
 }
 ```
 
-> **Modélisation à respecter :** un artiste au cachet saisit des **cachets** (jamais des heures). Toute conversion (1 cachet = 12 h) est faite par le moteur via la config.
+> **Modélisation à respecter, corrigée le 01/08/2026 :** un contrat peut porter des **cachets**, des **heures**, ou **les deux à la fois** (ex. heures de répétition/technique et cachets de représentation sur la même AEM — confirmé sur pièce réelle et par l'utilisateur, qui connaît la règle réelle du régime). Affirmation précédente de cette section (« un artiste au cachet saisit des cachets, jamais des heures ») **fausse** : elle a produit un vrai bug de calcul (`engine/decompteHeures.ts` ne retenait que l'un des deux champs quand les deux étaient renseignés, sous-comptant silencieusement l'autre — un contrat mixte perdait la moitié de ses heures réelles, y compris dans le NHT du montant ARE). Corrigé : les deux contributions (heures directes + cachets convertis, 1 cachet = 12 h via la config) comptent désormais TOUJOURS ensemble quand les deux champs sont renseignés sur un même contrat, jamais un choix exclusif entre les deux.
 
 ---
 

@@ -194,13 +194,14 @@ type PropositionContrat = Extract<Proposition, { cible: "contrat" }>;
  * fusionner deux contrats réellement distincts qui partageraient par coïncidence employeur et
  * montant — pas acceptable non plus (perte d'information, devoir n°1).
  *
- * ⚠️ Ce que cette fusion NE règle PAS : `Contrat.typeRemuneration` reste un champ unique — le moteur
- * (`engine/decompteHeures.ts`) ne lit que le champ correspondant (nbHeures si "heures", nbCachets si
- * "cachet"), l'autre reste ignoré du décompte même une fois fusionné sur une seule proposition.
- * Cette fusion élimine la duplication du SALAIRE ; elle ne tranche pas laquelle des deux unités doit
- * compter pour les 507 h — la justification du contrat fusionné le signale explicitement, pour que
- * la revue humaine (jamais une application directe, cf. "revue_formulaire") tranche en connaissance
- * de cause.
+ * ✅ Mise à jour du 01/08/2026, confirmée par Benoît (règle réelle du régime) : un contrat peut
+ * porter seulement des cachets, seulement des heures, OU LES DEUX à la fois — quand les deux sont
+ * présents, les deux comptent, ce n'est jamais un choix exclusif. `engine/decompteHeures.ts` a été
+ * corrigé en conséquence (`heuresCombinees = nbHeures + nbCachets × heuresParCachet`) : cette
+ * fusion élimine la duplication du SALAIRE ET les deux champs comptent désormais réellement dans
+ * le décompte des 507 h une fois la proposition fusionnée. `Contrat.typeRemuneration` reste un
+ * champ unique mais n'exclut plus l'autre valeur du calcul — il ne sert plus qu'à l'attribution
+ * d'affichage (répartition cachets/heures de scène) et n'a plus d'incidence sur le total.
  */
 export function fusionnerContratsDupliques(propositions: Proposition[]): Proposition[] {
   const consommes = new Set<number>();
@@ -267,8 +268,8 @@ function fusionnerContrats(a: PropositionContrat, b: PropositionContrat): Propos
     justification:
       `${a.justification} — Fusionné avec une seconde proposition détectée comme le même contrat ` +
       `(heures et cachets coexistent sur ce document pour un seul salaire, jamais deux) : ${b.justification} ` +
-      `⚠️ Un seul des deux champs (nbHeures ou nbCachets) compte réellement dans le décompte des 507 h, ` +
-      `selon le mode de rémunération choisi ci-dessous — vérifie lequel est le bon avant d'enregistrer.`,
+      `Les deux champs (nombre d'heures et nombre de cachets) comptent ensemble dans le décompte des ` +
+      `507 h — vérifie simplement que les deux valeurs correspondent bien au document avant d'enregistrer.`,
   };
 }
 

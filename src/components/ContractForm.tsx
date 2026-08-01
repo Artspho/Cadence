@@ -28,7 +28,6 @@ const TYPES_CONTRAT: { id: TypeContrat; label: string }[] = [
 export function ContractForm({ profil, config, decompteActuel, valeurInitiale, onValider, onValiderRecurrent, onAnnuler, previsualisationSeulement }: ContractFormProps) {
   const [formRecurrentOuvert, setFormRecurrentOuvert] = useState(false);
   const [type, setType] = useState<TypeContrat>(valeurInitiale?.type ?? "artiste");
-  const [typeRemuneration, setTypeRemuneration] = useState<TypeRemuneration>(valeurInitiale?.typeRemuneration ?? "cachet");
   const [territoire, setTerritoire] = useState<Territoire>(valeurInitiale?.territoire ?? "france");
   const [dateDebut, setDateDebut] = useState(valeurInitiale?.dateDebut ?? valeurInitiale?.date ?? "");
   const [date, setDate] = useState(valeurInitiale?.date ?? "");
@@ -39,6 +38,15 @@ export function ContractForm({ profil, config, decompteActuel, valeurInitiale, o
   const [nbJoursEEE, setNbJoursEEE] = useState(valeurInitiale?.nbJoursEEE?.toString() ?? "");
   const [etablissementAgree, setEtablissementAgree] = useState(valeurInitiale?.etablissementAgree ?? false);
   const [enRapportAvecMetier, setEnRapportAvecMetier] = useState(valeurInitiale?.enRapportAvecMetier ?? false);
+
+  // Un contrat peut porter seulement des cachets, seulement des heures, ou les deux à la fois (ex.
+  // heures de répétition ET cachets de représentation sur la même AEM) — confirmé sur pièce réelle
+  // le 01/08/2026, et le moteur (engine/decompteHeures.ts) compte désormais les deux ensemble quand
+  // les deux sont renseignés. `typeRemuneration` reste un champ requis par le schéma (sert encore à
+  // l'attribution d'affichage cachets/heuresScene quand les deux sont présents sur un contrat
+  // "artiste"), mais ce n'est PLUS un choix que l'utilisateur doit faire explicitement : il se
+  // déduit de ce qui est effectivement rempli, jamais l'inverse.
+  const typeRemuneration: TypeRemuneration = nbHeures && !nbCachets ? "heures" : "cachet";
 
   // Pré-rempli à la même date que `date` (contrat d'un seul jour, cas le plus courant) tant que
   // l'utilisateur n'a pas explicitement modifié `dateDebut` — cf. changerDateFin ci-dessous.
@@ -96,7 +104,9 @@ export function ContractForm({ profil, config, decompteActuel, valeurInitiale, o
   }, [type, apercu, decompteActuel, config]);
 
   const alerteCachets = useMemo(() => {
-    if (typeRemuneration !== "cachet" || territoire === "eee_suisse_uk" || !date) return null;
+    // nbCachets renseigné, pas typeRemuneration === "cachet" : un contrat mixte (heures ET cachets)
+    // doit aussi être compté pour ce plafond, même si son mode principal affiché est "heures".
+    if (!nbCachets || territoire === "eee_suisse_uk" || !date) return null;
     const mois = date.slice(0, 7);
     const dejaCeMois = Object.entries(decompteActuel.cachetsParMois).find(([cle]) => cle === mois)?.[1] ?? 0;
     const total = dejaCeMois + (parseFloat(nbCachets) || 0);
@@ -104,7 +114,7 @@ export function ContractForm({ profil, config, decompteActuel, valeurInitiale, o
       return `${total} cachets ce mois-ci : au-delà du plafond de ${config.plafondCachetsParMois}/mois.`;
     }
     return null;
-  }, [typeRemuneration, territoire, date, nbCachets, decompteActuel, config]);
+  }, [territoire, date, nbCachets, decompteActuel, config]);
 
   function soumettre(e: React.FormEvent) {
     e.preventDefault();
@@ -224,19 +234,41 @@ export function ContractForm({ profil, config, decompteActuel, valeurInitiale, o
       ) : (
         <div>
           <span className="block text-xs uppercase tracking-[.03em] text-muted mb-1">Rémunération</span>
-          <div className="flex gap-2 mb-2">
-            <button type="button" onClick={() => setTypeRemuneration("cachet")} className={`rounded-lg border px-3 py-2 text-sm ${typeRemuneration === "cachet" ? "border-mint bg-mint/10" : "border-line bg-surface-2"}`}>
-              Cachets
-            </button>
-            <button type="button" onClick={() => setTypeRemuneration("heures")} className={`rounded-lg border px-3 py-2 text-sm ${typeRemuneration === "heures" ? "border-mint bg-mint/10" : "border-line bg-surface-2"}`}>
-              Heures
-            </button>
+          <p className="text-xs text-faint mb-2">
+            Renseigne cachets et/ou heures — un même contrat peut cumuler les deux (ex. heures de répétition et cachets de représentation) : les deux comptent alors ensemble.
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs text-muted mb-1" htmlFor="nb-cachets">
+                Nombre de cachets
+              </label>
+              <input
+                id="nb-cachets"
+                type="number"
+                min="0"
+                step="1"
+                placeholder="Si applicable"
+                value={nbCachets}
+                onChange={(e) => setNbCachets(e.target.value)}
+                className="w-full bg-surface-2 border border-line rounded-lg px-3 py-2"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-muted mb-1" htmlFor="nb-heures">
+                Nombre d'heures
+              </label>
+              <input
+                id="nb-heures"
+                type="number"
+                min="0"
+                step="0.5"
+                placeholder="Si applicable"
+                value={nbHeures}
+                onChange={(e) => setNbHeures(e.target.value)}
+                className="w-full bg-surface-2 border border-line rounded-lg px-3 py-2"
+              />
+            </div>
           </div>
-          {typeRemuneration === "cachet" ? (
-            <input type="number" min="0" step="1" placeholder="Nombre de cachets" value={nbCachets} onChange={(e) => setNbCachets(e.target.value)} className="w-full bg-surface-2 border border-line rounded-lg px-3 py-2" />
-          ) : (
-            <input type="number" min="0" step="0.5" placeholder="Nombre d'heures" value={nbHeures} onChange={(e) => setNbHeures(e.target.value)} className="w-full bg-surface-2 border border-line rounded-lg px-3 py-2" />
-          )}
         </div>
       )}
 

@@ -21,6 +21,17 @@ describe("calculerSalaireReference", () => {
     expect(resultatAvecEnseignement.nht).toBe(resultatBase.nht);
   });
 
+  // Bug réel du 01/08/2026 (cf. engine/decompteHeures.test.ts) : le NHT réutilise
+  // calculerDecompteHeures — un contrat mixte heures+cachets sous-comptait donc aussi le NHT, pas
+  // seulement le compteur 507 h. Le NHT alimente directement le montant de l'ARE (areBrute.ts,
+  // partie B) : ce sous-comptage aurait produit un montant faux, pas seulement un compteur faux.
+  it("le NHT compte heures ET cachets d'un même contrat mixte, jamais un seul", () => {
+    const p = profil({ dateNaissance: "1990-01-01" });
+    const contrats = [contrat({ date: "2026-06-28", type: "artiste", typeRemuneration: "heures", nbHeures: 14, nbCachets: 3, salaireBrut: 245 })];
+    const resultat = calculerSalaireReference(contrats, [], p, franceTravailConfig, FENETRE);
+    expect(resultat.nht).toBe(50); // 14 h + 3 × 12 h, jamais seulement 14 ou seulement 36
+  });
+
   it("applique le SAR aménagé quand des périodes maternité/adoption/ALD sont retenues", () => {
     const p = profil({ dateNaissance: "1990-01-01" });
     // Contrat en SEPTEMBRE, volontairement HORS de la maternité. Il tombait auparavant le 01/06, donc

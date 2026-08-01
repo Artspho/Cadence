@@ -274,9 +274,11 @@ describe("fusionnerContratsDupliques — bug réel du 01/08/2026 : salaire dupli
     expect(fusionnee.donnees.nbCachets).toBe(3);
   });
 
-  it("signale dans la justification qu'un seul des deux champs compte réellement pour le décompte", () => {
+  // Mis à jour le 01/08/2026 : confirmé par Benoît (règle réelle) que les deux champs comptent
+  // ENSEMBLE, jamais un choix exclusif — le moteur a été corrigé en conséquence (decompteHeures.ts).
+  it("signale dans la justification que les deux champs comptent ensemble, pas un choix exclusif", () => {
     const [fusionnee] = fusionnerContratsDupliques(extractionAemDupliqueeHeuresCachets.propositions) as Extract<Proposition, { cible: "contrat" }>[];
-    expect(fusionnee.justification).toMatch(/un seul des deux champs.*compte réellement/i);
+    expect(fusionnee.justification).toMatch(/comptent ensemble/i);
   });
 
   it("bout en bout via evaluerExtraction : une seule carte de revue, pas deux, pour ce document", () => {
