@@ -28,6 +28,7 @@
 import { zodToJsonSchema } from "zod-to-json-schema";
 // Schéma partagé avec le front (écran de revue) — source unique, cf. l'en-tête du fichier.
 import { extractionResultSchema, type ExtractionResult } from "../src/types/extraction";
+import { texteOcrIllisible } from "../src/lib/ocrIllisible";
 
 /**
  * Runtime Edge (et non Node). Choix cohérent avec le code : le handler ci-dessous
@@ -392,6 +393,20 @@ export class ConfigurationManquanteError extends Error {
   }
 }
 
+/**
+ * Échec TECHNIQUE de lecture (OCR vide), distinct d'un document lu normalement mais sans rien
+ * d'exploitable dedans (`non_reconnu`, 0 proposition légitime). Cf. `lib/ocrIllisible.ts` pour le
+ * détail de ce qui est vérifié vs déduit sur ce cas. Sans cette distinction, les deux situations
+ * s'affichaient de façon identique à l'écran de revue — l'utilisateur croyait son document sans
+ * intérêt alors que Cadence n'avait rien pu en lire du tout.
+ */
+export class OcrIllisibleError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "OcrIllisibleError";
+  }
+}
+
 export async function extractDocument(pdfBase64: string): Promise<ExtractionResult> {
   // Garde explicite : sans cette vérification, une clé absente partait en
   // `Bearer ` vide, Mistral répondait 401, et l'utilisateur voyait un 500
@@ -472,6 +487,19 @@ export async function extractDocument(pdfBase64: string): Promise<ExtractionResu
 
   const data = await response.json();
 
+  // Vérifié AVANT de faire confiance à l'annotation du modèle : si l'OCR n'a rien extrait
+  // (`pages[].markdown` vide sur toutes les pages), le modèle répond quand même quelque chose —
+  // typiquement `non_reconnu` avec 0 proposition — ce qui est indiscernable à l'écran d'un document
+  // lu normalement mais sans rien d'utile dedans. Ici on sait que la lecture elle-même a échoué,
+  // ne laisse jamais cette distinction se perdre en aval.
+  if (texteOcrIllisible(data?.pages)) {
+    throw new OcrIllisibleError(
+      "Ce document n'a pas pu être lu (aucun texte détecté à l'intérieur) — ce n'est pas qu'il n'y avait rien " +
+        "d'exploitable dedans, c'est un échec de lecture. Essaie un export PDF différent : une version texte " +
+        "plutôt qu'un scan ou une photo, ou une meilleure qualité si tu n'as que ça."
+    );
+  }
+
   // document_annotation peut arriver en objet déjà parsé ou en chaîne JSON
   // selon la version de l'API — on gère les deux, prudence oblige.
   const rawAnnotation = data?.document_annotation;
@@ -517,7 +545,17 @@ export default async function handler(req: Request): Promise<Response> {
       });
     }
 
-    // Cas 2 : tout le reste. Ne jamais renvoyer le contenu du document dans un
+    // Cas 2 : la lecture du document a techniquement échoué (OCR vide) — 422 (« Unprocessable
+    // Entity » : la requête est valide, mais ce document précis n'a pas pu être traité), distinct du
+    // 500 générique pour que le front puisse afficher un message différent (cf. extraireDocumentIA.ts).
+    if (err instanceof OcrIllisibleError) {
+      return new Response(JSON.stringify({ error: err.message }), {
+        status: 422,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    // Cas 3 : tout le reste. Ne jamais renvoyer le contenu du document dans un
     // message d'erreur.
     return new Response(
       JSON.stringify({ error: "Échec de l'extraction. Réessaie ou saisis manuellement." }),

@@ -84,6 +84,17 @@ describe("extraireDocumentIA — messages d'erreur honnêtes", () => {
     await expect(extraireDocumentIA("UERG")).rejects.toThrow(/saisis le document à la main/i);
   });
 
+  // 30/07/2026 : un OCR vide (bulletin GHS-sPAIEctacle) s'affichait comme un document lu
+  // normalement sans rien à en tirer. Le 422 (OcrIllisibleError, api/extract-document.ts) doit
+  // remonter tel quel, avec un message distinct qui invite à changer d'export PDF.
+  it("remonte tel quel le message du 422 (OCR vide, échec de lecture technique)", async () => {
+    const messageServeur =
+      "Ce document n'a pas pu être lu (aucun texte détecté à l'intérieur) — ce n'est pas qu'il n'y avait rien " +
+      "d'exploitable dedans, c'est un échec de lecture. Essaie un export PDF différent.";
+    simulerReponse(422, { error: messageServeur });
+    await expect(extraireDocumentIA("UERG")).rejects.toThrow(messageServeur);
+  });
+
   // Un proxy / CDN / tunnel de dev peut répondre son propre 504 avec son propre corps : ce n'est pas
   // notre texte, il ne doit pas atterrir à l'écran (adresse interne exposée au passage).
   it("n'affiche pas le corps d'un statut qui n'est pas le nôtre (504 de proxy)", async () => {

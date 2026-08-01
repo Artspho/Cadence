@@ -37,15 +37,17 @@ const ECHEC_RESEAU =
   "Le service d'extraction n'a pas pu être joint (connexion interrompue). Aucune proposition n'a été reçue — réessaie, ou saisis les informations à la main.";
 
 /**
- * Le SEUL statut dont on accepte de réafficher le message : le 503 que notre endpoint renvoie quand
- * `MISTRAL_API_KEY` est absente. C'est le seul cas où le message générique serait activement
- * trompeur, puisqu'il invite à réessayer alors que réessayer n'y changera jamais rien.
+ * Les SEULS statuts dont on accepte de réafficher le message : le 503 que notre endpoint renvoie
+ * quand `MISTRAL_API_KEY` est absente (réessayer n'y changera jamais rien), et le 422 renvoyé quand
+ * l'OCR n'a rien pu extraire du document (`OcrIllisibleError`, cf. api/extract-document.ts et
+ * lib/ocrIllisible.ts) — ce cas précis doit s'afficher différemment de « rien d'exploitable dedans »,
+ * pour que l'utilisateur sache qu'il s'agit d'un échec de lecture, pas d'un document sans intérêt.
  *
  * Liste blanche et non liste noire, volontairement : entre nous et l'endpoint peuvent se glisser un
  * proxy, un CDN, un tunnel de dev, qui renvoient leurs propres 500/502/504 avec leur propre corps.
  * Tout ce qui n'est pas explicitement à nous retombe sur le message générique.
  */
-const STATUTS_AU_MESSAGE_MAITRISE = new Set([503]);
+const STATUTS_AU_MESSAGE_MAITRISE = new Set([503, 422]);
 
 /**
  * Un message que l'on accepte de montrer : non vide, de longueur raisonnable, et sans chevrons —
