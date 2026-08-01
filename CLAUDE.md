@@ -965,14 +965,29 @@ synchronisée à chaque commit. 5 commits locaux cette session, rien poussé sur
   plus bas : ce paragraphe disait encore « pas encore géré » après coup, contradiction corrigée le
   29/07/2026 (soir). **Non prouvé** : rien de tout ça n'a été exécuté sur Vercel, aucun déploiement
   n'a eu lieu.
-- 🔶 **RIEN du chantier import IA n'est fusionné dans `master`** — `master` est resté sur `2721778`.
-  Tout vit sur la branche `backend-api-import-ia`, dans cet ordre — **11 commits** : `59d129f`
-  (backend minimal), `d3ebb36` (écran de revue sur fixtures), `45a54e1` + `362bbfd` (doc),
-  `ecca2c8` (consentement), `d4906d5` (point d'entrée réel), `4c6cebb` (prompt éprouvé +
-  descriptions de schéma), `58d6525` (doc), `a934db2` (`etablissementAgree` non déductible),
-  `80d4904` (schéma en draft-07), `e05d604` (doc).
-  Fusion à décider explicitement, pas encore faite. Liste à revérifier avec
-  `git log --oneline master..backend-api-import-ia` avant de s'y fier.
+- ✅ **Fusion `backend-api-import-ia` → `master` faite (01/08/2026)**, cette entrée est close. Fait
+  par l'utilisateur depuis son propre terminal : `git merge backend-api-import-ia` sur `master`,
+  fast-forward propre (21 fichiers, aucun conflit). Vérifié depuis cette session :
+  `git log --oneline master..backend-api-import-ia` et le sens inverse renvoient tous les deux
+  vide, `git rev-list --left-right --count master...backend-api-import-ia` → `0  0` — divergence
+  réellement nulle des deux côtés, les deux branches locales pointent sur le même commit
+  (`045d46a` au moment de cette vérification). ⚠️ **Nuance à ne pas escamoter** : `origin/master`
+  et `origin/backend-api-import-ia` (GitHub) sont tous les deux restés sur `2330a2d` au moment de
+  cette vérification (`git fetch origin` propre, sans erreur) — le push mentionné ne s'est donc pas
+  encore reflété sur le dépôt distant, ou a été poussé ailleurs. Écart entre affirmation et preuve,
+  signalé plutôt que supposé exact ; à recontrôler après un prochain `git push`. Rappel : Claude
+  Code ne pousse jamais vers `origin` par consigne explicite, indépendamment de la présence
+  d'identifiants dans l'URL du remote.
+  **Stratégie de branches à partir de maintenant (décidée le 01/08/2026)** : développer
+  directement sur `master`, `backend-api-import-ia` n'est plus utilisée comme branche de travail
+  séparée. Raison : le chantier import IA n'est plus un gros morceau isolé à valider avant fusion
+  (c'était la justification initiale de la branche séparée) — c'est désormais une suite de petits
+  ajustements ponctuels (AEM, `justificatif_declaration`, corrections de lexique), de la même
+  nature que le reste du travail sur `master`. Garder une branche séparée pour ça ajouterait un
+  risque de re-divergence silencieuse (déjà arrivé deux fois cette semaine, cf. entrées
+  précédentes) sans bénéfice clair en retour. Si un futur chantier redevient assez gros et risqué
+  pour justifier une validation isolée avant fusion (ex. Annexe 8/article 65, §11.C), rouvrir une
+  branche dédiée à ce moment-là plutôt que de réutiliser `backend-api-import-ia` par habitude.
 - ✅ **`document_annotation_prompt` éprouvé sur documents réels (29/07/2026)** — le prompt d'extraction
   de `api/extract-document.ts` n'est plus une supposition : il a été mis au point par essais successifs
   dans le Document AI Playground de Mistral, sur **deux documents réels de Benoît** (une notification
