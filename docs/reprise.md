@@ -8,22 +8,27 @@ Mémoire durable à consulter au démarrage : `CLAUDE.md`, `docs/SPEC.md`, `docs
 
 Deux devoirs sacrés : (1) ne jamais perdre les données ; (2) ne jamais afficher un chiffre faux (ni faux « feu vert » rassurant, ni faux « Bloqué », ni faux montant, ni fausse alerte, ni valeur sentinelle brute).
 
-État (mis à jour le 31/07/2026, fin de session) : les deux devoirs sacrés sont tenus, la bêta a
-son socle. 473 tests verts, `tsc -b` propre. Dernier commit : `2330a2d` (exercices clos reconstruits
-sur les vraies bornes, cf. « Fait » ci-dessous). `master` et `backend-api-import-ia` pointent tous
-les deux sur ce commit — `origin/master` aussi (poussé par l'utilisateur depuis son propre
-terminal), aucune divergence. Tous les items §11.A du SPEC sont désormais traités.
+État (mis à jour le 01/08/2026, fin de session) : les deux devoirs sacrés sont tenus, la bêta a
+son socle. **530 tests verts, `tsc -b` propre sur les deux tsconfig (src et api).** Dernier commit
+local : `7c835de` (correspondance AEM/bulletin avec un contrat déjà saisi, cf. « Fait » ci-dessous).
+`master` est la seule branche de travail désormais (décision actée cette session,
+`backend-api-import-ia` abandonnée — plus de gros chantier isolé à valider avant fusion). ⚠️
+**`origin/master` est 3 commits en retard** (`83d0429`, `116b482`, `7c835de` non poussés) — Benoît
+avait re-poussé une première fois avec succès en cours de session (`origin/master` a rattrapé
+jusqu'à `391ffce`), mais pas depuis. **À repousser en début de prochaine session.** Tous les items
+§11.A du SPEC sont traités ; l'audit d'exhaustivité du 01/08 a par ailleurs trouvé et corrigé un
+vrai manquement au devoir n°2 (cf. « Fait » ci-dessous).
 
-**Point de vigilance immédiat pour la prochaine session — mis à jour, corrige une note précédente
-fausse** : `dateAnniversaire` doit porter la prochaine échéance réelle (`2027-01-17` pour
-l'utilisateur) dans « Ton profil » — inchangé. **`dateAnniversairePrecedente` doit lui rester (ou
-redevenir) la VRAIE FCT historique du droit précédent (`2025-03-23`)**, PAS la FCT du droit en cours
-comme une note précédente de cette section le recommandait à tort — cette recommandation aurait
-cassé la reconstruction de l'historique des cycles (`engine/cycles.ts`) une fois suivie ; le moteur
-dérive maintenant tout seul la borne dont il a besoin pour le cycle en cours
-(`calculerFenetreEnCours`), sans plus jamais lire ce champ pour cet usage-là. Vérifier au démarrage
-de la prochaine session que les deux champs du profil réel de l'utilisateur (pas seulement
-`docs/cadence-import-complet.json`, corrigé côté fichier) ont bien ces deux valeurs.
+**Points de vigilance non résolus, non retouchés cette session — toujours à vérifier** :
+- `dateAnniversaire`/`dateAnniversairePrecedente` du profil réel de l'utilisateur : la note du
+  31/07/2026 demandant de vérifier ces deux valeurs (`2027-01-17` et `2025-03-23`) n'a pas été
+  reconfirmée explicitement cette session — à recontrôler, ne pas supposer que c'est fait.
+- **Confusion de dossier jamais résolue** (note du 31/07/2026, inchangée) : deux copies du projet
+  existent sur cette machine, `C:\Users\benoi\cadence` (le vrai dépôt, celui de toute session) et
+  `C:\Users\benoi\OneDrive\Bureau\cadence\cadence` (ossature vide, sans git). Rien n'a été fait sur
+  ce point cette session non plus — cf. mémoire longue durée (`cadence_dossier_projet.md`) qui
+  tranche déjà : le vrai dépôt est `C:\Users\benoi\cadence`, l'autre dossier est une ébauche à
+  ignorer sauf si Benoît indique explicitement vouloir la faire avancer en parallèle.
 
 **⚠️ Point d'attention avant tout nouveau chantier — confusion de dossier non résolue** : il existe
 **deux copies** du projet sur cette machine : `C:\Users\benoi\cadence` (le vrai dépôt git, celui de
@@ -39,6 +44,81 @@ depuis `C:\Users\benoi\cadence`, rien à coder), soit c'est un second projet vol
 à faire avancer en parallèle (auquel cas il faut construire l'import/export et l'onglet Profil
 avant que les deux boutons demandés aient un sens). Ne pas relancer une demande de clarification
 au démarrage sans que le contexte l'indique — attendre que l'utilisateur revienne dessus.
+
+## Fait le 01/08/2026 (session longue — 15 commits, `2330a2d` → `7c835de`)
+
+Session structurée en plusieurs chantiers indépendants, chacun avec ses propres commits. Détail
+complet dans `CLAUDE.md` (§ État actuel) ; ici, uniquement ce qui compte pour reprendre.
+
+**1. Ergonomie et routine** — `a621638`, `0ca61b7`
+- Sélecteur de date de naissance : remplacé par `DateNaissanceInput.tsx` (jour/mois/année, année en
+  saisie libre) — fini le défilement sur 30 ans du `<input type="date">` natif sur mobile. Bug de
+  resynchronisation trouvé et corrigé en cours de route (une saisie invalide se faisait effacer
+  avant correction). `dateAnniversaire` non touchée (pas le même problème).
+- `docs/routine-mensuelle-veille.md` créé (checklist SNAM/impôts/France Travail) + entrée backlog.
+
+**2. Audit d'exhaustivité bêta** (pas de code, juste état des lieux) — a trouvé un vrai manquement
+au devoir n°2 : le bandeau de contradiction hors A10 (« Deux saisies se contredisent ») promettait
+que l'AJ était masquée partout, mais `Historique.tsx`/`Simulateur.tsx` continuaient d'afficher des
+montants bruts. Corrigé en `0ef81db`. Doc PWA corrigée en `2dfbbb9` (le test réel sur téléphone
+avait bien eu lieu hors dépôt, jamais consigné jusque-là).
+
+**3. Chantier import IA, en plusieurs vagues** :
+- `dd1139d` — Distinction OCR vide vs document lu sans rien d'exploitable (nouveau statut HTTP 422,
+  `lib/ocrIllisible.ts`). Non résolu avec certitude : l'incident du 30/07 (bulletin GHS échoué) et
+  sa clôture par un simple correctif de lexique restent peut-être deux problèmes distincts — signalé,
+  pas tranché.
+- `908c6d7` — Nouveau type `justificatif_declaration` (actualisation mensuelle), lexique basé sur de
+  vrais documents (hors dépôt, dans `OneDrive\Bureau\Pole emploi\`). Risque de doublon avec des
+  contrats déjà saisis à la main **documenté mais pas résolu à ce stade** (résolu plus tard, cf. §6).
+- `045d46a` — **Premier test réel d'une AEM en production**, fait par Benoît (canal IA, pas
+  Playground). NIR absent de la réponse (vérifié exhaustivement) ; bug réel trouvé : `nbCachets`
+  rangé à `null` avec une justification FAUSSE alors que la valeur était présente sur le document.
+  Corrigé (lexique + fixture de régression).
+- `78c2e74` — Préparation contrat d'enseignement (aucun spécimen réel, donc aucun code d'extraction
+  — seulement un recensement documenté « à confirmer sur pièce »). **Benoît doit fournir un contrat
+  d'enseignement réel** (son cas confirmé simple : contrat annuel classique, un seul établissement).
+- **AEM générique : toujours aucun spécimen fourni pour valider le lexique au-delà du cas testé en
+  045d46a** — demande envoyée à Benoît, sans réponse à ce stade.
+
+**4. Bug de calcul confirmé, pas juste une question d'UI** — `391ffce`, `83d0429` : un contrat
+« artiste » peut porter à la fois des cachets ET des heures (confirmé par Benoît, réel sur une AEM).
+Deux bugs distincts trouvés et corrigés :
+- Le routage produisait deux propositions séparées pour un seul contrat, dupliquant le salaire
+  (`391ffce`, `lib/correspondanceContrat` pas encore créé à ce stade — fusion locale seulement).
+- Le moteur (`engine/decompteHeures.ts`) ne comptait qu'un des deux champs (celui correspondant à
+  `typeRemuneration`), sous-comptant silencieusement l'autre — affecte aussi le NHT (montant ARE),
+  pas seulement le compteur 507 h. Corrigé : les deux comptent désormais toujours ensemble.
+  `ContractForm.tsx` : suppression du sélecteur exclusif Cachets/Heures, les deux champs sont
+  désormais toujours visibles. **`docs/SPEC.md` corrigé** (affirmait littéralement l'inverse).
+  ⚠️ **5 contrats réels existants** (« Les Arts Phocéens », dans un export du 24/07) avaient déjà ce
+  cas de figure et étaient donc sous-comptés avant ce correctif — signalé à Benoît, **jamais
+  corrigé** (ambiguïté non tranchée : vraie coexistence ou résidu de l'ancien formulaire).
+
+**5. Branches** — `44b6b81` : fusion `backend-api-import-ia` → `master` close, stratégie décidée
+(développer directement sur `master` désormais). Écart trouvé : le push que Benoît croyait fait
+n'avait pas atteint GitHub à ce moment-là (corrigé ensuite, cf. l'état en tête de ce document).
+
+**6. Plan « cycle de vie du contrat »** (validé par Benoît avant code) — `116b482`, `7c835de` :
+- `Contrat.statutVerification?: "a_verifier" | "confirme"` — défaut selon `source`, jamais
+  rétroactif sur les contrats déjà existants.
+- Nouvelle fonction `modifierContrat` (n'existait pas), fusionnée avec une demande d'édition libre
+  déjà en attente : bouton « Modifier » sur `ContractList.tsx` (jamais sur un contrat de série
+  récurrente, décision documentée). Bug trouvé en vérifiant : deux formulaires coexistaient avec les
+  mêmes `id` de champs — corrigé en remontant l'état d'édition dans `App.tsx`.
+- `lib/correspondanceContrat.ts` : mécanisme UNIQUE de détection de doublon (même employeur/mois ou
+  période qui se recoupe, montant jamais un filtre), réutilisable pour le risque noté en §3 sur
+  `justificatif_declaration` — **ce risque est donc maintenant réellement couvert**, contrairement à
+  ce que disait encore le commit `908c6d7` en son temps.
+- Écran de revue IA : détecte une correspondance avec un contrat « a_verifier », affiche le diff
+  Ancien→Nouveau, jamais de fusion automatique.
+
+**Reste à faire, dans l'ordre de priorité** :
+1. Repousser les 3 commits locaux vers `origin/master`.
+2. Décider quoi faire des 5 contrats « Les Arts Phocéens » potentiellement sous-comptés (§4).
+3. Obtenir un vrai contrat d'enseignement de Benoît (annoncé, pas encore reçu) pour le chantier
+   `contrat_enseignement`.
+4. Obtenir un vrai spécimen AEM générique si Benoît veut aller plus loin que le cas déjà testé.
 
 ## Fait dans les sessions récentes
 

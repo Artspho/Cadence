@@ -95,7 +95,40 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 
 ## État actuel
 
-### Le plus récent d'abord — 01/08/2026 (test réel AEM en production, bug heures/cachets trouvé et corrigé)
+### Le plus récent d'abord — 01/08/2026 (fin de session : cycle de vie du contrat, bug heures+cachets moteur, fusion de branches close)
+
+- ✅ **Plan « cycle de vie du contrat » validé par Benoît avant code, implémenté en 2 commits**
+  (`116b482`, `7c835de`) : `Contrat.statutVerification?: "a_verifier" | "confirme"` (défaut selon
+  `source`, jamais rétroactif) ; nouvelle fonction `modifierContrat` (n'existait pas — fusionnée
+  avec une demande séparée d'édition manuelle libre, bouton « Modifier » sur `ContractList.tsx`,
+  jamais sur un contrat de série récurrente) ; `lib/correspondanceContrat.ts`, mécanisme UNIQUE de
+  détection de correspondance/doublon, réutilisé pour fermer le risque noté au commit `908c6d7`
+  (`justificatif_declaration`) qui n'était alors pas encore couvert. Bug trouvé en vérifiant dans le
+  navigateur : deux `<ContractForm>` coexistaient avec les mêmes `id` de champs pendant une édition
+  — corrigé en remontant l'état d'édition dans `App.tsx`. 530 tests verts.
+- 🔴 **Bug de calcul confirmé (pas qu'une question d'UI)** (`391ffce`, `83d0429`) : un contrat
+  « artiste » peut porter cachets ET heures à la fois (confirmé par Benoît, réel sur une AEM) —
+  `engine/decompteHeures.ts` n'en comptait qu'un (celui de `typeRemuneration`), sous-comptant l'autre
+  silencieusement, y compris dans le NHT (montant ARE, pas seulement le compteur 507 h). Corrigé :
+  les deux comptent désormais toujours ensemble. `ContractForm.tsx` : sélecteur exclusif
+  Cachets/Heures supprimé, les deux champs toujours visibles. `docs/SPEC.md` corrigé (affirmait
+  l'inverse). Un bug de routage distinct (deux propositions dupliquant un salaire) corrigé au
+  passage (`391ffce`).
+  ⚠️ **Trouvé en vérifiant les données réelles** : 5 contrats déjà saisis (« Les Arts Phocéens »,
+  export du 24/07) avaient déjà ce cas et étaient donc sous-comptés avant ce correctif — signalé à
+  Benoît, **décision de correction toujours en attente** (ambiguïté : vraie coexistence ou résidu de
+  l'ancien formulaire qui ne réinitialisait pas le champ masqué en changeant de mode).
+- ✅ **Fusion de branches close, stratégie décidée** (`44b6b81`) : `master` seule branche de travail
+  désormais, `backend-api-import-ia` abandonnée. Écart trouvé : `origin/master` était resté en
+  retard malgré un push que Benoît croyait réussi — reconfirmé ensuite (`391ffce` atteint), mais
+  **3 commits locaux again en attente de push** (`83d0429`, `116b482`, `7c835de`) à la fin de cette
+  session — à repousser au démarrage de la prochaine.
+- ⬜ **Préparation contrat d'enseignement, aucun code** (`78c2e74`) : recensement documenté « à
+  confirmer sur pièce », `contrat_enseignement` réservé en commentaire (pas activé) dans
+  `typeDocumentDetecte`. Benoît a confirmé son cas (contrat annuel simple, un établissement) et va
+  fournir un spécimen réel — pas encore reçu à la fin de cette session.
+
+### 01/08/2026 (test réel AEM en production, bug heures/cachets trouvé et corrigé)
 
 - ✅ **Premier test réel d'une AEM sur l'app déployée** (`cadence-benoit3.vercel.app`, canal
   « Importer avec l'IA », spécimen réel format GHS sPAIEctacle fourni par l'utilisateur — jamais
