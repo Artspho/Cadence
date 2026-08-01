@@ -964,6 +964,10 @@ l'écriture, commit `d3ebb36`), qui ne couvrait que ce canal.
   ET le retour d'usage qui te revient). Prévoir aussi, avant d'élargir au-delà du cercle d'amis, une
   courte page « à propos » (ce que l'app fait / ne fait pas / données restent chez l'utilisateur) —
   mentions légales absentes, limite déjà notée au SPEC §10 (« Cadre légal léger »).
+- Programmer le rappel mensuel de veille réglementaire (SNAM / impôts / France
+  Travail-Unédic) — routine détaillée dans `docs/routine-mensuelle-veille.md`.
+  Reste à faire : choisir le jour du mois, créer l'événement récurrent
+  (Google Calendar et/ou Todoist) avec la checklist en description.
 
 ### Idées consignées le 2026-07-23 (à cadrer plus tard, pas de plan pour l'instant)
 
