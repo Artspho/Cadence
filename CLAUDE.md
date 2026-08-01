@@ -95,7 +95,57 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 
 ## État actuel
 
-### Le plus récent d'abord — suite du 31/07/2026 (routage IA des périodes, bug des cycles fabriqués)
+### Le plus récent d'abord — 01/08/2026 (test réel AEM en production, bug heures/cachets trouvé et corrigé)
+
+- ✅ **Premier test réel d'une AEM sur l'app déployée** (`cadence-benoit3.vercel.app`, canal
+  « Importer avec l'IA », spécimen réel format GHS sPAIEctacle fourni par l'utilisateur — jamais
+  committé, données personnelles réelles, cf. règle de confidentialité ci-dessous). Fait par
+  Benoît lui-même (upload + consentement + envoi), réponse JSON lue via Network DevTools —
+  **pas** le Playground Mistral (un premier essai par erreur via le Playground le 01/08 a été
+  écarté : aucune trace de `document_annotation`, ne valide ni le filtrage du NIR ni le routage,
+  juste l'OCR brut). Résultats :
+  - ✅ `typeDocumentDetecte: "aem"` correctement distingué de `bulletin_paie`.
+  - ✅ **Aucun OCR vide** sur ce spécimen (le détecteur `ocrIllisible.ts`, commit `dd1139d`, ne
+    s'est pas déclenché) — le format GHS sPAIEctacle n'est donc **pas** systématiquement en cause
+    dans l'échec silencieux du 30/07 sur un bulletin du même logiciel. Cohérent avec le doute déjà
+    consigné dans `dd1139d` (le correctif `081a516` qui avait clos cet incident semblait résoudre
+    un problème de lexique, pas un OCR réellement vide) : les deux incidents sont vraisemblablement
+    deux problèmes distincts, pas le même.
+  - ✅ **NIR absent de la réponse**, vérifié par recherche exhaustive dans le JSON complet — la
+    règle d'exclusion (`api/extract-document.ts`, « N'extrais JAMAIS... NIR ») tient aussi sur une
+    AEM, pas seulement sur les documents France Travail déjà testés.
+  - ✅ Champs corrects avec citation à l'appui : dates de contrat, `type: "artiste"`,
+    `typeRemuneration: "heures"`, `nbHeures`, `salaireBrut`, employeur (« Association du Festival
+    de St Germain en Laye »). Garde-fous actifs : `etablissementAgree` resté `null` avec
+    avertissement (pas de déduction depuis un nom d'établissement) ; `territoire` signalé « non lu »
+    plutôt que deviné.
+  - 🔴 **Bug trouvé : `nbCachets` rangé à `null` avec une justification FAUSSE.** Le document porte
+    à la fois « Nombre d'HEURES effectuées : 14 » ET « Nombre de CACHETS : 3 » pour le même contrat
+    (cas réel d'un artiste musicien cumulant les deux sur une même attestation — la question posée
+    avant ce test, cf. entrée précédente). Le modèle a correctement lu les heures, puis justifié
+    l'absence de cachets par « le document indique une valeur vide » — **alors que la case portait
+    bien 3**. Pas une prudence légitime (un vrai null aurait été correct s'il l'était) : une
+    affirmation fausse sur un contenu non vérifié, la même famille d'erreur qu'inventer une valeur
+    (devoir n°2), juste dans l'autre sens (nier au lieu d'inventer).
+  - ✅ **Corrigé** : nouvelle règle de lexique dédiée dans `api/extract-document.ts` — heures et
+    cachets doivent être lus indépendamment l'un de l'autre, jamais l'un déduit de l'absence/présence
+    de l'autre ; un `null` doit correspondre à une case réellement regardée, jamais une affirmation
+    non vérifiée. CAS 7 ajouté à la section des erreurs observées, avec l'exemple réel généralisé.
+    Fixture de régression `extractionAemHeuresEtCachets` (données fictives) + test de routage
+    confirmant que `nbHeures` et `nbCachets` survivent tous les deux au routage sans que l'un
+    supplante l'autre. **Limite assumée** : la fixture protège contre une régression de *code*
+    (le routage n'écrase pas un champ au profit de l'autre), pas contre une régression de *qualité
+    du prompt* — seul un futur envoi réel confirmera si le modèle applique bien la nouvelle règle.
+  - ✅ Question ouverte avant ce test (coexistence heures/cachets côté moteur) tranchée par lecture
+    du code, pas par supposition : `engine/decompteHeures.ts` (lignes ~33-45) ne lit que le champ
+    correspondant à `typeRemuneration` — l'autre est simplement **ignoré**, jamais sommé deux fois.
+    Remplir les deux champs sur un même contrat ne double donc jamais un montant ; ça évite
+    seulement de perdre silencieusement l'information si `typeRemuneration` change un jour.
+- **Confidentialité de ce test** : le spécimen (NIR, adresse, téléphone, signature réels) n'a été ni
+  committé ni recopié dans aucun fichier suivi par git — reste sur la machine de l'utilisateur, hors
+  du dépôt (`OneDrive\Bureau\Pole emploi\`). Cette entrée ne reproduit aucune de ces valeurs.
+
+### Suite du 31/07/2026 (routage IA des périodes, bug des cycles fabriqués)
 
 - ✅ **Routage de l'extraction IA vers `PeriodeAssimilee` câblé** (commit `5b31711`) : `periode_assimilee`
   était encore refusée par `routageExtraction.ts` avec un commentaire périmé (« l'écran de saisie

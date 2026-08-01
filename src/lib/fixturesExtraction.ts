@@ -109,6 +109,42 @@ export const extractionBulletinPaie: ExtractionResult = {
 };
 
 /**
+ * AEM d'artiste musicien où heures ET cachets sont tous les deux renseignés sur le même contrat
+ * (ex. heures de répétition distinctes de cachets de représentation) — cas réel observé en
+ * production le 01/08/2026, où le modèle avait à tort rangé nbCachets à null avec une justification
+ * fausse après avoir déjà rempli nbHeures (cf. CAS 7, api/extract-document.ts). Cette fixture fige
+ * le comportement ATTENDU (les deux champs remplis indépendamment) pour repérer une régression de
+ * CODE qui supprimerait l'un des deux au routage — elle ne peut pas, en revanche, garantir que le
+ * modèle continuera à bien lire les deux cases : ça reste une question de qualité de prompt, pas de
+ * code, revalidée uniquement par un futur envoi réel.
+ */
+export const extractionAemHeuresEtCachets: ExtractionResult = {
+  typeDocumentDetecte: "aem",
+  propositions: [
+    {
+      cible: "contrat",
+      donnees: {
+        date: "2026-06-28",
+        dateDebut: "2026-06-26",
+        type: "artiste",
+        typeRemuneration: "heures",
+        territoire: null,
+        nbCachets: 3,
+        nbHeures: 14,
+        nbJoursEEE: null,
+        salaireBrut: 245,
+        employeur: "Association Fictive du Festival de Test",
+        etablissementAgree: null,
+        enRapportAvecMetier: null,
+      },
+      confiance: { date: "haute", dateDebut: "haute", type: "haute", typeRemuneration: "haute", nbCachets: "haute", nbHeures: "haute", salaireBrut: "haute", employeur: "haute" },
+      justification: "« Nombre d'HEURES effectuées : 14 » et « Nombre de CACHETS : 3 » toutes deux renseignées sur la même attestation, emploi « Artiste musicien ».",
+    },
+  ],
+  avertissementsGeneraux: [],
+};
+
+/**
  * Cas des refus (aj_reelle_historique, profil_ouverture_droits) + un cas de revue manuelle
  * (periode_assimilee, routée vers PeriodeForm depuis le 31/07/2026) : chaque proposition ici doit
  * être affichée sans jamais s'appliquer directement (statut "applicable"). Sert à vérifier
@@ -254,6 +290,7 @@ export const extractionNonReconnue: ExtractionResult = {
 export const FIXTURES_EXTRACTION: { id: string; libelle: string; resultat: ExtractionResult }[] = [
   { id: "notification", libelle: "Notification d'admission (tout applicable)", resultat: extractionNotificationAdmission },
   { id: "bulletin", libelle: "Bulletin de paie (champs manquants)", resultat: extractionBulletinPaie },
+  { id: "aem_heures_et_cachets", libelle: "AEM (heures ET cachets sur le même contrat)", resultat: extractionAemHeuresEtCachets },
   { id: "releve", libelle: "Relevé de situation (2 refus + 1 à vérifier)", resultat: extractionReleveAvecRefus },
   { id: "justificatif_declaration", libelle: "Justificatif de déclaration mensuelle (même employeur 2×, à ne pas fusionner)", resultat: extractionJustificatifDeclaration },
   { id: "non_reconnu", libelle: "Document non reconnu (rien à proposer)", resultat: extractionNonReconnue },

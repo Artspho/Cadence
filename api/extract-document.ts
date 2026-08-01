@@ -226,6 +226,27 @@ BULLETIN DE PAIE / AEM
         en heures. Si le nombre de cachets n'est pas écrit, ne le déduis pas du montant brut.
   employeur          → contrat.employeur
 
+  ⚠️⚠️ PIÈGE OBSERVÉ EN PRODUCTION (01/08/2026) — HEURES ET CACHETS PEUVENT COEXISTER SUR UNE AEM,
+  LIS CHAQUE CASE INDÉPENDAMMENT DE L'AUTRE
+  Une AEM d'artiste musicien porte souvent DEUX cases voisines : « Nombre d'HEURES effectuées » ET
+  « Nombre de CACHETS » (isolés/groupés) — TOUTES LES DEUX peuvent être renseignées pour le MÊME
+  contrat (ex. des heures de répétition distinctes de cachets de représentation). Erreur réelle
+  observée : le modèle lit correctement « Nombre d'HEURES effectuées : 14 », mais range ensuite
+  nbCachets à null en justifiant « le document indique une valeur vide » — alors que la case
+  portait bien un chiffre. Ce n'est pas une prudence légitime, c'est une AFFIRMATION FAUSSE sur ce
+  que dit le document.
+     • Lis CHAQUE case séparément. Ne conclus JAMAIS qu'une case voisine est vide simplement parce
+       que tu viens de remplir l'autre — ce sont deux lectures indépendantes, pas un choix binaire.
+     • Si les DEUX valeurs sont présentes sur le document, remplis les DEUX champs (nbHeures ET
+       nbCachets) sur la MÊME proposition contrat : le schéma le permet, ce n'est pas une erreur de
+       structure. typeRemuneration reste ton choix du mode de rémunération principal pour ce
+       contrat, mais nbHeures et nbCachets restent chacun le reflet fidèle et indépendant de ce que
+       dit le document, peu importe ce choix.
+     • Un champ à null doit correspondre à une case RÉELLEMENT vide que tu as regardée — jamais une
+       affirmation sur le contenu du document que tu n'as pas vérifiée. Si tu doutes d'avoir bien lu
+       une case, ne prétends pas qu'elle est vide : dis dans ta justification que tu n'es pas
+       certain, plutôt que d'affirmer un fait que tu n'as pas constaté.
+
   Un bulletin GHS/sPAIEctacle présente parfois ces données sous forme de tableau plutôt qu'en
   phrase — même cible, ne traite pas différemment :
      • une ligne de tableau du type « Cachets | 1,00 » (ou une colonne « Cachets » avec une
@@ -345,7 +366,7 @@ JUSTIFICATIF DE DÉCLARATION DE SITUATION MENSUELLE (ACTUALISATION FRANCE TRAVAI
   arrêt de travail, d'une formation ou d'un congé justifierait d'envisager cette cible, et ce
   document-type ne contient par construction que des négations dans cette section.
 
-════════ SIX ERREURS OBSERVÉES, À NE PAS REFAIRE ════════
+════════ ERREURS OBSERVÉES, À NE PAS REFAIRE ════════
 
 CAS 1 — allocation rangée au mauvais endroit
   mauvais : le document dit « Le montant de votre allocation journalière nette est de 53,81 euros »
@@ -398,6 +419,16 @@ CAS 6 — taux PAS attribué à la mauvaise section (date confondue avec un titr
             deux) ; l'occurrence de « Situation au 28/06/2026 » (même taux, montant différent :
             15,03 €) est une confirmation croisée, pas une source de doute.
 
+CAS 7 — heures ET cachets présents sur la même AEM, l'un rangé à null avec une justification fausse
+  (observé en production, 01/08/2026, spécimen AEM réel format GHS sPAIEctacle)
+  document : AEM d'artiste musicien portant « Nombre d'HEURES effectuées : 14 » ET, juste à côté,
+             « Nombre de CACHETS : 3 » — les deux cases renseignées pour le même contrat.
+  mauvais : contrat.nbHeures = 14 (correctement lu), contrat.nbCachets = null, justifié par
+            « le document indique une valeur vide » — FAUX : la case portait bien 3, le modèle
+            affirme avoir constaté quelque chose qu'il n'a pas vérifié.
+  attendu : contrat.nbHeures = 14 ET contrat.nbCachets = 3, chacun lu indépendamment sur sa propre
+            ligne, chacun avec sa propre citation exacte tirée du document.
+
 ════════ RÈGLES DE SÛRETÉ (elles priment sur tout le reste) ════════
 
 - Jamais de valeur inventée. Champ illisible ou absent → null s'il est nullable, sinon pas de
@@ -443,7 +474,11 @@ barèmes), activiteHorsAnnexe10 (déprécié), la date de départ d'affichage (c
 9. Sur un justificatif de déclaration mensuelle : compte les encadrés d'activité de la section
    « 1 - Activités » et vérifie que tu as produit EXACTEMENT une proposition « contrat » par
    encadré, y compris quand deux encadrés partagent le même employeur. Vérifie qu'aucun champ
-   contrat.nbHeures/nbCachets ne provient du « Total des activités » du bas de document.`;
+   contrat.nbHeures/nbCachets ne provient du « Total des activités » du bas de document.
+10. Si tu as rangé nbHeures OU nbCachets à null sur un contrat/AEM, vérifie que tu as vraiment
+    regardé la case correspondante et qu'elle est réellement vide — pas seulement que tu as déjà
+    rempli l'autre champ juste à côté. Si les deux cases portent une valeur, les deux champs
+    doivent être remplis (cf. CAS 7).`;
 
 /**
  * Erreur de configuration du serveur (clé API absente) — distincte d'un échec

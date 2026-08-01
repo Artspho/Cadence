@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Profil } from "../../types";
 import type { Proposition } from "../../types/extraction";
 import { contratDepuisProposition, evaluerExtraction, evaluerProposition, periodeDepuisProposition, profilAvecProposition } from "../routageExtraction";
-import { extractionBulletinPaie, extractionJustificatifDeclaration, extractionNotificationAdmission, extractionReleveAvecRefus } from "../fixturesExtraction";
+import { extractionAemHeuresEtCachets, extractionBulletinPaie, extractionJustificatifDeclaration, extractionNotificationAdmission, extractionReleveAvecRefus } from "../fixturesExtraction";
 
 const profilBase: Profil = {
   dateNaissance: "1988-04-12",
@@ -236,6 +236,15 @@ describe("contrat — toujours relu dans le formulaire, jamais appliqué directe
 
   it("ne s'applique pas au profil", () => {
     expect(() => profilAvecProposition(profilBase, proposition)).toThrow();
+  });
+
+  // 01/08/2026 (spécimen AEM réel) : nbHeures et nbCachets peuvent être TOUS LES DEUX renseignés
+  // sur le même contrat — ni l'un ni l'autre ne doit être supprimé ou converti au routage.
+  it("conserve nbHeures ET nbCachets simultanément quand les deux sont renseignés (AEM heures + cachets)", () => {
+    const propositionMixte = extractionAemHeuresEtCachets.propositions[0] as Extract<Proposition, { cible: "contrat" }>;
+    const valeurs = contratDepuisProposition(propositionMixte.donnees);
+    expect(valeurs.nbHeures).toBe(14);
+    expect(valeurs.nbCachets).toBe(3);
   });
 });
 
