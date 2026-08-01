@@ -568,10 +568,16 @@ synchronisée à chaque commit. 5 commits locaux cette session, rien poussé sur
   `navigator.serviceWorker`, contenu du cache (`caches.keys()`) confirmé complet (JS/CSS/HTML/
   icônes/manifest + une police déjà mise en cache) — puis le **processus du serveur preview a été
   tué** (pas juste un bouton "Offline" des DevTools) et la page rechargée : l'app s'affiche
-  intégralement, aucune erreur console. **Limite actée** : l'installation réelle sur un téléphone
-  (Android/iOS) n'a pas pu être testée depuis cet environnement — dépend du déploiement bêta
-  (backlog), toujours en attente ; ce lot rend l'app installable selon les critères
-  Lighthouse/Chrome, la confirmation finale sur un vrai appareil reste à faire une fois déployée.
+  intégralement, aucune erreur console. **Installation réelle sur téléphone confirmée le
+  01/08/2026** (session de support utilisateur, hors dépôt) : testée sur `https://cadence-benoit3.vercel.app`
+  (alias de prod Vercel, projet `cadence`, dernier déploiement Ready/Production sur commit
+  `2330a2d`), Android, navigateur Chrome (pas Samsung Internet, pas l'appli Bing — celle-ci embarque
+  un navigateur qui ne supporte pas correctement l'installation PWA, cause d'un premier échec avec
+  écran blanc/raccourci buggé). Installation via menu ⋮ → « Installer l'application » : réussie,
+  icône sur l'écran d'accueil, lancement en plein écran sans barre d'adresse. Mode offline testé :
+  navigation sur plusieurs écrans, passage en mode avion, relance depuis l'icône installée — app
+  fonctionnelle, aucune erreur. **iOS non testé** (aucun appareil disponible pour ce test) — limite
+  distincte qui reste ouverte, à ne pas confondre avec Android désormais confirmé.
 - ✅ **Module indemnisation mensuelle (V2), 3 phases terminées** : `engine/indemnisationMensuelle.ts`
   (`calculerMoisIndemnisation`, `calculerSerieIndemnisation`, `calculerSerieDepuisDeclarations`)
   calcule, mois par mois, le nombre de **jours réellement indemnisés** — pas juste l'AJ théorique
@@ -1268,7 +1274,6 @@ de situation ✅ — l'échec semble propre à ce format de bulletin, pas au can
   défaut. Aucun document réel ne montre encore ce cas — pas de correctif tant qu'on n'a pas de preuve
   sur pièce.
 - ⬜ Vérifier données réelles — import JSON + Dashboard vs notification France Travail
-- ⬜ PWA sur téléphone — installer et vérifier sur appareil réel
 - ⬜ Phase 2 périodes assimilées — conditions ALD (en attente source réglementaire)
 
 ### À faire — priorité normale
