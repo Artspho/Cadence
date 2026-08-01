@@ -84,6 +84,19 @@ describe("calculerDecompteHeures", () => {
     expect(resultat.repartition.enseignementRetenu).toBe(0);
   });
 
+  it("le plafond enseignement (70/120 h) s'applique identiquement qu'un contrat soit saisi manuellement ou importé (décision 01/08/2026 : enseignement = saisie manuelle uniquement, aucune distinction moteur selon `source`)", () => {
+    const p = profil({ dateNaissance: "1990-01-01" });
+    const enseignementManuel = contrat({ date: "2026-06-01", type: "enseignement", typeRemuneration: "heures", nbHeures: 90, etablissementAgree: true, enRapportAvecMetier: true, source: "manuel" });
+    const enseignementImporte = { ...enseignementManuel, source: "import_pdf" as const };
+
+    const resultatManuel = calculerDecompteHeures([enseignementManuel], [], p, franceTravailConfig, FENETRE);
+    const resultatImporte = calculerDecompteHeures([enseignementImporte], [], p, franceTravailConfig, FENETRE);
+
+    expect(resultatManuel.repartition.enseignementRetenu).toBe(70);
+    expect(resultatManuel.repartition.enseignementExcedentaire).toBe(20);
+    expect(resultatImporte.repartition).toEqual(resultatManuel.repartition);
+  });
+
   it("100 jours de maternité ajoutent 500 h au décompte (5 h/jour)", () => {
     const p = profil({ dateNaissance: "1990-01-01" });
     const periodes = [periode({ type: "maternite", dateDebut: "2026-03-01", dateFin: "2026-06-08" })]; // 100 jours inclusifs

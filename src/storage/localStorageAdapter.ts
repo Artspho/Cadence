@@ -114,6 +114,29 @@ function migrerAjReelleHistoriqueVersProfil(brut: unknown): unknown {
   return { ...donnees, profil: { ...p, ajReelleHistorique: s.ajReelleHistorique } };
 }
 
+// Migration silencieuse (2026-08-01) : un profil enregistré avant le passage de
+// `ouvertureDroits.tauxPrelevementSource: number` à un historique de taux
+// (`tauxPrelevementSourceHistorique`, cf. types/index.ts) n'a que l'ancien champ scalaire. Convertit
+// en une entrée unique à une date arbitrairement ancienne (couvre tout mois déjà déclaré) — aucune
+// perte pour un profil déjà configuré (devoir sacré n°1). Même pattern que
+// `migrerAjReelleHistorique` ci-dessus.
+function migrerTauxPASHistorique(brut: unknown): unknown {
+  if (typeof brut !== "object" || brut === null) return brut;
+  const donnees = brut as Record<string, unknown>;
+  const profilBrut = donnees.profil;
+  if (typeof profilBrut !== "object" || profilBrut === null) return brut;
+  const p = profilBrut as Record<string, unknown>;
+  const ouverture = p.ouvertureDroits;
+  if (typeof ouverture !== "object" || ouverture === null || Array.isArray(ouverture)) return brut;
+  const o = ouverture as Record<string, unknown>;
+  if (typeof o.tauxPrelevementSource !== "number" || o.tauxPrelevementSourceHistorique !== undefined) return brut;
+  const { tauxPrelevementSource, ...ouvertureSansTaux } = o;
+  return {
+    ...donnees,
+    profil: { ...p, ouvertureDroits: { ...ouvertureSansTaux, tauxPrelevementSourceHistorique: [{ dateEffet: "2000-01-01", valeur: tauxPrelevementSource }] } },
+  };
+}
+
 // Migration silencieuse (2026-07-25) : un solde de départ configuré avant le passage à
 // `Profil.ouvertureDroits` portait `delaiRestant`/`franchiseCPRestante`/`quotaCPCarryOver`,
 // désormais simulés automatiquement par le moteur. Ne garde que `date` → `dateDepart` (à partir de
@@ -178,7 +201,7 @@ const donneesAppSchemaLecture = z.object({ profil: profilSchemaForme.nullable(),
 const donneesAppSchemaEcriture = z.object({ profil: profilSchema.nullable(), ...champsCommuns });
 
 function migrer(brut: unknown) {
-  return migrerSoldeVersDateDepart(migrerAjReelleHistoriqueVersProfil(migrerContratsDateDebut(migrerAjReelleHistorique(brut))));
+  return migrerTauxPASHistorique(migrerSoldeVersDateDepart(migrerAjReelleHistoriqueVersProfil(migrerContratsDateDebut(migrerAjReelleHistorique(brut)))));
 }
 
 export async function chargerDonnees(): Promise<DonneesApp> {

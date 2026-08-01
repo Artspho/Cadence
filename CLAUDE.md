@@ -123,10 +123,14 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
   retard malgré un push que Benoît croyait réussi — reconfirmé ensuite (`391ffce` atteint), mais
   **3 commits locaux again en attente de push** (`83d0429`, `116b482`, `7c835de`) à la fin de cette
   session — à repousser au démarrage de la prochaine.
-- ⬜ **Préparation contrat d'enseignement, aucun code** (`78c2e74`) : recensement documenté « à
-  confirmer sur pièce », `contrat_enseignement` réservé en commentaire (pas activé) dans
-  `typeDocumentDetecte`. Benoît a confirmé son cas (contrat annuel simple, un établissement) et va
-  fournir un spécimen réel — pas encore reçu à la fin de cette session.
+- ✅ **Contrat d'enseignement — décision produit actée, blocage levé** (`78c2e74` puis décision plus
+  tard le même jour) : les contrats d'enseignement ne seront PAS lus/extraits par IA — saisie
+  manuelle uniquement. Plus besoin d'attendre un spécimen réel de Benoît : `ContractForm.tsx`
+  couvrait déjà tous les champs (`etablissementAgree`/`enRapportAvecMetier`), et le moteur ne
+  distingue déjà pas selon `source` — vérifié par deux tests de régression explicites
+  (`decompteHeures.test.ts`, `salaireReference.test.ts`). `contrat_enseignement` reste réservé en
+  commentaire dans `typeDocumentDetecte`, mais plus comme une place en attente d'un lexique IA futur
+  — seulement pour qu'un futur chantier ne réutilise pas ce nom par erreur.
 
 ### 01/08/2026 (test réel AEM en production, bug heures/cachets trouvé et corrigé)
 

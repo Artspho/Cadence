@@ -187,11 +187,14 @@ export function detecterAlertes(
   }
 
   // Taux PAS multi-années (Q2, cf. commentaire "Mois de transition" dans indemnisationMensuelle.ts) :
-  // le taux peut avoir changé au 1er janvier (DGFIP), mais Cadence n'en a qu'une valeur scalaire.
-  // Ne se déclenche que si un vrai janvier "en cours d'indemnisation" (pas le mois d'ouverture
-  // lui-même, qui n'a jamais connu qu'un seul taux) apparaît dans la série affichée — une seule
-  // fois par série, jamais une ligne par janvier trouvé.
-  if (profil.ouvertureDroits?.tauxPrelevementSource != null && soldeDepart) {
+  // depuis le 01/08/2026, `tauxPrelevementSourceHistorique` peut porter plusieurs taux datés et le
+  // moteur choisit déjà le bon par mois (getTauxPASAt) — cette alerte n'existe plus pour compenser
+  // une limite structurelle, mais pour rappeler à l'utilisateur de VÉRIFIER si la DGFIP a revalorisé
+  // son taux et, si oui, d'AJOUTER une nouvelle entrée datée (sans quoi le dernier taux connu
+  // continue de s'appliquer, à tort). Ne se déclenche que si un vrai janvier "en cours
+  // d'indemnisation" (pas le mois d'ouverture lui-même, qui n'a jamais connu qu'un seul taux)
+  // apparaît dans la série affichée — une seule fois par série, jamais une ligne par janvier trouvé.
+  if (profil.ouvertureDroits && (profil.ouvertureDroits.tauxPrelevementSourceHistorique?.length ?? 0) > 0 && soldeDepart) {
     const serie = calculerSerieDepuisContrats(profil, soldeDepart, contrats, dateDuJour, config);
     const moisOuverture = moisCle(profil.ouvertureDroits.dateOuverture);
     const janvierEnCours = serie.calculable && serie.mois.some((m) => m.calculable && m.moisLabel.endsWith("-01") && m.moisLabel !== moisOuverture);
@@ -201,7 +204,7 @@ export function detecterAlertes(
         niveau: "attention",
         titre: "Taux PAS à vérifier",
         message:
-          "Ton taux de prélèvement à la source a peut-être été mis à jour au 1ᵉʳ janvier par la DGFIP. Vérifie sur impots.gouv.fr ou ton dernier relevé France Travail et corrige-le dans le profil si besoin.",
+          "Ton taux de prélèvement à la source a peut-être été mis à jour au 1ᵉʳ janvier par la DGFIP. Vérifie sur impots.gouv.fr ou ton dernier relevé France Travail, et ajoute une nouvelle ligne datée dans le profil si le taux a changé.",
       });
     }
   }

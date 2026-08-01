@@ -150,6 +150,19 @@ export const propositionOuvertureDroitsSchema = z.object({
       .number()
       .nullable()
       .describe("Taux de prélèvement à la source (%), présent sur notification/relevé/avis d'imposition."),
+    tauxPrelevementSourceDateEffet: z
+      .string()
+      .nullable()
+      .describe(
+        "Date (ISO) de la section où la phrase du taux a été trouvée — le libellé « Situation au " +
+          "JJ/MM/AAAA » qui précède le tableau contenant la phrase, ou la date de la notification " +
+          "elle-même si le document n'a qu'une seule section. Un même document peut contenir " +
+          "PLUSIEURS sections avec des dates différentes (un relevé de situation en couvre souvent " +
+          "deux) — prends TOUJOURS la date de la section où LA PHRASE DU TAUX ELLE-MÊME apparaît, " +
+          "jamais une autre date du document (règlement, période de paiement). Sert à choisir le " +
+          "bon taux quand plusieurs documents successifs en donnent des différents : le plus récent " +
+          "l'emporte, jamais le premier trouvé ni le taux du document le plus récemment importé."
+      ),
   }),
   confiance: z.record(niveauConfiance),
   justification: z.string(),
@@ -252,13 +265,13 @@ export const extractionResultSchema = z.object({
     "attestation_cpam",
     "justificatif_declaration", // Justificatif de déclaration de situation mensuelle (actualisation) — ajouté 01/08/2026
     "non_reconnu",
-    // ⚠️ "contrat_enseignement" est délibérément PAS ajouté ici (préparation du 01/08/2026, cf.
-    // docs/files/inventaire_donnees_et_documents.md §8.2) : l'ajouter en dur créerait un type
-    // accepté sans aucune section de lexique pour le remplir dans document_annotation_prompt —
-    // une case morte. À activer seulement une fois un vrai contrat d'enseignement obtenu et lu,
-    // dans le même mouvement que l'écriture du lexique correspondant, jamais avant (même règle que
-    // pour l'AEM avant son spécimen). Réserver ce nom ici évite juste qu'un futur chantier en
-    // choisisse un autre par erreur.
+    // ⚠️ "contrat_enseignement" est délibérément PAS ajouté ici — décision produit actée le
+    // 01/08/2026 (docs/reprise.md) : les contrats d'enseignement ne seront PAS lus/extraits par IA,
+    // saisie manuelle uniquement via ContractForm.tsx (etablissementAgree/enRapportAvecMetier déjà
+    // couverts). Ce n'est plus une réservation en attente d'un spécimen (l'ancienne note du
+    // 01/08/2026, cf. inventaire_donnees_et_documents.md §8.2, envisageait encore un lexique futur)
+    // — le nom reste réservé ici uniquement pour qu'un futur chantier ne le réutilise pas par erreur
+    // pour autre chose, jamais pour signaler un chantier IA en attente.
   ]),
   propositions: z.array(propositionSchema),
   avertissementsGeneraux: z.array(z.string()),

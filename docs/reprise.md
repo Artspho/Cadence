@@ -76,8 +76,14 @@ avait bien eu lieu hors dépôt, jamais consigné jusque-là).
   rangé à `null` avec une justification FAUSSE alors que la valeur était présente sur le document.
   Corrigé (lexique + fixture de régression).
 - `78c2e74` — Préparation contrat d'enseignement (aucun spécimen réel, donc aucun code d'extraction
-  — seulement un recensement documenté « à confirmer sur pièce »). **Benoît doit fournir un contrat
-  d'enseignement réel** (son cas confirmé simple : contrat annuel classique, un seul établissement).
+  — seulement un recensement documenté « à confirmer sur pièce »). ⚠️ **Décision actée plus tard le
+  même jour (01/08/2026, fin de session) : ANNULE le blocage ci-dessus.** Les contrats d'enseignement
+  ne seront PAS lus/extraits par IA — saisie manuelle uniquement. `ContractForm.tsx` couvrait déjà
+  tous les champs nécessaires (`etablissementAgree`/`enRapportAvecMetier`, déjà utilisés en
+  production sur les 18 contrats réels « Commune de Levallois Perret », cf. plus bas dans ce
+  document) ; le moteur (`decompteHeures.ts`/`salaireReference.ts`) ne fait déjà aucune distinction
+  selon `source` — vérifié et couvert par deux tests de régression explicites. Plus besoin d'attendre
+  un document réel de Benoît pour ce chantier.
 - **AEM générique : toujours aucun spécimen fourni pour valider le lexique au-delà du cas testé en
   045d46a** — demande envoyée à Benoît, sans réponse à ce stade.
 
@@ -114,11 +120,13 @@ n'avait pas atteint GitHub à ce moment-là (corrigé ensuite, cf. l'état en t�
   Ancien→Nouveau, jamais de fusion automatique.
 
 **Reste à faire, dans l'ordre de priorité** :
-1. Repousser les 3 commits locaux vers `origin/master`.
+1. Repousser les commits locaux vers `origin/master`.
 2. Décider quoi faire des 5 contrats « Les Arts Phocéens » potentiellement sous-comptés (§4).
-3. Obtenir un vrai contrat d'enseignement de Benoît (annoncé, pas encore reçu) pour le chantier
-   `contrat_enseignement`.
-4. Obtenir un vrai spécimen AEM générique si Benoît veut aller plus loin que le cas déjà testé.
+3. Obtenir un vrai spécimen AEM générique si Benoît veut aller plus loin que le cas déjà testé.
+
+~~Obtenir un vrai contrat d'enseignement de Benoît pour le chantier `contrat_enseignement`~~ — retiré
+de cette liste (01/08/2026, fin de session) : décision produit actée, saisie manuelle uniquement,
+plus jamais une condition de blocage.
 
 ## Fait dans les sessions récentes
 

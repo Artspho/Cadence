@@ -10,3 +10,17 @@ export function getAjReelleAt(historique: { dateEffet: string; valeur: number }[
   const applicables = historique.filter((h) => h.dateEffet <= date).sort((a, b) => b.dateEffet.localeCompare(a.dateEffet));
   return applicables.length > 0 ? applicables[0].valeur : null;
 }
+
+// Même recherche, même contrat (`null` = aucun taux connu ne couvre cette date), pour le taux de
+// prélèvement à la source (`Profil.ouvertureDroits.tauxPrelevementSourceHistorique`, cf.
+// types/index.ts) — la DGFIP peut le revaloriser plusieurs fois sur une même période
+// d'indemnisation, pas seulement une fois par an. Fonction distincte plutôt qu'un paramètre
+// générique partagé avec `getAjReelleAt` : les deux historiques ont des appelants et des cycles de
+// vie indépendants, un couplage introduirait un risque de régression croisée pour zéro bénéfice réel.
+export function getTauxPASAt(historique: { dateEffet: string; valeur: number }[] | undefined, date: string): number | null {
+  if (!historique || historique.length === 0) {
+    return null;
+  }
+  const applicables = historique.filter((h) => h.dateEffet <= date).sort((a, b) => b.dateEffet.localeCompare(a.dateEffet));
+  return applicables.length > 0 ? applicables[0].valeur : null;
+}

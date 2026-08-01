@@ -87,7 +87,7 @@ export const GROUPES_DOCUMENTS_UTILES: GroupeDocumentsUtiles[] = [
           "Seule source pour savoir si ton établissement est agréé et si ton enseignement est en rapport avec ton métier d'artiste — les deux conditions qui déterminent si ces heures comptent dans tes 507 h.",
         role: "indispensable",
         canal: "manuel_uniquement",
-        noteCanal: "Pas encore lu par le canal IA — les deux cases se cochent à la main dans le formulaire du contrat.",
+        noteCanal: "Saisie manuelle uniquement, aucune extraction IA prévue pour ce type de contrat (décision du 01/08/2026) — les deux cases se cochent à la main dans le formulaire du contrat.",
       },
     ],
   },

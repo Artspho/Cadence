@@ -79,7 +79,7 @@ describe("aj_reelle_historique — le champ de l'app attend une AJ NETTE", () =>
 describe("profil_ouverture_droits — refus si un chiffre qui change les montants manque", () => {
   const complete: Proposition = {
     cible: "profil_ouverture_droits",
-    donnees: { dateOuverture: "2026-02-01", franchiseCPTotale: 12, delaiAttenteInitial: 7, dateLimiteIndemnisation: "2027-01-31", tauxPrelevementSource: 7.2 },
+    donnees: { dateOuverture: "2026-02-01", franchiseCPTotale: 12, delaiAttenteInitial: 7, dateLimiteIndemnisation: "2027-01-31", tauxPrelevementSource: 7.2, tauxPrelevementSourceDateEffet: "2026-02-01" },
     confiance: {},
     justification: "test",
   };
@@ -92,7 +92,7 @@ describe("profil_ouverture_droits — refus si un chiffre qui change les montant
       franchiseCPTotale: 12,
       delaiAttenteInitial: 7,
       dateLimiteIndemnisation: "2027-01-31",
-      tauxPrelevementSource: 7.2,
+      tauxPrelevementSourceHistorique: [{ dateEffet: "2026-02-01", valeur: 7.2 }],
     });
   });
 
@@ -111,11 +111,11 @@ describe("profil_ouverture_droits — refus si un chiffre qui change les montant
   it("ne perd pas un taux déjà saisi quand le document n'en donne pas", () => {
     const profil: Profil = {
       ...profilBase,
-      ouvertureDroits: { dateOuverture: "2025-02-01", franchiseCPTotale: 5, delaiAttenteInitial: 7, tauxPrelevementSource: 3.1, dateLimiteIndemnisation: "2026-01-31" },
+      ouvertureDroits: { dateOuverture: "2025-02-01", franchiseCPTotale: 5, delaiAttenteInitial: 7, tauxPrelevementSourceHistorique: [{ dateEffet: "2025-02-01", valeur: 3.1 }], dateLimiteIndemnisation: "2026-01-31" },
     };
-    const sansTaux = { ...complete, donnees: { ...complete.donnees, tauxPrelevementSource: null, dateLimiteIndemnisation: null } } as Proposition;
+    const sansTaux = { ...complete, donnees: { ...complete.donnees, tauxPrelevementSource: null, tauxPrelevementSourceDateEffet: null, dateLimiteIndemnisation: null } } as Proposition;
     const resultat = profilAvecProposition(profil, sansTaux);
-    expect(resultat.ouvertureDroits?.tauxPrelevementSource).toBe(3.1);
+    expect(resultat.ouvertureDroits?.tauxPrelevementSourceHistorique).toEqual([{ dateEffet: "2025-02-01", valeur: 3.1 }]);
     expect(resultat.ouvertureDroits?.dateLimiteIndemnisation).toBe("2026-01-31");
   });
 
@@ -126,25 +126,25 @@ describe("profil_ouverture_droits — refus si un chiffre qui change les montant
     };
     const tauxSeul = {
       ...complete,
-      donnees: { ...complete.donnees, dateOuverture: "", franchiseCPTotale: null, delaiAttenteInitial: null, dateLimiteIndemnisation: null, tauxPrelevementSource: 3.1 },
+      donnees: { ...complete.donnees, dateOuverture: "", franchiseCPTotale: null, delaiAttenteInitial: null, dateLimiteIndemnisation: null, tauxPrelevementSource: 3.1, tauxPrelevementSourceDateEffet: "2025-06-01" },
     } as Proposition;
     expect(evaluerProposition(tauxSeul, profil).statut).toBe("applicable");
   });
 
-  it("récupère dateOuverture/franchiseCPTotale/delaiAttenteInitial du profil existant quand la proposition ne donne que tauxPrelevementSource", () => {
+  it("récupère dateOuverture/franchiseCPTotale/delaiAttenteInitial du profil existant quand la proposition ne donne que le taux", () => {
     const profil: Profil = {
       ...profilBase,
       ouvertureDroits: { dateOuverture: "2025-02-01", franchiseCPTotale: 5, delaiAttenteInitial: 7 },
     };
     const tauxSeul = {
       ...complete,
-      donnees: { ...complete.donnees, dateOuverture: "", franchiseCPTotale: null, delaiAttenteInitial: null, dateLimiteIndemnisation: null, tauxPrelevementSource: 3.1 },
+      donnees: { ...complete.donnees, dateOuverture: "", franchiseCPTotale: null, delaiAttenteInitial: null, dateLimiteIndemnisation: null, tauxPrelevementSource: 3.1, tauxPrelevementSourceDateEffet: "2025-06-01" },
     } as Proposition;
     const resultat = profilAvecProposition(profil, tauxSeul);
     expect(resultat.ouvertureDroits?.dateOuverture).toBe("2025-02-01");
     expect(resultat.ouvertureDroits?.franchiseCPTotale).toBe(5);
     expect(resultat.ouvertureDroits?.delaiAttenteInitial).toBe(7);
-    expect(resultat.ouvertureDroits?.tauxPrelevementSource).toBe(3.1);
+    expect(resultat.ouvertureDroits?.tauxPrelevementSourceHistorique).toEqual([{ dateEffet: "2025-06-01", valeur: 3.1 }]);
   });
 
   it("applicable même si le relevé redonne dateOuverture en plus du taux, franchise/délai non redonnés", () => {
@@ -154,25 +154,60 @@ describe("profil_ouverture_droits — refus si un chiffre qui change les montant
     };
     const releve = {
       ...complete,
-      donnees: { ...complete.donnees, dateOuverture: "2026-01-18", franchiseCPTotale: null, delaiAttenteInitial: null, dateLimiteIndemnisation: null, tauxPrelevementSource: 3.1 },
+      donnees: { ...complete.donnees, dateOuverture: "2026-01-18", franchiseCPTotale: null, delaiAttenteInitial: null, dateLimiteIndemnisation: null, tauxPrelevementSource: 3.1, tauxPrelevementSourceDateEffet: "2026-01-18" },
     } as Proposition;
     expect(evaluerProposition(releve, profil).statut).toBe("applicable");
   });
 
-  it("un relevé qui redonne dateOuverture met quand même à jour tauxPrelevementSource sans perdre franchise/délai", () => {
+  it("un relevé qui redonne dateOuverture met quand même à jour le taux sans perdre franchise/délai", () => {
     const profil: Profil = {
       ...profilBase,
       ouvertureDroits: { dateOuverture: "2026-01-18", franchiseCPTotale: 5, delaiAttenteInitial: 7 },
     };
     const releve = {
       ...complete,
-      donnees: { ...complete.donnees, dateOuverture: "2026-01-18", franchiseCPTotale: null, delaiAttenteInitial: null, dateLimiteIndemnisation: null, tauxPrelevementSource: 3.1 },
+      donnees: { ...complete.donnees, dateOuverture: "2026-01-18", franchiseCPTotale: null, delaiAttenteInitial: null, dateLimiteIndemnisation: null, tauxPrelevementSource: 3.1, tauxPrelevementSourceDateEffet: "2026-01-18" },
     } as Proposition;
     const resultat = profilAvecProposition(profil, releve);
     expect(resultat.ouvertureDroits?.dateOuverture).toBe("2026-01-18");
     expect(resultat.ouvertureDroits?.franchiseCPTotale).toBe(5);
     expect(resultat.ouvertureDroits?.delaiAttenteInitial).toBe(7);
-    expect(resultat.ouvertureDroits?.tauxPrelevementSource).toBe(3.1);
+    expect(resultat.ouvertureDroits?.tauxPrelevementSourceHistorique).toEqual([{ dateEffet: "2026-01-18", valeur: 3.1 }]);
+  });
+
+  it("sans dateEffet lisible, le taux n'est pas appliqué (pas de date inventée, devoir n°2)", () => {
+    const sansDate = { ...complete, donnees: { ...complete.donnees, tauxPrelevementSourceDateEffet: null } } as Proposition;
+    const resultat = profilAvecProposition(profilBase, sansDate);
+    expect(resultat.ouvertureDroits?.tauxPrelevementSourceHistorique).toBeUndefined();
+  });
+
+  it("régression réelle 01/08/2026 : un second relevé plus récent AJOUTE une entrée, ne remplace jamais l'historique (3,30 % mi-2025 puis 3,10 % fin 2025/2026, cf. relevés réels du dossier)", () => {
+    const profilApresPremierReleve: Profil = {
+      ...profilBase,
+      ouvertureDroits: { dateOuverture: "2025-03-24", franchiseCPTotale: 5, delaiAttenteInitial: 7, tauxPrelevementSourceHistorique: [{ dateEffet: "2025-07-03", valeur: 3.3 }] },
+    };
+    const secondReleve = {
+      ...complete,
+      donnees: { ...complete.donnees, dateOuverture: "2025-03-24", franchiseCPTotale: null, delaiAttenteInitial: null, dateLimiteIndemnisation: null, tauxPrelevementSource: 3.1, tauxPrelevementSourceDateEffet: "2026-02-17" },
+    } as Proposition;
+    const resultat = profilAvecProposition(profilApresPremierReleve, secondReleve);
+    expect(resultat.ouvertureDroits?.tauxPrelevementSourceHistorique).toEqual([
+      { dateEffet: "2025-07-03", valeur: 3.3 },
+      { dateEffet: "2026-02-17", valeur: 3.1 },
+    ]);
+  });
+
+  it("un même document réimporté (même dateEffet) remplace l'entrée existante plutôt que d'en créer une seconde", () => {
+    const profilExistant: Profil = {
+      ...profilBase,
+      ouvertureDroits: { dateOuverture: "2025-03-24", franchiseCPTotale: 5, delaiAttenteInitial: 7, tauxPrelevementSourceHistorique: [{ dateEffet: "2026-02-17", valeur: 3.1 }] },
+    };
+    const memeDocument = {
+      ...complete,
+      donnees: { ...complete.donnees, dateOuverture: "2025-03-24", franchiseCPTotale: null, delaiAttenteInitial: null, dateLimiteIndemnisation: null, tauxPrelevementSource: 3.1, tauxPrelevementSourceDateEffet: "2026-02-17" },
+    } as Proposition;
+    const resultat = profilAvecProposition(profilExistant, memeDocument);
+    expect(resultat.ouvertureDroits?.tauxPrelevementSourceHistorique).toEqual([{ dateEffet: "2026-02-17", valeur: 3.1 }]);
   });
 });
 

@@ -80,6 +80,20 @@ describe("calculerSalaireReference", () => {
     expect(resultat.joursPeriodeAssimileesRetenues).toBe(99);
   });
 
+  it("l'exclusion enseignement/formation du SR/NHT ne dépend jamais de Contrat.source (saisie manuelle ou import IA identiques, cf. décision 01/08/2026 : contrat d'enseignement en saisie manuelle uniquement)", () => {
+    const p = profil({ dateNaissance: "1990-01-01" });
+    const enseignementManuel = contrat({ date: "2026-07-01", type: "enseignement", typeRemuneration: "heures", nbHeures: 60, salaireBrut: 3000, etablissementAgree: true, enRapportAvecMetier: true, source: "manuel" });
+    const enseignementImporte = { ...enseignementManuel, source: "import_pdf" as const };
+
+    const resultatManuel = calculerSalaireReference([enseignementManuel], [], p, franceTravailConfig, FENETRE);
+    const resultatImporte = calculerSalaireReference([enseignementImporte], [], p, franceTravailConfig, FENETRE);
+
+    expect(resultatManuel.sr).toBe(0);
+    expect(resultatManuel.nht).toBe(0);
+    expect(resultatImporte.sr).toBe(resultatManuel.sr);
+    expect(resultatImporte.nht).toBe(resultatManuel.nht);
+  });
+
   it("ne calcule pas de SAR sans période assimilée éligible", () => {
     const p = profil({ dateNaissance: "1990-01-01" });
     const contrats = [contrat({ date: "2026-06-01", nbCachets: 40, salaireBrut: 8000 })];

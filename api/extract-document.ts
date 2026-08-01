@@ -145,17 +145,23 @@ NOTIFICATION D'ADMISSION ARE / RELEVÉ DE SITUATION
   dans une même justification vague. Si le taux est identique dans les deux occurrences (cas
   fréquent : même taux DGFIP sur toute la période), c'est une CONFIRMATION croisée qui AUGMENTE la
   confiance (haute), jamais une raison de douter.
-  Pour profil_ouverture_droits.tauxPrelevementSource (un champ scalaire unique, pas historique) :
-  retiens le taux de la section « Situation au [date] » la PLUS RÉCENTE, confiance "haute", justifié
-  par la phrase ET le nom exact de cette section. ⚠️ « La plus récente » se détermine en COMPARANT
-  EXPLICITEMENT les deux dates elles-mêmes (jour/mois/année) — PAS en supposant que la première
-  section rencontrée en lisant le document est la plus ancienne ou la plus récente. Exemple : entre
-  « Situation au 28/06/2026 » et « Situation au 13/07/2026 », le 13/07/2026 est postérieur au
-  28/06/2026 (juillet après juin) → c'est la section « Situation au 13/07/2026 » qui est la plus
-  récente, même si elle apparaît plus loin dans le document. Si une autre section antérieure porte
-  une occurrence différente (rare, mais possible en cas de changement de taux DGFIP en cours de
-  période), ajoute-la en info_seule (clé scalaire à plat, ex. tauxPrelevementSourceSituationAu[date])
-  pour ne perdre aucune information — jamais une deuxième proposition profil_ouverture_droits.
+  Pour profil_ouverture_droits.tauxPrelevementSource (une seule proposition, donc un seul couple
+  taux/date par document) : retiens le taux de la section « Situation au [date] » la PLUS RÉCENTE,
+  confiance "haute", justifié par la phrase ET le nom exact de cette section. ⚠️ « La plus récente »
+  se détermine en COMPARANT EXPLICITEMENT les deux dates elles-mêmes (jour/mois/année) — PAS en
+  supposant que la première section rencontrée en lisant le document est la plus ancienne ou la plus
+  récente. Exemple : entre « Situation au 28/06/2026 » et « Situation au 13/07/2026 », le 13/07/2026
+  est postérieur au 28/06/2026 (juillet après juin) → c'est la section « Situation au 13/07/2026 »
+  qui est la plus récente, même si elle apparaît plus loin dans le document.
+  tauxPrelevementSourceDateEffet DOIT porter la date ISO de CETTE section (celle du taux retenu),
+  jamais celle d'une autre section, ni une date devinée — c'est ce qui permet à Cadence de conserver
+  un historique de taux successifs plutôt qu'un scalaire unique écrasé à chaque import (bug réel
+  corrigé le 01/08/2026 : un utilisateur réel a eu 3,30 % mi-2025 puis 3,10 % dès fin 2025/2026, les
+  deux valeurs doivent survivre, pas seulement la plus récemment importée).
+  Si une autre section antérieure DU MÊME DOCUMENT porte un taux DIFFÉRENT (rare, mais possible en
+  cas de changement de taux DGFIP en cours de période), ajoute-la en info_seule (clé scalaire à
+  plat, ex. tauxPrelevementSourceSituationAu[date]) pour ne perdre aucune information — jamais une
+  deuxième proposition profil_ouverture_droits (le schéma n'en accepte qu'une par document).
 
   ⚠️ GARDE-FOU — SI LA PHRASE N'EXISTE PAS : une section de paiement peut exister sans que la phrase
   du taux personnalisé n'y figure (France Travail peut changer sa formulation ou la structure de son
@@ -414,10 +420,12 @@ CAS 6 — taux PAS attribué à la mauvaise section (date confondue avec un titr
              pas une section « Situation au »).
   mauvais : justification citant « REGLEMENT DU 01/07/2026 » comme section d'origine du taux, ou
             confiance "moyenne" faute de date dans la phrase elle-même.
-  attendu : profil_ouverture_droits.tauxPrelevementSource = 3.10, confiance "haute", justifié par la
-            phrase ET par le nom exact de la section « Situation au 13/07/2026 » (la plus récente des
-            deux) ; l'occurrence de « Situation au 28/06/2026 » (même taux, montant différent :
-            15,03 €) est une confirmation croisée, pas une source de doute.
+  attendu : profil_ouverture_droits.tauxPrelevementSource = 3.10, tauxPrelevementSourceDateEffet =
+            "2026-07-13" (ISO de la section retenue, jamais "2026-07-01" qui est la date du
+            règlement voisin), confiance "haute", justifié par la phrase ET par le nom exact de la
+            section « Situation au 13/07/2026 » (la plus récente des deux) ; l'occurrence de
+            « Situation au 28/06/2026 » (même taux, montant différent : 15,03 €) est une
+            confirmation croisée, pas une source de doute.
 
 CAS 7 — heures ET cachets présents sur la même AEM, l'un rangé à null avec une justification fausse
   (observé en production, 01/08/2026, spécimen AEM réel format GHS sPAIEctacle)
@@ -468,7 +476,9 @@ barèmes), activiteHorsAnnexe10 (déprécié), la date de départ d'affichage (c
 7. Si tu as rempli tauxPrelevementSource, vérifie que ta justification nomme la section exacte
    « Situation au [date] » dont provient la phrase — jamais un titre voisin sans rapport comme
    « REGLEMENT DU [date] ». Si le document a deux occurrences de la phrase, vérifie que tu as bien
-   retenu celle de la section la plus récente pour le champ structuré.
+   retenu celle de la section la plus récente pour le champ structuré, ET que
+   tauxPrelevementSourceDateEffet porte bien la date ISO de cette même section (jamais null si
+   tauxPrelevementSource est renseigné, jamais la date d'un autre titre).
 8. Vérifie que chaque « justification » contient une citation, et que tu n'as inscrit de confiance
    que pour les champs effectivement renseignés.
 9. Sur un justificatif de déclaration mensuelle : compte les encadrés d'activité de la section

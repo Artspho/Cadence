@@ -240,9 +240,9 @@ describe("calculerSerieDepuisContrats", () => {
     expect(premier.montantMensuel).toEqual({ calculable: true, montant: 28 * 50, ajUtilisee: 50 });
   });
 
-  it("montantNet = montantBrut × (1 - taux/100), arrondi, quand tauxPrelevementSource est renseigné", () => {
+  it("montantNet = montantBrut × (1 - taux/100), arrondi, quand tauxPrelevementSourceHistorique est renseigné", () => {
     const p = profil({
-      ouvertureDroits: { ...ouvertureDroits, tauxPrelevementSource: 7.2 },
+      ouvertureDroits: { ...ouvertureDroits, tauxPrelevementSourceHistorique: [{ dateEffet: "2026-01-01", valeur: 7.2 }] },
       ajReelleHistorique: [{ dateEffet: "2026-01-01", valeur: 50 }],
     });
     const resultat = calculerSerieDepuisContrats(p, { dateDepart: "2026-02-01" }, [], "2026-02-28", franceTravailConfig);
@@ -255,7 +255,7 @@ describe("calculerSerieDepuisContrats", () => {
     expect(montantMensuel.montantNet).toBe(Math.round(1400 * (1 - 7.2 / 100) * 100) / 100); // 1299.2
   });
 
-  it("montantNet reste absent quand tauxPrelevementSource n'est pas renseigné", () => {
+  it("montantNet reste absent quand tauxPrelevementSourceHistorique n'est pas renseigné", () => {
     const p = profil({ ouvertureDroits, ajReelleHistorique: [{ dateEffet: "2026-01-01", valeur: 50 }] });
     const resultat = calculerSerieDepuisContrats(p, { dateDepart: "2026-02-01" }, [], "2026-02-28", franceTravailConfig);
     if (!resultat.calculable) throw new Error("devrait être calculable");
@@ -264,6 +264,30 @@ describe("calculerSerieDepuisContrats", () => {
     const montantMensuel = premier.montantMensuel;
     if (!montantMensuel.calculable) throw new Error("devrait être calculable");
     expect(montantMensuel.montantNet).toBeUndefined();
+  });
+
+  it("régression réelle 01/08/2026 : deux taux PAS successifs (3,30 % mi-2025 puis 3,10 % dès 2026) — chaque mois utilise le taux en vigueur CE mois-là, jamais le dernier taux connu réappliqué rétroactivement", () => {
+    const p = profil({
+      ouvertureDroits: {
+        ...ouvertureDroits,
+        dateOuverture: "2025-06-01",
+        tauxPrelevementSourceHistorique: [
+          { dateEffet: "2025-06-01", valeur: 3.3 },
+          { dateEffet: "2026-01-01", valeur: 3.1 },
+        ],
+      },
+      ajReelleHistorique: [{ dateEffet: "2025-06-01", valeur: 50 }],
+    });
+    const resultat = calculerSerieDepuisContrats(p, { dateDepart: "2025-06-01" }, [], "2026-01-31", franceTravailConfig);
+    if (!resultat.calculable) throw new Error("devrait être calculable");
+    const juin2025 = resultat.mois.find((m) => m.moisLabel === "2025-06");
+    const janvier2026 = resultat.mois.find((m) => m.moisLabel === "2026-01");
+    if (!juin2025?.calculable || !janvier2026?.calculable) throw new Error("devrait être calculable");
+    const mJuin = juin2025.montantMensuel;
+    const mJanvier = janvier2026.montantMensuel;
+    if (!mJuin.calculable || !mJanvier.calculable) throw new Error("devrait être calculable");
+    expect(mJuin.montantNet).toBe(Math.round(mJuin.montant * (1 - 3.3 / 100) * 100) / 100);
+    expect(mJanvier.montantNet).toBe(Math.round(mJanvier.montant * (1 - 3.1 / 100) * 100) / 100);
   });
 
   it("régression : les contrats artiste comptent bien, mélangés avec un enseignement récurrent sur le même mois (bug signalé, non reproduit)", () => {

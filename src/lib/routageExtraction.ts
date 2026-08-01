@@ -393,6 +393,16 @@ export function periodeDepuisProposition(donnees: Extract<Proposition, { cible: 
 }
 
 /**
+ * Ajoute (ou remplace, même `dateEffet`) une entrée dans un historique de taux PAS — jamais un
+ * écrasement du reste de l'historique. Trié croissant par `dateEffet`, même convention que
+ * `ajReelleHistorique` (cf. MonProfil.tsx, GestionAjReelle/GestionTauxPAS).
+ */
+function fusionnerTauxPASHistorique(historique: { dateEffet: string; valeur: number }[] | undefined, dateEffet: string, valeur: number): { dateEffet: string; valeur: number }[] {
+  const base = (historique ?? []).filter((h) => h.dateEffet !== dateEffet);
+  return [...base, { dateEffet, valeur }].sort((a, b) => a.dateEffet.localeCompare(b.dateEffet));
+}
+
+/**
  * Construit le profil CANDIDAT résultant de l'application d'une proposition.
  * Ne persiste rien : l'appelant passe le candidat à `modifierProfil`, qui le valide (forme Zod +
  * cohérence) et ne l'écrit que s'il est valide. Un champ non lu (`null`) laisse la valeur
@@ -418,8 +428,15 @@ export function profilAvecProposition(profil: Profil, proposition: Proposition):
           dateOuverture,
           franchiseCPTotale,
           delaiAttenteInitial,
-          // Champs optionnels : on ne remplace une valeur déjà saisie que si le document en donne une.
-          tauxPrelevementSource: d.tauxPrelevementSource ?? profil.ouvertureDroits?.tauxPrelevementSource,
+          // Historique de taux (cf. types/index.ts) : une nouvelle valeur lue s'AJOUTE à l'existant,
+          // elle ne l'écrase JAMAIS — bug réel corrigé le 01/08/2026 (un scalaire unique ici
+          // effaçait tout taux antérieur, y compris un taux plus ancien encore valable pour des
+          // mois déjà passés). Sans date d'effet lisible, la donnée est ignorée plutôt que devinée
+          // (pas d'entrée à une date inventée, devoir n°2).
+          tauxPrelevementSourceHistorique:
+            d.tauxPrelevementSource != null && d.tauxPrelevementSourceDateEffet
+              ? fusionnerTauxPASHistorique(profil.ouvertureDroits?.tauxPrelevementSourceHistorique, d.tauxPrelevementSourceDateEffet, d.tauxPrelevementSource)
+              : profil.ouvertureDroits?.tauxPrelevementSourceHistorique,
           dateLimiteIndemnisation: d.dateLimiteIndemnisation ?? profil.ouvertureDroits?.dateLimiteIndemnisation,
         },
       };

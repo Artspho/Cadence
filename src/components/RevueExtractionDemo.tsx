@@ -136,7 +136,10 @@ function EtatBacASable({ profil, contrats, periodes }: { profil: Profil; contrat
     { libelle: "Ouverture — franchise CP (jours)", valeur: profil.ouvertureDroits?.franchiseCPTotale?.toString() ?? "—" },
     { libelle: "Ouverture — délai d'attente (jours)", valeur: profil.ouvertureDroits?.delaiAttenteInitial?.toString() ?? "—" },
     { libelle: "Ouverture — date limite", valeur: profil.ouvertureDroits?.dateLimiteIndemnisation ?? "—" },
-    { libelle: "Ouverture — prélèvement à la source (%)", valeur: profil.ouvertureDroits?.tauxPrelevementSource?.toString() ?? "—" },
+    {
+      libelle: "Ouverture — prélèvement à la source (historique)",
+      valeur: (profil.ouvertureDroits?.tauxPrelevementSourceHistorique ?? []).map((e) => `${e.dateEffet} → ${e.valeur} %`).join(" · ") || "—",
+    },
     {
       libelle: "AJ nette (historique)",
       valeur: (profil.ajReelleHistorique ?? []).map((e) => `${e.dateEffet} → ${e.valeur} €`).join(" · ") || "—",

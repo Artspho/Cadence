@@ -3,7 +3,7 @@ import type { Contrat, LigneSerieIndemnisation, MoisIndemnisationResultat, MoisO
 import type { FranceTravailConfig } from "../config/franceTravailConfig";
 import { calculerSerieDepuisContrats } from "../engine/indemnisationMensuelle";
 import { calculerJoursTravailes, calculerSerie } from "../engine/calculerSerie";
-import { getAjReelleAt } from "../engine/ajReelleUtils";
+import { getAjReelleAt, getTauxPASAt } from "../engine/ajReelleUtils";
 import { joursDansMois } from "../engine/dateUtils";
 import { repartirContratParMois } from "../engine/decoupageMensuel";
 import { calculerNetEstime } from "../engine/estimationPaie";
@@ -188,10 +188,9 @@ interface LigneAffichage {
   messageOuverturePartielle: string | null;
 }
 
-function construireLignesAffichage(profil: Profil, contrats: Contrat[], config: FranceTravailConfig, mois: LigneSerieIndemnisation[], ouvertureDroits: NonNullable<Profil["ouvertureDroits"]>, tauxRenseigne: boolean): LigneAffichage[] {
+function construireLignesAffichage(profil: Profil, contrats: Contrat[], config: FranceTravailConfig, mois: LigneSerieIndemnisation[], ouvertureDroits: NonNullable<Profil["ouvertureDroits"]>): LigneAffichage[] {
   const ligneOuverturePartielle = mois.find((m): m is MoisOuverturePartielleNonCalcule => !m.calculable);
   const moisCalcules = mois.filter((m): m is MoisIndemnisationResultat => m.calculable);
-  const tauxPASFraction = (ouvertureDroits.tauxPrelevementSource ?? 0) / 100;
 
   // Heures du mois d'ouverture partiel : pas exposées par calculerSerieDepuisContrats (mois jamais
   // simulé par indemnisationMensuelle.ts, cf. Q1 dans ce fichier moteur) — recalculées ici
@@ -249,7 +248,12 @@ function construireLignesAffichage(profil: Profil, contrats: Contrat[], config: 
     const ajNetteAvantPAS = getAjReelleAt(profil.ajReelleHistorique, `${entree.moisLabel}-01`);
     const ajConnue = ajNetteAvantPAS !== null;
     const montant = ajConnue ? Math.round(s.joursIndemnisables * ajNetteAvantPAS * 100) / 100 : null;
-    const montantNet = ajConnue && tauxRenseigne ? Math.round((montant as number) * (1 - tauxPASFraction) * 100) / 100 : null;
+    // Taux applicable CE mois-là (getTauxPASAt), jamais un taux courant unique réappliqué à tous
+    // les mois passés — cf. types/index.ts, tauxPrelevementSourceHistorique, bug réel corrigé le
+    // 01/08/2026 (un utilisateur réel a eu 3,30 % mi-2025 puis 3,10 % dès fin 2025/2026, jamais les
+    // deux en même temps sur un seul mois).
+    const tauxPASDuMois = getTauxPASAt(ouvertureDroits.tauxPrelevementSourceHistorique, `${entree.moisLabel}-01`);
+    const montantNet = ajConnue && tauxPASDuMois != null ? Math.round((montant as number) * (1 - tauxPASDuMois / 100) * 100) / 100 : null;
 
     const mCalculable = moisCalcules.find((m) => m.moisLabel === entree.moisLabel);
 
@@ -340,15 +344,18 @@ function TableauResultats({
   }
   const { ouvertureDroits } = profil;
 
-  // tauxPrelevementSource vit sur ouvertureDroits (renseigné une fois dans "Mon profil"), pas sur
-  // chaque mois — s'il est absent, on ne peut structurellement pas calculer de montant net ici.
-  const tauxRenseigne = ouvertureDroits.tauxPrelevementSource != null;
+  // tauxPrelevementSourceHistorique vit sur ouvertureDroits (renseigné une fois dans "Mon profil",
+  // potentiellement plusieurs fois si le taux a changé) — s'il est vide, on ne peut structurellement
+  // pas calculer de montant net ici. Sert seulement à décider d'afficher la colonne « Net » (une
+  // colonne, pas un chiffre) : la valeur réellement appliquée à CHAQUE mois est recalculée dans
+  // construireLignesAffichage via getTauxPASAt, jamais ce booléen global.
+  const tauxRenseigne = (ouvertureDroits.tauxPrelevementSourceHistorique?.length ?? 0) > 0;
   // franchiseSalaires est un TOTAL (pas une valeur qui varie mois par mois) : le même objet est
   // porté par chaque mois calculé de la série, un seul suffit pour l'afficher une fois en pied de
   // tableau (cf. calculerSerieDepuisContrats, engine/indemnisationMensuelle.ts).
   const franchiseSalaires = mois.find((m) => m.calculable)?.franchiseSalaires;
 
-  const lignes = construireLignesAffichage(profil, contrats, config, mois, ouvertureDroits, tauxRenseigne);
+  const lignes = construireLignesAffichage(profil, contrats, config, mois, ouvertureDroits);
 
   const desMoisEnEstimation = lignes.some((l) => l.estimation);
   const desMoisSansAj = lignes.some((l) => l.montant === null);

@@ -210,7 +210,7 @@ function ligneNotification(profil: Profil | null): LigneDocument {
       // chiffre faux n'est affiché — c'est exactement ce qui la distingue de la date limite ci-dessus.
       poids: "precision",
       consequence: "Sans lui, les montants mensuels restent bruts — aucun net n'est affiché, et le tableau le signale.",
-      present: ouverture?.tauxPrelevementSource != null,
+      present: (ouverture?.tauxPrelevementSourceHistorique?.length ?? 0) > 0,
       applicable: ouverture != null,
     },
     {
@@ -313,7 +313,7 @@ export function documentsRequis(profil: Profil | null, contrats: Contrat[]): Lig
 
   // Ligne affichée UNIQUEMENT quand le taux manque : c'est sa seule raison d'être, et une ligne
   // sans objet dans une checklist est du bruit qui dilue les vrais manques.
-  if (profil?.ouvertureDroits?.tauxPrelevementSource == null) {
+  if ((profil?.ouvertureDroits?.tauxPrelevementSourceHistorique?.length ?? 0) === 0) {
     lignes.push({
       id: "attestation_taux",
       document: "Attestation de taux de prélèvement à la source",

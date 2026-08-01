@@ -119,7 +119,14 @@ export interface Profil {
     dateOuverture: string; // ISO — date de la notification France Travail
     franchiseCPTotale: number; // jours — chiffre exact de la notification, PAS le solde restant
     delaiAttenteInitial: number; // jours — presque toujours 7
-    tauxPrelevementSource?: number; // % entier ou décimal, ex. 7.2
+    // Historique de taux PAS successifs — remplace le scalaire unique d'origine (01/08/2026,
+    // décision Q2 d'engine/indemnisationMensuelle.ts renversée : un utilisateur réel a montré
+    // plusieurs relevés de situation avec des taux différents dans le temps, ex. 3,30 % mi-2025
+    // puis 3,10 % à partir de fin 2025/début 2026 — la DGFIP le revalorise, pas seulement en
+    // janvier). Même pattern que `ajReelleHistorique` ci-dessus : `dateEffet` ISO, `valeur` en %,
+    // trié croissant, appliqué mois par mois via `getTauxPASAt` (engine/ajReelleUtils.ts), jamais un
+    // taux courant unique réappliqué rétroactivement à tous les mois passés (devoir n°2).
+    tauxPrelevementSourceHistorique?: { dateEffet: string; valeur: number }[];
     // Date de fin de la période d'indemnisation en cours — chiffre exact de la notification
     // France Travail (« La date limite de votre indemnisation est le JJ/MM/AAAA »), jamais
     // calculée par Cadence (même principe que franchiseCPTotale/delaiAttenteInitial : le moteur ne

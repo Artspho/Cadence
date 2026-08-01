@@ -358,7 +358,18 @@ chercher sur une vraie pièce, **insuffisant pour coder** (cf. §2).
 
 ### 8.2 Contrat d'enseignement
 
-**Statut au 01/08/2026 : préparation seulement, aucun code d'extraction — pas de spécimen réel.**
+**⚠️ DÉCISION ACTÉE LE 01/08/2026 (fin de journée), qui ANNULE le blocage décrit ci-dessous : les
+contrats d'enseignement ne seront PAS lus/extraits par IA — saisie manuelle uniquement via
+`ContractForm.tsx` (`etablissementAgree`/`enRapportAvecMetier` déjà couverts par le formulaire).
+Le reste de cette section (§8.2, écrite plus tôt le même jour) documente le recensement des champs
+probables et les pièges déjà identifiés : ce contenu reste VALABLE et n'est pas à jeter, mais son
+but a changé — ce n'est plus la préparation d'un futur lexique IA (abandonnée), c'est une référence
+pour vérifier que la saisie manuelle couvre bien tout ce qu'un contrat d'enseignement réel peut
+porter. Ne plus attendre de spécimen réel de Benoît avant d'avancer sur ce type de contrat : ce
+n'est plus une condition de blocage.**
+
+**Statut au 01/08/2026 (texte d'origine, avant la décision ci-dessus) : préparation seulement, aucun
+code d'extraction — pas de spécimen réel.**
 Même règle que pour l'AEM avant d'en obtenir un exemplaire (§8.1) : ne pas coder de lexique contre
 une mise en page supposée. Un lexique écrit sans pièce réelle a déjà causé des reprises ailleurs
 dans ce projet (formulations plausibles au lieu de citations exactes, corrigées après coup sur le

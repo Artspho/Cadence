@@ -134,12 +134,12 @@ describe("validerProfilPourEcriture", () => {
     if (!resultat.ok) expect(resultat.erreur).toMatch(/postérieure/i);
   });
 
-  it("profilSchema conserve tauxPrelevementSource (non-régression : Zod l'écartait silencieusement avant le fix, cf. docs/reprise.md)", () => {
+  it("profilSchema conserve tauxPrelevementSourceHistorique (non-régression : Zod l'écartait silencieusement avant le fix historique, cf. docs/reprise.md)", () => {
     const candidat = profil({
-      ouvertureDroits: { dateOuverture: "2026-01-18", franchiseCPTotale: 10, delaiAttenteInitial: 7, tauxPrelevementSource: 7.2 },
+      ouvertureDroits: { dateOuverture: "2026-01-18", franchiseCPTotale: 10, delaiAttenteInitial: 7, tauxPrelevementSourceHistorique: [{ dateEffet: "2026-01-18", valeur: 7.2 }] },
     });
     const resultat = validerProfilPourEcriture(candidat);
     expect(resultat.ok).toBe(true);
-    if (resultat.ok) expect(resultat.profil.ouvertureDroits?.tauxPrelevementSource).toBe(7.2);
+    if (resultat.ok) expect(resultat.profil.ouvertureDroits?.tauxPrelevementSourceHistorique).toEqual([{ dateEffet: "2026-01-18", valeur: 7.2 }]);
   });
 });

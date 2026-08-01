@@ -143,6 +143,68 @@ describe("exporterJSON / importerJSON — round-trip", () => {
     expect(reimporte.profil?.ajReelleHistorique).toBeUndefined();
     expect(reimporte.soldeIndemnisationDepart).toEqual({ dateDepart: "2026-02-01" });
   });
+
+  it("migration silencieuse (01/08/2026) : un profil avec l'ancien tauxPrelevementSource scalaire est converti en tauxPrelevementSourceHistorique", () => {
+    const exportAncien = JSON.stringify({
+      schemaVersion: SCHEMA_VERSION_DONNEES,
+      profil: {
+        dateNaissance: "1990-01-01",
+        dateAnniversaire: "2026-01-18",
+        situation: "readmission",
+        ouvertureDroits: { dateOuverture: "2026-01-18", franchiseCPTotale: 5, delaiAttenteInitial: 7, tauxPrelevementSource: 3.1 },
+      },
+      contrats: [],
+      periodes: [],
+      soldeIndemnisationDepart: null,
+    });
+    const reimporte = importerJSON(exportAncien);
+    expect(reimporte.profil?.ouvertureDroits?.tauxPrelevementSourceHistorique).toEqual([{ dateEffet: "2000-01-01", valeur: 3.1 }]);
+  });
+
+  it("migration silencieuse : ouvertureDroits sans tauxPrelevementSource (jamais renseigné) ne produit aucune entrée", () => {
+    const exportAncien = JSON.stringify({
+      schemaVersion: SCHEMA_VERSION_DONNEES,
+      profil: {
+        dateNaissance: "1990-01-01",
+        dateAnniversaire: "2026-01-18",
+        situation: "readmission",
+        ouvertureDroits: { dateOuverture: "2026-01-18", franchiseCPTotale: 5, delaiAttenteInitial: 7 },
+      },
+      contrats: [],
+      periodes: [],
+      soldeIndemnisationDepart: null,
+    });
+    const reimporte = importerJSON(exportAncien);
+    expect(reimporte.profil?.ouvertureDroits?.tauxPrelevementSourceHistorique).toBeUndefined();
+  });
+
+  it("migration silencieuse : un profil déjà migré (tauxPrelevementSourceHistorique déjà présent) n'est jamais écrasé", () => {
+    const exportDejaMigre = JSON.stringify({
+      schemaVersion: SCHEMA_VERSION_DONNEES,
+      profil: {
+        dateNaissance: "1990-01-01",
+        dateAnniversaire: "2026-01-18",
+        situation: "readmission",
+        ouvertureDroits: {
+          dateOuverture: "2026-01-18",
+          franchiseCPTotale: 5,
+          delaiAttenteInitial: 7,
+          tauxPrelevementSourceHistorique: [
+            { dateEffet: "2025-07-03", valeur: 3.3 },
+            { dateEffet: "2026-02-17", valeur: 3.1 },
+          ],
+        },
+      },
+      contrats: [],
+      periodes: [],
+      soldeIndemnisationDepart: null,
+    });
+    const reimporte = importerJSON(exportDejaMigre);
+    expect(reimporte.profil?.ouvertureDroits?.tauxPrelevementSourceHistorique).toEqual([
+      { dateEffet: "2025-07-03", valeur: 3.3 },
+      { dateEffet: "2026-02-17", valeur: 3.1 },
+    ]);
+  });
 });
 
 // 01/08/2026 : un contrat saisi de mémoire (manuel/récurrent) n'est pas encore adossé à un document

@@ -20,7 +20,7 @@ const profilComplet: Profil = profil({
     dateOuverture: "2026-02-05",
     franchiseCPTotale: 12,
     delaiAttenteInitial: 7,
-    tauxPrelevementSource: 3.1,
+    tauxPrelevementSourceHistorique: [{ dateEffet: "2026-02-05", valeur: 3.1 }],
     dateLimiteIndemnisation: "2027-01-17",
   },
 });
@@ -122,7 +122,7 @@ describe("documentsRequis — précisions inatteignables non réclamées", () =>
 });
 
 describe("documentsRequis — bloquant vs précision : la frontière est « l'app affiche-t-elle un chiffre faux ? »", () => {
-  const ouvertureSansDateLimite = { dateOuverture: "2026-02-05", franchiseCPTotale: 12, delaiAttenteInitial: 7, tauxPrelevementSource: 3.1 };
+  const ouvertureSansDateLimite = { dateOuverture: "2026-02-05", franchiseCPTotale: 12, delaiAttenteInitial: 7, tauxPrelevementSourceHistorique: [{ dateEffet: "2026-02-05", valeur: 3.1 }] };
 
   it("dateLimiteIndemnisation est BLOQUANTE : son absence produit de vrais mois erronés", () => {
     // Vérifié le 29/07/2026 dans le moteur : la borne dure de calculerSerieDepuisContrats est sautée

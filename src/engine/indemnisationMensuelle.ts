@@ -16,7 +16,7 @@
 import type { Contrat, FranchiseSalairesResultat, LigneSerieIndemnisation, MoisIndemnisationEntree, MoisIndemnisationResultat, MontantMensuelResultat, Profil, SerieIndemnisationResultat, SoldeIndemnisation, SoldeIndemnisationDepart } from "../types";
 import type { FranceTravailConfig } from "../config/franceTravailConfig";
 import { bornesDuMois, joursDansMois, moisCle, moisSuivant } from "./dateUtils";
-import { getAjReelleAt } from "./ajReelleUtils";
+import { getAjReelleAt, getTauxPASAt } from "./ajReelleUtils";
 import { repartirContratParMois } from "./decoupageMensuel";
 import { messageMoisOuverturePartielle } from "../content/moisOuverturePartielle";
 
@@ -34,13 +34,21 @@ const MONTANT_MENSUEL_INDISPONIBLE: MontantMensuelResultat = { calculable: false
 // Montant réellement versé pour un mois donné = joursIndemnises × AJ réelle applicable ce mois-là.
 // `debutDuMoisISO` doit être une vraie date ISO (ex. "2026-03-01") — jamais un `moisLabel` non
 // vérifié, cf. avertissement ci-dessus.
-function calculerMontantMensuel(joursIndemnises: number, debutDuMoisISO: string, ajReelleHistorique: { dateEffet: string; valeur: number }[] | undefined, tauxPrelevementSource?: number): MontantMensuelResultat {
+function calculerMontantMensuel(
+  joursIndemnises: number,
+  debutDuMoisISO: string,
+  ajReelleHistorique: { dateEffet: string; valeur: number }[] | undefined,
+  tauxPrelevementSourceHistorique: { dateEffet: string; valeur: number }[] | undefined,
+): MontantMensuelResultat {
   const ajUtilisee = getAjReelleAt(ajReelleHistorique, debutDuMoisISO);
   if (ajUtilisee === null) {
     return { calculable: false, raison: "aj_manquante" };
   }
   const montant = Math.round(joursIndemnises * ajUtilisee * 100) / 100;
-  const montantNet = tauxPrelevementSource != null ? Math.round(montant * (1 - tauxPrelevementSource / 100) * 100) / 100 : undefined;
+  // Taux applicable CE mois-là (getTauxPASAt), jamais le taux courant réappliqué à tous les mois
+  // passés — cf. types/index.ts, tauxPrelevementSourceHistorique.
+  const tauxPAS = getTauxPASAt(tauxPrelevementSourceHistorique, debutDuMoisISO);
+  const montantNet = tauxPAS != null ? Math.round(montant * (1 - tauxPAS / 100) * 100) / 100 : undefined;
   return { calculable: true, montant, ajUtilisee, montantNet };
 }
 
@@ -57,13 +65,15 @@ function calculerMontantMensuel(joursIndemnises: number, debutDuMoisISO: string,
 // structurellement pas accès à l'ancien droit (ni ses paramètres ni son historique de contrats),
 // donc ce mois ne peut être reconstitué sans deviner (devoir n°2).
 //
-// Q2 — Taux PAS multi-années : DÉCISION — `tauxPrelevementSource` reste un scalaire unique sur
-// `Profil.ouvertureDroits` (pas de tableau `{ annee, taux }[]` pour l'instant, reporté en V2 si
-// besoin réel se confirme). À la place : une alerte "attention" déclenchée automatiquement chaque
-// année en janvier (premier mois calculé de l'année civile), si `tauxPrelevementSource` est
-// renseigné : "Ton taux de prélèvement à la source a peut-être été mis à jour au 1ᵉʳ janvier par
-// la DGFIP. Vérifie sur impots.gouv.fr ou ton dernier relevé France Travail et corrige-le dans le
-// profil si besoin." Pas encore câblée dans `alertes.ts`.
+// Q2 — Taux PAS multi-années : DÉCISION RENVERSÉE le 01/08/2026 — le besoin réel envisagé ici s'est
+// confirmé (relevés de situation réels d'un utilisateur : 3,30 % mi-2025, 3,10 % dès fin
+// 2025/début 2026, la DGFIP le revalorise, pas seulement en janvier). `tauxPrelevementSource`
+// scalaire unique remplacé par `tauxPrelevementSourceHistorique` (même pattern que
+// `ajReelleHistorique`, cf. types/index.ts et `getTauxPASAt`, engine/ajReelleUtils.ts) : chaque mois
+// de la série utilise désormais le taux réellement en vigueur CE mois-là, jamais le taux courant
+// réappliqué rétroactivement à tous les mois passés (devoir n°2 — c'était le bug réel avant ce
+// correctif). L'alerte de vigilance annuelle envisagée initialement n'est plus le mécanisme
+// retenu : un historique correct rend inutile un simple rappel "vérifie en janvier".
 //
 // Q3 — Affichage du mois de transition (RevenusMensuels.tsx) : DÉCISION — une ligne non calculée par
 // ce moteur, avec un tooltip expliquant pourquoi. Le texte vit dans
@@ -72,9 +82,8 @@ function calculerMontantMensuel(joursIndemnises: number, debutDuMoisISO: string,
 // ligne reste présente (pas retirée du tableau) pour que la chronologie mois par mois reste
 // continue, sans trou silencieux.
 //
-// Q1 et Q3 sont désormais câblés (cf. `calculerSerieDepuisContrats` plus bas et
-// `LigneSerieIndemnisation` dans types/index.ts). Q2 (alerte taux PAS multi-années) reste à
-// faire — pas encore câblée dans `alertes.ts`.
+// Q1, Q2 et Q3 sont désormais câblés (cf. `calculerSerieDepuisContrats` plus bas,
+// `LigneSerieIndemnisation` dans types/index.ts, `getTauxPASAt`).
 
 // Palier bas/haut du forfait mensuel de franchise CP, décidé par la franchise TOTALE accordée à
 // l'ouverture des droits (Profil.ouvertureDroits.franchiseCPTotale) — pas par le restant courant.
@@ -286,7 +295,7 @@ export function calculerSerieDepuisContrats(
     .filter((resultat) => resultat.moisLabel >= moisAffichageDebut)
     .map((resultat) => ({
       ...resultat,
-      montantMensuel: calculerMontantMensuel(resultat.joursIndemnises, `${resultat.moisLabel}-01`, profil.ajReelleHistorique, ouvertureDroits.tauxPrelevementSource),
+      montantMensuel: calculerMontantMensuel(resultat.joursIndemnises, `${resultat.moisLabel}-01`, profil.ajReelleHistorique, ouvertureDroits.tauxPrelevementSourceHistorique),
       salairesContratsBruts: salairesParMois.get(resultat.moisLabel) ?? 0,
     }));
 

@@ -406,7 +406,6 @@ function MonIndemnisationEnCours({
   const [franchiseCPTotale, setFranchiseCPTotale] = useState(ouverture?.franchiseCPTotale ?? 0);
   const [delaiAttenteInitial, setDelaiAttenteInitial] = useState(ouverture?.delaiAttenteInitial ?? 7);
   const [dateLimiteIndemnisation, setDateLimiteIndemnisation] = useState(ouverture?.dateLimiteIndemnisation ?? "");
-  const [tauxPrelevementSource, setTauxPrelevementSource] = useState(ouverture?.tauxPrelevementSource?.toString() ?? "");
   // Mémorise la dernière date acceptée pour ne pas réafficher la même suggestion en boucle après un
   // clic — mais la refaire apparaître si `dateLimiteIndemnisation` change vers une autre valeur.
   // `profil.dateAnniversaire` reste la source de vérité pour "déjà renseignée" : la suggestion accepte
@@ -423,7 +422,6 @@ function MonIndemnisationEnCours({
 
   function enregistrer() {
     if (!dateOuverture) return;
-    const tauxSaisi = tauxPrelevementSource.trim() === "" ? undefined : Number(tauxPrelevementSource);
     const resultat = onModifierProfil({
       ...profil,
       dureeDroitsMois: dureeDroitsMois === "" ? undefined : (Number(dureeDroitsMois) as 12 | 6),
@@ -431,7 +429,9 @@ function MonIndemnisationEnCours({
         dateOuverture,
         franchiseCPTotale,
         delaiAttenteInitial,
-        tauxPrelevementSource: tauxSaisi,
+        // Champ géré séparément (GestionTauxPAS, plusieurs lignes datées possibles) — préservé tel
+        // quel, jamais écrasé par ce formulaire qui ne le touche pas.
+        tauxPrelevementSourceHistorique: ouverture?.tauxPrelevementSourceHistorique,
         dateLimiteIndemnisation: dateLimiteIndemnisation.trim() === "" ? undefined : dateLimiteIndemnisation,
       },
     });
@@ -556,24 +556,6 @@ function MonIndemnisationEnCours({
           <p className="text-xs text-faint mt-1">Indiqué dans ta notification France Travail. Standard = 12 mois. Clause de rattrapage = 6 mois.</p>
         </div>
 
-        <div>
-          <label className="block text-xs uppercase tracking-[.03em] text-muted mb-2" htmlFor="profil-taux-pas">
-            Taux de prélèvement à la source (%)
-          </label>
-          <input
-            id="profil-taux-pas"
-            type="number"
-            min={0}
-            max={99}
-            step={0.1}
-            placeholder="ex. 7,2"
-            value={tauxPrelevementSource}
-            onChange={(e) => setTauxPrelevementSource(e.target.value)}
-            className="w-full bg-surface-2 border border-line rounded-lg px-3 py-2 text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-mint"
-          />
-          <p className="text-xs text-faint mt-1">Visible sur tes relevés de situation France Travail ou sur impots.gouv.fr.</p>
-        </div>
-
         {erreur && <p className="text-xs text-red">{erreur}</p>}
 
         <button
@@ -585,6 +567,7 @@ function MonIndemnisationEnCours({
         </button>
 
           <GestionAjReelle profil={profil} onModifierProfil={onModifierProfil} />
+          <GestionTauxPAS profil={profil} onModifierProfil={onModifierProfil} />
         </div>
       </details>
     </section>
@@ -702,6 +685,108 @@ function GestionAjReelle({ profil, onModifierProfil }: { profil: Profil; onModif
           « allocation journalière nette » de ta notification d'ouverture de droits.
         </p>
       )}
+    </div>
+  );
+}
+
+// Historique des taux de prélèvement à la source successifs (la DGFIP peut le revaloriser plusieurs
+// fois sur une même période d'indemnisation, ex. réel : 3,30 % mi-2025 puis 3,10 % dès fin
+// 2025/2026 — pas seulement une fois par an, cf. types/index.ts). Même pattern que
+// GestionAjReelle ci-dessus. Aucun repli sur un taux estimé : sans entrée couvrant un mois donné,
+// RevenusMensuels.tsx affiche honnêtement le montant brut pour ce mois (pas de net).
+function GestionTauxPAS({ profil, onModifierProfil }: { profil: Profil; onModifierProfil: OnModifierProfil }) {
+  const ouverture = profil.ouvertureDroits;
+  const historique = ouverture?.tauxPrelevementSourceHistorique ?? [];
+  const [dateEffet, setDateEffet] = useState("");
+  const [valeur, setValeur] = useState("");
+
+  function ajouter() {
+    if (!ouverture || !dateEffet || valeur.trim() === "") return;
+    const nouveau = [...historique, { dateEffet, valeur: Number(valeur) }].sort((a, b) => a.dateEffet.localeCompare(b.dateEffet));
+    onModifierProfil({ ...profil, ouvertureDroits: { ...ouverture, tauxPrelevementSourceHistorique: nouveau } });
+    setDateEffet("");
+    setValeur("");
+  }
+
+  function supprimer(index: number) {
+    if (!ouverture) return;
+    onModifierProfil({ ...profil, ouvertureDroits: { ...ouverture, tauxPrelevementSourceHistorique: historique.filter((_, i) => i !== index) } });
+  }
+
+  if (!ouverture) return null;
+
+  return (
+    <div className="border-t border-line pt-5 space-y-4">
+      <div>
+        <h3 className="font-display text-base font-medium">Taux de prélèvement à la source</h3>
+        <p className="text-xs text-faint mt-1">Visible sur tes relevés de situation France Travail ou sur impots.gouv.fr.</p>
+        <p className="text-xs text-faint mt-1">Si ton taux a été revalorisé par la DGFIP en cours de droits, ajoute une nouvelle ligne avec la date d'effet.</p>
+      </div>
+
+      {historique.length === 0 ? (
+        <p className="text-xs rounded-lg px-3 py-2 bg-amber/10 text-amber">Sans ce chiffre, seul le montant brut est affiché — pas de montant net estimé.</p>
+      ) : (
+        <table className="w-full text-sm">
+          <thead className="text-xs uppercase tracking-[.03em] text-muted border-b border-line">
+            <tr>
+              <th className="text-left py-2">Date d'effet</th>
+              <th className="text-right py-2">Taux (%)</th>
+              <th className="py-2" />
+            </tr>
+          </thead>
+          <tbody>
+            {historique.map((h, i) => (
+              <tr key={`${h.dateEffet}-${i}`} className="border-b border-line last:border-0">
+                <td className="py-2">{h.dateEffet}</td>
+                <td className="text-right py-2">{h.valeur.toFixed(2)}</td>
+                <td className="text-right py-2">
+                  <button onClick={() => supprimer(i)} className="text-xs text-muted hover:text-red transition-colors">
+                    Supprimer
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+
+      <div className="grid grid-cols-[1fr_1fr_auto] gap-3 items-end">
+        <div>
+          <label className="block text-xs uppercase tracking-[.03em] text-muted mb-2" htmlFor="profil-taux-pas-date-effet">
+            Date d'effet
+          </label>
+          <input
+            id="profil-taux-pas-date-effet"
+            type="date"
+            value={dateEffet}
+            onChange={(e) => setDateEffet(e.target.value)}
+            className="w-full bg-surface-2 border border-line rounded-lg px-3 py-2 text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-mint"
+          />
+        </div>
+        <div>
+          <label className="block text-xs uppercase tracking-[.03em] text-muted mb-2" htmlFor="profil-taux-pas-valeur">
+            Taux (%)
+          </label>
+          <input
+            id="profil-taux-pas-valeur"
+            type="number"
+            min={0}
+            max={99}
+            step={0.1}
+            placeholder="ex. 7,2"
+            value={valeur}
+            onChange={(e) => setValeur(e.target.value)}
+            className="w-full bg-surface-2 border border-line rounded-lg px-3 py-2 text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-mint"
+          />
+        </div>
+        <button
+          onClick={ajouter}
+          disabled={!dateEffet || valeur.trim() === ""}
+          className="bg-mint text-bg font-medium rounded-lg px-4 py-2 disabled:opacity-40 disabled:cursor-not-allowed transition-opacity whitespace-nowrap"
+        >
+          + Ajouter un taux
+        </button>
+      </div>
     </div>
   );
 }

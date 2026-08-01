@@ -30,6 +30,7 @@ export const extractionNotificationAdmission: ExtractionResult = {
         delaiAttenteInitial: 7,
         dateLimiteIndemnisation: "2027-01-31",
         tauxPrelevementSource: 7.2,
+        tauxPrelevementSourceDateEffet: "2026-02-01",
       },
       confiance: {
         dateOuverture: "haute",
@@ -233,6 +234,7 @@ export const extractionReleveAvecRefus: ExtractionResult = {
         delaiAttenteInitial: null,
         dateLimiteIndemnisation: null,
         tauxPrelevementSource: 5.4,
+        tauxPrelevementSourceDateEffet: "2026-03-01",
       },
       confiance: { dateOuverture: "moyenne", tauxPrelevementSource: "haute" },
       justification: "Un relevé de situation rappelle la date d'ouverture mais pas le détail des franchises.",

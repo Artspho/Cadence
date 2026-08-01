@@ -72,7 +72,7 @@ export const profilSchemaForme = z.object({
       dateOuverture: z.string(),
       franchiseCPTotale: z.number(),
       delaiAttenteInitial: z.number(),
-      tauxPrelevementSource: z.number().optional(), // % PAS, cf. types/index.ts
+      tauxPrelevementSourceHistorique: z.array(z.object({ dateEffet: z.string(), valeur: z.number() })).optional(), // historique de taux PAS, cf. types/index.ts
       dateLimiteIndemnisation: z.string().optional(), // fin de la période d'indemnisation, cf. types/index.ts
     })
     .optional(),
