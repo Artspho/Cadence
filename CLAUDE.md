@@ -95,7 +95,62 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 
 ## État actuel
 
-### Le plus récent d'abord — suite du 31/07/2026 (bug des 710h, gel des exercices, filtre année)
+### Le plus récent d'abord — suite du 31/07/2026 (routage IA des périodes, bug des cycles fabriqués)
+
+- ✅ **Routage de l'extraction IA vers `PeriodeAssimilee` câblé** (commit `5b31711`) : `periode_assimilee`
+  était encore refusée par `routageExtraction.ts` avec un commentaire périmé (« l'écran de saisie
+  n'existe pas » — faux depuis le 29/07, commit `d664344`). Traitée maintenant en `revue_formulaire`
+  (comme `contrat`) : `RevueExtraction.tsx` ouvre `PeriodeForm` pré-rempli (type/dates lues), jamais
+  appliqué sans confirmation — le type n'est jamais deviné depuis le document (`ald` et
+  `maladie_intercontrat` ont des effets opposés sur le décompte, piège déjà documenté). Câblé de
+  bout en bout (`RevueExtraction.tsx` → `ImportDocumentIA.tsx` → `App.tsx` → `ajouterPeriode`),
+  vérifié dans le bac à sable de développement. `docs/validation.md` et l'en-tête de
+  `routageExtraction.ts` nettoyés (même péremption documentaire que le bug des 710h : le CRUD avait
+  été construit, la doc jamais mise à jour).
+- ✅ **Bug réel corrigé : l'Historique affichait un cycle clos qui n'a jamais existé** (commit
+  `2330a2d`) — `2025-01-18→2026-01-17, 977 h` reconstruit par simple soustraction calendaire de 12
+  mois depuis la date anniversaire, ignorant `Profil.dateAnniversairePrecedente` qui porte pourtant
+  la vraie borne. **Cause plus profonde révélée en creusant** : `dateAnniversairePrecedente` portait
+  DEUX besoins incompatibles à la fois — la vraie borne historique du cycle passé (`engine/cycles.ts`)
+  et la borne de réadmission du cycle EN COURS (attribution faite plus tôt dans la session précédente
+  pour corriger le bug des 710h). Un seul champ ne peut pas servir les deux à la fois sans casser
+  l'un ou l'autre selon sa valeur stockée. **Résolu en cascade, pas par un rustine locale** :
+  - Nouvelle fonction `calculerFenetreEnCours` (`engine/periodeReference.ts`) : dérive TOUJOURS la
+    borne de réadmission du cycle en cours depuis `dateAnniversaire` (Règle #2, toujours vraie —
+    `deriverFctRetenueActuelle`, déplacée depuis `renouvellementAnticipe.ts` qui n'en avait plus
+    l'usage exclusif), sans plus jamais lire `dateAnniversairePrecedente` tel quel pour cet usage.
+    Câblée dans `prediction.ts`, `App.tsx`, `Simulateur.tsx`, `RevenusMensuels.tsx`, `alertes.ts` —
+    tous concernés par le même risque, pas seulement le Dashboard.
+  - `engine/cycles.ts` : `dateAnniversairePrecedente` reprend son unique vocation (borner le cycle
+    précédent i=1 quand connue) ; comportement inchangé sinon (reconstruction calendaire, cas le
+    plus courant). Les cycles plus anciens (i≥2) restent une reconstruction calendaire non garantie
+    (backlog V3 inchangé — pas de vraie historique au-delà d'une génération).
+  - Bouton **↻** sur chaque exercice clos dans `Historique.tsx` (avec confirmation) : efface le gel
+    d'un exercice figé à tort, regelé automatiquement au calcul suivant avec les bonnes données.
+    Filet de rattrapage manuel pour ce cas précis et pour tout futur cas similaire.
+  - **`docs/cadence-import-complet.json` corrigé** : `dateAnniversairePrecedente` était resté à
+    `2026-01-17` (la valeur recommandée — puis rétractée — pour le bug des 710h) ; remis à la vraie
+    valeur historique `2025-03-23`.
+  - **Vérifié en navigateur avec les 56 vrais contrats de l'utilisateur** : cycle en cours inchangé
+    (588 h), cycle précédent corrigé à `2025-03-24→2026-01-17, 780 h` (= 710 h NHT réellement notifié
+    + 70 h d'enseignement plafonné, qui compte dans le seuil des 507 h mais jamais dans le NHT — deux
+    compteurs distincts, cohérence exacte confirmée) ; bouton ↻ testé (efface puis regèle
+    automatiquement à l'identique, aucune régression du mécanisme de gel lui-même). Un 3ᵉ exercice
+    (i=2, ~2024-01-18→2025-01-17) apparaît désormais dans l'historique — reconstruction calendaire
+    non garantie (backlog V3), signalé comme tel, pas un vrai chiffre confirmé.
+- 🔶 **Incident de branche pendant la session, résolu sans perte** : `HEAD` s'est retrouvé sur
+  `backend-api-import-ia` (pas une action de Claude Code — la même machine sert aussi le terminal
+  personnel de l'utilisateur, cf. `docs/reprise.md`) juste après le commit `9528f4a`, faisant
+  atterrir le commit suivant (`5b31711`) sur cette branche au lieu de `master`. Confirmé fast-forward
+  strict (`git merge-base --is-ancestor`) avant toute action : `master` avancé sans réécriture
+  d'historique, `HEAD` reramené dessus. `origin/master` a rattrapé (poussé par l'utilisateur depuis
+  son propre terminal en parallèle) : `backend-api-import-ia` et `master` pointent maintenant tous
+  les deux sur `2330a2d`, aucune divergence. Rien à faire de plus, juste à savoir que ça peut se
+  reproduire tant que les deux branches restent utilisées en parallèle sur cette machine.
+
+Bilan : 473 tests verts, `tsc -b` propre. 2 commits cette suite de session (`5b31711`, `2330a2d`).
+
+### Suite du 31/07/2026 (bug des 710h, gel des exercices, filtre année)
 
 - ✅ **Bug réel corrigé : le Dashboard affichait 710 h au compteur des 507 h — le NH exact d'une
   notification France Travail PASSÉE (24/03/2025→17/01/2026), pas la progression du cycle en

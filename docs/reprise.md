@@ -9,16 +9,21 @@ Mémoire durable à consulter au démarrage : `CLAUDE.md`, `docs/SPEC.md`, `docs
 Deux devoirs sacrés : (1) ne jamais perdre les données ; (2) ne jamais afficher un chiffre faux (ni faux « feu vert » rassurant, ni faux « Bloqué », ni faux montant, ni fausse alerte, ni valeur sentinelle brute).
 
 État (mis à jour le 31/07/2026, fin de session) : les deux devoirs sacrés sont tenus, la bêta a
-son socle. 467 tests verts, `tsc -b` propre. Dernier commit sur `master` : `9e56656` (fix
-`dateAnniversaire`, cf. « Fait » ci-dessous). `master` est 5 commits en avance sur `origin/master`
-— non poussés (Claude Code ne pousse jamais, par consigne explicite, quelle que soit la
-configuration des identifiants). Tous les items §11.A du SPEC sont désormais traités.
+son socle. 473 tests verts, `tsc -b` propre. Dernier commit : `2330a2d` (exercices clos reconstruits
+sur les vraies bornes, cf. « Fait » ci-dessous). `master` et `backend-api-import-ia` pointent tous
+les deux sur ce commit — `origin/master` aussi (poussé par l'utilisateur depuis son propre
+terminal), aucune divergence. Tous les items §11.A du SPEC sont désormais traités.
 
-**Point de vigilance immédiat pour la prochaine session** : le bug des 710h (cf. « Fait » ci-dessous)
-est corrigé côté code, mais l'utilisateur doit encore mettre à jour lui-même, dans « Ton profil »,
-`dateAnniversaire` (→ la prochaine échéance réelle) et `dateAnniversairePrecedente` (→ la FCT du
-droit en cours) — sans quoi le Dashboard réel continuera d'afficher l'ancien chiffre malgré le
-correctif. Vérifier au démarrage de la prochaine session si c'est fait.
+**Point de vigilance immédiat pour la prochaine session — mis à jour, corrige une note précédente
+fausse** : `dateAnniversaire` doit porter la prochaine échéance réelle (`2027-01-17` pour
+l'utilisateur) dans « Ton profil » — inchangé. **`dateAnniversairePrecedente` doit lui rester (ou
+redevenir) la VRAIE FCT historique du droit précédent (`2025-03-23`)**, PAS la FCT du droit en cours
+comme une note précédente de cette section le recommandait à tort — cette recommandation aurait
+cassé la reconstruction de l'historique des cycles (`engine/cycles.ts`) une fois suivie ; le moteur
+dérive maintenant tout seul la borne dont il a besoin pour le cycle en cours
+(`calculerFenetreEnCours`), sans plus jamais lire ce champ pour cet usage-là. Vérifier au démarrage
+de la prochaine session que les deux champs du profil réel de l'utilisateur (pas seulement
+`docs/cadence-import-complet.json`, corrigé côté fichier) ont bien ces deux valeurs.
 
 **⚠️ Point d'attention avant tout nouveau chantier — confusion de dossier non résolue** : il existe
 **deux copies** du projet sur cette machine : `C:\Users\benoi\cadence` (le vrai dépôt git, celui de
@@ -936,6 +941,28 @@ l'écriture, commit `d3ebb36`), qui ne couvrait que ce canal.
 **Bilan tests** : 467 tests verts (460 en début de session + 7 nouveaux : 3 pour le bug dateAnniversaire, 4 pour le gel des exercices), `tsc -b` propre.
 
 **5 commits cette session** (`05108f5` → `9e56656`, + `ae8e7c8` pour `.claude/settings.json`), tous sur `master`, **rien poussé sur `origin`** (`git remote -v` montre un jeton dans l'URL — des identifiants de push existent bien dans cet environnement, contrairement à ce qu'affirmait une note antérieure de ce document ; Claude Code ne pousse quand même jamais vers `origin`, par consigne explicite de l'utilisateur, indépendamment de la présence d'identifiants).
+
+## Fait (2026-07-31, suite de la suite — routage IA des périodes, bug des cycles fabriqués corrigé en cascade)
+
+**Routage de l'extraction IA vers `PeriodeAssimilee` câblé** (commit `5b31711`) : `periode_assimilee` était encore refusée par `routageExtraction.ts` avec un commentaire périmé (« l'écran de saisie n'existe pas » — faux depuis le 29/07, commit `d664344`, jamais mis à jour depuis — même genre de péremption documentaire que le bug des 710h de la section précédente). Traitée maintenant en `revue_formulaire` (comme `contrat`) : `RevueExtraction.tsx` ouvre `PeriodeForm` pré-rempli (type/dates lues), jamais appliqué sans confirmation — le type n'est jamais deviné depuis le document (`ald` et `maladie_intercontrat` ont des effets opposés sur le décompte, piège déjà documenté dans `types/extraction.ts`). Câblé de bout en bout, vérifié dans le bac à sable de développement (`RevueExtractionDemo.tsx`).
+
+**Bug réel signalé par l'utilisateur : l'Historique affichait un exercice clos qui n'a jamais existé** (`2025-01-18→2026-01-17, 977h`). Confirmé : `decouperExercices` (`engine/cycles.ts`) reconstruisait le cycle précédent par simple soustraction calendaire de 12 mois depuis la date anniversaire, ignorant `Profil.dateAnniversairePrecedente` qui porte pourtant la vraie borne.
+
+**Cause plus profonde, découverte en creusant avant de corriger à l'aveugle** : `dateAnniversairePrecedente` portait DEUX besoins incompatibles à la fois — la vraie borne historique du cycle passé (dont `cycles.ts` a besoin) et la borne de réadmission du cycle EN COURS (l'attribution faite dans la section précédente de cette même session pour corriger le bug des 710h). Un seul champ ne peut pas servir les deux à la fois : le corriger pour l'un cassait forcément l'autre selon la valeur réellement stockée par l'utilisateur. **J'ai dû revenir sur ma propre recommandation précédente** (mettre `dateAnniversairePrecedente` à la FCT du droit en cours, `2026-01-17`) — c'était nécessaire pour `periodeReference.ts` MAIS aurait cassé `cycles.ts` en le suivant.
+
+**Résolu en cascade, pas par un rustine locale** :
+- Nouvelle fonction `calculerFenetreEnCours` (`engine/periodeReference.ts`) : dérive TOUJOURS la borne de réadmission du cycle en cours depuis `dateAnniversaire` (Règle #2 du chantier renouvellement anticipé, toujours vraie — `deriverFctRetenueActuelle`, déplacée depuis `renouvellementAnticipe.ts`), sans plus jamais lire `dateAnniversairePrecedente` tel quel pour cet usage. Câblée dans `prediction.ts`, `App.tsx`, `Simulateur.tsx`, `RevenusMensuels.tsx`, `alertes.ts` — tous partageaient le même risque, pas seulement le Dashboard (bug potentiel plus large que ce qui avait été signalé).
+- `engine/cycles.ts` : `dateAnniversairePrecedente` reprend son unique vocation — borner le cycle précédent (i=1) quand elle est connue ; comportement inchangé sinon (reconstruction calendaire par défaut, cas le plus courant où le cycle précédent a duré 12 mois pleins).
+- Bouton **↻** sur chaque exercice clos dans `Historique.tsx` (avec confirmation avant action, même pattern que les suppressions ailleurs dans l'app) : efface le gel d'un exercice figé à tort — au calcul suivant, il est recalculé puis regelé automatiquement avec les bonnes données. Demandé explicitement par l'utilisateur en filet de rattrapage.
+- `docs/cadence-import-complet.json` corrigé : `dateAnniversairePrecedente` remis à `2025-03-23` (la vraie valeur historique), après être passé par `2026-01-17` (ma recommandation précédente, maintenant obsolète).
+
+**Vérifié en navigateur avec les 56 vrais contrats de l'utilisateur** (pas des données de test synthétiques) : cycle en cours inchangé (588h), cycle précédent corrigé à `2025-03-24→2026-01-17, 780h`. Ce chiffre de 780h a demandé une vérification supplémentaire : il diffère du NHT réellement notifié (710h) parce que ce sont deux compteurs différents par principe du projet (`heuresPour507` inclut l'enseignement plafonné, le NHT/montant ARE l'exclut totalement) — 780 = 710 (696 cachets + 14 scène, exactement le NHT notifié) + 70 (enseignement plafonné). Cohérence confirmée, pas une anomalie. Bouton ↻ testé : efface puis regèle automatiquement à l'identique, aucune régression du mécanisme de gel lui-même.
+
+**Point non résolu, signalé honnêtement, pas caché** : un 3ᵉ exercice (`~2024-01-18→2025-01-17, 48h`) apparaît maintenant dans l'Historique de l'utilisateur — c'est un cycle i=2, reconstruit par la méthode calendaire naïve (aucune vraie borne disponible au-delà de `dateAnniversairePrecedente`, backlog V3 inchangé). Ses chiffres ne sont pas garantis réels, contrairement aux deux autres cycles — à ne jamais présenter comme confirmé sans vraie source historique.
+
+**Incident de branche pendant la session, résolu sans perte** : `HEAD` s'est retrouvé sur `backend-api-import-ia` (pas une action de Claude Code — la même machine sert aussi le terminal personnel de l'utilisateur) juste après un commit, faisant atterrir le commit suivant sur cette branche au lieu de `master`. Confirmé fast-forward strict (`git merge-base --is-ancestor`) avant toute action corrective : `master` avancé sans réécriture d'historique, `HEAD` reramené dessus. Peut se reproduire tant que les deux branches restent utilisées en parallèle sur cette machine — à surveiller, pas à « corriger » définitivement (c'est le mode de travail de l'utilisateur, pas une erreur à empêcher).
+
+**Bilan** : 473 tests verts (467 en début de cette suite + quelques ajustements pour la nouvelle dérivation), `tsc -b` propre. 2 commits (`5b31711`, `2330a2d`, ce dernier amendé une fois sur demande de l'utilisateur pour corriger le sujet du message).
 
 ## Ensuite (backlog)
 
