@@ -1173,12 +1173,15 @@ l'écriture, commit `d3ebb36`), qui ne couvrait que ce canal.
 - Réadmission allongée jamais confrontée à source externe (le simulateur officiel ne modélise pas l'allongement → attendre une vraie notif de testeur, consigné validation.md).
 - Barème CSG figé à « normal » en dur dans l'onboarding (sous-estime le net pour barème réduit, non bloquant).
 - Maintenance config mensuelle (déjà notée CLAUDE.md).
-- **Déploiement bêta** : l'app ne tourne qu'en `npm run dev` — rien à partager tant qu'elle n'est
-  pas déployée. C'est une SPA statique (Vite + localStorage, pas de backend) → `build` dist/ +
-  hébergeur statique gratuit (Netlify / Vercel / Cloudflare Pages) → URL partageable. Lot à cadrer.
-  **Devient aussi le prérequis pour tester l'installation PWA sur un vrai téléphone** (PWA
-  techniquement prête, cf. section « Fait » ci-dessus — la confirmation finale attend ce
-  déploiement).
+- **Déploiement bêta** : l'app est déjà déployée en production sur Vercel
+  (`https://cadence-benoit3.vercel.app`, dernier déploiement Ready/Production sur commit `2330a2d`).
+  Reste à cadrer : partage plus large à d'autres testeurs (Netlify / Cloudflare Pages restent des
+  alternatives si un second hébergeur est utile un jour).
+  **Installation PWA sur un vrai téléphone confirmée le 01/08/2026** (session de support
+  utilisateur, hors dépôt ; détail complet dans CLAUDE.md « État actuel ») : Android, navigateur
+  Chrome, testée sur l'URL ci-dessus — icône sur l'écran d'accueil, lancement en plein écran, mode
+  offline fonctionnel (navigation multi-écrans en mode avion, relance depuis l'icône installée,
+  aucune erreur). **iOS non testé** (aucun appareil disponible), limite distincte qui reste ouverte.
 - **Note testeurs (devoir n°1)** : données en `localStorage`, propres à chaque navigateur/appareil ;
   vidage de cache = perte. Dire aux testeurs d'exporter leur JSON régulièrement (= leur sauvegarde
   ET le retour d'usage qui te revient). Prévoir aussi, avant d'élargir au-delà du cercle d'amis, une
