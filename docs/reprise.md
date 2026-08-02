@@ -8,16 +8,30 @@ Mémoire durable à consulter au démarrage : `CLAUDE.md`, `docs/SPEC.md`, `docs
 
 Deux devoirs sacrés : (1) ne jamais perdre les données ; (2) ne jamais afficher un chiffre faux (ni faux « feu vert » rassurant, ni faux « Bloqué », ni faux montant, ni fausse alerte, ni valeur sentinelle brute).
 
-État (mis à jour le 01/08/2026, fin de session) : les deux devoirs sacrés sont tenus, la bêta a
-son socle. **530 tests verts, `tsc -b` propre sur les deux tsconfig (src et api).** Dernier commit
-local : `7c835de` (correspondance AEM/bulletin avec un contrat déjà saisi, cf. « Fait » ci-dessous).
-`master` est la seule branche de travail désormais (décision actée cette session,
-`backend-api-import-ia` abandonnée — plus de gros chantier isolé à valider avant fusion). ⚠️
-**`origin/master` est 3 commits en retard** (`83d0429`, `116b482`, `7c835de` non poussés) — Benoît
-avait re-poussé une première fois avec succès en cours de session (`origin/master` a rattrapé
-jusqu'à `391ffce`), mais pas depuis. **À repousser en début de prochaine session.** Tous les items
-§11.A du SPEC sont traités ; l'audit d'exhaustivité du 01/08 a par ailleurs trouvé et corrigé un
-vrai manquement au devoir n°2 (cf. « Fait » ci-dessous).
+État (mis à jour le 01/08/2026, fin de session — session longue, suite directe de la précédente) :
+les deux devoirs sacrés sont tenus. **569 tests verts, `tsc -b` propre sur les deux tsconfig (src
+et api).** Dernier commit local : `16a0330` (tableau comparatif de correspondance). `master` reste
+la seule branche de travail. ⚠️ **`origin/master` est 1 commit en retard** (`16a0330` non poussé —
+tous les commits précédents de cette session ont été poussés au fur et à mesure, sur demande
+explicite à chaque fois). Tous les items §11.A du SPEC sont traités.
+
+**Deux points concrets à vérifier en tout premier, avant tout nouveau chantier** :
+1. **Script de nettoyage final non confirmé exécuté** : corrige le contrat « Les Étoiles du
+   Classique » (`nbHeures` 26 → 14, résidu de conversion — confirmé par le document officiel
+   `Justificatif_declaration_06_2026.pdf`) ET renommage `LEVALLOIS` → `Commune de Levallois Perret`
+   sur les 13 contrats de la série récurrente. Le script combiné a été donné à Benoît en fin de
+   session avec l'instruction « exécute puis recharge (F5) immédiatement, rien entre les deux » —
+   **son statut réel est inconnu au moment d'écrire ceci.** Demander confirmation, ou redemander un
+   export JSON frais et vérifier directement (mêmes IDs qu'avant : `e9077806-...` pour Étoiles,
+   `recurrenceId: c55f263f-...` pour la série Levallois).
+2. **`16a0330` à pousser** (`git push`, ou attendre la demande explicite de Benoît — pas de push
+   sans demande, cf. mémoire longue durée `cadence_push_credentials.md`).
+
+**Si le nettoyage ci-dessus est confirmé fait** : `heuresPour507` de la fenêtre en cours doit valoir
+**588h** (recalculé et vérifié avec le vrai moteur sur les données d'avant nettoyage : 756h de
+base, −168h = 84 (onpl) + 72 (Les Arts Phocéens 26/04) + 12 (Les Étoiles, déjà nettoyés pour les
+deux premiers avant la fin de session) — un écart que Benoît avait signalé dès le début de cette
+partie de la session et qui est maintenant entièrement expliqué).
 
 **Points de vigilance non résolus, non retouchés cette session — toujours à vérifier** :
 - `dateAnniversaire`/`dateAnniversairePrecedente` du profil réel de l'utilisateur : la note du
@@ -152,7 +166,10 @@ n'avait pas atteint GitHub à ce moment-là (corrigé ensuite, cf. l'état en t�
   correspondances détectées ; la 4ᵉ (Levallois-Perret) manquante — investiguée avec Benoît :
   `statutVerification` écarté, caractère invisible écarté (exécuté, pas relu) — cause réelle :
   contrat existant nommé `"LEVALLOIS"` (raccourci) vs `"COMMUNE DE LEVALLOIS PERRET"` (document).
-  Pas un bug — écart de donnée, renommé par Benoît via un script console fourni.
+  Pas un bug — écart de donnée. ⚠️ Le premier script console de renommage n'a PAS persisté (cause
+  probable : `App.tsx` sauvegarde `donnees` en mémoire vers `localStorage` à chaque changement —
+  une action après le script, avant rechargement, réécrit l'ancienne valeur). Un second script,
+  fourni en fin de session, corrige aussi ce point (cf. tout en haut de ce document).
 - **`diagnostiquerAbsenceCorrespondance`** : nouvelle fonction pure, appelée uniquement quand
   `trouverContratsCorrespondants` est vide, distinguant `deja_confirme` / `nom_different_meme_mois`
   / `aucune_piste`. `RevueExtraction.tsx` affiche désormais un message informatif au lieu du
@@ -169,15 +186,48 @@ n'avait pas atteint GitHub à ce moment-là (corrigé ensuite, cf. l'état en t�
   `045d46a` ci-dessus) mais rien pour le montant en euros qui suit sur la même ligne. Aucun bug
   confirmé à ce jour — le premier envoi réel (`Justificatif_declaration_02_2026.pdf`, ci-dessus)
   n'était déjà pas tombé dans ce piège avant le correctif (4 montants individuels corrects, jamais
-  le total 2 100 €), mais ça ne garantit rien pour l'avenir. Consigne explicite ajoutée dans le
-  prompt (CAS 8, exemple fictif) par prudence. **Non re-testé avec un second appel Mistral réel** —
-  décision en attente de Benoît (nouvel envoi maintenant, ou reconfirmation au prochain justificatif
-  envoyé naturellement).
+  le total 2 100 €). Consigne explicite ajoutée dans le prompt (CAS 8, exemple fictif) par
+  prudence. ✅ **Confirmé par un second envoi réel plus tard le même jour** (cf. ci-dessous).
+- **Bug réel confirmé : résidu `nbHeures` sur des contrats à cachets, comptés en double** — trouvé
+  en creusant l'écart 756h/588h signalé par Benoît. `onpl` (7 cachets) et `Les Arts Phocéens`
+  (26/04, 6 cachets) avaient un `nbHeures` EXACTEMENT égal à `nbCachets × 12` (84 et 72) — pas une
+  vraie activité indépendante, un résidu de l'ancien formulaire (sélecteur exclusif Cachets/Heures,
+  remplacé cette session par les deux champs toujours visibles + somme systématique, `83d0429`).
+  Recalcul exécuté sur les vraies données : 756h → 600h après retrait des deux résidus. Corrélation
+  nette avec `typeRemuneration: "heures"` sur les deux (jamais `"cachet"`), pas une coïncidence.
+- **Garde-fou « Activité mixte »** : cartographie complète en 9 points (A à I, tous les chemins
+  d'écriture — saisie manuelle, import IA, confirmation de correspondance, édition, contrat
+  récurrent, cas zéro) faite AVANT le code. `ContractForm.tsx` : case à cocher décochée par défaut
+  (mode exclusif, remplir un champ efface l'autre), précochée automatiquement si les deux champs
+  sont déjà renseignés. Point critique isolé : « Confirmer la correspondance » écrit directement
+  sans passer par `ContractForm`, donc sans la case — `detecterMergeAmbiguHeuresCachets` bloque ce
+  chemin précis (état « à vérifier manuellement » plutôt qu'une fusion silencieuse). Logique
+  extraite en fonctions pures (`lib/activiteMixteFormulaire.ts`, pas d'infra de test de composants
+  React dans ce projet) — vérifié aussi en navigateur. 560 → 568 tests verts.
+- **Second test réel Mistral** (`Justificatif_declaration_06_2026.pdf`) : confirme le fix
+  `salaireBrut` ci-dessus ET révèle que « Les Étoiles du Classique » — validé « légitime, ne rien
+  toucher » plus tôt dans la session — était en fait lui aussi corrompu (`nbHeures: 26` au lieu de
+  14, le document officiel dit littéralement « 14h et 1 cachet », une seule activité). Preuve
+  documentaire qui renverse la confirmation antérieure. **756h → 588h** au total une fois les 3
+  résidus retirés (84+72+12=168h), exécuté et confirmé avec le vrai moteur — le chiffre que Benoît
+  attendait depuis le début de cette investigation. Confirme aussi, à nouveau, que le renommage
+  LEVALLOIS n'avait toujours pas pris (cf. §3 plus haut).
+- **Tableau comparatif de correspondance** : l'ancienne liste « champ : ancien → nouveau » ne
+  montrait que les champs différents — silence ambigu sur les champs identiques (même piège que
+  « aucune correspondance » avant `diagnosticAbsence`). `comparerContratExistant` remplace
+  `champsDivergents` : retourne toutes les lignes lues par le document, identiques (neutre) ou
+  différentes (accent + flèche). Nouveau composant `TableauComparaisonContrat.tsx`. 568 → 569
+  tests verts.
 
 **Reste à faire, dans l'ordre de priorité** :
-1. Repousser les commits locaux vers `origin/master`.
-2. Décider quoi faire des 5 contrats « Les Arts Phocéens » potentiellement sous-comptés (§4).
+1. Vérifier/exécuter le script de nettoyage final (Étoiles + renommage Levallois, cf. tout en haut
+   de ce document) — statut inconnu à la fin de cette session.
+2. Pousser `16a0330` vers `origin/master` (sur demande explicite de Benoît, comme d'habitude).
 3. Obtenir un vrai spécimen AEM générique si Benoît veut aller plus loin que le cas déjà testé.
+
+~~Décider quoi faire des 5 contrats « Les Arts Phocéens » potentiellement sous-comptés~~ — résolu
+cette session : ce n'était pas un sous-comptage, mais l'inverse (un sur-comptage par résidu
+`nbHeures`, cf. ci-dessus), et le garde-fou empêche que ça se reproduise.
 
 ~~Obtenir un vrai contrat d'enseignement de Benoît pour le chantier `contrat_enseignement`~~ — retiré
 de cette liste (01/08/2026, fin de session) : décision produit actée, saisie manuelle uniquement,

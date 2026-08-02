@@ -131,7 +131,15 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
   écarté), ni caractère invisible (`normaliserEmployeur` exécuté sur les deux vraies chaînes,
   identique) — cause réelle trouvée en lisant l'export réel : le contrat existant portait
   `employeur: "LEVALLOIS"` (raccourci de saisie), pas le nom officiel. Pas un bug : le mécanisme
-  fonctionne comme prévu, c'est un écart de donnée. Benoît a renommé via un script console fourni.
+  fonctionne comme prévu, c'est un écart de donnée.
+  ⚠️ **Correction (retest de juin, cf. plus bas) : le premier script console de renommage n'a PAS
+  persisté.** Cause probable trouvée dans le code : `App.tsx:62-64` sauvegarde automatiquement
+  `donnees` (état React en mémoire) vers `localStorage` à chaque changement — si l'onglet est resté
+  ouvert et qu'une action a suivi le script avant le rechargement, cette sauvegarde a réécrit
+  l'ancienne valeur par-dessus. Un second script combiné a été fourni (renommage + nettoyage
+  Étoiles, cf. plus bas) avec l'instruction « script → F5 immédiat, rien entre les deux » —
+  **statut d'exécution non confirmé à la fin de cette session, à vérifier au démarrage de la
+  prochaine.**
 - ✅ **`diagnostiquerAbsenceCorrespondance`** (`449fec1`) : le cas Levallois-Perret a montré qu'un
   « aucune correspondance » silencieux peut recouvrir plusieurs causes indiscernables sans lire le
   code. Nouvelle fonction pure (`lib/correspondanceContrat.ts`), appelée uniquement quand
@@ -153,9 +161,46 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
   (exemple fictif). Document réel confirmé disponible pour un cas de non-régression
   (`Justificatif_declaration_02_2026.pdf`, motif exact présent : total 2 100 € à côté de 4 montants
   individuels) — le premier envoi réel de ce document (avant ce correctif) n'était déjà pas tombé
-  dans ce piège, mais ça ne garantit rien pour l'avenir. **Second appel Mistral réel non fait** —
-  décision en attente de Benoît, pour ne pas renvoyer ses données personnelles une seconde fois sans
-  redemander son accord (cf. `docs/reprise.md`).
+  dans ce piège, mais ça ne garantit rien pour l'avenir. ✅ **Confirmé plus tard le même jour** par
+  un second envoi réel (`Justificatif_declaration_06_2026.pdf`, cf. plus bas) : aucune confusion,
+  chaque montant individuel resté correct.
+- 🔴 **Bug réel confirmé : résidu `nbHeures` sur des contrats cachets, comptés en double** — trouvé
+  en creusant l'écart 756h/588h que Benoît signalait. `onnpl` (7 cachets) et `Les Arts Phocéens`
+  (26/04, 6 cachets) avaient un `nbHeures` EXACTEMENT égal à `nbCachets × 12` — pas une vraie
+  activité indépendante, un résidu d'une saisie antérieure à l'ancien formulaire (sélecteur exclusif
+  Cachets/Heures, remplacé depuis par les deux champs toujours visibles + somme systématique,
+  cf. `83d0429`). Exécuté sur les vraies données : **756h → 600h** après retrait des deux résidus.
+  Cause confirmée par exécution (pas supposée) : `typeRemuneration` des 2 contrats fautifs valait
+  toujours `"heures"`, jamais `"cachet"` — corrélation nette, pas une coïncidence.
+- ✅ **Garde-fou « Activité mixte »** (`c3897ac`) : cartographie complète en 9 points (A à I) de
+  TOUS les chemins qui écrivent `nbHeures`/`nbCachets` avant d'écrire une ligne de code (saisie
+  manuelle, import IA nouveau contrat, confirmation de correspondance, édition, contrat récurrent,
+  cas zéro explicite). `ContractForm.tsx` : case à cocher, décochée par défaut (mode exclusif —
+  remplir un champ efface l'autre), précochée automatiquement si les deux champs sont déjà
+  renseignés à l'ouverture. **Point critique isolé (E)** : « Confirmer la correspondance » écrit
+  directement sans passer par `ContractForm`, donc sans la case — `detecterMergeAmbiguHeuresCachets`
+  (`lib/routageExtraction.ts`) bloque ce chemin précis : si le document ne fournit qu'un champ et
+  que le contrat existant a déjà l'autre, la fusion en un clic est remplacée par un état « à
+  vérifier manuellement », jamais un écrasement silencieux. Logique extraite en fonctions pures
+  (`lib/activiteMixteFormulaire.ts`) car le projet n'a pas d'infrastructure de test de composants
+  React — vérifié aussi en navigateur (mode exclusif efface bien, mode mixte ne touche à rien).
+  560 → 568 tests verts.
+- ✅ **Second test réel Mistral** (`Justificatif_declaration_06_2026.pdf`) : confirme le fix
+  `salaireBrut` (ci-dessus) ET révèle que le contrat « Les Étoiles du Classique » (validé
+  « légitime, ne rien toucher » plus tôt dans la session) était en fait **lui aussi corrompu** —
+  le document officiel dit littéralement « Vous avez travaillé 14h et effectué 1 cachet(s) »
+  (une seule activité, pas deux), contredisant le `nbHeures: 26` stocké. Preuve documentaire directe
+  qui renverse la confirmation antérieure de Benoît — **756h → 588h** au total une fois les 3
+  résidus retirés (84+72+12=168h), exécuté et confirmé avec le vrai moteur. Confirme aussi (à
+  nouveau) que le renommage LEVALLOIS n'avait toujours pas pris. Script combiné fourni (nettoyage
+  Étoiles 26→14 + renommage Levallois) — **statut d'exécution non confirmé à la fin de cette
+  session.**
+- ✅ **Tableau comparatif de correspondance** (`16a0330`) : l'ancienne liste « champ : ancien →
+  nouveau » ne montrait QUE les champs différents — un champ identique restait invisible, silence
+  ambigu (même piège que « aucune correspondance » avant `diagnosticAbsence`). `comparerContratExistant`
+  remplace `champsDivergents` : retourne toutes les lignes lues par le document, identiques
+  (neutre) ou différentes (accent + flèche). Nouveau composant `TableauComparaisonContrat.tsx`.
+  568 → 569 tests verts.
 
 ### 01/08/2026 (fin de session : cycle de vie du contrat, bug heures+cachets moteur, fusion de branches close)
 
