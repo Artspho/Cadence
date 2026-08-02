@@ -65,9 +65,19 @@ avait bien eu lieu hors dépôt, jamais consigné jusque-là).
 
 **3. Chantier import IA, en plusieurs vagues** :
 - `dd1139d` — Distinction OCR vide vs document lu sans rien d'exploitable (nouveau statut HTTP 422,
-  `lib/ocrIllisible.ts`). Non résolu avec certitude : l'incident du 30/07 (bulletin GHS échoué) et
-  sa clôture par un simple correctif de lexique restent peut-être deux problèmes distincts — signalé,
-  pas tranché.
+  `lib/ocrIllisible.ts`). **Tranché le 01/08/2026 (re-creusé en fin de session, voir CLAUDE.md
+  pour le détail complet) : verdict (b) infirmé, avec réserve.** La vraie cause de l'incident du
+  30/07 était très probablement un trou de lexique (parsing des bulletins GHS-sPAIEctacle
+  multi-colonnes), pas un OCR réellement vide — `081a516` (le correctif qui a clos l'incident à
+  l'époque, lexique seul) a été testé « 7/7 champs corrects » sur le bulletin réel : un lexique ne
+  peut pas réparer un texte OCR VRAIMENT vide, seulement une mauvaise interprétation d'un texte
+  présent. Corroboré depuis par un test réel indépendant sur un document du même format/logiciel
+  (AEM « Association du Festival de St Germain en Laye », test du 01/08 documenté plus bas) :
+  `ocrIllisible.ts` ne s'est PAS déclenché. `ocrIllisible.ts` reste un garde-fou valable pour un
+  futur cas de VRAI OCR vide, mais ne couvre pas rétroactivement la cause réelle du 30/07 — les deux
+  restent des incidents distincts. Certitude absolue impossible : le document/la réponse Mistral
+  bruts du 30/07 n'ont jamais été conservés, donc l'incident d'origine ne peut littéralement pas
+  être rejoué.
 - `908c6d7` — Nouveau type `justificatif_declaration` (actualisation mensuelle), lexique basé sur de
   vrais documents (hors dépôt, dans `OneDrive\Bureau\Pole emploi\`). Risque de doublon avec des
   contrats déjà saisis à la main **documenté mais pas résolu à ce stade** (résolu plus tard, cf. §6).
@@ -133,6 +143,27 @@ n'avait pas atteint GitHub à ce moment-là (corrigé ensuite, cf. l'état en t�
   avec preuve). Benoît a ensuite vérifié de son côté : **une erreur de saisie de sa part**, pas un
   défaut du moteur. Chantier fermé, aucun code touché pour cette raison — cf. `docs/SPEC.md` §11.B
   pour l'écart de formule à un SR extrême, qui reste une question distincte et toujours ouverte.
+- **Bug réel confirmé sur `trouverContratsCorrespondants`** : filtre `=== "a_verifier"` excluait
+  silencieusement tout contrat créé avant le 01/08/2026 (le champ n'existait pas encore) — soit la
+  totalité des 56 contrats réels de Benoît. Corrigé en `!== "confirme"`.
+- **Premier envoi réel à Mistral via le vrai chemin utilisateur** (émulateur dev ajouté à
+  `vite.config.ts`, `vite dev` ne servant pas les Vercel Functions) : `Justificatif_declaration_02_2026.pdf`
+  de Benoît, consentement réel. NIR absent confirmé, pièges dates/fusion déjà gérés. 3/4
+  correspondances détectées ; la 4ᵉ (Levallois-Perret) manquante — investiguée avec Benoît :
+  `statutVerification` écarté, caractère invisible écarté (exécuté, pas relu) — cause réelle :
+  contrat existant nommé `"LEVALLOIS"` (raccourci) vs `"COMMUNE DE LEVALLOIS PERRET"` (document).
+  Pas un bug — écart de donnée, renommé par Benoît via un script console fourni.
+- **`diagnostiquerAbsenceCorrespondance`** : nouvelle fonction pure, appelée uniquement quand
+  `trouverContratsCorrespondants` est vide, distinguant `deja_confirme` / `nom_different_meme_mois`
+  / `aucune_piste`. `RevueExtraction.tsx` affiche désormais un message informatif au lieu du
+  silence total — aucune action automatique.
+- **Verdict tranché sur l'incident OCR du 30/07** (`dd1139d`) : (b) infirmé, avec réserve — la
+  vraie cause était très probablement un trou de lexique (bulletins GHS-sPAIEctacle
+  multi-colonnes, corrigé par `081a516` le jour même, testé « 7/7 champs corrects »), pas un OCR
+  réellement vide. Corroboré par le test AEM réel du 01/08 (même format, `ocrIllisible.ts` ne
+  s'était pas déclenché). `ocrIllisible.ts` reste un garde-fou valable pour un futur cas de vrai
+  OCR vide, mais ne couvre pas rétroactivement la cause du 30/07. Certitude absolue impossible
+  (document/réponse brute du 30/07 jamais conservés).
 
 **Reste à faire, dans l'ordre de priorité** :
 1. Repousser les commits locaux vers `origin/master`.

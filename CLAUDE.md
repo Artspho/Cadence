@@ -117,6 +117,36 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
   Aucun code touché pour ce chantier — `salaireReference.ts`/`decompteHeures.ts`/`periodeReference.ts`
   calculaient déjà correctement. Cf. `docs/reprise.md`, `docs/SPEC.md` §11.B (l'écart de formule à un
   SR extrême, noté depuis le 31/07/2026, reste une question distincte et toujours ouverte).
+- 🔴 **Bug réel confirmé sur `trouverContratsCorrespondants`** (`3ac2e8f`) : le filtre exigeait
+  `statutVerification === "a_verifier"`, excluant SILENCIEUSEMENT tout contrat créé avant l'ajout de
+  ce champ (01/08/2026) — soit la totalité des 56 contrats réels de Benoît à l'époque. Corrigé en
+  `!== "confirme"` (absent traité comme équivalent à `"a_verifier"`, jamais réécrit — devoir n°1).
+  543 tests verts.
+- ✅ **Premier envoi réel à Mistral via le vrai chemin utilisateur** (émulateur dev `e7bc1d0`,
+  `vite.config.ts`, car `vite dev` ne sert pas les Vercel Functions) : `Justificatif_declaration_02_2026.pdf`
+  de Benoît, consentement réel, 4 propositions. NIR absent confirmé. Les deux pièges déjà encodés
+  dans le prompt (date « depuis le » ≠ période du mois ; même employeur deux fois dans le mois,
+  jamais fusionné) correctement gérés. 3/4 correspondances détectées ; la 4ᵉ (Commune de
+  Levallois-Perret) absente — investigué avec Benoît : ni `statutVerification` (`"confirme"`
+  écarté), ni caractère invisible (`normaliserEmployeur` exécuté sur les deux vraies chaînes,
+  identique) — cause réelle trouvée en lisant l'export réel : le contrat existant portait
+  `employeur: "LEVALLOIS"` (raccourci de saisie), pas le nom officiel. Pas un bug : le mécanisme
+  fonctionne comme prévu, c'est un écart de donnée. Benoît a renommé via un script console fourni.
+- ✅ **`diagnostiquerAbsenceCorrespondance`** (`449fec1`) : le cas Levallois-Perret a montré qu'un
+  « aucune correspondance » silencieux peut recouvrir plusieurs causes indiscernables sans lire le
+  code. Nouvelle fonction pure (`lib/correspondanceContrat.ts`), appelée uniquement quand
+  `trouverContratsCorrespondants` est vide, distinguant `deja_confirme` / `nom_different_meme_mois`
+  / `aucune_piste`. `RevueExtraction.tsx` affiche désormais un message informatif — aucun bouton,
+  aucune action automatique. 551 tests verts.
+- ✅ **Verdict tranché sur l'incident OCR du 30/07 (`dd1139d`)** : re-creusé en fin de session.
+  (b) **infirmé, avec réserve** — la vraie cause était très probablement un trou de lexique
+  (bulletins GHS-sPAIEctacle multi-colonnes), pas un OCR réellement vide. Preuve : `081a516` (le
+  correctif qui a clos l'incident, lexique SEUL) a été testé « 7/7 champs corrects » sur le
+  bulletin réel — un lexique ne répare jamais un texte OCR vraiment vide. Corroboré par le test AEM
+  réel du même format documenté juste au-dessus (`ocrIllisible.ts` ne s'était pas déclenché).
+  `ocrIllisible.ts` reste un garde-fou valable pour un futur cas de VRAI OCR vide, mais ne couvre
+  pas rétroactivement la cause du 30/07 — deux incidents distincts. Certitude absolue impossible :
+  le document/la réponse Mistral bruts du 30/07 n'ont jamais été conservés. Cf. `docs/reprise.md`.
 
 ### 01/08/2026 (fin de session : cycle de vie du contrat, bug heures+cachets moteur, fusion de branches close)
 
