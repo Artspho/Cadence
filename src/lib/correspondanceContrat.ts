@@ -68,3 +68,43 @@ export function trouverContratsCorrespondants(candidat: CandidatCorrespondance, 
     .filter((c) => moisCle(c.date) === moisCandidat || joursChevauchement(c.dateDebut, c.date, candidat.dateDebut, candidat.date) > 0)
     .sort((a, b) => Math.abs(a.salaireBrut - candidat.salaireBrut) - Math.abs(b.salaireBrut - candidat.salaireBrut));
 }
+
+/**
+ * Diagnostic PUREMENT INFORMATIF, appelé UNIQUEMENT quand `trouverContratsCorrespondants` renvoie
+ * un tableau vide — jamais une seconde façon de proposer une correspondance (ce serait dupliquer la
+ * décision), seulement une piste sur POURQUOI rien n'est remonté. Un « aucune correspondance »
+ * silencieux peut recouvrir des causes très différentes (cas réel du 01/08/2026 : un contrat
+ * existant "LEVALLOIS" n'a jamais matché un document "COMMUNE DE LEVALLOIS PERRET", pas par bug
+ * mais par écart de nom — indiscernable depuis l'écran sans relire le code). Ne choisit et n'écrit
+ * jamais rien : `RevueExtraction.tsx` affiche le résultat, ne pré-coche aucune action.
+ *
+ * Trois issues possibles, dans cet ordre de priorité :
+ * - `"deja_confirme"` : un contrat du même employeur et de la même période existe, mais il est déjà
+ *   `"confirme"` — exactement le seul cas qu'exclut `trouverContratsCorrespondants` (cf. son
+ *   commentaire) : rien d'anormal, ce contrat n'a pas besoin d'être retrouvé une seconde fois.
+ * - `"nom_different_meme_mois"` : un contrat de la même période existe, mais son employeur normalisé
+ *   diffère de celui du document — le signe le plus probable d'un écart de saisie (raccourci,
+ *   orthographe), PAS une preuve : reste à l'utilisateur de juger, jamais une fusion automatique.
+ * - `"aucune_piste"` : rien n'explique l'absence — vraisemblablement un contrat qui n'existe
+ *   simplement pas encore dans le profil.
+ */
+export type DiagnosticAbsenceCorrespondance =
+  | { type: "deja_confirme"; contratExistant: Contrat }
+  // `employeurDocument` : le nom TEL QU'ÉCRIT sur le document (candidat.employeur, pas sa forme
+  // normalisée) — pour que l'utilisateur puisse comparer les deux graphies telles qu'il les
+  // reconnaît, exactement le rapprochement qui a permis de repérer le cas réel LEVALLOIS.
+  | { type: "nom_different_meme_mois"; contratExistant: Contrat; employeurDocument: string }
+  | { type: "aucune_piste" };
+
+export function diagnostiquerAbsenceCorrespondance(candidat: CandidatCorrespondance, contratsExistants: Contrat[]): DiagnosticAbsenceCorrespondance {
+  const employeurCandidat = normaliserEmployeur(candidat.employeur);
+  const memePeriode = (c: Contrat) => moisCle(c.date) === moisCle(candidat.date) || joursChevauchement(c.dateDebut, c.date, candidat.dateDebut, candidat.date) > 0;
+
+  const dejaConfirme = contratsExistants.find((c) => c.statutVerification === "confirme" && normaliserEmployeur(c.employeur) === employeurCandidat && memePeriode(c));
+  if (dejaConfirme) return { type: "deja_confirme", contratExistant: dejaConfirme };
+
+  const nomDifferent = contratsExistants.find((c) => normaliserEmployeur(c.employeur) !== employeurCandidat && memePeriode(c));
+  if (nomDifferent) return { type: "nom_different_meme_mois", contratExistant: nomDifferent, employeurDocument: candidat.employeur };
+
+  return { type: "aucune_piste" };
+}

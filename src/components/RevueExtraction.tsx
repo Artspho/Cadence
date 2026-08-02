@@ -28,6 +28,7 @@ import {
   type PropositionEvaluee,
   type StatutProposition,
 } from "../lib/routageExtraction";
+import type { DiagnosticAbsenceCorrespondance } from "../lib/correspondanceContrat";
 import { ContractForm } from "./ContractForm";
 import { PeriodeForm } from "./PeriodeForm";
 
@@ -168,6 +169,23 @@ function formaterValeur(valeur: unknown): { texte: string; nonLu: boolean } {
   if (typeof valeur === "boolean") return { texte: valeur ? "Oui" : "Non", nonLu: false };
   if (typeof valeur === "string") return { texte: LABELS_VALEURS[valeur] ?? valeur, nonLu: false };
   return { texte: String(valeur), nonLu: false };
+}
+
+/**
+ * Texte purement informatif accompagnant un « aucune correspondance » (cf.
+ * lib/correspondanceContrat.ts, diagnostiquerAbsenceCorrespondance) — jamais une action, jamais une
+ * suggestion de fusion. Rend visible POURQUOI rien n'a été proposé, là où c'était un silence total
+ * jusqu'ici (cas réel du 01/08/2026 : indiscernable sans relire le code).
+ */
+function texteDiagnosticAbsence(diagnostic: DiagnosticAbsenceCorrespondance): string {
+  switch (diagnostic.type) {
+    case "deja_confirme":
+      return `Un contrat du même employeur et de la même période existe déjà, mais il est déjà confirmé par un document (${diagnostic.contratExistant.employeur} · ${diagnostic.contratExistant.dateDebut} → ${diagnostic.contratExistant.date}) — c'est pour ça qu'il n'est pas reproposé ici.`;
+    case "nom_different_meme_mois":
+      return `Un contrat de la même période existe déjà, mais sous un autre nom d'employeur : « ${diagnostic.contratExistant.employeur} » dans ton profil, « ${diagnostic.employeurDocument} » sur ce document — vérifie qu'il ne s'agit pas du même employeur écrit différemment.`;
+    case "aucune_piste":
+      return "Aucun contrat existant ne correspond (même employeur, même période) — sera enregistré comme un nouveau contrat.";
+  }
 }
 
 export function RevueExtraction({
@@ -324,7 +342,7 @@ function CarteProposition({
   onConfirmerCorrespondance,
   onEcarter,
 }: CartePropositionProps) {
-  const { proposition, titre, statut, motif, avertissements, correspondances } = evaluee;
+  const { proposition, titre, statut, motif, avertissements, correspondances, diagnosticAbsence } = evaluee;
   const labels = LABELS_CHAMPS[proposition.cible];
   const style = STYLE_STATUT[statut];
   const traitee = etat !== "en_attente";
@@ -419,6 +437,10 @@ function CarteProposition({
             Aucun de ceux-ci — nouveau contrat séparé
           </button>
         </div>
+      )}
+
+      {!traitee && !formulaireOuvert && !aDesCorrespondances && proposition.cible === "contrat" && diagnosticAbsence && (
+        <p className="text-xs text-muted leading-relaxed rounded-lg px-3 py-2.5 bg-surface-2">{texteDiagnosticAbsence(diagnosticAbsence)}</p>
       )}
 
       {!traitee && !formulaireOuvert && !aDesCorrespondances && (

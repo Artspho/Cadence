@@ -33,7 +33,7 @@
 
 import type { Contrat, PeriodeAssimilee, Profil } from "../types";
 import type { ExtractionResult, Proposition } from "../types/extraction";
-import { trouverContratsCorrespondants } from "./correspondanceContrat";
+import { diagnostiquerAbsenceCorrespondance, trouverContratsCorrespondants, type DiagnosticAbsenceCorrespondance } from "./correspondanceContrat";
 
 export type StatutProposition =
   /** Va dans le formulaire de contrat, pré-rempli, pour relecture champ par champ. Jamais direct. */
@@ -65,6 +65,12 @@ export interface PropositionEvaluee {
    * proposer une correspondance plutôt qu'une création directe (jamais choisie automatiquement).
    */
   correspondances?: Contrat[];
+  /**
+   * Renseigné UNIQUEMENT quand `correspondances` est vide (cf. lib/correspondanceContrat.ts,
+   * diagnostiquerAbsenceCorrespondance) — une piste sur POURQUOI rien n'a été proposé, jamais une
+   * seconde correspondance. Purement informatif : RevueExtraction.tsx l'affiche, ne décide rien.
+   */
+  diagnosticAbsence?: DiagnosticAbsenceCorrespondance;
 }
 
 const TITRES: Record<Proposition["cible"], string> = {
@@ -94,11 +100,10 @@ export function evaluerProposition(proposition: Proposition, profil: Profil, con
       const avertissements = DEFAUTS_FORMULAIRE_CONTRAT.filter((d) => proposition.donnees[d.champ] === null).map(
         (d) => `Le document n'indique pas ${d.libelle} : le formulaire propose « ${d.defaut} » par défaut. Vérifie ce champ avant d'enregistrer.`
       );
-      const correspondances = trouverContratsCorrespondants(
-        { employeur: proposition.donnees.employeur, date: proposition.donnees.date, dateDebut: proposition.donnees.dateDebut ?? proposition.donnees.date, salaireBrut: proposition.donnees.salaireBrut },
-        contratsExistants
-      );
-      return { proposition, titre, statut: "revue_formulaire", avertissements, correspondances };
+      const candidat = { employeur: proposition.donnees.employeur, date: proposition.donnees.date, dateDebut: proposition.donnees.dateDebut ?? proposition.donnees.date, salaireBrut: proposition.donnees.salaireBrut };
+      const correspondances = trouverContratsCorrespondants(candidat, contratsExistants);
+      const diagnosticAbsence = correspondances.length === 0 ? diagnostiquerAbsenceCorrespondance(candidat, contratsExistants) : undefined;
+      return { proposition, titre, statut: "revue_formulaire", avertissements, correspondances, diagnosticAbsence };
     }
 
     case "profil_ouverture_droits": {

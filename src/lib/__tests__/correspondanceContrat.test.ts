@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { trouverContratsCorrespondants } from "../correspondanceContrat";
+import { diagnostiquerAbsenceCorrespondance, trouverContratsCorrespondants } from "../correspondanceContrat";
 import { contrat } from "../../engine/__tests__/testUtils";
 
 describe("trouverContratsCorrespondants", () => {
@@ -94,5 +94,47 @@ describe("trouverContratsCorrespondants", () => {
       const resultat = trouverContratsCorrespondants(activite, contratsExistants);
       expect(resultat.map((c) => c.salaireBrut)).toContain(activite.salaireBrut);
     }
+  });
+});
+
+describe("diagnostiquerAbsenceCorrespondance", () => {
+  it("'deja_confirme' : un contrat du même employeur et de la même période existe, mais déjà confirmé", () => {
+    const confirme = contrat({ date: "2026-06-28", dateDebut: "2026-06-26", employeur: "Association Fictive", salaireBrut: 245, statutVerification: "confirme" });
+    const diagnostic = diagnostiquerAbsenceCorrespondance({ employeur: "Association Fictive", date: "2026-06-28", dateDebut: "2026-06-26", salaireBrut: 245 }, [confirme]);
+    expect(diagnostic).toEqual({ type: "deja_confirme", contratExistant: confirme });
+  });
+
+  // Scénario inspiré d'un cas réel (01/08/2026, données entièrement fictives ici) : un contrat
+  // existant porte un raccourci de saisie ("Ass. Fictive Test") tandis que le document officiel
+  // porte le nom complet ("Association Fictive de Testville") — même période, employeurs différents
+  // une fois normalisés.
+  it("'nom_different_meme_mois' : un contrat de la même période existe, mais sous un autre nom d'employeur", () => {
+    const raccourci = contrat({ date: "2026-06-28", dateDebut: "2026-06-26", employeur: "Ass. Fictive Test", salaireBrut: 245 });
+    const diagnostic = diagnostiquerAbsenceCorrespondance({ employeur: "Association Fictive de Testville", date: "2026-06-28", dateDebut: "2026-06-26", salaireBrut: 245 }, [raccourci]);
+    expect(diagnostic).toEqual({ type: "nom_different_meme_mois", contratExistant: raccourci, employeurDocument: "Association Fictive de Testville" });
+  });
+
+  it("'aucune_piste' : rien de plausible, ni même employeur déjà confirmé ni même période", () => {
+    const autreMois = contrat({ date: "2026-01-15", employeur: "Un Tout Autre Employeur", salaireBrut: 100 });
+    const diagnostic = diagnostiquerAbsenceCorrespondance({ employeur: "Association Fictive", date: "2026-06-28", dateDebut: "2026-06-26", salaireBrut: 245 }, [autreMois]);
+    expect(diagnostic).toEqual({ type: "aucune_piste" });
+  });
+
+  it("'aucune_piste' sur un tableau de contrats existants vide", () => {
+    const diagnostic = diagnostiquerAbsenceCorrespondance({ employeur: "Association Fictive", date: "2026-06-28", dateDebut: "2026-06-26", salaireBrut: 245 }, []);
+    expect(diagnostic).toEqual({ type: "aucune_piste" });
+  });
+
+  it("priorité : 'deja_confirme' l'emporte même si un autre contrat de nom différent existe aussi sur la même période", () => {
+    const confirme = contrat({ date: "2026-06-28", dateDebut: "2026-06-26", employeur: "Association Fictive", salaireBrut: 245, statutVerification: "confirme" });
+    const autreNom = contrat({ date: "2026-06-27", dateDebut: "2026-06-25", employeur: "Un Nom Différent", salaireBrut: 245 });
+    const diagnostic = diagnostiquerAbsenceCorrespondance({ employeur: "Association Fictive", date: "2026-06-28", dateDebut: "2026-06-26", salaireBrut: 245 }, [autreNom, confirme]);
+    expect(diagnostic).toEqual({ type: "deja_confirme", contratExistant: confirme });
+  });
+
+  it("ne remonte jamais un diagnostic sur un mois totalement différent, même même employeur", () => {
+    const moisDifferent = contrat({ date: "2026-01-15", dateDebut: "2026-01-14", employeur: "Association Fictive", salaireBrut: 245 });
+    const diagnostic = diagnostiquerAbsenceCorrespondance({ employeur: "Association Fictive", date: "2026-06-28", dateDebut: "2026-06-26", salaireBrut: 245 }, [moisDifferent]);
+    expect(diagnostic).toEqual({ type: "aucune_piste" });
   });
 });

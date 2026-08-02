@@ -298,6 +298,27 @@ describe("contrat — toujours relu dans le formulaire, jamais appliqué directe
     expect(valeurs.nbHeures).toBe(14);
     expect(valeurs.nbCachets).toBe(3);
   });
+
+  // 01/08/2026 : diagnosticAbsence n'est renseigné QUE quand correspondances est vide — jamais une
+  // seconde correspondance, seulement une piste sur pourquoi rien n'a été proposé.
+  it("renseigne diagnosticAbsence quand aucun contrat existant ne correspond", () => {
+    const { correspondances, diagnosticAbsence } = evaluerProposition(proposition, profilBase, []);
+    expect(correspondances).toEqual([]);
+    expect(diagnosticAbsence).toEqual({ type: "aucune_piste" });
+  });
+
+  it("laisse diagnosticAbsence absent dès qu'une correspondance existe", () => {
+    const contratExistant = contrat({
+      date: proposition.donnees.date,
+      dateDebut: proposition.donnees.dateDebut ?? proposition.donnees.date,
+      employeur: proposition.donnees.employeur,
+      salaireBrut: proposition.donnees.salaireBrut,
+      statutVerification: "a_verifier",
+    });
+    const { correspondances, diagnosticAbsence } = evaluerProposition(proposition, profilBase, [contratExistant]);
+    expect(correspondances).toHaveLength(1);
+    expect(diagnosticAbsence).toBeUndefined();
+  });
 });
 
 // 01/08/2026 : plan "cycle de vie du contrat" — une proposition "contrat" issue d'un document
