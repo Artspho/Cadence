@@ -95,7 +95,7 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 
 ## État actuel
 
-### Le plus récent d'abord — 01/08/2026 (suite : historique de taux PAS, contrat d'enseignement re-confirmé, bug SR ~400k€ non reproduit)
+### Le plus récent d'abord — 01/08/2026 (suite : historique de taux PAS, contrat d'enseignement re-confirmé, SR ~400k€ élucidé — erreur de saisie, pas un bug)
 
 - ✅ **Historique de taux PAS daté** (`4cd3e66`) : `tauxPrelevementSource` (scalaire) devenait
   rétroactif — un seul taux courant appliqué à tous les mois du tableau `RevenusMensuels.tsx`, y
@@ -108,13 +108,15 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
   cf. entrée du 01/08 ci-dessous) est confirmée par deux tests de régression explicites prouvant que
   `ContractForm.tsx`/`decompteHeures.ts`/`salaireReference.ts` ne distinguent jamais selon
   `Contrat.source` — rien à recoder, seulement à vérifier.
-- ⚠️ **Bug SR ~400 000 € — NON REPRODUIT, chantier NON FERMÉ** : Benoît a signalé un SR affiché
-  manifestement irréaliste. Investigation complète sur les données réelles (56 contrats) : aucune
-  reproduction (SR recalculé = 6 049 €, somme de toute la carrière = 25 593 €). Benoît n'a ni écran,
-  ni date, ni export du moment — possible bug ponctuel déjà résolu par un correctif de cette même
-  session (dédoublonnage heures+cachets). **Décision explicite de Benoît : ne pas investiguer plus
-  loin, ne rien corriger spéculativement.** Classé en point de vigilance (cf. `docs/reprise.md`,
-  `docs/SPEC.md` §11.B) — à rouvrir seulement si le chiffre réapparaît avec preuve (écran/date/export).
+- ✅ **SR ~400 000 € élucidé — CE N'ÉTAIT PAS UN BUG, chantier FERMÉ** : Benoît avait signalé un SR
+  affiché manifestement irréaliste. Investigation complète sur les données réelles (56 contrats) :
+  aucune reproduction (SR recalculé avec le vrai moteur = 6 049 €, somme de toute la carrière =
+  25 593 €), les 4 hypothèses demandées (doublon, date aberrante, confusion mensuel/annuel,
+  enseignement mal exclu) toutes écartées avec preuve. Benoît a ensuite vérifié de son côté :
+  **une erreur de saisie de sa part** (pas précisée davantage), pas un défaut du moteur Cadence.
+  Aucun code touché pour ce chantier — `salaireReference.ts`/`decompteHeures.ts`/`periodeReference.ts`
+  calculaient déjà correctement. Cf. `docs/reprise.md`, `docs/SPEC.md` §11.B (l'écart de formule à un
+  SR extrême, noté depuis le 31/07/2026, reste une question distincte et toujours ouverte).
 
 ### 01/08/2026 (fin de session : cycle de vie du contrat, bug heures+cachets moteur, fusion de branches close)
 

@@ -20,21 +20,6 @@ jusqu'à `391ffce`), mais pas depuis. **À repousser en début de prochaine sess
 vrai manquement au devoir n°2 (cf. « Fait » ci-dessous).
 
 **Points de vigilance non résolus, non retouchés cette session — toujours à vérifier** :
-- **Bug SR ~400 000 € signalé, NON REPRODUIT, chantier NON FERMÉ** (01/08/2026) : Benoît a vu un SR
-  affiché manifestement irréaliste (~400 000 €). Investigation menée sur les 3 fichiers du moteur
-  concernés (`salaireReference.ts`/`decompteHeures.ts`/`periodeReference.ts`) et les 4 hypothèses
-  demandées (doublon, date aberrante, confusion mensuel/annuel, enseignement mal exclu), toutes
-  vérifiées avec preuve sur les données réelles disponibles (export du 31/07, 56 contrats) — SR
-  recalculé avec le vrai moteur = 6 049 €, somme de TOUS les contrats de toute la carrière =
-  25 593 €, aucun outlier. **Aucune reproduction obtenue.** Benoît confirme ne pas avoir d'écran, de
-  date ni d'export du moment où le chiffre est apparu, et pense qu'il s'agissait peut-être d'un bug
-  ponctuel déjà résolu par un correctif de cette session (ex. dédoublonnage heures+cachets,
-  `lib/correspondanceContrat.ts`, cf. « Fait » §4/§6 ci-dessous). Décision explicite : **ne pas
-  investiguer plus loin, ne rien corriger spéculativement (devoir n°2)** — cf. aussi l'écart
-  préexistant documenté dans `docs/SPEC.md` §11.B (formule A+B+C divergente à un SR ~400 000 €,
-  noté depuis le 31/07/2026, jamais rencontré à un SR réaliste). **Ne PAS rouvrir ce chantier sans
-  signal neuf** — seulement si le chiffre réapparaît, avec cette fois l'écran, la date, et si
-  possible un export JSON du moment.
 - `dateAnniversaire`/`dateAnniversairePrecedente` du profil réel de l'utilisateur : la note du
   31/07/2026 demandant de vérifier ces deux valeurs (`2027-01-17` et `2025-03-23`) n'a pas été
   reconfirmée explicitement cette session — à recontrôler, ne pas supposer que c'est fait.
@@ -133,6 +118,21 @@ n'avait pas atteint GitHub à ce moment-là (corrigé ensuite, cf. l'état en t�
   ce que disait encore le commit `908c6d7` en son temps.
 - Écran de revue IA : détecte une correspondance avec un contrat « a_verifier », affiche le diff
   Ancien→Nouveau, jamais de fusion automatique.
+
+**7. Suite de session (même jour)** — `ea6b72c`, `4cd3e66`, `2bb90c4` :
+- **Historique de taux PAS daté** : `tauxPrelevementSource` (scalaire) appliquait à tort le taux
+  courant à tous les mois passés du tableau `RevenusMensuels.tsx`, y compris ceux couverts par un
+  taux DGFIP différent (confirmé sur relevés réels de Benoît : 3,30 % mi-2025, 3,10 % dès fin
+  2025/2026). Remplacé par `tauxPrelevementSourceHistorique` + `getTauxPASAt` (même pattern que
+  `ajReelleHistorique`). Migration silencieuse, UI dédiée, pipeline IA corrigé pour ajouter une
+  entrée datée plutôt que d'écraser l'historique.
+- **Contrat d'enseignement** : décision du point 3 (blocage IA) re-vérifiée avec deux tests de
+  régression prouvant que le moteur ne distingue jamais selon `Contrat.source` — rien à recoder.
+- **Bug SR ~400 000 € signalé par Benoît — investigué, PAS un bug** : aucune reproduction obtenue
+  sur les données réelles (SR recalculé = 6 049 €, somme carrière = 25 593 €, 4 hypothèses écartées
+  avec preuve). Benoît a ensuite vérifié de son côté : **une erreur de saisie de sa part**, pas un
+  défaut du moteur. Chantier fermé, aucun code touché pour cette raison — cf. `docs/SPEC.md` §11.B
+  pour l'écart de formule à un SR extrême, qui reste une question distincte et toujours ouverte.
 
 **Reste à faire, dans l'ordre de priorité** :
 1. Repousser les commits locaux vers `origin/master`.
