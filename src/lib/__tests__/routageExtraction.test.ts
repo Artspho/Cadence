@@ -3,7 +3,7 @@ import type { Profil } from "../../types";
 import type { Proposition } from "../../types/extraction";
 import { contrat } from "../../engine/__tests__/testUtils";
 import {
-  champsDivergents,
+  comparerContratExistant,
   contratConfirmeDepuisCorrespondance,
   contratDepuisProposition,
   detecterMergeAmbiguHeuresCachets,
@@ -363,31 +363,48 @@ describe("evaluerProposition / evaluerExtraction — correspondances avec des co
   });
 });
 
-describe("champsDivergents — Ancien → Nouveau avant confirmation d'une correspondance", () => {
+describe("comparerContratExistant — tableau Existant/Document avant confirmation d'une correspondance", () => {
   const propositionDonnees = (extractionBulletinPaie.propositions[0] as Extract<Proposition, { cible: "contrat" }>).donnees;
 
-  it("signale un champ dont la valeur diffère (ex. salaireBrut saisi à la main vs document)", () => {
+  it("marque un champ différent avec identique: false (ex. salaireBrut saisi à la main vs document)", () => {
     const existant = contrat({ date: propositionDonnees.date, employeur: propositionDonnees.employeur, salaireBrut: 999 });
-    const divergences = champsDivergents(existant, propositionDonnees);
-    const salaire = divergences.find((d) => d.champ === "salaireBrut");
-    expect(salaire).toEqual({ champ: "salaireBrut", ancien: 999, nouveau: propositionDonnees.salaireBrut });
+    const comparaisons = comparerContratExistant(existant, propositionDonnees);
+    const salaire = comparaisons.find((c) => c.champ === "salaireBrut");
+    expect(salaire).toEqual({ champ: "salaireBrut", existant: 999, document: propositionDonnees.salaireBrut, identique: false });
   });
 
-  it("ne signale JAMAIS un champ que le document n'a pas lu (null), même si le contrat existant a une valeur", () => {
-    // extractionBulletinPaie a type/typeRemuneration/territoire à null (cf. fixturesExtraction.ts)
-    const existant = contrat({ date: propositionDonnees.date, employeur: propositionDonnees.employeur, salaireBrut: propositionDonnees.salaireBrut, type: "enseignement" });
-    const divergences = champsDivergents(existant, propositionDonnees);
-    expect(divergences.find((d) => d.champ === "type")).toBeUndefined();
-  });
-
-  it("ne signale rien quand tout correspond déjà", () => {
+  // 01/08/2026 : un champ identique n'est plus filtré — il apparaît comme une ligne à part
+  // entière (identique: true), pour que le tableau reste complet et ne recrée pas le piège
+  // "silence = identique, pas explicite" déjà corrigé pour les correspondances absentes.
+  it("marque un champ identique avec identique: true, ne le filtre PAS hors du résultat", () => {
     const existant = contrat({
       date: propositionDonnees.date,
       dateDebut: propositionDonnees.dateDebut ?? propositionDonnees.date,
       employeur: propositionDonnees.employeur,
       salaireBrut: propositionDonnees.salaireBrut,
     });
-    expect(champsDivergents(existant, propositionDonnees)).toEqual([]);
+    const comparaisons = comparerContratExistant(existant, propositionDonnees);
+    const employeur = comparaisons.find((c) => c.champ === "employeur");
+    expect(employeur).toEqual({ champ: "employeur", existant: propositionDonnees.employeur, document: propositionDonnees.employeur, identique: true });
+  });
+
+  it("n'inclut JAMAIS un champ que le document n'a pas lu (null), même si le contrat existant a une valeur", () => {
+    // extractionBulletinPaie a type/typeRemuneration/territoire à null (cf. fixturesExtraction.ts)
+    const existant = contrat({ date: propositionDonnees.date, employeur: propositionDonnees.employeur, salaireBrut: propositionDonnees.salaireBrut, type: "enseignement" });
+    const comparaisons = comparerContratExistant(existant, propositionDonnees);
+    expect(comparaisons.find((c) => c.champ === "type")).toBeUndefined();
+  });
+
+  it("quand tout correspond déjà, retourne une ligne par champ lu, toutes identique: true — jamais un tableau vide", () => {
+    const existant = contrat({
+      date: propositionDonnees.date,
+      dateDebut: propositionDonnees.dateDebut ?? propositionDonnees.date,
+      employeur: propositionDonnees.employeur,
+      salaireBrut: propositionDonnees.salaireBrut,
+    });
+    const comparaisons = comparerContratExistant(existant, propositionDonnees);
+    expect(comparaisons.length).toBeGreaterThan(0); // date, dateDebut, salaireBrut, employeur — pas []
+    expect(comparaisons.every((c) => c.identique)).toBe(true);
   });
 });
 

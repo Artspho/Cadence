@@ -339,19 +339,29 @@ const CHAMPS_COMPARABLES: (keyof Contrat)[] = [
   "enRapportAvecMetier",
 ];
 
-export interface ChampDivergent {
+export interface ChampComparaison {
   champ: keyof Contrat;
-  ancien: unknown;
-  nouveau: unknown;
+  existant: unknown;
+  document: unknown;
+  /** `true` si les deux valeurs sont égales — sert à l'affichage neutre (pas masqué, cf.
+   * TableauComparaisonContrat.tsx) plutôt qu'à filtrer la ligne. */
+  identique: boolean;
 }
 
-/** Divergences entre un contrat existant et ce qu'un document propose — jamais les champs non lus. */
-export function champsDivergents(existant: Contrat, proposition: Extract<Proposition, { cible: "contrat" }>["donnees"]): ChampDivergent[] {
+/**
+ * Compare CHAQUE champ lu par le document à la valeur existante — identique ou non, jamais les
+ * champs non lus (`null`), qui restent affichés ailleurs sur la carte (« À vérifier dans le
+ * formulaire »). Remplace `champsDivergents` (01/08/2026) : une ligne « champ identique » masquée
+ * silencieusement laissait croire à une comparaison complète alors qu'elle n'en montrait qu'une
+ * partie — même piège que "aucune correspondance" avant `diagnostiquerAbsenceCorrespondance`.
+ */
+export function comparerContratExistant(existant: Contrat, proposition: Extract<Proposition, { cible: "contrat" }>["donnees"]): ChampComparaison[] {
   const nouveau = contratDepuisProposition(proposition);
-  return CHAMPS_COMPARABLES.filter((champ) => nouveau[champ] !== undefined && nouveau[champ] !== existant[champ]).map((champ) => ({
+  return CHAMPS_COMPARABLES.filter((champ) => nouveau[champ] !== undefined).map((champ) => ({
     champ,
-    ancien: existant[champ],
-    nouveau: nouveau[champ],
+    existant: existant[champ],
+    document: nouveau[champ],
+    identique: nouveau[champ] === existant[champ],
   }));
 }
 

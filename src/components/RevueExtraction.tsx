@@ -19,7 +19,7 @@ import type { FranceTravailConfig } from "../config/franceTravailConfig";
 import { RAPPEL_DOCUMENT_ENVOYE } from "../content/mentionEnvoiIA";
 import type { ResultatEcritureProfil } from "../lib/coherenceProfil";
 import {
-  champsDivergents,
+  comparerContratExistant,
   contratConfirmeDepuisCorrespondance,
   contratDepuisProposition,
   detecterMergeAmbiguHeuresCachets,
@@ -32,6 +32,7 @@ import {
 import type { DiagnosticAbsenceCorrespondance } from "../lib/correspondanceContrat";
 import { ContractForm } from "./ContractForm";
 import { PeriodeForm } from "./PeriodeForm";
+import { TableauComparaisonContrat } from "./TableauComparaisonContrat";
 
 interface RevueExtractionProps {
   resultat: ExtractionResult;
@@ -88,7 +89,7 @@ const COULEUR_CONFIANCE: Record<"haute" | "moyenne" | "faible", string> = {
   faible: "text-red",
 };
 
-const LABELS_CHAMPS: Record<Proposition["cible"], Record<string, string>> = {
+export const LABELS_CHAMPS: Record<Proposition["cible"], Record<string, string>> = {
   contrat: {
     dateDebut: "Date de début",
     date: "Date de fin",
@@ -160,12 +161,12 @@ const STYLE_STATUT: Record<StatutProposition, { libelle: string; classe: string 
  * l'app a compris de quoi il s'agit. Les accents manquent donc parfois : c'est le texte de l'IA,
  * pas un libellé de Cadence.
  */
-function humaniserCle(cle: string): string {
+export function humaniserCle(cle: string): string {
   const mots = cle.replace(/([a-z0-9])([A-Z])/g, "$1 $2").toLowerCase();
   return mots.charAt(0).toUpperCase() + mots.slice(1);
 }
 
-function formaterValeur(valeur: unknown): { texte: string; nonLu: boolean } {
+export function formaterValeur(valeur: unknown): { texte: string; nonLu: boolean } {
   if (valeur === null || valeur === undefined || valeur === "") return { texte: "non lu dans le document", nonLu: true };
   if (typeof valeur === "boolean") return { texte: valeur ? "Oui" : "Non", nonLu: false };
   if (typeof valeur === "string") return { texte: LABELS_VALEURS[valeur] ?? valeur, nonLu: false };
@@ -405,7 +406,7 @@ function CarteProposition({
         <div className="space-y-3">
           <p className="text-sm text-ink">Ce document semble correspondre à un contrat déjà saisi :</p>
           {(correspondances ?? []).map((candidat) => {
-            const divergences = champsDivergents(candidat, proposition.donnees);
+            const comparaisons = comparerContratExistant(candidat, proposition.donnees);
             const mergeAmbigu = proposition.cible === "contrat" ? detecterMergeAmbiguHeuresCachets(candidat, proposition.donnees) : null;
             return (
               <div key={candidat.id} className="border border-line rounded-lg p-3 space-y-2.5">
@@ -413,19 +414,7 @@ function CarteProposition({
                   {candidat.employeur} · {candidat.dateDebut} → {candidat.date} · {candidat.salaireBrut.toFixed(0)} € brut
                   <span className="ml-2 text-xs font-normal px-2 py-0.5 rounded-full bg-surface-2 text-muted border border-line align-middle">AEM/bulletin en attente</span>
                 </p>
-                {divergences.length > 0 && (
-                  <ul className="text-xs text-muted space-y-1">
-                    {divergences.map((d) => {
-                      const ancien = formaterValeur(d.ancien).texte;
-                      const nouveau = formaterValeur(d.nouveau).texte;
-                      return (
-                        <li key={String(d.champ)}>
-                          {labels[d.champ] ?? humaniserCle(String(d.champ))} : <span className="text-faint">{ancien}</span> → <span className="text-ink font-medium">{nouveau}</span>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )}
+                <TableauComparaisonContrat comparaisons={comparaisons} />
                 {mergeAmbigu ? (
                   // Purement informatif — jamais un bouton qui fusionnerait ou réinitialiserait quoi
                   // que ce soit ici (cf. detecterMergeAmbiguHeuresCachets, lib/routageExtraction.ts).
