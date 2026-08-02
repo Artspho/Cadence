@@ -164,6 +164,15 @@ n'avait pas atteint GitHub à ce moment-là (corrigé ensuite, cf. l'état en t�
   s'était pas déclenché). `ocrIllisible.ts` reste un garde-fou valable pour un futur cas de vrai
   OCR vide, mais ne couvre pas rétroactivement la cause du 30/07. Certitude absolue impossible
   (document/réponse brute du 30/07 jamais conservés).
+- **Fix préventif : le « Total des activités » pouvait aussi être pris pour un `salaireBrut`
+  individuel** — le prompt avertissait déjà pour `nbHeures`/`nbCachets` (cf. entrée du 01/08 sur
+  `045d46a` ci-dessus) mais rien pour le montant en euros qui suit sur la même ligne. Aucun bug
+  confirmé à ce jour — le premier envoi réel (`Justificatif_declaration_02_2026.pdf`, ci-dessus)
+  n'était déjà pas tombé dans ce piège avant le correctif (4 montants individuels corrects, jamais
+  le total 2 100 €), mais ça ne garantit rien pour l'avenir. Consigne explicite ajoutée dans le
+  prompt (CAS 8, exemple fictif) par prudence. **Non re-testé avec un second appel Mistral réel** —
+  décision en attente de Benoît (nouvel envoi maintenant, ou reconfirmation au prochain justificatif
+  envoyé naturellement).
 
 **Reste à faire, dans l'ordre de priorité** :
 1. Repousser les commits locaux vers `origin/master`.

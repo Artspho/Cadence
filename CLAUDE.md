@@ -147,6 +147,15 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
   `ocrIllisible.ts` reste un garde-fou valable pour un futur cas de VRAI OCR vide, mais ne couvre
   pas rétroactivement la cause du 30/07 — deux incidents distincts. Certitude absolue impossible :
   le document/la réponse Mistral bruts du 30/07 n'ont jamais été conservés. Cf. `docs/reprise.md`.
+- 🔶 **Fix préventif (pas un bug confirmé) : le « Total des activités » pouvait aussi être pris pour
+  un `salaireBrut` individuel** — le prompt avertissait déjà contre ce piège pour `nbHeures`/
+  `nbCachets` (CAS 7 ci-dessus) mais rien pour le montant en euros de la même ligne. CAS 8 ajouté
+  (exemple fictif). Document réel confirmé disponible pour un cas de non-régression
+  (`Justificatif_declaration_02_2026.pdf`, motif exact présent : total 2 100 € à côté de 4 montants
+  individuels) — le premier envoi réel de ce document (avant ce correctif) n'était déjà pas tombé
+  dans ce piège, mais ça ne garantit rien pour l'avenir. **Second appel Mistral réel non fait** —
+  décision en attente de Benoît, pour ne pas renvoyer ses données personnelles une seconde fois sans
+  redemander son accord (cf. `docs/reprise.md`).
 
 ### 01/08/2026 (fin de session : cycle de vie du contrat, bug heures+cachets moteur, fusion de branches close)
 

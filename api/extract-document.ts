@@ -352,17 +352,23 @@ JUSTIFICATIF DE DÉCLARATION DE SITUATION MENSUELLE (ACTUALISATION FRANCE TRAVAI
   l'employeur est identique et le mois aussi. Fusionner ferait perdre les deux périodes réelles au
   profit d'une période composite fausse.
 
-  ⚠️⚠️ PIÈGE — LE « TOTAL DES ACTIVITÉS » EN BAS DE SECTION MÉLANGE HEURES ET CACHETS
+  ⚠️⚠️ PIÈGE — LE « TOTAL DES ACTIVITÉS » EN BAS DE SECTION MÉLANGE HEURES, CACHETS ET MONTANT
   Le document se termine par un encadré « Total des activités » du type :
      « N pour un employeur »
      « H h (X h + Y cachet(s)) / M € »
   Ce H (ex. « 153 h (21 h + 11cachet(s)) ») est un total D'AFFICHAGE qui convertit les cachets en
   équivalent-heures pour donner un seul chiffre — ce n'est PAS une donnée d'un contrat individuel.
   NE L'UTILISE JAMAIS pour remplir contrat.nbHeures ou contrat.nbCachets d'AUCUN encadré, même le
-  seul de la liste si le document n'a qu'une activité. Si tu ranges ce total quelque part, ce ne
-  peut être qu'en « info_seule », avec un nom de clé qui dit explicitement qu'il s'agit du total
-  du document entier (ex. totalActivitesMoisHeuresCachetsMelanges), jamais associé à un employeur
-  précis.
+  seul de la liste si le document n'a qu'une activité.
+  Le M € qui suit (ex. « 2100,00 € ») est le MÊME genre de total cumulé — la somme des montants de
+  TOUS les encadrés du mois, pas le salaire d'un contrat individuel. NE L'UTILISE JAMAIS pour
+  remplir contrat.salaireBrut d'AUCUN encadré, même le seul de la liste : chaque encadré porte son
+  propre montant, sur sa propre ligne « Vous avez effectué/travaillé... pour un montant de X € brut »
+  — c'est CE montant-là, jamais le total, qui va dans salaireBrut.
+  Si tu ranges ce total (heures/cachets OU montant) quelque part, ce ne peut être qu'en
+  « info_seule », avec un nom de clé qui dit explicitement qu'il s'agit du total du document entier
+  (ex. totalActivitesMoisHeuresCachetsMelanges, totalActivitesMoisMontantCumule), jamais associé à
+  un employeur précis.
 
   À ranger en « info_seule » si utile (aucun champ dédié dans le schéma) : le nombre total
   d'activités déclarées, le total mixte ci-dessus. Les déclarations de la section
@@ -437,6 +443,19 @@ CAS 7 — heures ET cachets présents sur la même AEM, l'un rangé à null avec
   attendu : contrat.nbHeures = 14 ET contrat.nbCachets = 3, chacun lu indépendamment sur sa propre
             ligne, chacun avec sa propre citation exacte tirée du document.
 
+CAS 8 — le montant du « Total des activités » pris pour le salaireBrut d'un encadré individuel
+  (ajout préventif, 01/08/2026 — aucun cas réel confirmé à ce jour, cf. CAS 5 pour le même piège
+  déjà observé sur un montant d'un autre type de document ; données de l'exemple ci-dessous fictives)
+  document : justificatif de déclaration mensuelle avec deux encadrés d'activité — « Orchestre Fictif
+             de Testville : ... pour un montant de 400,00 € brut » et « Ensemble Imaginaire du Sud :
+             ... pour un montant de 300,00 € brut » — puis, en bas de section, « Total des activités :
+             2 pour un employeur / 40 h (20 h + 5cachet(s)) / 700,00 € ».
+  mauvais : contrat.salaireBrut = 700 sur l'un des deux encadrés (ou sur les deux) — le total
+            cumulé des deux activités, pas le montant réel de l'encadré concerné.
+  attendu : contrat.salaireBrut = 400 pour le premier encadré, 300 pour le second, chacun lu sur sa
+            propre ligne « ... pour un montant de X € brut » ; 700 ne va nulle part associé à un
+            employeur précis (au mieux en info_seule, nom de clé explicite sur le total du document).
+
 ════════ RÈGLES DE SÛRETÉ (elles priment sur tout le reste) ════════
 
 - Jamais de valeur inventée. Champ illisible ou absent → null s'il est nullable, sinon pas de
@@ -484,7 +503,8 @@ barèmes), activiteHorsAnnexe10 (déprécié), la date de départ d'affichage (c
 9. Sur un justificatif de déclaration mensuelle : compte les encadrés d'activité de la section
    « 1 - Activités » et vérifie que tu as produit EXACTEMENT une proposition « contrat » par
    encadré, y compris quand deux encadrés partagent le même employeur. Vérifie qu'aucun champ
-   contrat.nbHeures/nbCachets ne provient du « Total des activités » du bas de document.
+   contrat.nbHeures/nbCachets/salaireBrut ne provient du « Total des activités » du bas de document
+   (cf. CAS 8 pour salaireBrut).
 10. Si tu as rangé nbHeures OU nbCachets à null sur un contrat/AEM, vérifie que tu as vraiment
     regardé la case correspondante et qu'elle est réellement vide — pas seulement que tu as déjà
     rempli l'autre champ juste à côté. Si les deux cases portent une valeur, les deux champs
