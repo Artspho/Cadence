@@ -14,3 +14,6 @@ cadence-export-*.json
 docs/cadence-export-*.json
 cadence-import-*.json
 docs/cadence-import-*.json
+
+# Fourre-tout local pour fichiers à supprimer plus tard (jamais suivi par git).
+_a_supprimer/
