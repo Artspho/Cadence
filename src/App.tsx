@@ -346,38 +346,44 @@ export default function App() {
 
         {onglet === "import" && calculs && (
           <div className="space-y-6">
-            {/* AU-DESSUS des deux canaux, et volontairement pas dans l'un d'eux : savoir quel document
-                aller chercher précède le fait d'en déposer un, et cette information est NEUTRE au canal
-                — une saisie manuelle éteint un manque exactement comme un import (cf.
-                lib/documentsRequis.ts, qui ne lit que les données enregistrées). Rendue à l'intérieur
-                du bloc IA, elle se lisait comme une dépendance de l'IA, ce qu'elle n'est pas. */}
+            {/* AU-DESSUS des deux blocs qui suivent, et volontairement pas dans l'un d'eux : savoir
+                quel document aller chercher précède le fait d'en déposer un, et cette information
+                est NEUTRE au canal — une saisie manuelle éteint un manque exactement comme un import
+                (cf. lib/documentsRequis.ts, qui ne lit que les données enregistrées). */}
             <ChecklistDocuments profil={profil} contrats={donnees.contrats} />
 
-            <ImportBulletins profil={profil} config={franceTravailConfig} decompteActuel={calculs.decompte} onImporterContrat={ajouterContrat} />
-
-            {/* À côté du point d'entrée IA, pas dedans : simple lien sortant vers l'espace personnel
-                France Travail (nouvel onglet, jamais une iframe — FranceConnect l'interdit). Aucune
-                donnée ne transite par ce bloc, donc pas d'accent ambre : contrairement au canal IA
-                juste en dessous, rien ne quitte l'appareil ici. */}
-            <div className="border-t border-line pt-6">
+            {/* Parcours en deux temps, rendu explicite par la numérotation des deux titres : avec
+                l'arrivée d'un second bouton de redirection (§ci-dessous), un bloc unique aurait mêlé
+                « aller chercher le fichier » et « le déposer ici », deux étapes qui se suivent mais ne
+                se confondent pas. Étape 1 seule, avant les deux canaux d'import : elle ne dépend
+                d'aucun des deux et ne doit pas se lire comme une dépendance de l'un ou l'autre. */}
+            <div>
+              <h3 className="font-display text-base font-medium tracking-tight mb-3">1. Récupérer un document depuis France Travail</h3>
               <OuvrirEspacePersonnelFT />
             </div>
 
-            {/* Deuxième canal, distinct du local ci-dessus : celui-ci envoie le document à un serveur.
-                Aucun état ni code partagé entre les deux — la seule chose commune est l'onglet.
-                L'accent visuel est ambre (et non menthe) parce que ce canal fait quitter l'appareil :
-                la couleur suit la conséquence, comme dans la modale de consentement. */}
             <div className="border-t border-line pt-6">
-              <ImportDocumentIA
-                profil={profil}
-                config={franceTravailConfig}
-                decompteActuel={calculs.decompte}
-                contrats={donnees.contrats}
-                onAjouterContrat={ajouterContrat}
-                onAjouterPeriode={ajouterPeriode}
-                onModifierProfil={modifierProfil}
-                onModifierContrat={modifierContrat}
-              />
+              <h3 className="font-display text-base font-medium tracking-tight mb-3">2. Importer le document</h3>
+              <div className="space-y-6">
+                <ImportBulletins profil={profil} config={franceTravailConfig} decompteActuel={calculs.decompte} onImporterContrat={ajouterContrat} />
+
+                {/* Deuxième canal, distinct du local ci-dessus : celui-ci envoie le document à un
+                    serveur. Aucun état ni code partagé entre les deux — la seule chose commune est
+                    l'onglet. L'accent visuel est ambre (et non menthe) parce que ce canal fait quitter
+                    l'appareil : la couleur suit la conséquence, comme dans la modale de consentement. */}
+                <div className="border-t border-line pt-6">
+                  <ImportDocumentIA
+                    profil={profil}
+                    config={franceTravailConfig}
+                    decompteActuel={calculs.decompte}
+                    contrats={donnees.contrats}
+                    onAjouterContrat={ajouterContrat}
+                    onAjouterPeriode={ajouterPeriode}
+                    onModifierProfil={modifierProfil}
+                    onModifierContrat={modifierContrat}
+                  />
+                </div>
+              </div>
             </div>
 
             {/* Chantier en cours : import IA premium. Replié par défaut, invisible en production
