@@ -71,9 +71,10 @@ export const franceTravailConfig = {
     // (éd. juillet 2026) et plusieurs pages cultureetspectacle.francetravail.fr affirment 174,80 €
     // comme plafond inchangé depuis 01/01/2024 — contradiction non résolue avec les valeurs Unédic
     // ci-dessous. Config alignée sur Unédic (organisme gestionnaire des paramètres), écart visible
-    // uniquement à SR proche du plafond de la partie A (13 700 €) — cas extrême, même famille que
-    // l'écart de formule à SR extrême déjà déprioritisé. Non résolu avec certitude à 100 %, contact
-    // direct Unédic/France Travail nécessaire pour trancher définitivement.
+    // uniquement à un SR assez élevé pour que A+B+C dépasse le plafond (~400 000 €, cf. cas B3b de
+    // docs/validation.md) — cas extrême, même famille que l'écart de formule à SR extrême déjà
+    // déprioritisé. Non résolu avec certitude à 100 %, contact direct Unédic/France Travail
+    // nécessaire pour trancher définitivement.
     // TODO: valeur(s) antérieure(s) au 01/01/2024 inconnues — aucune source certifiée à ce jour
     // (éditions Unédic archivées remontées jusqu'à janvier 2024, rien de plus ancien en accès
     // libre). Tant qu'elles manquent, `getPlafondAreAt` retombe explicitement sur la plus ancienne

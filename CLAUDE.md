@@ -1540,8 +1540,9 @@ de situation ✅ — l'échec semble propre à ce format de bulletin, pas au can
   pas dépasser **174,80 € depuis le 1er janvier 2024** », sans mention de 177,56 € ni 181,18 €.
   **Décision de Benoît (03/08/2026) : la config reste alignée sur Unédic** — organisme qui fixe
   réellement ces paramètres, documents datés et cohérents sur 5 éditions vérifiées. `plafondHistorique`
-  n'est PAS modifié. Écart visible uniquement à SR proche du plafond de la partie A (13 700 €) — cas
-  extrême, même famille que l'écart de formule à SR extrême déjà déprioritisé. Non résolu avec
+  n'est PAS modifié. Écart visible uniquement à un SR assez élevé pour que A+B+C dépasse le plafond
+  (~400 000 €, cf. cas B3b de `docs/validation.md`) — cas extrême, même famille que l'écart de
+  formule à SR extrême déjà déprioritisé. Non résolu avec
   certitude à 100 % : un contact direct Unédic/France Travail reste nécessaire pour trancher
   définitivement. Même texte en commentaire dans `franceTravailConfig.ts` et dans `docs/validation.md`
   (« Dette tracée »).

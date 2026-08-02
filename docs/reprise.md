@@ -173,8 +173,9 @@ l'édition mars 2026 citée dans `meta.source`) et plusieurs pages `cultureetspe
 sans mentionner 177,56 € ni 181,18 € — qui viennent, eux, d'Unédic « Paramètres utiles ».
 **Décision de Benoît : la config reste alignée sur Unédic** (organisme qui fixe réellement ces
 paramètres, documents datés et cohérents sur 5 éditions vérifiées) — `plafondHistorique` inchangé.
-Écart visible uniquement à SR proche du plafond de la partie A (13 700 €), cas extrême de la même
-famille que l'écart de formule à SR extrême déjà déprioritisé. Non résolu à 100 % : contact direct
+Écart visible uniquement à un SR assez élevé pour que A+B+C dépasse le plafond (~400 000 €, cf. cas
+B3b de `docs/validation.md`), cas extrême de la même famille que l'écart de formule à SR extrême déjà
+déprioritisé. Non résolu à 100 % : contact direct
 Unédic/France Travail nécessaire pour trancher définitivement. Tracé aux trois endroits
 (`franceTravailConfig.ts`, `docs/validation.md` « Dette tracée », `CLAUDE.md`).
 

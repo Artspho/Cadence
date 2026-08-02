@@ -235,9 +235,10 @@ mais non nulle à SR élevé. Deux tests de caractérisation figent l'écart dan
   plafond inchangé depuis 01/01/2024 — contradiction non résolue avec les valeurs Unédic retenues en
   config (`are.plafondHistorique` : 174,80 € en 2024, 177,56 € en 2025, 181,18 € en 2026). Config
   alignée sur Unédic (organisme gestionnaire des paramètres, documents datés et cohérents sur
-  5 éditions vérifiées), écart visible uniquement à SR proche du plafond de la partie A (13 700 €) —
-  cas extrême, même famille que l'écart de formule à SR extrême déjà déprioritisé. Non résolu avec
-  certitude à 100 %, contact direct Unédic/France Travail nécessaire pour trancher définitivement.
+  5 éditions vérifiées), écart visible uniquement à un SR assez élevé pour que A+B+C dépasse le
+  plafond (~400 000 €, cf. cas B3b plus haut) — cas extrême, même famille que l'écart de formule à SR
+  extrême déjà déprioritisé. Non résolu avec certitude à 100 %, contact direct Unédic/France Travail
+  nécessaire pour trancher définitivement.
 - **`StatutPrediction.joursRestants` (champ brut) reste fragile** — il peut valoir `0` sans que
   ça signifie une vraie échéance atteinte : quand l'anniversaire est inconnu, `periodeReference.ts`
   referme la fenêtre sur une date sentinelle ("aujourd'hui", faute de mieux), et `joursRestants`
