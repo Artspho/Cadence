@@ -8,56 +8,142 @@ Mémoire durable à consulter au démarrage : `CLAUDE.md`, `docs/SPEC.md`, `docs
 
 Deux devoirs sacrés : (1) ne jamais perdre les données ; (2) ne jamais afficher un chiffre faux (ni faux « feu vert » rassurant, ni faux « Bloqué », ni faux montant, ni fausse alerte, ni valeur sentinelle brute).
 
-État (mis à jour le 01/08/2026, fin de session — session longue, suite directe de la précédente) :
-les deux devoirs sacrés sont tenus. **569 tests verts, `tsc -b` propre sur les deux tsconfig (src
-et api).** Dernier commit local : `16a0330` (tableau comparatif de correspondance). `master` reste
-la seule branche de travail. ⚠️ **`origin/master` est 1 commit en retard** (`16a0330` non poussé —
-tous les commits précédents de cette session ont été poussés au fur et à mesure, sur demande
-explicite à chaque fois). Tous les items §11.A du SPEC sont traités.
+État (mis à jour le 02/08/2026) : les deux devoirs sacrés sont tenus. **592 tests
+verts, `tsc -b` propre sur les deux tsconfig (src et api).** Dernier commit local : `2c000af`
+(un commit docs supplémentaire, décrit ci-dessous, suit juste après). `master` reste la seule
+branche de travail. `origin/master` était à jour au dernier point de contrôle (poussé par Benoît
+lui-même en cours de session) — non revérifié depuis le commit `440d6c2`. Tous les items §11.A du
+SPEC restent traités.
 
-**Deux points concrets à vérifier en tout premier, avant tout nouveau chantier** :
-1. **Script de nettoyage final non confirmé exécuté** : corrige le contrat « Les Étoiles du
-   Classique » (`nbHeures` 26 → 14, résidu de conversion — confirmé par le document officiel
-   `Justificatif_declaration_06_2026.pdf`) ET renommage `LEVALLOIS` → `Commune de Levallois Perret`
-   sur les 13 contrats de la série récurrente. Le script combiné a été donné à Benoît en fin de
-   session avec l'instruction « exécute puis recharge (F5) immédiatement, rien entre les deux » —
-   **son statut réel est inconnu au moment d'écrire ceci.** Demander confirmation, ou redemander un
-   export JSON frais et vérifier directement (mêmes IDs qu'avant : `e9077806-...` pour Étoiles,
-   `recurrenceId: c55f263f-...` pour la série Levallois).
-2. **`16a0330` à pousser** (`git push`, ou attendre la demande explicite de Benoît — pas de push
-   sans demande, cf. mémoire longue durée `cadence_push_credentials.md`).
+**Résumé de cette session (7 commits, `bcc4f6e` → `2c000af`)** :
+1. `bcc4f6e` — doc : correction de la note périmée sur le déploiement/test PWA téléphone (l'app
+   était déjà déployée sur Vercel et l'installation Android confirmée depuis le 01/08 ; `reprise.md`
+   affirmait encore le contraire).
+2. `9a62d29` — fix : `dateNaissance` à année invalide (ex. `"19994-06-09"`, import JSON) faisait
+   basculer silencieusement le plafond enseignement sur 70h au lieu du plafond réel — rejetée
+   proprement à l'écriture désormais (`lib/coherenceProfil.ts`), jamais côté lecture.
+3. `880d05a` — feat : import IA, nouveau type de document « attestation de taux de prélèvement à la
+   source » — une proposition par couple (taux, date), jamais un choix automatique de valeur
+   "primaire" (`taux_pas_historique`, `types/extraction.ts`).
+4. `4213582` — feat : alerte « l'AEM fait foi, pas le bulletin de paie » harmonisée sur les deux
+   flux d'import (manuel pdfjs + IA Mistral) — nouveau champ `contrat.natureDocumentSource`, texte
+   de référence unique (`content/rappelAEM.ts`).
+5. `1394cb9` — docs : point 2 du backlog (AJ brute vs nette) confirmé **définitivement clos** —
+   second cas réel indépendant vérifié (24/03/2025, écart 2,27 %), et vérification directe sur les
+   vraies données (`ajReelleHistorique` du profil réel) : déjà correct, aucune correction
+   nécessaire. Écart réel confirmé 2,2-2,3 %, jamais ~5 % comme supposé initialement.
+6. `440d6c2` puis `2c000af` — feat : bouton unique « Récupérer un document sur France Travail »
+   (nouvel onglet, jamais une iframe — FranceConnect l'interdit explicitement) remplacé le même
+   jour par DEUX boutons vers des pages précises (URLs confirmées par Benoît), avec réorganisation
+   de l'onglet Import PDF en deux blocs numérotés. Remplace le point backlog « Webview France
+   Travail intégrée », bloqué par design depuis le 31/07.
 
-**Si le nettoyage ci-dessus est confirmé fait** : `heuresPour507` de la fenêtre en cours doit valoir
-**588h** (recalculé et vérifié avec le vrai moteur sur les données d'avant nettoyage : 756h de
-base, −168h = 84 (onpl) + 72 (Les Arts Phocéens 26/04) + 12 (Les Étoiles, déjà nettoyés pour les
-deux premiers avant la fin de session) — un écart que Benoît avait signalé dès le début de cette
-partie de la session et qui est maintenant entièrement expliqué).
+**Également cette session, deux audits de backlog sur preuve (aucun commit, vérification pure)** :
+- 5 points : PWA/téléphone (✅ fait et testé sur vrai appareil), périodes assimilées ALD (✅
+  complet, source citée), `enRapportAvecMetier` (✅ même rigueur que `etablissementAgree`),
+  `dateNaissance` à l'import JSON (🔴 bug réel confirmé, corrigé ensuite dans cette même session),
+  5 documents non couverts par l'IA (🔶 3 déjà couverts, 1 clos par décision produit, 1 vrai trou =
+  attestation de taux, comblé ensuite dans cette même session).
+- 3 points : clé Mistral exposée côté navigateur (✅ déjà réglé, fichier `.jsx` supprimé), CRUD
+  `PeriodeAssimilee` (✅ complet et branché, testé en navigateur réel), franchise salaires SR/SJM
+  (✅ branché sur de vraies données calculées, pas un placeholder).
 
-**Points de vigilance non résolus, non retouchés cette session — toujours à vérifier** :
-- `dateAnniversaire`/`dateAnniversairePrecedente` du profil réel de l'utilisateur : la note du
-  31/07/2026 demandant de vérifier ces deux valeurs (`2027-01-17` et `2025-03-23`) n'a pas été
-  reconfirmée explicitement cette session — à recontrôler, ne pas supposer que c'est fait.
-- **Confusion de dossier jamais résolue** (note du 31/07/2026, inchangée) : deux copies du projet
-  existent sur cette machine, `C:\Users\benoi\cadence` (le vrai dépôt, celui de toute session) et
-  `C:\Users\benoi\OneDrive\Bureau\cadence\cadence` (ossature vide, sans git). Rien n'a été fait sur
-  ce point cette session non plus — cf. mémoire longue durée (`cadence_dossier_projet.md`) qui
-  tranche déjà : le vrai dépôt est `C:\Users\benoi\cadence`, l'autre dossier est une ébauche à
-  ignorer sauf si Benoît indique explicitement vouloir la faire avancer en parallèle.
+**Points encore ouverts, non touchés cette session — à reprendre en premier** :
+- **Confusion de dossier OneDrive, toujours non résolue** (note du 31/07/2026, inchangée depuis) :
+  deux copies du projet existent sur cette machine, `C:\Users\benoi\cadence` (le vrai dépôt, celui
+  de toute session) et `C:\Users\benoi\OneDrive\Bureau\cadence\cadence` (ossature vide, sans git).
+  Cf. mémoire longue durée `cadence_dossier_projet.md`, qui tranche déjà : le vrai dépôt est
+  `C:\Users\benoi\cadence`. Ne pas relancer une demande de clarification au démarrage sans que le
+  contexte l'indique — attendre que Benoît revienne dessus.
+- **`dateAnniversaire`/`dateAnniversairePrecedente` du profil réel, toujours pas reconfirmées** :
+  `docs/cadence-import-complet.json` (export du 31/07, le plus récent disponible) porte
+  `dateAnniversaire: "2027-01-17"` et `dateAnniversairePrecedente: "2025-03-23"`. ⚠️ **Incohérence
+  trouvée cette session, non résolue** : le journal du 31/07 (plus bas dans ce document, section
+  « bug des 710h corrigé ») affirme avoir corrigé `dateAnniversairePrecedente` à `"2026-01-17"`,
+  mais la valeur réellement présente dans le fichier est `"2025-03-23"` — écart non expliqué entre
+  ce qui est journalisé et ce qui est stocké. À vérifier avant de faire confiance à l'une ou
+  l'autre valeur, et à recontrôler contre la vraie notification France Travail de Benoît.
+- **Script de nettoyage Étoiles/Levallois (note du 01/08)** : **confirmé fait par Benoît** en tout
+  début de cette session (plus un point ouvert). `heuresPour507` de la fenêtre en cours attendu à
+  **588h** en conséquence — non re-vérifié avec un export frais cette session, seule la parole de
+  Benoît fait foi ici.
 
-**⚠️ Point d'attention avant tout nouveau chantier — confusion de dossier non résolue** : il existe
-**deux copies** du projet sur cette machine : `C:\Users\benoi\cadence` (le vrai dépôt git, celui de
-toute cette session et de tout le travail décrit ci-dessous) et
-`C:\Users\benoi\OneDrive\Bureau\cadence\cadence` (une ossature de tout début de projet, sans git,
-sans `storage/`, sans Onboarding, rien de construit — son propre `CLAUDE.md` dit encore
-« ⬜ storage/, components/, câblage App.tsx »). L'utilisateur a montré une capture d'écran de cette
-**seconde** copie (« Ossature prête. ») en pensant que c'était l'app actuelle, bloquée sans action
-possible. Deux questions de clarification posées (quel dossier corriger, quelle hypothèse) ont
-toutes les deux été **rejetées sans réponse** par l'utilisateur — **rien n'a été fait sur ce point,
-à reprendre en premier** : soit c'est un vieux dossier oublié (l'app réelle tourne déjà très bien
-depuis `C:\Users\benoi\cadence`, rien à coder), soit c'est un second projet volontairement distinct
-à faire avancer en parallèle (auquel cas il faut construire l'import/export et l'onglet Profil
-avant que les deux boutons demandés aient un sens). Ne pas relancer une demande de clarification
-au démarrage sans que le contexte l'indique — attendre que l'utilisateur revienne dessus.
+## Fait le 02/08/2026 (7 commits, `bcc4f6e` → `2c000af`, + deux audits de backlog)
+
+Détail complet de chaque chantier dans `CLAUDE.md` (§ État actuel, entrées du 02/08/2026) ; ici,
+uniquement le résumé nécessaire pour reprendre.
+
+**1. Correction de note périmée** (`bcc4f6e`) : `docs/reprise.md` affirmait encore que rien n'était
+déployé et que le test PWA téléphone attendait ce déploiement — faux, contredit par `CLAUDE.md` qui
+documentait déjà le déploiement Vercel et le test réel du 01/08/2026.
+
+**2. Fix `dateNaissance` à année invalide** (`9a62d29`) : trouvé lors de l'audit backlog des 5
+points. `"19994-06-09"` passait sans contrainte de format à l'import JSON (`profilSchemaForme`
+n'exigeait qu'un `z.string()` non vide) ; `ageAuJour` renvoie alors `NaN`, et `NaN >= 50` valant
+`false`, le moteur retombait silencieusement sur le plafond <50 ans (70h) quel que soit l'âge réel.
+Nouvelle fonction `dateIsoEstValide` (`lib/dateJourMoisAnnee.ts`) appelée dans
+`validerCoherenceProfil` — volontairement seulement côté écriture, jamais côté lecture (devoir
+n°1). Rejet propre avec message clair à l'import, jamais une correction automatique silencieuse.
+
+**3. Import IA — attestation de taux PAS** (`880d05a`) : nouveau document reconnu, distinct du
+mécanisme existant `profil_ouverture_droits.tauxPrelevementSource` (notification/relevé, une seule
+proposition par document). Nouvelle cible `taux_pas_historique` : une proposition par couple
+(taux, date) trouvé, jamais une seule qui choisirait une valeur "primaire" — ferme ce gap connu
+pour ce nouveau canal spécifiquement (le canal existant n'est pas retouché, toujours non validé sur
+pièce réelle). Testé dans le vrai navigateur : statut Applicable/Non applicable correct selon la
+présence d'`ouvertureDroits`, deux propositions appliquées séparément reconstruisent bien
+l'historique complet sans perte.
+
+**4. Alerte AEM vs bulletin de paie, sur les deux flux** (`4213582`) : le rappel « l'AEM fait foi »
+n'existait qu'en version statique côté import manuel. Nouveau champ
+`contrat.natureDocumentSource: "aem" | "bulletin_paie" | null` (même rigueur que
+`etablissementAgree`/`enRapportAvecMetier` : rempli uniquement sur mention littérale du titre,
+jamais déduit du contenu). Avertissement conditionnel côté IA, jamais de blocage, jamais
+d'avertissement sur un cas non déterminé. Texte de référence unique (`content/rappelAEM.ts`)
+partagé par les deux flux.
+
+**5. Point 2 du backlog (AJ brute vs nette) définitivement clos** (`1394cb9`) : le 31/07 avait
+prouvé la formule sur un seul cas réel ; cette session a vérifié en plus la VALEUR réellement
+saisie dans le profil réel (`docs/cadence-import-complet.json`) — `ajReelleHistorique` contient
+bien `53,31 €`/`53,81 €` (la nette), jamais `54,55 €`/`55,02 €` (la brute). Second cas réel
+indépendant confirmé (24/03/2025, écart 2,27 %), en plus de celui du 18/01/2026 (2,20 %) déjà
+documenté. Écart réel confirmé sur deux cas indépendants : ~2,2-2,3 %, jamais ~5 %.
+
+**6. Boutons « Récupérer un document sur France Travail »** (`440d6c2` puis `2c000af`) : demande
+arrivée en cours de session (après le point « fin de session » ci-dessus), complétée le même jour
+en deux temps.
+
+*Première passe* (`440d6c2`) : FranceConnect interdit explicitement pop-ups et iframes pendant une
+session de connexion (vérification du certificat SSL par l'utilisateur) — la piste webview
+intégrée du 31/07 (`CLAUDE.md`, point désormais ✅) était donc sans issue. Remplacée par un simple
+lien sortant, `window.open(..., "_blank", "noopener,noreferrer")`, à côté du canal IA dans l'onglet
+Import PDF (`components/OuvrirEspacePersonnelFT.tsx`).
+
+*Deuxième passe, le même jour* : le bouton unique vers l'espace personnel générique remplacé par
+DEUX boutons vers des pages précises, chacune vérifiée par Benoît lui-même en se connectant (jamais
+déduite) : `candidat.francetravail.fr/mescourriers/` (relevés, notifications, déclaration fiscale)
+et `candidat.francetravail.fr/actualisation-declaree/` (justificatifs après actualisation). Logique
+`window.open` factorisée (une fonction interne partagée, une fonction exportée par destination) pour
+éviter la duplication. ⚠️ Contrairement à la règle FranceConnect anti-iframe (stable, documentée),
+ces deux URLs ne sont pas garanties stables dans le temps par France Travail — routine de
+vérification mensuelle ajoutée (`docs/routine-mensuelle-veille.md` §6).
+
+Avec deux boutons, l'onglet Import PDF passait à 4 zones (2 redirections + 2 canaux d'import) ; le
+rendu à plat testé en navigateur montrait un vrai défaut de parcours : le bloc redirection se
+retrouvait coincé ENTRE le canal local et le canal IA, donc un nouvel utilisateur voyait « dépose
+ton fichier ici » avant même d'avoir été renvoyé vers France Travail pour l'obtenir. Réorganisé en
+deux blocs numérotés dans `App.tsx` — « 1. Récupérer un document depuis France Travail » (les deux
+boutons) puis « 2. Importer le document » (canal local + canal IA regroupés, séparateur visuel) —
+décidé avec Benoît après lui avoir montré le rendu réel, pas une réorganisation par principe.
+
+Aucune donnée profil/contrat ne transite par ce composant (fonctions pures, même discipline que
+`construireLienFeedback`). Testé : `window.open` mocké, une assertion par URL exacte pour chacun
+des deux boutons (le projet n'a pas d'infra jsdom/testing-library, environnement de test `node` —
+le mock est posé directement sur `globalThis.window`, pas de nouvelle dépendance ajoutée) et
+vérifié en navigateur réel (les deux boutons ouvrent chacun la bonne URL avec `noopener,noreferrer`,
+l'onglet Cadence reste intact après le clic).
+
+**Audits de backlog (pas de commit)** : voir le résumé dans l'État ci-dessus.
 
 ## Fait le 01/08/2026 (session longue — 15 commits, `2330a2d` → `7c835de`)
 

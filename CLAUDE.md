@@ -1569,18 +1569,30 @@ de situation ✅ — l'échec semble propre à ce format de bulletin, pas au can
 - ⬜ Phase 2 périodes assimilées — conditions ALD (en attente source réglementaire)
 
 ### À faire — priorité normale
-- 🔴 Webview France Travail intégrée (idée révisée le 31/07/2026) — plutôt qu'une API introuvable
-  ou du scraping distant, l'idée était d'ouvrir une fenêtre de navigation DANS Cadence pour que
-  l'utilisateur se connecte lui-même à son espace France Travail (cookies/jeton chiffrés stockés
-  uniquement sur l'appareil). Point bloquant : FranceConnect interdit explicitement l'affichage de
-  sa mire de connexion en iframe/webview (FAQ officielle, anti-phishing) — une webview embarquée est
-  fonctionnellement équivalente à un iframe du point de vue de l'IdP, donc probablement inapplicable
-  pour les utilisateurs passant par FranceConnect (la voie recommandée par France Travail). Options
-  restantes : (a) connexion directe identifiant/mot de passe France Travail hors FranceConnect —
-  zone grise CGU, utilisateur seul garant de ses identifiants ; (b) navigateur système EXTERNE (pas
-  une webview intégrée) pour la connexion/téléchargement, retour dans Cadence pour déposer le
-  fichier — perd le "tout intégré" mais reste compatible FranceConnect et évite le terrain iframe.
-  À trancher : réorienter vers (b), ou abandonner si (a) est jugé trop fragile juridiquement/UX.
+- ✅ **Webview France Travail intégrée — tranché en faveur de l'option (b), liens externes
+  directs (02/08/2026, complété le même jour).** L'idée d'une fenêtre de navigation DANS Cadence
+  (cookies/jeton chiffrés stockés sur l'appareil) restait bloquée par FranceConnect, qui interdit
+  explicitement l'affichage de sa mire de connexion en iframe/webview (FAQ officielle,
+  anti-phishing : une webview embarquée est fonctionnellement équivalente à un iframe du point de
+  vue de l'IdP — vérification du certificat SSL par l'utilisateur impossible dans les deux cas).
+  Réorienté vers l'option (b) : deux boutons ouvrent chacun une page précise de l'espace personnel
+  France Travail dans un **vrai nouvel onglet du navigateur** (`window.open(..., "_blank",
+  "noopener,noreferrer")`, jamais une iframe ni une webview) — `candidat.francetravail.fr/mescourriers/`
+  (relevés, notifications, déclaration fiscale) et `candidat.francetravail.fr/actualisation-declaree/`
+  (justificatifs après actualisation), deux URLs confirmées par Benoît lui-même en se connectant,
+  jamais déduites. L'utilisateur se connecte avec ses propres identifiants, télécharge le document
+  qui l'intéresse, puis revient dans Cadence pour l'importer normalement (canal local ou canal IA,
+  au choix comme aujourd'hui). Aucune donnée profil/contrat ne transite par ce composant — fonctions
+  pures, même discipline que `construireLienFeedback` (`config/contact.ts`).
+  `components/OuvrirEspacePersonnelFT.tsx` (logique `window.open` factorisée, une fonction par
+  destination), intégré dans l'onglet Import PDF en tête d'un bloc « 1. Récupérer un document
+  depuis France Travail », séparé du bloc « 2. Importer le document » (canal local + canal IA
+  regroupés) qui suit — réorganisation nécessaire une fois passé à deux boutons, tranchée après
+  vérification du rendu réel en navigateur (`App.tsx`). Testé (`window.open` mocké, une assertion
+  par URL) et vérifié en navigateur réel. ⚠️ Ces deux URLs, contrairement à la règle FranceConnect
+  anti-iframe (stable, documentée), ne sont pas garanties stables dans le temps par France Travail —
+  routine de vérification mensuelle ajoutée (`docs/routine-mensuelle-veille.md` §6). Détail complet
+  dans `docs/reprise.md`.
 - ✅ **AJ brute vs nette — non reproduit, formule prouvée correcte (31/07/2026).** L'écart supposé
   n'a jamais été un bug de calcul : `docs/validation.md` (Cas réel #1, notification FT du
   03/02/2026) montre `calculerAJNette` appliqué à l'AJ brute réelle (55,02 €) donnant 53,81 € net —

@@ -104,6 +104,24 @@ Check-list pour ne perdre aucune pièce officielle du mois :
 
 ---
 
+## 6. Vérifier les liens directs France Travail (boutons Cadence)
+
+France Travail peut changer la structure de son site sans prévenir (contrairement à la
+règle FranceConnect anti-iframe, qui elle est stable et documentée). Vérifier une fois
+par mois que chaque bouton mène toujours à la bonne page :
+
+- [ ] https://candidat.francetravail.fr/mescourriers/ → doit toujours afficher la liste
+      des courriers reçus (relevés, notifications, déclaration fiscale).
+- [ ] https://candidat.francetravail.fr/actualisation-declaree/ → doit toujours afficher
+      l'historique d'actualisation.
+- [ ] Si une URL a changé ou redirige ailleurs : se reconnecter, renaviguer manuellement
+      jusqu'à la bonne page, noter la nouvelle URL exacte, et mettre à jour
+      `OuvrirEspacePersonnelFT.tsx` en conséquence (jamais deviner un nouveau chemin).
+
+**Source** : navigation manuelle dans l'espace personnel candidat.francetravail.fr
+
+---
+
 ## Fréquence et déclenchement
 
 - [ ] **Jour fixé** : ________________ (à préciser — ex. le 5 de chaque mois,
@@ -112,4 +130,4 @@ Check-list pour ne perdre aucune pièce officielle du mois :
 
 ---
 
-*Dernière mise à jour de cette routine : 01/08/2026 (première version).*
+*Dernière mise à jour de cette routine : 02/08/2026 (ajout §6 — liens directs France Travail).*
