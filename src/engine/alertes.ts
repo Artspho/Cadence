@@ -186,6 +186,24 @@ export function detecterAlertes(
     });
   }
 
+  // Renouvellement anticipé (SPEC.md §11.B, règle sourcée et validée le 31/07/2026, cf.
+  // docs/validation.md) : signale la POSSIBILITÉ d'un réexamen anticipé, jamais un feu vert sur son
+  // issue (parfois à la baisse, cf. engine/renouvellementAnticipe.ts) — juste une invite à simuler.
+  // `heuresActuelles >= seuilHeures` délibérément, PAS `prediction.niveau === "securite"` seul : ce
+  // dernier peut aussi valoir "securite" via `heuresAvecCertain` (contrats déjà signés à venir, pas
+  // encore travaillés) — annoncer un seuil "atteint" sur cette seule base serait prématuré et faux
+  // (devoir n°2). `joursRestants > 0` couvre "avant sa date anniversaire" (et exclut de fait le cas
+  // où la date anniversaire est inconnue, la fenêtre se refermant alors sur "aujourd'hui").
+  if (prediction.heuresActuelles >= prediction.seuilHeures && prediction.joursRestants > 0) {
+    alertes.push({
+      code: "renouvellement_anticipe_possible",
+      niveau: "info",
+      titre: "Réexamen anticipé possible",
+      message: `Tu as atteint ${Math.ceil(prediction.heuresActuelles)} h sur ta période en cours, avant ta date anniversaire (${prediction.dateAnniversaire}) — tu peux demander à France Travail un réexamen anticipé de tes droits, parfois à la baisse.`,
+      actionSuggeree: "Simule d'abord dans « Mon profil » → « Renouvellement anticipé », puis contacte France Travail pour la démarche réelle.",
+    });
+  }
+
   // Taux PAS multi-années (Q2, cf. commentaire "Mois de transition" dans indemnisationMensuelle.ts) :
   // depuis le 01/08/2026, `tauxPrelevementSourceHistorique` peut porter plusieurs taux datés et le
   // moteur choisit déjà le bon par mois (getTauxPASAt) — cette alerte n'existe plus pour compenser

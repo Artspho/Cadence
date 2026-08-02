@@ -46,13 +46,60 @@ describe("detecterAlertes", () => {
     expect(JSON.stringify(alertes)).not.toMatch(/Infinity/);
   });
 
-  it("ne signale rien quand l'objectif est confortablement atteint", () => {
+  it("ne signale rien quand l'objectif est confortablement atteint (à part le réexamen anticipé, désormais possible)", () => {
     const p = profil({ dateAnniversaire: "2026-12-31", dateNaissance: "1990-01-01" });
     const contrats = [contrat({ date: "2026-02-01", nbCachets: 50 })]; // 600 h
     const alertes = detecterAlertes(p, contrats, [], franceTravailConfig, "2026-06-01");
     expect(codes(alertes)).not.toContain("rythme_insuffisant");
     expect(codes(alertes)).not.toContain("anniversaire_imminent");
     expect(codes(alertes)).not.toContain("plafond_enseignement");
+    expect(codes(alertes)).toContain("renouvellement_anticipe_possible");
+  });
+
+  describe("renouvellement_anticipe_possible", () => {
+    it("apparaît une fois le seuil dépassé, avant la date anniversaire", () => {
+      const p = profil({ dateAnniversaire: "2026-12-31" });
+      const contrats = [contrat({ date: "2026-02-01", nbCachets: 50 })]; // 600 h > 507
+      const alertes = detecterAlertes(p, contrats, [], franceTravailConfig, "2026-06-01");
+      expect(codes(alertes)).toContain("renouvellement_anticipe_possible");
+    });
+
+    it("n'apparaît pas tant que le seuil n'est pas atteint", () => {
+      const p = profil({ dateAnniversaire: "2026-12-31" });
+      const contrats = [contrat({ date: "2026-01-15", nbCachets: 5 })]; // 60 h, très en dessous
+      const alertes = detecterAlertes(p, contrats, [], franceTravailConfig, "2026-04-01");
+      expect(codes(alertes)).not.toContain("renouvellement_anticipe_possible");
+    });
+
+    it("n'apparaît plus une fois la date anniversaire atteinte ou dépassée (ce n'est alors plus un réexamen ANTICIPÉ)", () => {
+      const p = profil({ dateAnniversaire: "2026-06-01" });
+      const contrats = [contrat({ date: "2026-01-01", nbCachets: 50 })]; // 600 h, seuil largement dépassé
+      const alertes = detecterAlertes(p, contrats, [], franceTravailConfig, "2026-06-01"); // pile sur l'échéance
+      expect(codes(alertes)).not.toContain("renouvellement_anticipe_possible");
+    });
+
+    it("cas limite exact : heuresActuelles === seuilHeures (507 pile) déclenche déjà l'alerte, >= inclusif", () => {
+      const p = profil({ dateAnniversaire: "2026-12-31" });
+      const contrats = [contrat({ date: "2026-02-01", typeRemuneration: "heures", nbHeures: franceTravailConfig.seuilHeures })]; // exactement 507 h
+      const alertes = detecterAlertes(p, contrats, [], franceTravailConfig, "2026-06-01");
+      expect(codes(alertes)).toContain("renouvellement_anticipe_possible");
+    });
+
+    // Distinction volontaire (cf. commentaire dans engine/alertes.ts) : un contrat déjà signé mais
+    // pas encore travaillé peut faire passer prediction.niveau à "securite" (via heuresAvecCertain)
+    // SANS que les heures soient réellement atteintes aujourd'hui (heuresActuelles). Annoncer un
+    // réexamen anticipé "possible" sur cette seule base serait prématuré : rien ne prouve encore que
+    // ces heures seront effectivement travaillées avant la date de la simulation. L'alerte doit donc
+    // rester silencieuse ici, contrairement à prediction.niveau qui, lui, vaut déjà "securite".
+    it("n'apparaît PAS quand seuls des contrats déjà signés à venir atteindraient le seuil (heuresAvecCertain), tant que heuresActuelles n'y est pas encore", () => {
+      const p = profil({ dateAnniversaire: "2026-12-31" });
+      const contrats = [
+        contrat({ date: "2026-02-01", typeRemuneration: "heures", nbHeures: 100 }), // déjà travaillé, avant aujourd'hui
+        contrat({ date: "2026-08-01", typeRemuneration: "heures", nbHeures: 450 }), // signé, mais après aujourd'hui : 100 + 450 = 550 h sur la fenêtre entière
+      ];
+      const alertes = detecterAlertes(p, contrats, [], franceTravailConfig, "2026-06-01"); // avant le 2e contrat
+      expect(codes(alertes)).not.toContain("renouvellement_anticipe_possible");
+    });
   });
 
   it("garde-fou situation mixte : ne renvoie QUE l'alerte situation_mixte, même avec des données qui déclencheraient normalement d'autres alertes", () => {
