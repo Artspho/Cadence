@@ -95,7 +95,29 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 
 ## État actuel
 
-### Le plus récent d'abord — 01/08/2026 (suite : historique de taux PAS, contrat d'enseignement re-confirmé, SR ~400k€ élucidé — erreur de saisie, pas un bug)
+### Le plus récent d'abord — 02/08/2026 (correctif : dateNaissance à année invalide faussait silencieusement le plafond enseignement)
+
+- 🔴 **Bug réel confirmé et corrigé : `dateNaissance` à année malformée (ex. `"19994-06-09"`)
+  faisait basculer silencieusement le plafond enseignement sur le seuil <50 ans (70 h) au lieu
+  d'un vrai signal d'erreur.** Trouvé lors d'un audit backlog (5 points vérifiés sur preuve, pas
+  sur supposition). Impact réel confirmé AVANT le correctif par un test jetable : `ageAuJour`
+  (`engine/dateUtils.ts`, date-fns `differenceInYears`) renvoie `NaN` sur cette valeur, et
+  `NaN >= 50` valant `false`, `decompteHeures.ts:180` retombait sur `plafondMoins50ans` quel que
+  soit l'âge réel — un faux chiffre sans le moindre signal (devoir n°2). Bloqué depuis toujours à
+  la saisie normale (`DateNaissanceInput.tsx`, année à 4 chiffres max), mais un JSON importé ne
+  passe jamais par ce composant : `profilSchemaForme`/`profilSchema` (`lib/coherenceProfil.ts`)
+  n'exigeaient qu'un `z.string()` non vide, aucun format.
+  **Correctif** : nouvelle fonction pure `dateIsoEstValide` (`lib/dateJourMoisAnnee.ts`, réutilise
+  `decouperDateIso`/`dateEstValide` déjà existants) + appel dans `validerCoherenceProfil` —
+  volontairement PAS dans `profilSchemaForme` (schéma de LECTURE, `chargerDonnees`) pour ne pas
+  faire échouer au chargement un profil déjà stocké (devoir n°1, cf. règle déjà actée dans ce
+  fichier de cohérence). La règle ne s'applique donc qu'à l'ÉCRITURE (`profilSchema` : onboarding,
+  édition, ET `importerJSON`). **Résultat à l'import d'un JSON corrompu avec cette valeur : rejet
+  propre, message clair** (« La date de naissance n'est pas une date valide... »), aucun état
+  partiel écrit — jamais une correction automatique silencieuse. 8 nouveaux tests (dont la
+  reproduction exacte du cas `"19994-06-09"` à l'import JSON). 577 tests verts, `tsc -b` propre.
+
+### 01/08/2026 (suite : historique de taux PAS, contrat d'enseignement re-confirmé, SR ~400k€ élucidé — erreur de saisie, pas un bug)
 
 - ✅ **Historique de taux PAS daté** (`4cd3e66`) : `tauxPrelevementSource` (scalaire) devenait
   rétroactif — un seul taux courant appliqué à tous les mois du tableau `RevenusMensuels.tsx`, y

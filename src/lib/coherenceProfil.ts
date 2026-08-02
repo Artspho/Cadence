@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { Profil } from "../types";
+import { dateIsoEstValide } from "./dateJourMoisAnnee";
 
 export interface ResultatCoherenceProfil {
   coherent: boolean;
@@ -22,10 +23,22 @@ type ChampsCoherence = Pick<Profil, "dateNaissance" | "situation" | "dateAnniver
  *   (ex. "2017" au lieu de "2027") fait s'effondrer silencieusement toute la série mensuelle
  *   (calculerSerieDepuisContrats, engine/indemnisationMensuelle.ts, plafonne moisFin en dessous du
  *   point de départ) — jamais un tableau vide sans explication (devoir n°2).
+ * - `dateNaissance` avec une année malformée (ex. "19994-06-09", import JSON corrompu) — bloqué à
+ *   la saisie normale par `DateNaissanceInput.tsx` (année à 4 chiffres max), mais un JSON importé
+ *   ne passe jamais par ce composant. Sans ce garde-fou, `ageAuJour` (engine/dateUtils.ts, via
+ *   date-fns `differenceInYears`) renvoie `NaN`, et `NaN >= 50` valant `false`, le plafond
+ *   enseignement retombe silencieusement sur 70 h (<50 ans) quel que soit l'âge réel — vérifié
+ *   concrètement avant ce correctif, jamais supposé (devoir n°2).
  */
 export function validerCoherenceProfil(profil: ChampsCoherence): ResultatCoherenceProfil {
   if (!profil.dateNaissance) {
     return { coherent: false, raison: "La date de naissance est obligatoire." };
+  }
+  if (!dateIsoEstValide(profil.dateNaissance)) {
+    return {
+      coherent: false,
+      raison: "La date de naissance n'est pas une date valide (année à 4 chiffres, jour et mois réellement existants).",
+    };
   }
   if (profil.situation === "readmission" && !profil.dateAnniversaire) {
     return {

@@ -30,3 +30,17 @@ export function composerDateIso({ jour, mois, annee }: DateJMA): string | null {
   if (!dateEstValide(jourN, moisN, anneeN)) return null;
   return `${annee}-${mois}-${String(jourN).padStart(2, "0")}`;
 }
+
+/**
+ * Une date ISO est-elle bien formée (année à EXACTEMENT 4 chiffres, cf. `decouperDateIso`) et
+ * calendairement réelle ? Contrairement à `new Date("19994-06-09")`, qui parse silencieusement
+ * une année à 5 chiffres au lieu de rejeter la chaîne — piège réel : ce genre de valeur corrompue
+ * (import JSON malformé) fait ensuite échouer `differenceInYears` (date-fns) en `NaN`, et
+ * `NaN >= 50` valant `false`, le plafond enseignement retombe silencieusement sur le seuil <50 ans
+ * (70 h) quel que soit l'âge réel — un faux chiffre sans le moindre signal (devoir n°2).
+ */
+export function dateIsoEstValide(iso: string): boolean {
+  const { jour, mois, annee } = decouperDateIso(iso);
+  if (!jour || !mois || annee.length !== 4) return false;
+  return dateEstValide(Number(jour), Number(mois), Number(annee));
+}

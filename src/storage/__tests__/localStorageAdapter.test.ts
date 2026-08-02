@@ -256,4 +256,14 @@ describe("importerJSON — trois refus distincts, trois messages distincts", () 
       expect(tentative).toThrow();
     }
   });
+
+  it("refuse un profil avec dateNaissance à année malformée (cas réel \"19994-06-09\") : rejet propre, jamais un plafond enseignement faussé en silence", () => {
+    const fichierDateMalformee = JSON.stringify({
+      schemaVersion: SCHEMA_VERSION_DONNEES,
+      profil: profil({ dateNaissance: "19994-06-09" }),
+      contrats: [],
+      periodes: [],
+    });
+    expect(() => importerJSON(fichierDateMalformee)).toThrow(/date de naissance/i);
+  });
 });

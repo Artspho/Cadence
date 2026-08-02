@@ -28,6 +28,17 @@ describe("validerCoherenceProfil", () => {
     expect(resultat.coherent).toBe(false);
   });
 
+  it("date de naissance à année malformée (5 chiffres, cas réel \"19994-06-09\") : incohérent, jamais un NaN silencieux", () => {
+    const resultat = validerCoherenceProfil({ dateNaissance: "19994-06-09", situation: "premiere_admission", dateAnniversaire: "" });
+    expect(resultat.coherent).toBe(false);
+    expect(resultat.raison).toMatch(/date de naissance/i);
+  });
+
+  it("date de naissance calendairement impossible (31 février) : incohérent", () => {
+    const resultat = validerCoherenceProfil({ dateNaissance: "1990-02-31", situation: "premiere_admission", dateAnniversaire: "" });
+    expect(resultat.coherent).toBe(false);
+  });
+
   it("dateLimiteIndemnisation antérieure à dateOuverture : incohérent (cas réel — faute de frappe sur l'année)", () => {
     const resultat = validerCoherenceProfil({
       dateNaissance: "1990-01-01",
@@ -132,6 +143,13 @@ describe("validerProfilPourEcriture", () => {
     const resultat = validerProfilPourEcriture(candidat);
     expect(resultat.ok).toBe(false);
     if (!resultat.ok) expect(resultat.erreur).toMatch(/postérieure/i);
+  });
+
+  it("dateNaissance à année malformée (import JSON corrompu) : refusé à l'écriture, message clair (pas un plafond enseignement faussé en silence)", () => {
+    const candidat = profil({ dateNaissance: "19994-06-09" });
+    const resultat = validerProfilPourEcriture(candidat);
+    expect(resultat.ok).toBe(false);
+    if (!resultat.ok) expect(resultat.erreur).toMatch(/date de naissance/i);
   });
 
   it("profilSchema conserve tauxPrelevementSourceHistorique (non-régression : Zod l'écartait silencieusement avant le fix historique, cf. docs/reprise.md)", () => {
