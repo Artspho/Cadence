@@ -235,7 +235,46 @@ export const propositionAjReelleSchema = z.object({
   justification: z.string(),
 });
 
-// ─── Cible 6 : information seule ────────────────────────────────────────────
+// ─── Cible 6 : historique de taux PAS (attestation dédiée) ─────────────────
+// Document dédié à cette seule information (espace personnel impots.gouv.fr, rubrique « Gérer mon
+// prélèvement à la source » / « Mes attestations ») — à distinguer de
+// propositionOuvertureDroitsSchema.tauxPrelevementSource ci-dessus, qui capture un taux trouvé EN
+// PLUS sur une notification/relevé (une seule proposition par document, celle-ci retenant la
+// section la plus récente faute de mieux). Ici, le document PEUT lister plusieurs taux successifs
+// (un historique de changements DGFIP) : chaque taux/date devient sa PROPRE proposition, jamais une
+// proposition unique qui choisirait laquelle est "primaire" — fermeture délibérée, pour ce canal,
+// du gap documenté dans CLAUDE.md (sélection d'une section comme valeur primaire) : aucune
+// sélection automatique n'est possible par construction, l'utilisateur voit et applique chaque
+// entrée lui-même. `valeur` et `dateEffet` sont volontairement NON nullables (contrairement à
+// tauxPrelevementSource/tauxPrelevementSourceDateEffet) : ce document n'a qu'un seul rôle, donc rien
+// à défaut de champ — si un taux ou sa date de prise d'effet ne peut pas être cité littéralement,
+// aucune proposition ne doit être produite pour lui (cf. api/extract-document.ts).
+export const propositionTauxPASHistoriqueSchema = z.object({
+  cible: z.literal("taux_pas_historique"),
+  donnees: z.object({
+    valeur: z
+      .number()
+      .describe(
+        "Taux de prélèvement à la source (%), UNIQUEMENT s'il est écrit EXPLICITEMENT comme un " +
+          "taux (« taux de prélèvement à la source : X % », « taux personnalisé de X % »). NE " +
+          "JAMAIS CALCULER un taux à partir d'un montant de retenue en euros et d'un revenu (ex. ne " +
+          "divise jamais 15,03 € par un salaire pour en déduire un pourcentage) — si seul un " +
+          "montant en euros est écrit, sans le mot « taux » et son pourcentage à côté, aucune " +
+          "proposition ne doit être produite pour cette ligne."
+      ),
+    dateEffet: z
+      .string()
+      .describe(
+        "Date ISO à partir de laquelle CE taux s'applique, telle qu'écrite EXPLICITEMENT à côté de " +
+          "ce taux sur l'attestation (« applicable depuis le… », « à compter du… »). Jamais la date " +
+          "d'édition du document en haut de page si elle diffère, jamais une date devinée."
+      ),
+  }),
+  confiance: z.record(niveauConfiance),
+  justification: z.string(),
+});
+
+// ─── Cible 7 : information seule ────────────────────────────────────────────
 // Salaire de référence officiel, NHT officiel, jours non indemnisés, taux
 // d'imposition, montants bruts/nets du relevé, ET les périodes assimilées
 // ambiguës (arrêt maladie non qualifiable ald/intercontrat) — jamais auto-appliqué.
@@ -252,6 +291,7 @@ export const propositionSchema = z.discriminatedUnion("cible", [
   propositionProfilInfosSchema,
   propositionPeriodeAssimileeSchema,
   propositionAjReelleSchema,
+  propositionTauxPASHistoriqueSchema,
   propositionInfoSeuleSchema,
 ]);
 
@@ -264,6 +304,7 @@ export const extractionResultSchema = z.object({
     "declaration_fiscale_annuelle",
     "attestation_cpam",
     "justificatif_declaration", // Justificatif de déclaration de situation mensuelle (actualisation) — ajouté 01/08/2026
+    "attestation_taux_pas", // Attestation de taux de prélèvement à la source (impots.gouv.fr) — ajouté 02/08/2026
     "non_reconnu",
     // ⚠️ "contrat_enseignement" est délibérément PAS ajouté ici — décision produit actée le
     // 01/08/2026 (docs/reprise.md) : les contrats d'enseignement ne seront PAS lus/extraits par IA,

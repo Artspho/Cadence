@@ -59,7 +59,8 @@ const INSTRUCTIONS = `Tu es un extracteur de documents pour Cadence, une app d'a
 artistes-interprètes intermittents du spectacle (régime Annexe 10, France). Documents reçus :
 bulletin de paie, AEM (Attestation d'Employeur Mensuelle — la pièce qui fait foi, pas « l'AER »),
 notification d'admission ARE (France Travail), relevé de situation (France Travail), déclaration
-fiscale annuelle, attestation CPAM, justificatif de déclaration de situation mensuelle (actualisation).
+fiscale annuelle, attestation CPAM, justificatif de déclaration de situation mensuelle (actualisation),
+attestation de taux de prélèvement à la source (espace personnel impots.gouv.fr).
 
 Détecte le type du document, puis produis des propositions d'écriture vers les cibles du schéma.
 
@@ -378,6 +379,40 @@ JUSTIFICATIF DE DÉCLARATION DE SITUATION MENSUELLE (ACTUALISATION FRANCE TRAVAI
   arrêt de travail, d'une formation ou d'un congé justifierait d'envisager cette cible, et ce
   document-type ne contient par construction que des négations dans cette section.
 
+ATTESTATION DE TAUX DE PRÉLÈVEMENT À LA SOURCE (PAS) — ajouté 02/08/2026
+
+  Document DÉDIÉ, distinct de la notification/du relevé (qui ne rapportent qu'UN taux en plus de
+  leurs autres informations, cf. profil_ouverture_droits.tauxPrelevementSource plus haut) :
+  téléchargé par l'utilisateur depuis son espace personnel impots.gouv.fr, rubrique « Gérer mon
+  prélèvement à la source » / « Mes attestations ». Il ne contient RIEN d'autre qu'un ou plusieurs
+  taux datés — pas de franchise, pas de délai d'attente, pas d'allocation.
+
+  « Votre taux de prélèvement à la source est de X % à compter du JJ/MM/AAAA »
+  « Taux personnalisé : X %, applicable depuis le JJ/MM/AAAA »
+        → UNE proposition taux_pas_historique par couple (taux, date) trouvé sur le document :
+          valeur = X, dateEffet = date ISO de la date de prise d'effet EXPLICITEMENT écrite à côté
+          de CE taux.
+
+  ⚠️ NE JAMAIS CALCULER UN TAUX. Le document peut aussi afficher un montant de retenue en euros
+  (« Montant prélevé : 15,03 € ») sans le pourcentage à côté — dans ce cas, NE DÉDUIS AUCUN
+  pourcentage à partir de ce montant et d'un revenu quelconque : cette ligne n'a pas de champ
+  structuré, range-la en info_seule si tu veux la conserver, jamais dans valeur.
+
+  ⚠️⚠️ PIÈGE — SI L'ATTESTATION LISTE PLUSIEURS TAUX SUCCESSIFS, PRODUIS UNE PROPOSITION PAR TAUX,
+  JAMAIS UNE SEULE QUI EN CHOISIRAIT UN COMME « PRINCIPAL »
+  Contrairement à profil_ouverture_droits.tauxPrelevementSource (une seule proposition par
+  document, qui retient la section la plus récente comme valeur unique faute de mieux, cf. plus
+  haut), ce schéma-ci permet d'écrire tout l'historique tel quel : ne choisis JAMAIS un taux
+  « actuel » ou « le plus important » au détriment des autres. Si le document montre deux taux à
+  deux dates différentes, produis DEUX propositions taux_pas_historique, chacune avec sa propre
+  justification citant sa propre phrase — jamais une seule proposition, jamais une justification
+  vague du type « historique des taux » qui mélangerait les deux.
+
+  Sans date de prise d'effet EXPLICITEMENT écrite à côté d'un taux, ne produis PAS de proposition
+  taux_pas_historique pour cette ligne — range-la en info_seule plutôt que d'inventer une date (la
+  date d'édition du document en haut de page N'EST PAS la date de prise d'effet du taux, sauf si le
+  document le dit littéralement pour CE taux).
+
 ════════ ERREURS OBSERVÉES, À NE PAS REFAIRE ════════
 
 CAS 1 — allocation rangée au mauvais endroit
@@ -456,6 +491,18 @@ CAS 8 — le montant du « Total des activités » pris pour le salaireBrut d'un
             propre ligne « ... pour un montant de X € brut » ; 700 ne va nulle part associé à un
             employeur précis (au mieux en info_seule, nom de clé explicite sur le total du document).
 
+CAS 9 — attestation de taux PAS avec un historique de deux valeurs, aucune ne doit être « choisie »
+  (exemple fictif — aucun document réel de ce type n'est encore disponible pour ce chantier,
+  02/08/2026)
+  document : attestation de taux de prélèvement à la source portant « Taux personnalisé : 2,90 %,
+             applicable depuis le 01/01/2025 » puis, plus bas, « Taux personnalisé : 3,45 %,
+             applicable depuis le 01/01/2026 ».
+  mauvais : une seule proposition taux_pas_historique avec valeur = 3,45 (le taux le plus récent),
+            le premier taux ignoré ou fondu dans une justification vague « historique des taux ».
+  attendu : DEUX propositions taux_pas_historique distinctes — { valeur: 2.90, dateEffet:
+            "2025-01-01" } et { valeur: 3.45, dateEffet: "2026-01-01" } — chacune avec sa propre
+            justification citant sa propre phrase.
+
 ════════ RÈGLES DE SÛRETÉ (elles priment sur tout le reste) ════════
 
 - Jamais de valeur inventée. Champ illisible ou absent → null s'il est nullable, sinon pas de
@@ -508,7 +555,12 @@ barèmes), activiteHorsAnnexe10 (déprécié), la date de départ d'affichage (c
 10. Si tu as rangé nbHeures OU nbCachets à null sur un contrat/AEM, vérifie que tu as vraiment
     regardé la case correspondante et qu'elle est réellement vide — pas seulement que tu as déjà
     rempli l'autre champ juste à côté. Si les deux cases portent une valeur, les deux champs
-    doivent être remplis (cf. CAS 7).`;
+    doivent être remplis (cf. CAS 7).
+11. Sur une attestation de taux de prélèvement à la source qui liste plusieurs taux : vérifie que
+    tu as produit UNE proposition taux_pas_historique PAR taux/date trouvé, jamais une seule
+    proposition qui aurait « choisi » le taux le plus récent ou le plus important (cf. CAS 9).
+    Vérifie aussi qu'aucune valeur n'a été calculée à partir d'un montant en euros sans le
+    pourcentage écrit à côté.`;
 
 /**
  * Erreur de configuration du serveur (clé API absente) — distincte d'un échec

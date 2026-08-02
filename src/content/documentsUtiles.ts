@@ -112,8 +112,9 @@ export const GROUPES_DOCUMENTS_UTILES: GroupeDocumentsUtiles[] = [
         nom: "Attestation de taux de prélèvement à la source",
         pourquoi: "Sans lui, Cadence affiche tes montants mensuels en brut, sans version nette.",
         role: "complement",
-        canal: "manuel_uniquement",
-        noteCanal: "Ce document précis n'est pas reconnu par le canal IA — mais le taux figure aussi sur ta notification ou ton relevé, eux bien couverts.",
+        canal: "ia_possible",
+        noteCanal:
+          "Lu par le canal IA depuis le 02/08/2026 — une proposition par taux si l'attestation en liste plusieurs, jamais un seul choisi automatiquement. Cette lecture n'a encore jamais été confirmée sur un vrai document — relis toujours le résultat. Le taux figure aussi sur ta notification ou ton relevé, eux déjà couverts.",
       },
     ],
   },

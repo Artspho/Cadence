@@ -79,6 +79,7 @@ const TITRES: Record<Proposition["cible"], string> = {
   profil_infos: "Informations de profil",
   periode_assimilee: "Période assimilée",
   aj_reelle_historique: "Allocation journalière réelle",
+  taux_pas_historique: "Taux de prélèvement à la source",
   info_seule: "Information à vérifier",
 };
 
@@ -163,6 +164,26 @@ export function evaluerProposition(proposition: Proposition, profil: Profil, con
             `« Allocation journalière nette » de ta notification d'ouverture de droits) : c'est sur elle que le calcul ` +
             `applique ensuite ton prélèvement à la source. Enregistrer un montant brut à sa place gonflerait tous tes ` +
             `montants mensuels. Aucune conversion fiable n'est possible — rien n'est enregistré.`,
+          avertissements: [],
+        };
+      }
+      return { proposition, titre, statut: "applicable", avertissements: [] };
+    }
+
+    case "taux_pas_historique": {
+      // Un taux PAS n'a de sens qu'accroché à une ouverture de droits déjà connue (c'est
+      // Profil.ouvertureDroits.tauxPrelevementSourceHistorique qui le porte, cf. types/index.ts) —
+      // sans base, il n'y a nulle part où l'écrire sans inventer les autres champs requis
+      // (dateOuverture/franchiseCPTotale/delaiAttenteInitial), même refus de principe que
+      // `profil_ouverture_droits` incomplet ci-dessus.
+      if (!profil.ouvertureDroits) {
+        return {
+          proposition,
+          titre,
+          statut: "non_applicable",
+          motif:
+            "Ce taux ne peut être rattaché qu'à une ouverture de droits déjà connue. Renseigne d'abord la date d'ouverture de tes droits dans « Mon profil », " +
+            "section « Mon indemnisation en cours », puis reviens appliquer cette proposition.",
           avertissements: [],
         };
       }
@@ -523,6 +544,24 @@ export function profilAvecProposition(profil: Profil, proposition: Proposition):
         a.dateEffet.localeCompare(b.dateEffet)
       );
       return { ...profil, ajReelleHistorique: fusionne };
+    }
+
+    case "taux_pas_historique": {
+      if (!profil.ouvertureDroits) {
+        throw new Error("Aucune ouverture de droits connue : non applicable (cf. evaluerProposition).");
+      }
+      const d = proposition.donnees;
+      return {
+        ...profil,
+        ouvertureDroits: {
+          ...profil.ouvertureDroits,
+          // Chaque proposition taux_pas_historique porte UN SEUL couple (taux, date) — jamais un
+          // choix de valeur "primaire" (cf. types/extraction.ts) : appliquer plusieurs propositions
+          // successives (une par entrée affichée sur l'attestation) reconstruit tout l'historique,
+          // une entrée à la fois, via la même fonction d'ajout que le canal notification/relevé.
+          tauxPrelevementSourceHistorique: fusionnerTauxPASHistorique(profil.ouvertureDroits.tauxPrelevementSourceHistorique, d.dateEffet, d.valeur),
+        },
+      };
     }
 
     default:

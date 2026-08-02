@@ -74,6 +74,7 @@ const LABEL_DOCUMENT: Record<ExtractionResult["typeDocumentDetecte"], string> = 
   declaration_fiscale_annuelle: "Déclaration fiscale annuelle",
   attestation_cpam: "Attestation CPAM",
   justificatif_declaration: "Justificatif de déclaration mensuelle",
+  attestation_taux_pas: "Attestation de taux de prélèvement à la source",
   non_reconnu: "Type de document non reconnu",
 };
 
@@ -121,6 +122,7 @@ export const LABELS_CHAMPS: Record<Proposition["cible"], Record<string, string>>
   },
   periode_assimilee: { type: "Type de période", dateDebut: "Début", dateFin: "Fin" },
   aj_reelle_historique: { dateEffet: "Date d'effet", valeur: "Montant (€)", natureMontant: "Nature du montant" },
+  taux_pas_historique: { valeur: "Prélèvement à la source (%)", dateEffet: "Date d'effet" },
   info_seule: {},
 };
 

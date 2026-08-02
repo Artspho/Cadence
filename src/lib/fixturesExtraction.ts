@@ -335,6 +335,33 @@ export const extractionJustificatifDeclaration: ExtractionResult = {
   ],
 };
 
+/**
+ * Attestation de taux de prélèvement à la source (espace personnel impots.gouv.fr) — document
+ * dédié à cette seule information, distinct de la notification/du relevé (qui ne rapportent qu'UN
+ * taux, cf. propositionOuvertureDroitsSchema). Ici l'attestation liste DEUX taux successifs : la
+ * fixture fige le comportement attendu — DEUX propositions "taux_pas_historique" distinctes, jamais
+ * une seule qui choisirait le taux le plus récent comme valeur "primaire" (gap documenté fermé pour
+ * ce canal, cf. lib/routageExtraction.ts et CLAUDE.md). Chiffres et dates FICTIFS.
+ */
+export const extractionAttestationTauxPAS: ExtractionResult = {
+  typeDocumentDetecte: "attestation_taux_pas",
+  propositions: [
+    {
+      cible: "taux_pas_historique",
+      donnees: { valeur: 2.9, dateEffet: "2025-01-01" },
+      confiance: { valeur: "haute", dateEffet: "haute" },
+      justification: "« Taux personnalisé : 2,90 %, applicable depuis le 01/01/2025 ».",
+    },
+    {
+      cible: "taux_pas_historique",
+      donnees: { valeur: 3.45, dateEffet: "2026-01-01" },
+      confiance: { valeur: "haute", dateEffet: "haute" },
+      justification: "« Taux personnalisé : 3,45 %, applicable depuis le 01/01/2026 ».",
+    },
+  ],
+  avertissementsGeneraux: [],
+};
+
 /** Cas dégradé : document non reconnu, rien à proposer. L'écran doit rester lisible et honnête. */
 export const extractionNonReconnue: ExtractionResult = {
   typeDocumentDetecte: "non_reconnu",
@@ -351,5 +378,6 @@ export const FIXTURES_EXTRACTION: { id: string; libelle: string; resultat: Extra
   { id: "aem_dupliquee", libelle: "AEM (bug réel : salaire dupliqué sur 2 propositions, avant fusion)", resultat: extractionAemDupliqueeHeuresCachets },
   { id: "releve", libelle: "Relevé de situation (2 refus + 1 à vérifier)", resultat: extractionReleveAvecRefus },
   { id: "justificatif_declaration", libelle: "Justificatif de déclaration mensuelle (même employeur 2×, à ne pas fusionner)", resultat: extractionJustificatifDeclaration },
+  { id: "attestation_taux_pas", libelle: "Attestation de taux PAS (historique de 2 taux, jamais une seule valeur primaire)", resultat: extractionAttestationTauxPAS },
   { id: "non_reconnu", libelle: "Document non reconnu (rien à proposer)", resultat: extractionNonReconnue },
 ];

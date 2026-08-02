@@ -16,6 +16,7 @@ import {
 import {
   extractionAemDupliqueeHeuresCachets,
   extractionAemHeuresEtCachets,
+  extractionAttestationTauxPAS,
   extractionBulletinPaie,
   extractionJustificatifDeclaration,
   extractionNotificationAdmission,
@@ -209,6 +210,79 @@ describe("profil_ouverture_droits — refus si un chiffre qui change les montant
     } as Proposition;
     const resultat = profilAvecProposition(profilExistant, memeDocument);
     expect(resultat.ouvertureDroits?.tauxPrelevementSourceHistorique).toEqual([{ dateEffet: "2026-02-17", valeur: 3.1 }]);
+  });
+});
+
+describe("taux_pas_historique — attestation dédiée, une proposition par taux, jamais un choix de valeur primaire", () => {
+  function propositionTaux(valeur: number, dateEffet: string): Proposition {
+    return {
+      cible: "taux_pas_historique",
+      donnees: { valeur, dateEffet },
+      confiance: { valeur: "haute", dateEffet: "haute" },
+      justification: "test",
+    };
+  }
+
+  it("non applicable tant qu'aucune ouverture de droits n'est connue (rien où le rattacher)", () => {
+    const evaluee = evaluerProposition(propositionTaux(3.1, "2026-01-01"), profilBase);
+    expect(evaluee.statut).toBe("non_applicable");
+    expect(evaluee.motif).toMatch(/ouverture de droits/i);
+  });
+
+  it("applicable dès qu'une ouverture de droits existe déjà", () => {
+    const profil: Profil = { ...profilBase, ouvertureDroits: { dateOuverture: "2025-02-01", franchiseCPTotale: 5, delaiAttenteInitial: 7 } };
+    expect(evaluerProposition(propositionTaux(3.1, "2026-01-01"), profil).statut).toBe("applicable");
+  });
+
+  it("refuse d'écrire au profil même si l'évaluation est contournée, sans ouvertureDroits", () => {
+    expect(() => profilAvecProposition(profilBase, propositionTaux(3.1, "2026-01-01"))).toThrow(/ouverture de droits/i);
+  });
+
+  it("ajoute le taux à l'historique existant sans écraser les entrées déjà présentes", () => {
+    const profil: Profil = {
+      ...profilBase,
+      ouvertureDroits: { dateOuverture: "2025-02-01", franchiseCPTotale: 5, delaiAttenteInitial: 7, tauxPrelevementSourceHistorique: [{ dateEffet: "2025-02-01", valeur: 2.9 }] },
+    };
+    const resultat = profilAvecProposition(profil, propositionTaux(3.45, "2026-01-01"));
+    expect(resultat.ouvertureDroits?.tauxPrelevementSourceHistorique).toEqual([
+      { dateEffet: "2025-02-01", valeur: 2.9 },
+      { dateEffet: "2026-01-01", valeur: 3.45 },
+    ]);
+  });
+
+  it("ne touche à aucun autre champ de ouvertureDroits (franchise, délai, date limite inchangés)", () => {
+    const profil: Profil = {
+      ...profilBase,
+      ouvertureDroits: { dateOuverture: "2025-02-01", franchiseCPTotale: 5, delaiAttenteInitial: 7, dateLimiteIndemnisation: "2026-01-31" },
+    };
+    const resultat = profilAvecProposition(profil, propositionTaux(3.1, "2026-01-01"));
+    expect(resultat.ouvertureDroits?.franchiseCPTotale).toBe(5);
+    expect(resultat.ouvertureDroits?.delaiAttenteInitial).toBe(7);
+    expect(resultat.ouvertureDroits?.dateLimiteIndemnisation).toBe("2026-01-31");
+  });
+
+  // Le cœur du chantier (cf. types/extraction.ts) : une attestation qui liste plusieurs taux
+  // successifs produit une proposition PAR taux, jamais une seule proposition qui aurait choisi le
+  // taux le plus récent (ou tout autre critère) comme valeur "primaire" au détriment des autres.
+  it("fixture attestation_taux_pas — deux taux distincts restent deux propositions séparées, jamais fusionnées ni réduites à une seule", () => {
+    const propositions = extractionAttestationTauxPAS.propositions;
+    expect(propositions).toHaveLength(2);
+    expect(propositions.every((p) => p.cible === "taux_pas_historique")).toBe(true);
+    const valeurs = propositions.map((p) => (p as Extract<Proposition, { cible: "taux_pas_historique" }>).donnees.valeur);
+    expect(valeurs).toEqual([2.9, 3.45]);
+  });
+
+  it("fixture attestation_taux_pas — appliquer les deux propositions dans l'ordre reconstruit tout l'historique", () => {
+    const profil: Profil = { ...profilBase, ouvertureDroits: { dateOuverture: "2025-02-01", franchiseCPTotale: 5, delaiAttenteInitial: 7 } };
+    let resultat = profil;
+    for (const evaluee of evaluerExtraction(extractionAttestationTauxPAS, profil)) {
+      expect(evaluee.statut).toBe("applicable");
+      resultat = profilAvecProposition(resultat, evaluee.proposition);
+    }
+    expect(resultat.ouvertureDroits?.tauxPrelevementSourceHistorique).toEqual([
+      { dateEffet: "2025-01-01", valeur: 2.9 },
+      { dateEffet: "2026-01-01", valeur: 3.45 },
+    ]);
   });
 });
 

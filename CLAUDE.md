@@ -95,7 +95,38 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 
 ## État actuel
 
-### Le plus récent d'abord — 02/08/2026 (correctif : dateNaissance à année invalide faussait silencieusement le plafond enseignement)
+### Le plus récent d'abord — 02/08/2026 (import IA : support de l'attestation de taux de prélèvement à la source)
+
+- ✅ **Nouveau type de document reconnu par l'import IA : attestation de taux de prélèvement à la
+  source (PAS)**, espace personnel impots.gouv.fr. Distinct de `profil_ouverture_droits.tauxPrelevementSource`
+  (notification/relevé, une seule proposition par document, retient la section la plus récente
+  faute de mieux) : nouvelle cible dédiée `taux_pas_historique` (`types/extraction.ts`) — **une
+  proposition par couple (taux, date) trouvé sur le document**, jamais une seule qui choisirait une
+  valeur "primaire". Ferme délibérément, pour ce nouveau canal, le gap documenté plus bas
+  (« Sélection de la section la plus récente... ») : plus de sélection automatique possible par
+  construction, l'utilisateur voit et applique chaque entrée lui-même. `valeur`/`dateEffet`
+  volontairement non nullables (contrairement au champ existant) — sans citation littérale des
+  deux, aucune proposition ne doit être produite (`info_seule` sinon).
+  ⚠️ Le gap PRÉEXISTANT sur le canal notification/relevé (une seule proposition par document) n'est
+  **pas** retouché ici — toujours non validé sur pièce réelle, cf. entrée plus bas, philosophie du
+  projet inchangée : pas de correctif sans preuve sur pièce.
+  **Routage** (`lib/routageExtraction.ts`) : applicable seulement si `Profil.ouvertureDroits` existe
+  déjà (rien où rattacher le taux sinon — même refus de principe qu'`ouvertureDroits` incomplet),
+  sinon message clair invitant à renseigner d'abord l'ouverture de droits. Fusionne via la même
+  fonction `fusionnerTauxPASHistorique` que le canal existant (ajoute, n'écrase jamais).
+  **Prompt** (`api/extract-document.ts`) : nouvelle section lexique dédiée + CAS 9 (deux taux
+  successifs, aucun ne doit être "choisi") + item 11 de la relecture finale.
+  **Contenu statique mis à jour** : `content/documentsUtiles.ts` (`canal: "ia_possible"`, la note
+  disait à tort que ce document n'était "pas reconnu par le canal IA").
+  **Testé dans le vrai navigateur** (pas seulement en test unitaire) : fixture à 2 taux (`lib/fixturesExtraction.ts`)
+  vérifiée dans la maquette de revue IA — "Non applicable" tant qu'aucune ouverture de droits
+  n'existe (message clair), "Applicable" dès qu'elle existe ; les deux propositions appliquées l'une
+  après l'autre (deux clics réels, pas dans le même batch React) reconstruisent bien l'historique
+  complet dans l'ordre (`2025-01-01 → 2.9 % · 2026-01-01 → 3.45 %`), sans perte.
+  **Aucun document réel de ce type disponible dans le projet** pour ce chantier — dit explicitement
+  plutôt que simulé comme testé sur pièce (cf. CAS 9, prompt). 584 tests verts, `tsc -b` propre.
+
+### 02/08/2026 (correctif : dateNaissance à année invalide faussait silencieusement le plafond enseignement)
 
 - 🔴 **Bug réel confirmé et corrigé : `dateNaissance` à année malformée (ex. `"19994-06-09"`)
   faisait basculer silencieusement le plafond enseignement sur le seuil <50 ans (70 h) au lieu
