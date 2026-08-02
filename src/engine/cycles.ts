@@ -57,7 +57,10 @@ export function decouperExercices(profil: Profil, contrats: Contrat[], periodes:
     let ajNette: number | undefined;
     if (cloture && decompte.total > 0) {
       const { sr, sar, nht } = calculerSalaireReference(contrats, periodes, profil, config, { dateDebut, dateFin });
-      const resultatBrut = calculerAJBrute({ salaireRetenu: sar ?? sr, nht, config });
+      // dateEffet = `dateFin`, la date anniversaire de CE cycle : c'est la FCT qui a ouvert le droit
+      // dont on recalcule l'AJ ici, donc la date qui décide du plafond applicable. Un cycle de 2024
+      // doit être borné par le plafond de 2024, pas par celui d'aujourd'hui (cf. plafondAreUtils.ts).
+      const resultatBrut = calculerAJBrute({ salaireRetenu: sar ?? sr, nht, config, dateEffet: dateFin });
       ajBrute = resultatBrut.brut;
       // Corrigé le 31/07/2026 (cf. App.tsx, même correctif) : SJM sur sar ?? sr, pas sur sr seul.
       const sjm = calculerSJM(sar ?? sr, nht, config);

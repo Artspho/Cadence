@@ -2,12 +2,20 @@
 import type { AJBruteResultat, FenetreReference } from "../types";
 import type { FranceTravailConfig } from "../config/franceTravailConfig";
 import { clamp } from "./dateUtils";
+import { getPlafondAreAt } from "./plafondAreUtils";
 
 export interface ParametresAJBrute {
   /** SR, ou SAR si un aménagement s'applique (cf. salaireReference.ts). */
   salaireRetenu: number;
   nht: number;
   config: FranceTravailConfig;
+  /**
+   * Date (ISO) à laquelle le droit est — ou serait — ouvert, c'est-à-dire la FCT retenue : c'est
+   * elle qui décide du plafond applicable (`getPlafondAreAt`), jamais la date du jour. Paramètre
+   * OBLIGATOIRE et sans valeur par défaut délibérément : un défaut implicite « aujourd'hui »
+   * recréerait exactement le bug corrigé le 03/08/2026 (plafond courant appliqué à une FCT passée).
+   */
+  dateEffet: string;
   /** Période allongée (réadmission) : les diviseurs de A et B changent (cf. §6.4). */
   readmissionAllongee?: boolean;
   /** Nombre d'heures NH (> 507), requis si readmissionAllongee est vrai. */
@@ -18,7 +26,10 @@ export interface ParametresAJBrute {
 
 export function calculerAJBrute(params: ParametresAJBrute): AJBruteResultat {
   const { salaireRetenu, nht, config } = params;
-  const { partieA, partieB, partieC, ajMinimale, plancherAnnexe10, plafond } = config.are;
+  const { partieA, partieB, partieC, ajMinimale, plancherAnnexe10 } = config.are;
+  // Jamais `config.are.plafond` (valeur courante) : le plafond dépend de la date d'ouverture du
+  // droit, cf. plafondAreUtils.ts et le commentaire de `plafondHistorique` dans la config.
+  const plafond = getPlafondAreAt(params.dateEffet, config);
 
   let diviseurA: number = partieA.diviseur;
   let diviseurB: number = partieB.diviseur;
@@ -75,6 +86,12 @@ export function calculerAJBrutePourFenetre(fenetre: FenetreReference, decompteTo
     salaireRetenu,
     nht,
     config,
+    // `fenetre.dateFin` EST la date d'ouverture du droit dans les trois appelants, et c'est la
+    // raison pour laquelle la date n'est pas un paramètre de plus ici : la fenêtre de référence se
+    // termine toujours à la FCT retenue (cf. periodeReference.ts, `dateFin = profil.dateAnniversaire`
+    // — pour le cycle en cours, l'échéance à venir, donc la FCT du droit projeté ; pour
+    // `calculerRenouvellementAnticipe`, la FCT simulée, qu'il pose lui-même dans le profil temporaire).
+    dateEffet: fenetre.dateFin,
     readmissionAllongee: enPeriodeAllongee,
     nh: enPeriodeAllongee ? decompteTotal : undefined,
     smicHoraireBrut,

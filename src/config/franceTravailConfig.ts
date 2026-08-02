@@ -56,17 +56,28 @@ export const franceTravailConfig = {
   are: {
     ajMinimale: 31.96, // ✅ depuis 01/07/2023
     plancherAnnexe10: 44, // ✅ AJ brute minimale
-    // ⚠️ Limite connue (préexistante, pas nouvelle avec cette valeur) : `plafond` est un scalaire
-    // UNIQUE, contrairement au SMIC qui a `smicHoraireBrutHistorique` (dateEffet + valeur) pour
-    // exactement cette raison. `calculerAJBrute` (areBrute.ts) applique donc TOUJOURS le plafond
-    // actuel, quelle que soit la date simulée. Sans incidence pour le cycle en cours (toujours
-    // orienté vers l'échéance à venir), mais `RenouvellementAnticipe.tsx` laisse choisir une FCT
-    // librement (aucune borne min/max sur l'input date) : simuler une FCT antérieure au 01/01/2026
-    // (date d'entrée en vigueur de la valeur actuelle) appliquerait à tort 181,18 € au lieu du
-    // plafond réellement en vigueur à cette date passée (174,80 € depuis le 01/01/2024, une valeur
-    // antérieure inconnue avant). Cf. CLAUDE.md (backlog, priorité normale) pour le chantier séparé
-    // si ça devient prioritaire : un `plafondHistorique` daté, sur le modèle du SMIC.
+    // Valeur COURANTE, conservée pour la commodité d'affichage (ex. seuil de plausibilité de
+    // MonProfil.tsx) : aucun calcul métier ne doit la lire. Le clamp de l'AJ brute passe par
+    // `plafondHistorique` via `getPlafondAreAt` (engine/plafondAreUtils.ts) — cf. ci-dessous.
     plafond: 181.18, // ✅ Unédic « Paramètres utiles » avril 2026, p.23 — en vigueur depuis le 01/01/2026, vérifié sur pièce le 03/08/2026 (ancienne valeur : 174,80 € au 01/01/2024)
+    // Historique daté du plafond, sur le modèle de `valeursDatees.smicHoraireBrutHistorique` — même
+    // raison d'être (devoir sacré n°2) : un calcul portant sur une FCT PASSÉE doit appliquer le
+    // plafond en vigueur À CETTE DATE, jamais le plafond courant. Deux appelants exposés au cas :
+    // `RenouvellementAnticipe.tsx` (FCT choisie librement, aucune borne min/max sur l'input date) et
+    // `engine/cycles.ts` (reconstruit jusqu'à 10 cycles en arrière). Avant le 03/08/2026, `plafond`
+    // était un scalaire unique et ces deux chemins appliquaient 181,18 € à des dates où le plafond
+    // réel était 174,80 € — limite corrigée ici, cf. CLAUDE.md.
+    // TODO: valeur(s) antérieure(s) au 01/01/2024 inconnues — aucune source certifiée à ce jour.
+    // Tant qu'elles manquent, `getPlafondAreAt` retombe explicitement sur la plus ancienne entrée
+    // connue pour toute date antérieure (repli documenté, jamais une extrapolation).
+    plafondHistorique: [
+      // ✅ valeur certifiée (Unédic « Paramètres utiles » avril 2026, p.23, qui rappelle l'ancienne
+      // valeur). ⚠️ La DATE d'effet 01/01/2024 est reprise de la note de config du 03/08/2026
+      // (« ancienne valeur : 174,80 € au 01/01/2024 ») et n'a PAS été re-vérifiée sur pièce depuis :
+      // si une revalorisation intermédiaire a existé entre 2024 et 2026, elle manque ici.
+      { dateEffet: "2024-01-01", valeur: 174.8 },
+      { dateEffet: "2026-01-01", valeur: 181.18 }, // ✅ Unédic « Paramètres utiles » avril 2026, p.23, vérifié sur pièce le 03/08/2026
+    ] as { dateEffet: string; valeur: number }[],
     partieA: { seuilSR: 13700, coeffSousSeuil: 0.36, coeffAuDelaSeuil: 0.05, diviseur: 5000 }, // ✅
     partieB: { seuilNHT: 690, coeffSousSeuil: 0.26, coeffAuDelaSeuil: 0.08, diviseur: 507 }, // ✅
     partieC: { coeff: 0.7 }, // ✅ AJ minimale × 0,70 (Annexe 10)
@@ -286,6 +297,9 @@ export const franceTravailConfigSchema = z.object({
     ajMinimale: z.number().positive(),
     plancherAnnexe10: z.number().positive(),
     plafond: z.number().positive(),
+    // `.min(1)` : un historique vide ferait échouer le calcul à l'exécution (getPlafondAreAt n'a
+    // alors AUCUNE valeur sur laquelle se replier) — mieux vaut casser au chargement du module.
+    plafondHistorique: z.array(z.object({ dateEffet: z.string(), valeur: z.number().positive() })).min(1),
     partieA: z.object({
       seuilSR: z.number().positive(),
       coeffSousSeuil: z.number(),

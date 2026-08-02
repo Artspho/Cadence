@@ -64,7 +64,9 @@ describe("calculerAJNette", () => {
 
   describe("chaîne complète SR/NHT réels → areBrute → areNette (cas validés dans docs/validation.md)", () => {
     it("cas #2 (SR 14 579 €, écrêté) : net = 62,00 €, CSG/CRDS écrêtées ≈ 1,68 €", () => {
-      const ajBrute = calculerAJBrute({ salaireRetenu: 14579, nht: 710, config: franceTravailConfig });
+      // dateEffet sans incidence sur ces deux cas (AJ brute très en-deçà du plafond, aucun clamp) —
+      // renseignée parce que le paramètre est obligatoire, cf. areBrute.ts.
+      const ajBrute = calculerAJBrute({ salaireRetenu: 14579, nht: 710, config: franceTravailConfig, dateEffet: "2026-01-01" });
       expect(ajBrute.brut).toBeCloseTo(65.59, 1);
 
       const sjm = calculerSJM(14579, 710, franceTravailConfig);
@@ -79,7 +81,7 @@ describe("calculerAJNette", () => {
     });
 
     it("cas #3 (SR 50 000 €, non écrêté) : net = 65,73 €, CSG/CRDS séparées ≈ 4,63 € au total", () => {
-      const ajBrute = calculerAJBrute({ salaireRetenu: 50000, nht: 710, config: franceTravailConfig });
+      const ajBrute = calculerAJBrute({ salaireRetenu: 50000, nht: 710, config: franceTravailConfig, dateEffet: "2026-01-01" });
       expect(ajBrute.brut).toBeCloseTo(76.91, 1);
 
       const sjm = calculerSJM(50000, 710, franceTravailConfig);

@@ -3,11 +3,16 @@ import { franceTravailConfig } from "../../config/franceTravailConfig";
 import { calculerAJBrute, calculerAJBrutePourFenetre } from "../areBrute";
 import { calculerDecompteHeures } from "../decompteHeures";
 import { calculerFenetreReference } from "../periodeReference";
+import { getPlafondAreAt } from "../plafondAreUtils";
 import { contrat, profil } from "./testUtils";
+
+// Date d'ouverture de droit par défaut pour les cas qui ne testent pas le plafond daté (cf.
+// plafondAreUtils.test.ts pour celui-là) : postérieure au 01/01/2026, donc plafond courant.
+const DATE_EFFET = "2026-06-01";
 
 describe("calculerAJBrute", () => {
   it("calcule A + B + C au-delà des deux seuils, sans clamp", () => {
-    const resultat = calculerAJBrute({ salaireRetenu: 20000, nht: 1000, config: franceTravailConfig });
+    const resultat = calculerAJBrute({ salaireRetenu: 20000, nht: 1000, config: franceTravailConfig, dateEffet: DATE_EFFET });
     expect(resultat.brutAvantClamp).toBeCloseTo(68.78, 1);
     expect(resultat.brut).toBeCloseTo(68.78, 1);
     expect(resultat.plancherApplique).toBe(false);
@@ -15,7 +20,7 @@ describe("calculerAJBrute", () => {
   });
 
   it("applique le plancher de 44 € quand SR et NHT sont nuls (part C seule)", () => {
-    const resultat = calculerAJBrute({ salaireRetenu: 0, nht: 0, config: franceTravailConfig });
+    const resultat = calculerAJBrute({ salaireRetenu: 0, nht: 0, config: franceTravailConfig, dateEffet: DATE_EFFET });
     expect(resultat.c).toBeCloseTo(22.372, 3);
     expect(resultat.brutAvantClamp).toBeLessThan(44);
     expect(resultat.brut).toBe(44);
@@ -23,22 +28,25 @@ describe("calculerAJBrute", () => {
   });
 
   it("applique le plafond pour de très hauts salaires/heures", () => {
-    const resultat = calculerAJBrute({ salaireRetenu: 1_000_000, nht: 100_000, config: franceTravailConfig });
-    expect(resultat.brutAvantClamp).toBeGreaterThan(franceTravailConfig.are.plafond);
-    expect(resultat.brut).toBe(franceTravailConfig.are.plafond);
+    const resultat = calculerAJBrute({ salaireRetenu: 1_000_000, nht: 100_000, config: franceTravailConfig, dateEffet: DATE_EFFET });
+    const plafond = getPlafondAreAt(DATE_EFFET, franceTravailConfig);
+    expect(resultat.brutAvantClamp).toBeGreaterThan(plafond);
+    expect(resultat.brut).toBe(plafond);
     expect(resultat.plafondApplique).toBe(true);
   });
 
   it("période allongée (réadmission) : diviseurs A = NH×SMIC et B = NH", () => {
-    const resultat = calculerAJBrute({ salaireRetenu: 20000, nht: 1000, config: franceTravailConfig, readmissionAllongee: true, nh: 600, smicHoraireBrut: 11.88 });
+    const resultat = calculerAJBrute({ salaireRetenu: 20000, nht: 1000, config: franceTravailConfig, dateEffet: DATE_EFFET, readmissionAllongee: true, nh: 600, smicHoraireBrut: 11.88 });
     // diviseur A = 600 * 11.88 = 7128 (au lieu de 5000) -> A doit être plus petit qu'en mode standard
-    const standard = calculerAJBrute({ salaireRetenu: 20000, nht: 1000, config: franceTravailConfig });
+    const standard = calculerAJBrute({ salaireRetenu: 20000, nht: 1000, config: franceTravailConfig, dateEffet: DATE_EFFET });
     expect(resultat.a).toBeLessThan(standard.a);
     expect(resultat.b).toBeLessThan(standard.b); // diviseur B = 600 au lieu de 507
   });
 
   it("réclame le SMIC horaire en période allongée plutôt que de l'approximer", () => {
-    expect(() => calculerAJBrute({ salaireRetenu: 20000, nht: 1000, config: franceTravailConfig, readmissionAllongee: true, nh: 600, smicHoraireBrut: null })).toThrow();
+    expect(() =>
+      calculerAJBrute({ salaireRetenu: 20000, nht: 1000, config: franceTravailConfig, dateEffet: DATE_EFFET, readmissionAllongee: true, nh: 600, smicHoraireBrut: null }),
+    ).toThrow();
   });
 });
 
@@ -72,7 +80,9 @@ describe("calculerAJBrutePourFenetre", () => {
     const configAvecSmic = { ...franceTravailConfig, valeursDatees: { ...franceTravailConfig.valeursDatees, smicHoraireBrut: 11.88 } };
 
     const resultat = calculerAJBrutePourFenetre(fenetreNonCalculable, 600, 20000, 1000, configAvecSmic);
-    const standard = calculerAJBrute({ salaireRetenu: 20000, nht: 1000, config: configAvecSmic });
+    // Même dateEffet que celle que calculerAJBrutePourFenetre dérive de la fenêtre (`dateFin`),
+    // sinon la comparaison ne vaudrait plus une fois le plafond réellement atteint.
+    const standard = calculerAJBrute({ salaireRetenu: 20000, nht: 1000, config: configAvecSmic, dateEffet: fenetreNonCalculable.dateFin });
     expect(resultat).toEqual(standard);
   });
 
@@ -85,7 +95,7 @@ describe("calculerAJBrutePourFenetre", () => {
     const configSansSmic = { ...franceTravailConfig, valeursDatees: { ...franceTravailConfig.valeursDatees, smicHoraireBrut: null } };
 
     const resultat = calculerAJBrutePourFenetre(fenetre, decompte.total, 20000, 1000, configSansSmic);
-    const standard = calculerAJBrute({ salaireRetenu: 20000, nht: 1000, config: configSansSmic });
+    const standard = calculerAJBrute({ salaireRetenu: 20000, nht: 1000, config: configSansSmic, dateEffet: fenetre.dateFin });
     expect(resultat).toEqual(standard);
   });
 
@@ -98,11 +108,12 @@ describe("calculerAJBrutePourFenetre", () => {
       salaireRetenu: 20000,
       nht: 1000,
       config: configAvecSmic,
+      dateEffet: fenetre.dateFin,
       readmissionAllongee: true,
       nh: decompte.total,
       smicHoraireBrut: 11.88,
     });
-    const standard = calculerAJBrute({ salaireRetenu: 20000, nht: 1000, config: franceTravailConfig });
+    const standard = calculerAJBrute({ salaireRetenu: 20000, nht: 1000, config: franceTravailConfig, dateEffet: fenetre.dateFin });
 
     expect(resultat).toEqual(allongeeAttendue);
     expect(resultat.brut).not.toBe(standard.brut);

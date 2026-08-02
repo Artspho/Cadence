@@ -1580,12 +1580,27 @@ de situation ✅ — l'échec semble propre à ce format de bulletin, pas au can
 - ⬜ Phase 2 périodes assimilées — conditions ALD (en attente source réglementaire)
 
 ### À faire — priorité normale
-- ⬜ **Plafond ARE Annexe 10 : scalaire unique, pas d'historique daté** (contrairement au SMIC) —
-  un renouvellement anticipé simulé sur une FCT antérieure au 01/01/2026 utiliserait à tort le
-  plafond actuel (181,18 €) au lieu de l'ancien (174,80 €). Limite préexistante depuis 2024, jamais
-  corrigée — pas nouvelle avec la revalorisation du 03/08/2026 (cf. `config/franceTravailConfig.ts`,
-  commentaire au-dessus de `are.plafond`). Chantier séparé si prioritaire : construire un
-  `plafondHistorique` daté, sur le modèle de `smicHoraireBrutHistorique`.
+- ✅ **Plafond ARE Annexe 10 : historique daté — corrigé le 03/08/2026.** La limite était réelle :
+  `config.are.plafond` étant un scalaire unique, tout calcul portant sur une FCT antérieure au
+  01/01/2026 se voyait appliquer 181,18 € au lieu de 174,80 € — deux chemins exposés, le
+  renouvellement anticipé (`RenouvellementAnticipe.tsx`, FCT choisie librement, aucune borne
+  min/max) et `engine/cycles.ts` (jusqu'à 10 cycles reconstruits en arrière, Historique.tsx).
+  **Correctif** : `are.plafondHistorique` (`{dateEffet, valeur}[]`, sur le modèle de
+  `valeursDatees.smicHoraireBrutHistorique`) + fonction pure `getPlafondAreAt`
+  (`engine/plafondAreUtils.ts`). `calculerAJBrute` prend désormais un `dateEffet` **obligatoire**
+  (pas de défaut « aujourd'hui » : un défaut implicite recréerait le bug) et lit le plafond à cette
+  date ; `calculerAJBrutePourFenetre` le dérive de `fenetre.dateFin`, qui EST la FCT retenue dans
+  les trois appelants (App.tsx, Simulateur.tsx, renouvellementAnticipe.ts) — aucun de ces appelants
+  n'a changé. `are.plafond` reste en config comme valeur courante de commodité (seuil de
+  plausibilité de `MonProfil.tsx`), plus lu par aucun calcul métier.
+  **Deux réserves assumées, pas des oublis** : (1) `TODO` en config — aucune valeur certifiée
+  antérieure au 01/01/2024, et la date d'effet 01/01/2024 elle-même est reprise d'une note de
+  session, non re-vérifiée sur pièce ; (2) pour une date antérieure à toute entrée connue,
+  `getPlafondAreAt` retombe **explicitement** sur la plus ancienne valeur plutôt que de lever une
+  exception (qui planterait Historique.tsx, aucun error boundary React dans l'app) ou de renvoyer
+  `null` (qui supprimerait le clamp, donc laisserait passer une AJ trop HAUTE) — repli vers le bas,
+  jamais une extrapolation. 11 tests dédiés (`engine/__tests__/plafondAreUtils.test.ts`), dont la
+  date pivot exacte et le scénario de bout en bout via `calculerRenouvellementAnticipe`.
 - ⬜ Vérifier l'éligibilité à un programme associatif/non-profit pour réduire les coûts
   d'hébergement (Supabase notamment) — repéré comme piste possible le 01/08/2026, NON confirmé
   officiellement. Des sources tierces (pas la documentation officielle Supabase) évoquent des
