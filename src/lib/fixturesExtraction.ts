@@ -80,6 +80,7 @@ export const extractionBulletinPaie: ExtractionResult = {
     {
       cible: "contrat",
       donnees: {
+        natureDocumentSource: "bulletin_paie",
         date: "2026-06-28",
         dateDebut: "2026-06-24",
         type: null,
@@ -93,8 +94,8 @@ export const extractionBulletinPaie: ExtractionResult = {
         etablissementAgree: null,
         enRapportAvecMetier: null,
       },
-      confiance: { date: "haute", dateDebut: "moyenne", salaireBrut: "haute", employeur: "haute" },
-      justification: "Période d'emploi en en-tête ; brut total au bas du bulletin.",
+      confiance: { date: "haute", dateDebut: "moyenne", salaireBrut: "haute", employeur: "haute", natureDocumentSource: "haute" },
+      justification: "Période d'emploi en en-tête ; brut total au bas du bulletin. En-tête « Bulletin de paie ».",
     },
     {
       cible: "info_seule",
@@ -125,6 +126,7 @@ export const extractionAemHeuresEtCachets: ExtractionResult = {
     {
       cible: "contrat",
       donnees: {
+        natureDocumentSource: "aem",
         date: "2026-06-28",
         dateDebut: "2026-06-26",
         type: "artiste",
@@ -138,8 +140,8 @@ export const extractionAemHeuresEtCachets: ExtractionResult = {
         etablissementAgree: null,
         enRapportAvecMetier: null,
       },
-      confiance: { date: "haute", dateDebut: "haute", type: "haute", typeRemuneration: "haute", nbCachets: "haute", nbHeures: "haute", salaireBrut: "haute", employeur: "haute" },
-      justification: "« Nombre d'HEURES effectuées : 14 » et « Nombre de CACHETS : 3 » toutes deux renseignées sur la même attestation, emploi « Artiste musicien ».",
+      confiance: { date: "haute", dateDebut: "haute", type: "haute", typeRemuneration: "haute", nbCachets: "haute", nbHeures: "haute", salaireBrut: "haute", employeur: "haute", natureDocumentSource: "haute" },
+      justification: "« Nombre d'HEURES effectuées : 14 » et « Nombre de CACHETS : 3 » toutes deux renseignées sur la même attestation, emploi « Artiste musicien ». En-tête « Attestation d'Employeur Mensuelle ».",
     },
   ],
   avertissementsGeneraux: [],
@@ -161,6 +163,7 @@ export const extractionAemDupliqueeHeuresCachets: ExtractionResult = {
     {
       cible: "contrat",
       donnees: {
+        natureDocumentSource: "aem",
         date: "2026-06-28",
         dateDebut: "2026-06-26",
         type: "artiste",
@@ -174,12 +177,13 @@ export const extractionAemDupliqueeHeuresCachets: ExtractionResult = {
         etablissementAgree: null,
         enRapportAvecMetier: null,
       },
-      confiance: { date: "haute", dateDebut: "haute", type: "haute", typeRemuneration: "haute", nbHeures: "haute", salaireBrut: "haute", employeur: "haute" },
-      justification: "« Nombre d'HEURES effectuées : 14 » ; « SALAIRES BRUTS 245,00 » ; employeur « Association Fictive du Festival de Test ».",
+      confiance: { date: "haute", dateDebut: "haute", type: "haute", typeRemuneration: "haute", nbHeures: "haute", salaireBrut: "haute", employeur: "haute", natureDocumentSource: "haute" },
+      justification: "« Nombre d'HEURES effectuées : 14 » ; « SALAIRES BRUTS 245,00 » ; employeur « Association Fictive du Festival de Test ». En-tête « Attestation d'Employeur Mensuelle ».",
     },
     {
       cible: "contrat",
       donnees: {
+        natureDocumentSource: "aem",
         date: "2026-06-28",
         dateDebut: "2026-06-26",
         type: "artiste",
@@ -193,8 +197,8 @@ export const extractionAemDupliqueeHeuresCachets: ExtractionResult = {
         etablissementAgree: null,
         enRapportAvecMetier: null,
       },
-      confiance: { date: "haute", dateDebut: "haute", type: "haute", typeRemuneration: "haute", nbCachets: "haute", salaireBrut: "haute", employeur: "haute" },
-      justification: "« Nombre de CACHETS isolés 3 » ; « SALAIRES BRUTS 245,00 » ; employeur « Association Fictive du Festival de Test ».",
+      confiance: { date: "haute", dateDebut: "haute", type: "haute", typeRemuneration: "haute", nbCachets: "haute", salaireBrut: "haute", employeur: "haute", natureDocumentSource: "haute" },
+      justification: "« Nombre de CACHETS isolés 3 » ; « SALAIRES BRUTS 245,00 » ; employeur « Association Fictive du Festival de Test ». En-tête « Attestation d'Employeur Mensuelle ».",
     },
   ],
   avertissementsGeneraux: ["Les deux modes de rémunération (heures et cachets) sont présents et doivent être traités séparément pour le même contrat."],
@@ -265,6 +269,9 @@ export const extractionJustificatifDeclaration: ExtractionResult = {
     {
       cible: "contrat",
       donnees: {
+        // Ni AEM ni bulletin de paie : ce document-type n'est ni l'un ni l'autre littéralement
+        // (justificatif de déclaration mensuelle) — null est la bonne réponse, pas une devinette.
+        natureDocumentSource: null,
         date: "2026-02-01",
         dateDebut: "2026-02-01",
         type: null,
@@ -286,6 +293,7 @@ export const extractionJustificatifDeclaration: ExtractionResult = {
       // doit rester une proposition séparée, jamais fusionnée avec la première.
       cible: "contrat",
       donnees: {
+        natureDocumentSource: null,
         date: "2026-02-15",
         dateDebut: "2026-02-10",
         type: null,
@@ -305,6 +313,7 @@ export const extractionJustificatifDeclaration: ExtractionResult = {
     {
       cible: "contrat",
       donnees: {
+        natureDocumentSource: null,
         date: "2026-02-28",
         dateDebut: "2026-02-01",
         type: null,

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Profil } from "../../types";
 import type { Proposition } from "../../types/extraction";
 import { contrat } from "../../engine/__tests__/testUtils";
+import { RAPPEL_AEM_FAIT_FOI } from "../../content/rappelAEM";
 import {
   comparerContratExistant,
   contratConfirmeDepuisCorrespondance,
@@ -344,7 +345,9 @@ describe("contrat — toujours relu dans le formulaire, jamais appliqué directe
 
   it("signale chaque champ que le document n'indiquait pas, pour ne pas faire passer un défaut du formulaire pour une valeur lue", () => {
     const { avertissements } = evaluerProposition(proposition, profilBase);
-    expect(avertissements).toHaveLength(3);
+    // 4, pas 3 : extractionBulletinPaie a natureDocumentSource: "bulletin_paie" (cf.
+    // fixturesExtraction.ts) — s'ajoute donc l'avertissement AEM vs bulletin (cf. describe dédié).
+    expect(avertissements).toHaveLength(4);
     expect(avertissements.join(" ")).toMatch(/Artiste/);
     expect(avertissements.join(" ")).toMatch(/Cachets/);
     expect(avertissements.join(" ")).toMatch(/France/);
@@ -399,6 +402,73 @@ describe("contrat — toujours relu dans le formulaire, jamais appliqué directe
 // 01/08/2026 : plan "cycle de vie du contrat" — une proposition "contrat" issue d'un document
 // importé doit signaler les contrats "a_verifier" existants qui pourraient être le même contrat,
 // pour que RevueExtraction.tsx propose une correspondance plutôt qu'une création systématique.
+// 02/08/2026 : l'alerte statique du canal manuel (ImportBulletins.tsx) n'existait que là — le canal
+// IA ne distinguait jamais un bulletin d'une AEM pour avertir l'utilisateur. natureDocumentSource
+// (types/extraction.ts) ferme ce trou : un avertissement conditionnel, jamais un blocage, jamais un
+// avertissement sur un cas non déterminé (faux positif aussi gênant qu'un faux silence).
+describe("contrat — avertissement AEM vs bulletin de paie (natureDocumentSource)", () => {
+  function propositionAvecNature(nature: "aem" | "bulletin_paie" | null): Extract<Proposition, { cible: "contrat" }> {
+    return {
+      cible: "contrat",
+      donnees: {
+        natureDocumentSource: nature,
+        date: "2026-06-28",
+        dateDebut: "2026-06-24",
+        type: null,
+        typeRemuneration: null,
+        territoire: null,
+        nbCachets: null,
+        nbHeures: null,
+        nbJoursEEE: null,
+        salaireBrut: 500,
+        employeur: "Test",
+        etablissementAgree: null,
+        enRapportAvecMetier: null,
+      },
+      confiance: {},
+      justification: "test",
+    };
+  }
+
+  it("aucun avertissement quand le document est une vraie AEM", () => {
+    const { avertissements } = evaluerProposition(propositionAvecNature("aem"), profilBase);
+    expect(avertissements.some((a) => a.includes("AEM"))).toBe(false);
+  });
+
+  it("avertissement clair quand le document est un bulletin de paie", () => {
+    const { avertissements } = evaluerProposition(propositionAvecNature("bulletin_paie"), profilBase);
+    const alerte = avertissements.find((a) => a.includes("bulletin de paie"));
+    expect(alerte).toBeDefined();
+    expect(alerte).toMatch(/AEM/);
+    expect(alerte).toMatch(/France Travail/);
+  });
+
+  it("aucun avertissement quand le document ne permet pas de trancher (null) — jamais un faux avertissement", () => {
+    const { avertissements } = evaluerProposition(propositionAvecNature(null), profilBase);
+    expect(avertissements.some((a) => a.includes("AEM"))).toBe(false);
+  });
+
+  it("fixture réelle : extractionAemHeuresEtCachets (aem) ne déclenche aucun avertissement AEM", () => {
+    const propositionAem = extractionAemHeuresEtCachets.propositions[0] as Extract<Proposition, { cible: "contrat" }>;
+    const { avertissements } = evaluerProposition(propositionAem, profilBase);
+    expect(avertissements.some((a) => a.includes("bulletin de paie"))).toBe(false);
+  });
+
+  it("fixture réelle : extractionJustificatifDeclaration (ni AEM ni bulletin, natureDocumentSource null) ne déclenche aucun avertissement AEM", () => {
+    const propositions = extractionJustificatifDeclaration.propositions.filter((p) => p.cible === "contrat");
+    for (const p of propositions) {
+      const { avertissements } = evaluerProposition(p, profilBase);
+      expect(avertissements.some((a) => a.includes("AEM"))).toBe(false);
+    }
+  });
+
+  it("l'avertissement reprend le texte de référence unique RAPPEL_AEM_FAIT_FOI (content/rappelAEM.ts), harmonisé avec le canal manuel", () => {
+    const { avertissements } = evaluerProposition(propositionAvecNature("bulletin_paie"), profilBase);
+    const alerte = avertissements.find((a) => a.includes("bulletin de paie"));
+    expect(alerte).toContain(RAPPEL_AEM_FAIT_FOI);
+  });
+});
+
 describe("evaluerProposition / evaluerExtraction — correspondances avec des contrats existants", () => {
   const propositionContrat = extractionBulletinPaie.propositions[0] as Extract<Proposition, { cible: "contrat" }>;
 

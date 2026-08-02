@@ -220,6 +220,23 @@ NOTIFICATION D'ADMISSION ARE / RELEVÉ DE SITUATION
 
 BULLETIN DE PAIE / AEM
 
+  contrat.natureDocumentSource — AJOUTÉ 02/08/2026, DISTINCTION LITTÉRALE UNIQUEMENT
+  Un bulletin de paie et une AEM contiennent souvent EXACTEMENT les mêmes informations (période,
+  brut, cachets, heures, employeur) — seule la mention explicite du TYPE de document permet de les
+  distinguer, jamais leur contenu.
+     • Le document porte « Attestation d'Employeur Mensuelle » ou l'acronyme « AEM » (titre,
+       en-tête, pied de page) → "aem".
+     • Le document porte « Bulletin de paie », « Bulletin de salaire », ou un intitulé standard
+       équivalent (ex. un bulletin GHS/sPAIEctacle) → "bulletin_paie".
+     • Aucune de ces deux mentions n'apparaît littéralement (photocopie sans en-tête, titre
+       illisible, format inhabituel) → null. NE DÉDUIS JAMAIS ce champ de la présence des champs
+       habituels ci-dessous : leur présence ne prouve rien sur le type de document. null est ici la
+       BONNE réponse, pas un échec — ne jamais deviner pour remplir ce champ à tout prix.
+  Motif : ce champ déclenche un rappel à l'utilisateur (l'AEM fait foi auprès de France Travail, pas
+  le bulletin). Un « bulletin_paie » inventé sur une vraie AEM afficherait un avertissement trompeur ;
+  un « aem » inventé sur un vrai bulletin le priverait du rappel dont il a besoin ; deviner dans le
+  doute produit l'un ou l'autre risque au hasard — d'où null en cas de doute réel.
+
   période d'emploi   → contrat.dateDebut et contrat.date
 
   Format GHS/sPAIEctacle fréquent : « Période du X au Y » (ou « Période d'emploi du X au Y »)
@@ -503,6 +520,17 @@ CAS 9 — attestation de taux PAS avec un historique de deux valeurs, aucune ne 
             "2025-01-01" } et { valeur: 3.45, dateEffet: "2026-01-01" } — chacune avec sa propre
             justification citant sa propre phrase.
 
+CAS 10 — natureDocumentSource deviné depuis le contenu au lieu du titre littéral
+  (exemple fictif, 02/08/2026)
+  document : bulletin de paie standard (« Bulletin de paie » en en-tête), avec cachets, brut,
+             employeur — toutes les données qu'une AEM porterait aussi.
+  mauvais : natureDocumentSource = "aem", raisonnement du type « ce document contient les mêmes
+            champs qu'une AEM habituelle » — une supposition sur le contenu, pas une lecture du
+            titre.
+  attendu : natureDocumentSource = "bulletin_paie", justifié par la citation littérale « Bulletin
+            de paie » en en-tête. Sans un tel en-tête sur un AUTRE document par ailleurs identique,
+            natureDocumentSource = null — jamais deviné dans un sens ou dans l'autre.
+
 ════════ RÈGLES DE SÛRETÉ (elles priment sur tout le reste) ════════
 
 - Jamais de valeur inventée. Champ illisible ou absent → null s'il est nullable, sinon pas de
@@ -560,7 +588,12 @@ barèmes), activiteHorsAnnexe10 (déprécié), la date de départ d'affichage (c
     tu as produit UNE proposition taux_pas_historique PAR taux/date trouvé, jamais une seule
     proposition qui aurait « choisi » le taux le plus récent ou le plus important (cf. CAS 9).
     Vérifie aussi qu'aucune valeur n'a été calculée à partir d'un montant en euros sans le
-    pourcentage écrit à côté.`;
+    pourcentage écrit à côté.
+12. Si tu as rempli contrat.natureDocumentSource ("aem" ou "bulletin_paie"), vérifie que ta
+    justification cite le titre/en-tête LITTÉRAL du document (« Attestation d'Employeur Mensuelle »,
+    « AEM », « Bulletin de paie », « Bulletin de salaire ») — jamais une déduction depuis les champs
+    présents (brut, cachets, employeur). Sans cette mention littérale, remets ce champ à null
+    (cf. CAS 10).`;
 
 /**
  * Erreur de configuration du serveur (clé API absente) — distincte d'un échec

@@ -92,6 +92,7 @@ const COULEUR_CONFIANCE: Record<"haute" | "moyenne" | "faible", string> = {
 
 export const LABELS_CHAMPS: Record<Proposition["cible"], Record<string, string>> = {
   contrat: {
+    natureDocumentSource: "Type de document source",
     dateDebut: "Date de début",
     date: "Date de fin",
     type: "Nature du contrat",
@@ -128,6 +129,8 @@ export const LABELS_CHAMPS: Record<Proposition["cible"], Record<string, string>>
 
 /** Valeurs d'énumération rendues lisibles. Une valeur inconnue est affichée brute, jamais masquée. */
 export const LABELS_VALEURS: Record<string, string> = {
+  aem: "AEM (Attestation d'Employeur Mensuelle)",
+  bulletin_paie: "Bulletin de paie",
   artiste: "Artiste",
   enseignement: "Enseignement",
   formation: "Formation",

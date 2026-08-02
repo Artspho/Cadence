@@ -3,6 +3,7 @@ import type { Contrat, DecompteHeuresResultat, Profil } from "../types";
 import type { FranceTravailConfig } from "../config/franceTravailConfig";
 import type { BulletinExtrait } from "../types";
 import { extraireBulletin } from "../lib/extractionBulletin";
+import { RAPPEL_AEM_FAIT_FOI } from "../content/rappelAEM";
 import { ContractForm } from "./ContractForm";
 
 interface ImportBulletinsProps {
@@ -69,8 +70,8 @@ export function ImportBulletins({ profil, config, decompteActuel, onImporterCont
           (`ConsentementEnvoiIA.tsx`). */}
       <p className="text-xs text-faint bg-surface-2 border border-line rounded-lg px-4 py-2.5">
         Cet import-ci est traité 100 % localement dans ton navigateur : le bulletin que tu déposes ci-dessous ne quitte jamais ton appareil. (L'import
-        assisté par IA, lui, envoie le document à un serveur — il te le dit explicitement et te demande ton accord avant chaque envoi.) Rappel : la
-        pièce qui fait foi auprès de France Travail est l'AEM, pas le bulletin de paie ; cet import sert uniquement à ton suivi personnel.
+        assisté par IA, lui, envoie le document à un serveur — il te le dit explicitement et te demande ton accord avant chaque envoi.) Rappel :{" "}
+        {RAPPEL_AEM_FAIT_FOI} Cet import sert uniquement à ton suivi personnel.
       </p>
 
       {!extrait && (

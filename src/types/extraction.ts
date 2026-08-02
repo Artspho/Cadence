@@ -64,6 +64,24 @@ const niveauConfiance = z.enum(["haute", "moyenne", "faible"]);
 export const propositionContratSchema = z.object({
   cible: z.literal("contrat"),
   donnees: z.object({
+    natureDocumentSource: z
+      .enum(["aem", "bulletin_paie"])
+      .nullable()
+      .describe(
+        "Nature LITTÉRALE du document lu, pas une supposition. « aem » UNIQUEMENT si le document " +
+          "porte explicitement la mention « Attestation d'Employeur Mensuelle » ou l'acronyme « AEM » " +
+          "(titre, en-tête, ou pied de page). « bulletin_paie » UNIQUEMENT si le document porte " +
+          "explicitement « Bulletin de paie », « Bulletin de salaire », ou un intitulé standard " +
+          "équivalent (« Bulletin GHS/sPAIEctacle », etc.). NE DÉDUIS JAMAIS ce champ de la présence " +
+          "de champs habituels (brut, cachets, employeur) : un bulletin et une AEM contiennent " +
+          "souvent les mêmes informations, seule la mention explicite du type de document permet de " +
+          "les distinguer. Sans mention littérale de l'un ou l'autre (photocopie sans en-tête, format " +
+          "inhabituel, titre illisible) → null. Ce null est la BONNE réponse et non un échec — ne " +
+          "jamais deviner pour faire disparaître un null. Motif : ce champ déclenche un rappel côté " +
+          "utilisateur (l'AEM fait foi auprès de France Travail, pas le bulletin) — un « bulletin_paie » " +
+          "inventé sur une vraie AEM afficherait un avertissement trompeur ; un « aem » inventé sur un " +
+          "vrai bulletin le priverait du rappel dont il a besoin."
+      ),
     date: z.string().describe("Date de fin de contrat (ISO)"),
     dateDebut: z.string().nullable().describe("Date de début (ISO), null si absente du document"),
     type: z

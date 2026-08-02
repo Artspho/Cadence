@@ -33,6 +33,7 @@
 
 import type { Contrat, PeriodeAssimilee, Profil } from "../types";
 import type { ExtractionResult, Proposition } from "../types/extraction";
+import { RAPPEL_AEM_FAIT_FOI } from "../content/rappelAEM";
 import { diagnostiquerAbsenceCorrespondance, trouverContratsCorrespondants, type DiagnosticAbsenceCorrespondance } from "./correspondanceContrat";
 
 export type StatutProposition =
@@ -101,6 +102,14 @@ export function evaluerProposition(proposition: Proposition, profil: Profil, con
       const avertissements = DEFAUTS_FORMULAIRE_CONTRAT.filter((d) => proposition.donnees[d.champ] === null).map(
         (d) => `Le document n'indique pas ${d.libelle} : le formulaire propose « ${d.defaut} » par défaut. Vérifie ce champ avant d'enregistrer.`
       );
+      // AEM vs bulletin de paie (cf. types/extraction.ts, natureDocumentSource) : avertissement
+      // CONDITIONNEL, uniquement quand le document se déclare lui-même « bulletin de paie » —
+      // jamais sur une vraie AEM (rien à signaler), jamais sur un document non déterminé (silence
+      // honnête plutôt qu'un faux avertissement, cf. commentaire du schéma). Même fait que le canal
+      // manuel (ImportBulletins.tsx), texte de référence unique (content/rappelAEM.ts).
+      if (proposition.donnees.natureDocumentSource === "bulletin_paie") {
+        avertissements.push(`Ce document semble être un bulletin de paie, pas l'AEM. ${RAPPEL_AEM_FAIT_FOI} Vérifie que ton employeur te l'a bien transmise séparément.`);
+      }
       const candidat = { employeur: proposition.donnees.employeur, date: proposition.donnees.date, dateDebut: proposition.donnees.dateDebut ?? proposition.donnees.date, salaireBrut: proposition.donnees.salaireBrut };
       const correspondances = trouverContratsCorrespondants(candidat, contratsExistants);
       const diagnosticAbsence = correspondances.length === 0 ? diagnostiquerAbsenceCorrespondance(candidat, contratsExistants) : undefined;

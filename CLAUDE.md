@@ -95,7 +95,37 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 
 ## État actuel
 
-### Le plus récent d'abord — 02/08/2026 (import IA : support de l'attestation de taux de prélèvement à la source)
+### Le plus récent d'abord — 02/08/2026 (alerte AEM vs bulletin de paie, cohérente sur les deux flux d'import)
+
+- ✅ **L'alerte « l'AEM fait foi, pas le bulletin de paie » couvre maintenant les deux flux
+  d'import, avec un seul texte de référence.** Avant ce chantier : le rappel n'existait qu'en
+  version STATIQUE côté import manuel (`ImportBulletins.tsx`), toujours affiché quel que soit le
+  document déposé (`lib/extractionBulletin.ts` ne détecte pas AEM/bulletin du tout) — le canal IA
+  n'avait rien.
+  **Nouveau champ `contrat.natureDocumentSource: "aem" | "bulletin_paie" | null`**
+  (`types/extraction.ts`) — même rigueur que `etablissementAgree`/`enRapportAvecMetier` : rempli
+  UNIQUEMENT si le document porte littéralement « Attestation d'Employeur Mensuelle »/« AEM » ou
+  « Bulletin de paie »/« Bulletin de salaire » en titre/en-tête, jamais déduit des champs présents
+  (brut, cachets, employeur — souvent identiques entre les deux types de document). Sans mention
+  littérale → `null`, jamais un choix par défaut (CAS 10, `api/extract-document.ts`).
+  **Routage** (`lib/routageExtraction.ts`, cas "contrat") : avertissement ajouté au tableau
+  `avertissements` existant (même emplacement que les défauts de formulaire) uniquement quand
+  `natureDocumentSource === "bulletin_paie"` — jamais sur une vraie AEM (rien à signaler), jamais
+  sur `null` (silence honnête plutôt qu'un faux avertissement, devoir n°2 dans les deux sens).
+  N'a jamais bloqué l'import : `contrat` reste toujours `revue_formulaire`, jamais refusé.
+  **Texte de référence unique** (`content/rappelAEM.ts`, `RAPPEL_AEM_FAIT_FOI`) : réutilisé tel
+  quel par le rappel statique du canal manuel (`ImportBulletins.tsx`, remplace le fragment
+  dupliqué) ET par l'avertissement conditionnel du canal IA — un seul fait, deux phrases
+  d'encadrement légitimement différentes (statique/toujours affiché vs conditionnel/après lecture).
+  **Vérifié dans le vrai navigateur** : fixture bulletin (`natureDocumentSource: "bulletin_paie"`)
+  → avertissement affiché avec le texte de référence ; fixture AEM
+  (`natureDocumentSource: "aem"`) → aucun avertissement, champ affiché « AEM (Attestation
+  d'Employeur Mensuelle) » ; message statique du canal manuel inchangé au mot près hors la source
+  désormais partagée. **Aucun document réel de type AEM/bulletin disponible dans le projet** pour
+  tester le canal IA sur pièce (spécimens hors dépôt, cf. règle de confidentialité déjà actée) —
+  dit explicitement plutôt que simulé comme testé sur pièce. 590 tests verts, `tsc -b` propre.
+
+### 02/08/2026 (import IA : support de l'attestation de taux de prélèvement à la source)
 
 - ✅ **Nouveau type de document reconnu par l'import IA : attestation de taux de prélèvement à la
   source (PAS)**, espace personnel impots.gouv.fr. Distinct de `profil_ouverture_droits.tauxPrelevementSource`
