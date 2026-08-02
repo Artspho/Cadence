@@ -1714,17 +1714,22 @@ de situation ✅ — l'échec semble propre à ce format de bulletin, pas au can
   écartée** : ce n'est PAS le plafond de cumul à 118 % du PMSS, qui est un écrêtement *prospectif* du
   montant mensuel (guide p.17, étape 5), pas un mécanisme d'indu. Citations, sources consultées sans
   succès et conditions de levée : `docs/validation.md` (section 2026-08-03).
-  **⚠️ Écart découvert au passage, NON corrigé — décision produit attendue** : la règle vise les
-  franchises CP **et salaires**, `ancienneFranchiseCPEpuisee` ne regarde que la CP, et
-  `franchiseSalairesRestante` vaut `0` *par défaut* (total absent), pas *parce qu'elle est épuisée*.
-  Donc `tropPercuRisque === false` veut dire « franchise CP prouvée épuisée », pas « aucun risque » :
-  faux feu vert au sens du devoir n°2 si une franchise salaires non nulle subsiste. Portée
-  probablement étroite (la franchise salaires tombe à 0 pour un SR ordinaire — la formule retranche
-  27 jours), mais réelle à SR élevé. Deux options, à trancher : passer `tropPercuRisque` en type
-  discriminé à trois états (`avéré` / `indéterminé` / `écarté`, sans montant) pour ne plus jamais
-  afficher de vert non prouvé — au prix d'un avertissement quasi permanent tant que la franchise
-  salaires n'est pas câblée ; ou laisser tel quel et lever d'abord la franchise salaires. Écart figé
-  par deux tests de caractérisation dans `renouvellementAnticipe.test.ts`.
+  **✅ Faux feu vert corrigé le 03/08/2026 (même journée, commit suivant).** La règle vise les
+  franchises CP **et salaires**, l'ancien `ancienneFranchiseCPEpuisee` ne regardait que la CP, et
+  `franchiseSalairesRestante` vaut `0` *par défaut* (total absent, `valeur: null`), pas *parce qu'elle
+  est épuisée* — `tropPercuRisque === false` voulait donc dire « franchise CP prouvée épuisée » mais
+  s'affichait comme « aucun risque » (pas de bandeau du tout).
+  **Correctif** : `tropPercuRisque: boolean` → `tropPercu: RisqueTropPercu`, type discriminé à trois
+  états sur le modèle de `SeuilReadmission` — `avere` (reliquat prouvé) / `indetermine` + `raison`
+  (`franchise_salaires_non_calculee`, le cas nominal dès que la CP est soldée ;
+  `historique_mensuel_insuffisant` ; `simulation_mensuelle_impossible`, défensif) / `ecarte` (les DEUX
+  franchises prouvées épuisées). **`ecarte` est inatteignable aujourd'hui, et c'est voulu** : la
+  franchise salaires n'étant jamais calculée, un « écarté » ne peut pas être prouvé, donc ne doit
+  jamais s'afficher. Aucun montant dans aucun état (`tropPercuChiffrable` toujours `false`).
+  `RenouvellementAnticipe.tsx` rend les trois cas distinctement (rouge / ambre / rien) avec un texte
+  par `raison` dans `content/renouvellementAnticipe.ts` : le silence ne couvre plus jamais un « on ne
+  sait pas ». 5 tests dédiés, dont un garde-fou qui échouera le jour où `ecarte` deviendra atteignable
+  (signal qu'il faudra écrire un vrai cas « écarté », pas supprimer le test). Détail : `docs/validation.md`.
 - ⬜ Module congés spectacle
 
 ---

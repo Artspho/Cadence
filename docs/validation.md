@@ -190,15 +190,29 @@ ajouter un champ déclaratif `franchiseSalairesTotale` à `ouvertureDroits` ; (2
 portant un trop-perçu notifié** — c'est la seule pièce qui montrerait à la fois la base retenue et
 l'AJ utilisée. Aucun relevé de ce type n'a jamais été fourni au projet.
 
-**⚠️ Écart découvert au passage, non corrigé (décision produit en attente).** La règle vise les
-franchises CP **et salaires** ; `ancienneFranchiseCPEpuisee` ne regarde que la CP, et
-`franchiseSalairesRestante` vaut `0` **par défaut** (total absent) et non parce qu'elle serait prouvée
-épuisée. Donc `tropPercuRisque === false` signifie « franchise CP prouvée épuisée », pas « aucun
-risque » : si une franchise salaires non nulle subsistait, le risque existerait quand même — un faux
-feu vert au sens du devoir n°2. Portée réelle probablement étroite (la formule de la franchise
-salaires retranche 27 jours : elle tombe à 0 pour un SR ordinaire, cf. `calculerFranchiseSalaires`),
-mais non nulle à SR élevé. Deux tests de caractérisation figent l'écart dans
-`renouvellementAnticipe.test.ts` pour qu'il reste visible.
+**Écart découvert au passage — ✅ CORRIGÉ le 03/08/2026, dans la foulée.** La règle vise les
+franchises CP **et salaires** ; l'ancien `ancienneFranchiseCPEpuisee` ne regardait que la CP, et
+`franchiseSalairesRestante` vaut `0` **par défaut** (total absent, `valeur: null`) et non parce
+qu'elle serait prouvée épuisée. `tropPercuRisque === false` signifiait donc « franchise CP prouvée
+épuisée » mais s'affichait comme « aucun risque » (absence de bandeau) — faux feu vert au sens du
+devoir n°2.
+
+**Correctif** : `tropPercuRisque: boolean` → `tropPercu: RisqueTropPercu`, type discriminé à trois
+états, même pattern que `SeuilReadmission`.
+
+| État | Condition | Atteignable aujourd'hui ? |
+|---|---|---|
+| `avere` | un reliquat est PROUVÉ : franchise CP non soldée, ou franchise salaires connue et non soldée | oui |
+| `indetermine` + `raison` | Cadence ne peut pas conclure — `franchise_salaires_non_calculee` (cas nominal dès que la CP est soldée), `historique_mensuel_insuffisant`, `simulation_mensuelle_impossible` (défensif) | oui |
+| `ecarte` | les **deux** franchises prouvées épuisées | **non, et c'est voulu** : inatteignable tant que le verrou 1 tient |
+
+Aucun montant dans aucun état (`tropPercuChiffrable` reste `false`). L'écran rend les trois cas
+distinctement — rouge / ambre / rien — avec un message dédié par `raison` : le silence ne couvre plus
+jamais un « on ne sait pas ». Portée réelle du faux feu vert corrigé : probablement étroite (la
+formule de la franchise salaires retranche 27 jours, elle tombe à 0 pour un SR ordinaire, cf.
+`calculerFranchiseSalaires`), mais non nulle à SR élevé. 5 tests dans `renouvellementAnticipe.test.ts`,
+dont un garde-fou qui échouera le jour où `ecarte` deviendra atteignable — signal qu'il faudra alors
+écrire un vrai cas « écarté », pas supprimer le test.
 
 #### 2026-07-20 — Règle CSG/CRDS établie (implémentée le 2026-07-20, commit `f0d18ae`)
 

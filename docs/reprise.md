@@ -159,12 +159,19 @@ ajoutée ; commentaires sourcés dans `engine/renouvellementAnticipe.ts`, sectio
 `docs/validation.md` (citations verbatim + sources consultées sans succès + conditions de levée),
 2 tests de garde-fou. 617 tests verts, `tsc -b` propre.
 
-⚠️ **Écart découvert au passage, NON corrigé, décision produit attendue** : la règle vise les
-franchises CP **et salaires**, `ancienneFranchiseCPEpuisee` ne regarde que la CP, et
-`franchiseSalairesRestante` vaut `0` *par défaut* (total absent) et non *parce qu'elle est épuisée*.
-`tropPercuRisque === false` signifie donc « franchise CP prouvée épuisée », pas « aucun risque » —
-faux feu vert potentiel au sens du devoir n°2, de portée probablement étroite (la franchise salaires
-tombe à 0 pour un SR ordinaire) mais réelle à SR élevé. Deux options tracées dans `CLAUDE.md`.
+**16. Faux feu vert de `tropPercuRisque` — corrigé, indépendamment du câblage de la franchise
+salaires.** L'écart découvert au point 15 : la règle vise les franchises CP **et salaires**, l'ancien
+`ancienneFranchiseCPEpuisee` ne regardait que la CP, et `franchiseSalairesRestante` vaut `0` *par
+défaut* (total absent) et non *parce qu'elle est épuisée* — `tropPercuRisque === false` signifiait
+« franchise CP prouvée épuisée » mais s'affichait comme « aucun risque » (aucun bandeau).
+**Correctif** : `tropPercuRisque: boolean` → `tropPercu: RisqueTropPercu`, type discriminé à trois
+états (même pattern que `SeuilReadmission`) — `avere` / `indetermine` + `raison` / `ecarte`. `ecarte`
+exige les DEUX franchises prouvées épuisées : **inatteignable aujourd'hui, et c'est voulu** (un
+« écarté » non prouvable ne doit jamais s'afficher). Aucun montant dans aucun état.
+`RenouvellementAnticipe.tsx` rend les trois cas distinctement (rouge / ambre / rien), un texte par
+`raison` dans `content/renouvellementAnticipe.ts` — le silence ne couvre plus jamais un « on ne sait
+pas ». 5 tests dédiés, dont un garde-fou qui échouera quand `ecarte` deviendra atteignable.
+619 tests verts, `tsc -b` propre.
 
 ⚠️ **Contradiction de sources découverte sur le plafond ARE, postérieure aux points 13-14 —
 documentée, arbitrage pris, non bloquante** : le guide FT éd. **juillet 2026** (plus récent que

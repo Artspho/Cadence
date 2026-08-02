@@ -72,7 +72,7 @@ describe("renouvellementAnticipe — cas réel du 31/07/2026 (Notification 1 + N
     const ancien: AncienDroit = {
       // Date de notification non fournie par le cas réel (seule la FCT retenue et la date
       // anniversaire notifiée le sont) — approximée à J+2 après la FCT, un délai de traitement
-      // plausible. N'affecte que delaiReapplique/tropPercuRisque, non vérifiés par ce test (cf. les
+      // plausible. N'affecte que delaiReapplique/tropPercu, non vérifiés par ce test (cf. les
       // cas D1/D2/C1 dédiés, construits et vérifiés au simulateur officiel séparément).
       dateOuverture: "2025-03-25",
       fctRetenue: FCT_ANCIENNE,
@@ -185,7 +185,7 @@ describe("cas fictifs B1/B2/B3/E1 — vérifiés au simulateur officiel du 31/07
 // obtenu (épuisée en avril, après 3 mois pleins depuis l'ouverture du 18/01/2026) reproduit presque
 // exactement le raisonnement du cas réel donné dans le prompt ("franchise CP ancienne (6j, à 2j/mois)
 // était épuisée en ~3 mois") — bonne confirmation croisée, même si ce n'est pas le même calendrier.
-describe("tropPercuRisque — cas C1 (franchise CP non épuisée) et son complémentaire", () => {
+describe("tropPercu — cas C1 (franchise CP non épuisée) et son complémentaire", () => {
   const ancienPetiteFranchise: AncienDroit = {
     dateOuverture: "2026-01-18",
     fctRetenue: "2026-01-15",
@@ -196,15 +196,38 @@ describe("tropPercuRisque — cas C1 (franchise CP non épuisée) et son complé
   };
   const profilBase = profil({ dateNaissance: "1985-06-15", situation: "readmission" });
 
-  it("C1 — demande 6 semaines après l'ouverture : franchise CP pas encore épuisée, tropPercuRisque = true", () => {
+  it("C1 — demande 6 semaines après l'ouverture : franchise CP pas encore épuisée, risque AVÉRÉ", () => {
     const r = calculerRenouvellementAnticipe([], [], profilBase, franceTravailConfig, ancienPetiteFranchise, "2026-03-01");
-    expect(r.tropPercuRisque).toBe(true);
+    expect(r.tropPercu).toEqual({ etat: "avere" });
     expect(r.tropPercuChiffrable).toBe(false); // jamais un montant, cf. devoir sacré n°2
   });
 
-  it("complémentaire — demande ~4 mois après l'ouverture : franchise CP épuisée (0 j restant depuis un mois complet), tropPercuRisque = false", () => {
+  // Ce cas renvoyait `tropPercuRisque = false` avant le 03/08/2026 — l'écran n'affichait alors RIEN,
+  // ce qui se lisait « aucun risque ». Or seule la franchise CP était prouvée épuisée : la franchise
+  // salaires, jamais calculée, pouvait parfaitement rester due (guide FT juillet 2026, encadré p.15 :
+  // « les franchises congés payés ET salaires totales »). Le verdict correct est « indéterminé ».
+  it("complémentaire — demande ~4 mois après l'ouverture : franchise CP épuisée, mais verdict INDÉTERMINÉ (franchise salaires inconnue), jamais « écarté »", () => {
     const r = calculerRenouvellementAnticipe([], [], profilBase, franceTravailConfig, ancienPetiteFranchise, "2026-05-15");
-    expect(r.tropPercuRisque).toBe(false);
+    expect(r.tropPercu).toEqual({ etat: "indetermine", raison: "franchise_salaires_non_calculee" });
+  });
+
+  it("demande dans le mois même de l'ouverture : aucun mois complet observable, verdict INDÉTERMINÉ (jamais « avéré » par défaut, ni « écarté »)", () => {
+    const r = calculerRenouvellementAnticipe([], [], profilBase, franceTravailConfig, ancienPetiteFranchise, "2026-01-25");
+    expect(r.tropPercu).toEqual({ etat: "indetermine", raison: "historique_mensuel_insuffisant" });
+  });
+
+  // Garde-fou structurel du correctif : `ecarte` exige que les DEUX franchises soient prouvées
+  // épuisées. La franchise salaires n'étant jamais calculée (verrou 1, cf. renouvellementAnticipe.ts),
+  // cet état est INATTEIGNABLE aujourd'hui — et c'est le comportement voulu, pas un manque. Ce test
+  // tombera le jour où la franchise salaires sera câblée : ce sera alors le signal qu'il faut le
+  // remplacer par un vrai cas « écarté », pas le supprimer.
+  it("aucun scénario ne produit « écarté » tant que la franchise salaires n'est pas calculée", () => {
+    const fcts = ["2026-01-25", "2026-03-01", "2026-05-15", "2026-08-01", "2026-11-30"];
+    const etats = fcts.map((fct) => calculerRenouvellementAnticipe([], [], profilBase, franceTravailConfig, ancienPetiteFranchise, fct).tropPercu.etat);
+
+    expect(etats).not.toContain("ecarte");
+    // …et jamais un silence non plus : chaque scénario porte un état explicite que l'écran sait rendre.
+    for (const etat of etats) expect(["avere", "indetermine"]).toContain(etat);
   });
 
   // Garde-fou de sourçage (03/08/2026) : la formule officielle du montant EXISTE et est citée dans
@@ -220,18 +243,17 @@ describe("tropPercuRisque — cas C1 (franchise CP non épuisée) et son complé
       expect(r.tropPercuChiffrable).toBe(false);
       // Aucune clé de la comparaison ne porte de montant de trop-perçu : ni maintenant, ni ajoutée
       // discrètement plus tard sous un autre nom.
-      const clesMontant = Object.keys(r).filter((cle) => /^tropPercu/.test(cle) && !["tropPercuRisque", "tropPercuChiffrable"].includes(cle));
+      const clesMontant = Object.keys(r).filter((cle) => /^tropPercu/.test(cle) && !["tropPercu", "tropPercuChiffrable"].includes(cle));
       expect(clesMontant).toEqual([]);
     }
   });
 
-  // ⚠️ CARACTÉRISATION D'UNE LIMITE CONNUE, PAS UN COMPORTEMENT SOUHAITÉ. La règle officielle
-  // (guide FT juillet 2026, encadré p.15) vise « les franchises congés payés ET salaires totales » ;
-  // `ancienneFranchiseCPEpuisee` ne regarde que la CP. Un `tropPercuRisque === false` signifie donc
-  // « franchise CP prouvée épuisée », pas « aucun risque ». Ce test fige l'écart pour qu'il reste
-  // visible et documenté (cf. CLAUDE.md, décision produit en attente) — le jour où la franchise
-  // salaires devient calculable, c'est ce test qu'il faut réécrire, pas contourner.
-  it("limite connue : le verdict ignore la franchise salaires — franchiseSalairesRestante vaut 0 par défaut, jamais parce qu'elle est prouvée épuisée", () => {
+  // Preuve du fait sur lequel repose tout le correctif : dans ce chemin, `franchiseSalairesRestante`
+  // vaut 0 parce que le TOTAL est absent (`valeur: null` = franchise_salaires_non_certifiee), pas
+  // parce que la franchise serait consommée. C'est exactement pour ça que `evaluerRisqueTropPercu`
+  // refuse de lire ce 0 comme une preuve et renvoie `indetermine`. Le jour où la franchise salaires
+  // sera câblée, ce test doit être réécrit (le 0 voudra alors dire quelque chose), pas contourné.
+  it("le 0 de franchiseSalairesRestante est une absence d'information, pas une franchise épuisée", () => {
     const serie = calculerSerieDepuisContrats(
       { ...profilBase, ouvertureDroits: { dateOuverture: ancienPetiteFranchise.dateOuverture, franchiseCPTotale: 6, delaiAttenteInitial: 7 } },
       { dateDepart: ancienPetiteFranchise.dateOuverture },

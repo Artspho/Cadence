@@ -3,10 +3,12 @@
 // engine/renouvellementAnticipe.ts pour une FCT anticipée choisie par l'utilisateur.
 //
 // Simulation seulement, jamais la demande elle-même (cf. SPEC.md §11.B) : un lien renvoie vers
-// l'espace personnel France Travail pour la démarche réelle. Bandeau de risque de trop-perçu
-// visible uniquement si `tropPercuRisque`, mais F2 (franchise salaires non fiabilisée) et F3
-// (trop-perçu ponctuel du mois de transition) restent TOUJOURS affichés, jamais conditionnels —
-// l'utilisateur doit toujours voir que ces deux points ne sont pas garantis par l'outil.
+// l'espace personnel France Travail pour la démarche réelle. Le bandeau de trop-perçu suit les trois
+// états de `comparaison.tropPercu` (cf. RisqueTropPercu, engine/renouvellementAnticipe.ts) : rouge si
+// le risque est avéré, ambre s'il est indéterminé, rien seulement s'il est écarté — l'absence de
+// bandeau ne doit JAMAIS couvrir un « on ne sait pas » (faux feu vert corrigé le 03/08/2026). F2
+// (franchise salaires non fiabilisée) et F3 (trop-perçu ponctuel du mois de transition) restent, eux,
+// TOUJOURS affichés, jamais conditionnels — ces deux points ne sont garantis dans aucun cas.
 import { useState } from "react";
 import type { Contrat, PeriodeAssimilee, Profil } from "../types";
 import type { FranceTravailConfig } from "../config/franceTravailConfig";
@@ -88,11 +90,13 @@ export function RenouvellementAnticipe({ profil, contrats, periodes, config }: R
 
               {comparaison && (
                 <div className="space-y-4">
-                  {comparaison.tropPercuRisque && (
-                    <p className="text-xs rounded-lg px-3 py-2 bg-red/10 text-red">
-                      ⚠ Risque de trop-perçu : ta franchise congés payés actuelle ({comparaison.ancien.franchiseCPTotale} j) n'était probablement pas épuisée à cette date. France Travail peut te
-                      réclamer un trop-perçu — montant non chiffré par Cadence, vérifie sur simucalcul.pole-emploi-services.fr ou directement auprès de France Travail.
-                    </p>
+                  {/* Trois états, trois rendus — cf. RisqueTropPercu (engine) : rouge si le risque est
+                      prouvé, ambre si Cadence ne peut pas conclure (jamais un silence, qui se lirait
+                      comme « pas de risque »), rien seulement si les DEUX franchises sont prouvées
+                      épuisées. Aucun montant dans aucun cas. */}
+                  {comparaison.tropPercu.etat === "avere" && <p className="text-xs rounded-lg px-3 py-2 bg-red/10 text-red">{RENOUVELLEMENT_ANTICIPE.tropPercu.avere}</p>}
+                  {comparaison.tropPercu.etat === "indetermine" && (
+                    <p className="text-xs rounded-lg px-3 py-2 bg-amber/10 text-amber">{RENOUVELLEMENT_ANTICIPE.tropPercu.indetermine[comparaison.tropPercu.raison]}</p>
                   )}
 
                   <div className="grid grid-cols-2 gap-3">

@@ -10,16 +10,15 @@
 // comme App.tsx (cf. calculs useMemo) — jamais une formule dupliquée.
 //
 // Zones non certifiées, jamais chiffrées (devoir sacré n°2) :
-//  - tropPercuRisque est un booléen de PRUDENCE (jamais un montant, cf. tropPercuChiffrable toujours
-//    false) : il vaut `true` sauf quand la simulation mensuelle réelle (calculerSerieDepuisContrats,
-//    réutilisée telle quelle) prouve que la franchise CP de l'ancien droit est retombée à 0 un mois
-//    calendaire complet AVANT celui de la FCT retenue. En cas de doute (premier mois, mois de la FCT
-//    retenue lui-même, données insuffisantes), le risque reste signalé.
+//  - tropPercu est un VERDICT À TROIS ÉTATS (avere / ecarte / indetermine), jamais un montant — cf.
+//    RisqueTropPercu et tropPercuChiffrable, toujours false. Il s'appuie sur la simulation mensuelle
+//    réelle (calculerSerieDepuisContrats, réutilisée telle quelle), jamais sur une formule à part.
 //    Sourçage complété le 03/08/2026 (cf. le bloc « Trop-perçu » sur ComparaisonRenouvellementAnticipe
-//    plus bas et docs/validation.md) : le DÉCLENCHEUR est désormais confirmé à la source primaire, la
-//    FORMULE du montant l'est aussi au niveau réglementaire — mais elle reste NON CALCULABLE par
-//    Cadence aujourd'hui, pour trois raisons nommées là-bas. Aucun montant n'est donc câblé, et ce
-//    n'est pas un oubli.
+//    plus bas et docs/validation.md) : le DÉCLENCHEUR est confirmé à la source primaire, la FORMULE du
+//    montant l'est aussi au niveau réglementaire — mais elle reste NON CALCULABLE par Cadence
+//    aujourd'hui, pour trois raisons nommées là-bas. Aucun montant n'est donc câblé, et ce n'est pas
+//    un oubli. Le booléen d'origine a été remplacé le même jour : son `false` mélangeait « prouvé sans
+//    risque » et « on ne sait pas », un faux feu vert au sens du devoir sacré n°2.
 //  - la franchise salaires du nouveau droit n'est pas calculée ici : cf. F2 (content/renouvellementAnticipe.ts),
 //    affichée par l'écran, jamais un 0 qui laisserait croire qu'elle est nulle.
 import type { AJBruteResultat, AJNetteResultat, Contrat, PeriodeAssimilee, Profil } from "../types";
@@ -84,6 +83,43 @@ export interface NouveauDroitCalcule {
   delaiReapplique: boolean;
 }
 
+/**
+ * Verdict de risque de trop-perçu — type discriminé, même pattern que `SeuilReadmission`
+ * (types/index.ts) et `RythmeRequis` : un booléen ne sait pas distinguer « prouvé sans risque » de
+ * « on ne sait pas », et c'est précisément la distinction qui manquait (faux feu vert corrigé le
+ * 03/08/2026, cf. le bloc « Trop-perçu » ci-dessous et docs/validation.md).
+ *
+ *  - `avere`        : un reliquat de franchise est PROUVÉ à la date de la FCT retenue.
+ *  - `ecarte`       : les DEUX franchises (CP et salaires) sont prouvées épuisées. La règle
+ *                     officielle vise « les franchises congés payés et salaires totales » : écarter
+ *                     le risque sur la seule franchise CP serait un faux feu vert. Tant que la
+ *                     franchise salaires n'est pas calculée par Cadence, cet état est **inatteignable
+ *                     en pratique** — c'est voulu, pas un oubli : un `ecarte` qu'on ne peut pas
+ *                     prouver ne doit jamais s'afficher (devoir sacré n°2).
+ *  - `indetermine`  : Cadence ne peut pas conclure. À afficher comme tel, jamais en silence.
+ *
+ * Aucun montant, dans aucun état : cf. `tropPercuChiffrable` et les trois verrous documentés plus bas.
+ */
+export type RisqueTropPercu =
+  | { etat: "avere" }
+  | { etat: "ecarte" }
+  | {
+      etat: "indetermine";
+      /**
+       * Union littérale plutôt que `string` libre, comme `SeuilReadmission.raison` : l'écran doit
+       * pouvoir formuler un message précis par cause, pas afficher une chaîne technique brute.
+       *  - `franchise_salaires_non_calculee` : franchise CP prouvée épuisée, mais la franchise
+       *    salaires n'est jamais calculée (cf. verrou 1) — donc rien ne prouve l'absence de reliquat.
+       *    C'est le cas NOMINAL aujourd'hui pour tout dossier dont la franchise CP est soldée.
+       *  - `simulation_mensuelle_impossible` : `calculerSerieDepuisContrats` n'a pas pu tourner
+       *    (ouverture de droits manquante, etc.).
+       *  - `historique_mensuel_insuffisant` : aucun mois calendaire COMPLET avant celui de la FCT
+       *    retenue — le mois de la FCT lui-même n'est jamais utilisé (la franchise peut s'y épuiser
+       *    après le jour exact de la FCT).
+       */
+      raison: "franchise_salaires_non_calculee" | "simulation_mensuelle_impossible" | "historique_mensuel_insuffisant";
+    };
+
 export interface ComparaisonRenouvellementAnticipe {
   ancien: AncienDroit;
   nouveau: NouveauDroitCalcule;
@@ -136,14 +172,11 @@ export interface ComparaisonRenouvellementAnticipe {
    * `franchiseSalairesTotale` à `ouvertureDroits` ; (2) trancher brute/nette sur un relevé réel
    * portant un trop-perçu notifié. Tant que (1) n'est pas levé, ne rien chiffrer.
    */
-  tropPercuRisque: boolean;
+  tropPercu: RisqueTropPercu;
   /**
    * Toujours false : aucun montant de trop-perçu n'est câblé — cf. les trois verrous ci-dessus.
-   * ⚠️ LIMITE CONNUE de `tropPercuRisque` lui-même, découverte par le sourçage du 03/08/2026 et
-   * NON corrigée ici (décision produit en attente, cf. CLAUDE.md) : la règle officielle vise les
-   * franchises CP **et salaires**, alors que `ancienneFranchiseCPEpuisee` ne regarde que la CP.
-   * `tropPercuRisque === false` signifie donc « franchise CP prouvée épuisée », pas « aucun risque » —
-   * si une franchise salaires non nulle subsistait, le risque existerait quand même.
+   * Distinct de `tropPercu.etat` : celui-ci dit s'il y a un risque, celui-là qu'on ne sait pas le
+   * chiffrer. Un `etat: "avere"` n'ouvrira jamais la porte à un montant tant que ce champ est false.
    */
   tropPercuChiffrable: false;
 }
@@ -191,36 +224,46 @@ export function delaiSeReapplique(dateOuvertureAncienne: string, fctRetenueNouve
 }
 
 /**
- * La franchise CP de l'ANCIEN droit était-elle sûrement épuisée avant la FCT retenue du nouveau
- * droit ? Réutilise tel quel `calculerSerieDepuisContrats` (indemnisationMensuelle.ts) — aucune
- * formule à part — pour simuler mois par mois la consommation réelle depuis `ancien.dateOuverture`.
+ * Reste-t-il un reliquat de franchises de l'ANCIEN droit à la FCT retenue du nouveau ? Réutilise tel
+ * quel `calculerSerieDepuisContrats` (indemnisationMensuelle.ts) — aucune formule à part — pour
+ * simuler mois par mois la consommation réelle depuis `ancien.dateOuverture`.
  *
  * Prudence délibérée (devoir sacré n°2) : seule une franchise dont le solde de fin de mois est tombé
  * à 0 un mois calendaire COMPLET avant celui de la FCT retenue est considérée comme sûrement
  * épuisée. Le mois de la FCT retenue lui-même n'est jamais utilisé (la franchise pourrait s'y épuiser
  * APRÈS le jour exact de la FCT) ; l'absence de mois antérieur calculable (historique trop court)
- * renvoie `false` (non prouvée épuisée) plutôt qu'une présomption optimiste.
+ * donne `indetermine`, jamais une présomption — ni optimiste, ni alarmiste.
  *
- * ⚠️ Ne regarde QUE la franchise congés payés, alors que la règle officielle vise les franchises CP
- * **et salaires** (cf. le bloc « Trop-perçu » sur ComparaisonRenouvellementAnticipe) : un `true`
- * renvoyé ici ne prouve donc pas l'absence de tout reliquat. Écart connu, laissé tel quel faute de
- * pouvoir calculer la franchise salaires — ne pas « simplifier » cette fonction sans lire ce bloc.
+ * Les DEUX franchises comptent, parce que la règle officielle vise « les franchises congés payés et
+ * salaires totales » (guide FT éd. juillet 2026, encadré p.15). D'où le passage en trois états le
+ * 03/08/2026 : avant, la franchise CP soldée suffisait à renvoyer « pas de risque », alors que la
+ * franchise salaires n'est jamais calculée — `franchiseSalairesRestante` vaut 0 PAR DÉFAUT (total
+ * absent, `valeur: null`), pas parce qu'elle serait prouvée épuisée. Lire ce 0 comme une preuve était
+ * un faux feu vert. Il est désormais lu pour ce qu'il est : une absence d'information.
  */
-function ancienneFranchiseCPEpuisee(contrats: Contrat[], profil: Profil, ancien: AncienDroit, fctRetenue: string, config: FranceTravailConfig): boolean {
+function evaluerRisqueTropPercu(contrats: Contrat[], profil: Profil, ancien: AncienDroit, fctRetenue: string, config: FranceTravailConfig): RisqueTropPercu {
   const profilAncien: Profil = {
     ...profil,
     dateAnniversaire: ancien.dateAnniversaire,
     ouvertureDroits: { dateOuverture: ancien.dateOuverture, franchiseCPTotale: ancien.franchiseCPTotale, delaiAttenteInitial: ancien.delaiAttenteInitial },
   };
   const serie = calculerSerieDepuisContrats(profilAncien, { dateDepart: ancien.dateOuverture }, contrats, fctRetenue, config);
-  if (!serie.calculable) return false;
+  if (!serie.calculable) return { etat: "indetermine", raison: "simulation_mensuelle_impossible" };
 
   const moisCible = moisCle(fctRetenue);
   const moisAvant = serie.mois.filter((m) => m.calculable && m.moisLabel < moisCible);
-  if (moisAvant.length === 0) return false;
-
   const dernier = moisAvant[moisAvant.length - 1];
-  return dernier.calculable && dernier.soldeFin.franchiseCPRestante === 0;
+  if (!dernier || !dernier.calculable) return { etat: "indetermine", raison: "historique_mensuel_insuffisant" };
+
+  // Franchise CP prouvée NON épuisée : le reliquat existe, inutile d'aller plus loin.
+  if (dernier.soldeFin.franchiseCPRestante > 0) return { etat: "avere" };
+
+  // Franchise CP soldée. La franchise salaires est-elle seulement connue ? `valeur: null` =
+  // `franchise_salaires_non_certifiee`, donc son reliquat est inconnu, donc on ne conclut pas.
+  if (dernier.franchiseSalaires.valeur === null) return { etat: "indetermine", raison: "franchise_salaires_non_calculee" };
+
+  // Total connu (y compris 0 : aucune franchise salaires due) — là seulement le solde a un sens.
+  return dernier.soldeFin.franchiseSalairesRestante > 0 ? { etat: "avere" } : { etat: "ecarte" };
 }
 
 /**
@@ -282,7 +325,7 @@ export function calculerRenouvellementAnticipe(
   const ecartAJ = Math.round((nouveau.ajNette.net - ancien.ajNette) * 100) / 100;
   const baisse = ecartAJ < -0.005;
 
-  const tropPercuRisque = !ancienneFranchiseCPEpuisee(contrats, profil, ancien, fctRetenue, config);
+  const tropPercu = evaluerRisqueTropPercu(contrats, profil, ancien, fctRetenue, config);
 
-  return { ancien, nouveau, ecartAJ, baisse, tropPercuRisque, tropPercuChiffrable: false };
+  return { ancien, nouveau, ecartAJ, baisse, tropPercu, tropPercuChiffrable: false };
 }
