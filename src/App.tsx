@@ -19,6 +19,7 @@ import { ContractList } from "./components/ContractList";
 import { ChecklistDocuments } from "./components/ChecklistDocuments";
 import { ImportBulletins } from "./components/ImportBulletins";
 import { ImportDocumentIA } from "./components/ImportDocumentIA";
+import { OuvrirEspacePersonnelFT } from "./components/OuvrirEspacePersonnelFT";
 // Maquette de test de l'écran de revue IA (extractions simulées, bac à sable) — ne rend rien
 // hors développement, cf. RevueExtractionDemo.tsx.
 import { RevueExtractionDemo } from "./components/RevueExtractionDemo";
@@ -353,6 +354,14 @@ export default function App() {
             <ChecklistDocuments profil={profil} contrats={donnees.contrats} />
 
             <ImportBulletins profil={profil} config={franceTravailConfig} decompteActuel={calculs.decompte} onImporterContrat={ajouterContrat} />
+
+            {/* À côté du point d'entrée IA, pas dedans : simple lien sortant vers l'espace personnel
+                France Travail (nouvel onglet, jamais une iframe — FranceConnect l'interdit). Aucune
+                donnée ne transite par ce bloc, donc pas d'accent ambre : contrairement au canal IA
+                juste en dessous, rien ne quitte l'appareil ici. */}
+            <div className="border-t border-line pt-6">
+              <OuvrirEspacePersonnelFT />
+            </div>
 
             {/* Deuxième canal, distinct du local ci-dessus : celui-ci envoie le document à un serveur.
                 Aucun état ni code partagé entre les deux — la seule chose commune est l'onglet.
