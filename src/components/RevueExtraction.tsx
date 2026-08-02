@@ -22,6 +22,7 @@ import {
   champsDivergents,
   contratConfirmeDepuisCorrespondance,
   contratDepuisProposition,
+  detecterMergeAmbiguHeuresCachets,
   evaluerExtraction,
   periodeDepuisProposition,
   profilAvecProposition,
@@ -405,6 +406,7 @@ function CarteProposition({
           <p className="text-sm text-ink">Ce document semble correspondre à un contrat déjà saisi :</p>
           {(correspondances ?? []).map((candidat) => {
             const divergences = champsDivergents(candidat, proposition.donnees);
+            const mergeAmbigu = proposition.cible === "contrat" ? detecterMergeAmbiguHeuresCachets(candidat, proposition.donnees) : null;
             return (
               <div key={candidat.id} className="border border-line rounded-lg p-3 space-y-2.5">
                 <p className="text-sm text-ink">
@@ -424,12 +426,22 @@ function CarteProposition({
                     })}
                   </ul>
                 )}
-                <button
-                  onClick={() => onConfirmerCorrespondance(candidat)}
-                  className="bg-mint text-bg font-medium rounded-lg px-4 py-2 text-sm transition-opacity hover:opacity-90"
-                >
-                  Confirmer la correspondance avec ce contrat
-                </button>
+                {mergeAmbigu ? (
+                  // Purement informatif — jamais un bouton qui fusionnerait ou réinitialiserait quoi
+                  // que ce soit ici (cf. detecterMergeAmbiguHeuresCachets, lib/routageExtraction.ts).
+                  <p className="text-xs leading-relaxed rounded-lg px-3 py-2.5 bg-amber/10 text-amber">
+                    Ce document ne mentionne que {labels[mergeAmbigu.champManquant === "nbHeures" ? "nbCachets" : "nbHeures"]?.toLowerCase()}, mais ce contrat porte déjà {labels[mergeAmbigu.champManquant]?.toLowerCase()}
+                    &nbsp;: {mergeAmbigu.valeurExistante}. Pour éviter un double comptage, cette correspondance ne peut pas être confirmée en un clic — modifie ce contrat depuis « Contrats » si besoin (la
+                    case « Activité mixte » s'applique là-bas).
+                  </p>
+                ) : (
+                  <button
+                    onClick={() => onConfirmerCorrespondance(candidat)}
+                    className="bg-mint text-bg font-medium rounded-lg px-4 py-2 text-sm transition-opacity hover:opacity-90"
+                  >
+                    Confirmer la correspondance avec ce contrat
+                  </button>
+                )}
               </div>
             );
           })}

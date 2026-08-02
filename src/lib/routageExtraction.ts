@@ -365,6 +365,48 @@ export function champsDivergents(existant: Contrat, proposition: Extract<Proposi
  * autres champs métier, donc les mettre à jour ne modifie ni le regroupement ni la suppression de
  * la série (`supprimerSerie`, qui filtre uniquement sur `recurrenceId`).
  */
+/**
+ * Détecte le cas où confirmer une correspondance risquerait de recréer le bug réel du 01/08/2026
+ * (deux contrats avec un `nbHeures` résidu égal à `nbCachets × 12`, comptés en double par le
+ * moteur) — mais cette fois via la fusion `contratConfirmeDepuisCorrespondance`, pas via une saisie
+ * manuelle (le garde-fou de `ContractForm.tsx`, case "Activité mixte", ne protège QUE ce chemin-là,
+ * jamais la confirmation en un clic ci-dessous, cf. RevueExtraction.tsx).
+ *
+ * Retourne un diagnostic (jamais `null` silencieusement transformé en fusion) dès que TOUTES ces
+ * conditions sont réunies :
+ * - Le document ne fournit qu'UN SEUL des deux champs (l'autre est `null`, donc pas une activité
+ *   mixte confirmée par le document lui-même).
+ * - Le contrat existant a DÉJÀ une valeur sur l'AUTRE champ (celui que le document ne fournit pas).
+ *
+ * Dans ce cas, PAS de fusion automatique en un clic : `RevueExtraction.tsx` doit afficher un état
+ * "à vérifier manuellement" plutôt que le bouton de confirmation habituel — aucune donnée n'est
+ * jamais réinitialisée ni fusionnée silencieusement par cette fonction (devoir n°1). L'utilisateur
+ * tranche lui-même en passant par l'édition normale du contrat (`ContractList.tsx` → « Modifier »),
+ * où la case "Activité mixte" s'applique.
+ */
+export interface MergeAmbiguHeuresCachets {
+  /** Le champ que le document NE fournit PAS, mais que le contrat existant porte déjà. */
+  champManquant: "nbHeures" | "nbCachets";
+  /** La valeur déjà présente sur le contrat existant pour ce champ. */
+  valeurExistante: number;
+}
+
+export function detecterMergeAmbiguHeuresCachets(existant: Contrat, donnees: Extract<Proposition, { cible: "contrat" }>["donnees"]): MergeAmbiguHeuresCachets | null {
+  const documentFournitHeures = donnees.nbHeures != null;
+  const documentFournitCachets = donnees.nbCachets != null;
+
+  // Les deux fournis par le document : mixte confirmé par la source elle-même, pas ambigu.
+  if (documentFournitHeures && documentFournitCachets) return null;
+
+  if (!documentFournitHeures && documentFournitCachets && existant.nbHeures != null) {
+    return { champManquant: "nbHeures", valeurExistante: existant.nbHeures };
+  }
+  if (!documentFournitCachets && documentFournitHeures && existant.nbCachets != null) {
+    return { champManquant: "nbCachets", valeurExistante: existant.nbCachets };
+  }
+  return null;
+}
+
 export function contratConfirmeDepuisCorrespondance(existant: Contrat, proposition: Extract<Proposition, { cible: "contrat" }>["donnees"]): Omit<Contrat, "id"> {
   const nouveau = contratDepuisProposition(proposition);
   return {

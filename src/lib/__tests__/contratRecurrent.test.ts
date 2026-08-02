@@ -105,6 +105,26 @@ describe("genererContratsRecurrents", () => {
     expect(contrats).toEqual([]);
   });
 
+  // Point H de la cartographie du 01/08/2026 (garde-fou heures/cachets) : le modèle récurrent n'a
+  // aucun paramètre `nbCachetsParMois` — structurellement non-mixte, jamais besoin de la case
+  // "Activité mixte" pour une occurrence générée. Verrouille cet invariant contre une régression
+  // future (ex. si `nbCachetsParMois` était ajouté un jour sans y penser).
+  it("aucune occurrence générée ne porte jamais nbCachets — le modèle récurrent est structurellement non-mixte (point H)", () => {
+    const contrats = genererContratsRecurrents({
+      employeur: "Conservatoire Test",
+      moisDebut: "2026-09",
+      moisFin: "2026-11",
+      moisExclus: [],
+      nbHeuresParMois: 12,
+      salaireBrutParMois: 450,
+      etablissementAgree: true,
+      enRapportAvecMetier: true,
+    });
+    for (const c of contrats) {
+      expect(c.nbCachets).toBeUndefined();
+    }
+  });
+
   it("un seul mois (moisDebut === moisFin) -> un seul contrat", () => {
     const contrats = genererContratsRecurrents({
       employeur: "X",

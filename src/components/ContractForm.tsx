@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import type { Contrat, DecompteHeuresResultat, Profil, Territoire, TypeContrat, TypeRemuneration } from "../types";
 import type { FranceTravailConfig } from "../config/franceTravailConfig";
 import { heuresBrutesContrat } from "../engine/decompteHeures";
+import { champAEffacerEnModeExclusif, detecterActiviteMixteInitiale } from "../lib/activiteMixteFormulaire";
 import { ContractFormRecurrent } from "./ContractFormRecurrent";
 
 interface ContractFormProps {
@@ -35,6 +36,8 @@ export function ContractForm({ profil, config, decompteActuel, valeurInitiale, o
   const [salaireBrut, setSalaireBrut] = useState(valeurInitiale?.salaireBrut?.toString() ?? "");
   const [nbCachets, setNbCachets] = useState(valeurInitiale?.nbCachets?.toString() ?? "");
   const [nbHeures, setNbHeures] = useState(valeurInitiale?.nbHeures?.toString() ?? "");
+  // cf. lib/activiteMixteFormulaire.ts pour le détail du garde-fou (bug réel du 01/08/2026).
+  const [activiteMixte, setActiviteMixte] = useState(detecterActiviteMixteInitiale(valeurInitiale?.nbHeures, valeurInitiale?.nbCachets));
   const [nbJoursEEE, setNbJoursEEE] = useState(valeurInitiale?.nbJoursEEE?.toString() ?? "");
   const [etablissementAgree, setEtablissementAgree] = useState(valeurInitiale?.etablissementAgree ?? false);
   const [enRapportAvecMetier, setEnRapportAvecMetier] = useState(valeurInitiale?.enRapportAvecMetier ?? false);
@@ -58,6 +61,15 @@ export function ContractForm({ profil, config, decompteActuel, valeurInitiale, o
       setDateDebut(nouvelleDate);
     }
     setDate(nouvelleDate);
+  }
+
+  function changerNbCachets(valeur: string) {
+    setNbCachets(valeur);
+    if (champAEffacerEnModeExclusif("nbCachets", valeur, activiteMixte) === "nbHeures") setNbHeures("");
+  }
+  function changerNbHeures(valeur: string) {
+    setNbHeures(valeur);
+    if (champAEffacerEnModeExclusif("nbHeures", valeur, activiteMixte) === "nbCachets") setNbCachets("");
   }
 
   const brouillon: Contrat = {
@@ -235,7 +247,8 @@ export function ContractForm({ profil, config, decompteActuel, valeurInitiale, o
         <div>
           <span className="block text-xs uppercase tracking-[.03em] text-muted mb-1">Rémunération</span>
           <p className="text-xs text-faint mb-2">
-            Renseigne cachets et/ou heures — un même contrat peut cumuler les deux (ex. heures de répétition et cachets de représentation) : les deux comptent alors ensemble.
+            Renseigne cachets ou heures. Coche « Activité mixte » seulement si ce contrat porte réellement les deux à la fois (ex. heures de répétition et cachets de représentation sur la même
+            attestation) — sinon, remplir un champ vide automatiquement l'autre.
           </p>
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -249,7 +262,7 @@ export function ContractForm({ profil, config, decompteActuel, valeurInitiale, o
                 step="1"
                 placeholder="Si applicable"
                 value={nbCachets}
-                onChange={(e) => setNbCachets(e.target.value)}
+                onChange={(e) => changerNbCachets(e.target.value)}
                 className="w-full bg-surface-2 border border-line rounded-lg px-3 py-2"
               />
             </div>
@@ -264,11 +277,15 @@ export function ContractForm({ profil, config, decompteActuel, valeurInitiale, o
                 step="0.5"
                 placeholder="Si applicable"
                 value={nbHeures}
-                onChange={(e) => setNbHeures(e.target.value)}
+                onChange={(e) => changerNbHeures(e.target.value)}
                 className="w-full bg-surface-2 border border-line rounded-lg px-3 py-2"
               />
             </div>
           </div>
+          <label className="flex items-center gap-2 text-sm text-muted mt-2">
+            <input type="checkbox" checked={activiteMixte} onChange={(e) => setActiviteMixte(e.target.checked)} />
+            Activité mixte (cachets ET heures réellement indépendants)
+          </label>
         </div>
       )}
 

@@ -6,6 +6,7 @@ import {
   champsDivergents,
   contratConfirmeDepuisCorrespondance,
   contratDepuisProposition,
+  detecterMergeAmbiguHeuresCachets,
   evaluerExtraction,
   evaluerProposition,
   fusionnerContratsDupliques,
@@ -421,6 +422,52 @@ describe("contratConfirmeDepuisCorrespondance — l'AEM fait foi, mais jamais si
     const existant = contrat({ date: propositionDonnees.date, employeur: propositionDonnees.employeur, salaireBrut: propositionDonnees.salaireBrut, source: "manuel" });
     const confirme = contratConfirmeDepuisCorrespondance(existant, propositionDonnees);
     expect(confirme.source).toBe("import_pdf");
+  });
+});
+
+// Point E de la cartographie du 01/08/2026 : "Confirmer la correspondance" appelle
+// contratConfirmeDepuisCorrespondance en écriture directe, en un clic, sans passer par
+// ContractForm — donc sans la case "Activité mixte". detecterMergeAmbiguHeuresCachets protège CE
+// chemin précis : RevueExtraction.tsx ne doit jamais appeler contratConfirmeDepuisCorrespondance
+// quand cette fonction retourne un diagnostic — elle affiche un état "à vérifier manuellement" à
+// la place (aucune fusion, aucune donnée réinitialisée).
+describe("detecterMergeAmbiguHeuresCachets — protège 'Confirmer la correspondance' (point E)", () => {
+  const seulementHeures = (extractionAemDupliqueeHeuresCachets.propositions[0] as Extract<Proposition, { cible: "contrat" }>).donnees; // nbHeures: 14, nbCachets: null
+  const seulementCachets = (extractionAemDupliqueeHeuresCachets.propositions[1] as Extract<Proposition, { cible: "contrat" }>).donnees; // nbCachets: 3, nbHeures: null
+  const lesDeux = (extractionAemHeuresEtCachets.propositions[0] as Extract<Proposition, { cible: "contrat" }>).donnees; // nbCachets: 3, nbHeures: 14
+
+  it("détecte l'ambiguïté : document ne fournit que nbHeures, le contrat existant a déjà nbCachets", () => {
+    const existant = contrat({ date: seulementHeures.date, employeur: seulementHeures.employeur, salaireBrut: 245, nbCachets: 6 });
+    const diagnostic = detecterMergeAmbiguHeuresCachets(existant, seulementHeures);
+    expect(diagnostic).toEqual({ champManquant: "nbCachets", valeurExistante: 6 });
+  });
+
+  it("détecte l'ambiguïté dans l'autre sens : document ne fournit que nbCachets, le contrat existant a déjà nbHeures", () => {
+    const existant = contrat({ date: seulementCachets.date, employeur: seulementCachets.employeur, salaireBrut: 245, nbHeures: 72 });
+    const diagnostic = detecterMergeAmbiguHeuresCachets(existant, seulementCachets);
+    expect(diagnostic).toEqual({ champManquant: "nbHeures", valeurExistante: 72 });
+  });
+
+  it("pas d'ambiguïté quand le document fournit les deux champs (mixte confirmé par la source elle-même)", () => {
+    const existant = contrat({ date: lesDeux.date, employeur: lesDeux.employeur, salaireBrut: 245, nbCachets: 6, nbHeures: 72 });
+    expect(detecterMergeAmbiguHeuresCachets(existant, lesDeux)).toBeNull();
+  });
+
+  it("pas d'ambiguïté quand le contrat existant n'a pas l'autre champ (rien à écraser)", () => {
+    const existant = contrat({ date: seulementHeures.date, employeur: seulementHeures.employeur, salaireBrut: 245 });
+    expect(detecterMergeAmbiguHeuresCachets(existant, seulementHeures)).toBeNull();
+  });
+
+  it("reproduit le bug réel (avant garde-fou) : contratConfirmeDepuisCorrespondance fusionnerait silencieusement — preuve que le garde-fou est nécessaire en amont", () => {
+    const existant = contrat({ date: seulementHeures.date, employeur: seulementHeures.employeur, salaireBrut: 245, nbCachets: 6 });
+    // Le diagnostic doit être posé AVANT tout appel à contratConfirmeDepuisCorrespondance —
+    // RevueExtraction.tsx ne l'appelle que si detecterMergeAmbiguHeuresCachets est null.
+    expect(detecterMergeAmbiguHeuresCachets(existant, seulementHeures)).not.toBeNull();
+    // Si l'appel avait quand même lieu (comportement d'avant ce chantier), la fusion doublerait
+    // bien les heures — la preuve que ce cas doit être intercepté, pas laissé passer.
+    const fusionSiAppelee = contratConfirmeDepuisCorrespondance(existant, seulementHeures);
+    expect(fusionSiAppelee.nbHeures).toBe(14);
+    expect(fusionSiAppelee.nbCachets).toBe(6); // les deux se retrouveraient sommés par le moteur
   });
 });
 
