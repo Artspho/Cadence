@@ -164,23 +164,12 @@ export const propositionOuvertureDroitsSchema = z.object({
           "seconde, c'est la DEUXIÈME date de la phrase — la première, celle de la fin de contrat, " +
           "va dans dateAnniversaire."
       ),
-    tauxPrelevementSource: z
-      .number()
-      .nullable()
-      .describe("Taux de prélèvement à la source (%), présent sur notification/relevé/avis d'imposition."),
-    tauxPrelevementSourceDateEffet: z
-      .string()
-      .nullable()
-      .describe(
-        "Date (ISO) de la section où la phrase du taux a été trouvée — le libellé « Situation au " +
-          "JJ/MM/AAAA » qui précède le tableau contenant la phrase, ou la date de la notification " +
-          "elle-même si le document n'a qu'une seule section. Un même document peut contenir " +
-          "PLUSIEURS sections avec des dates différentes (un relevé de situation en couvre souvent " +
-          "deux) — prends TOUJOURS la date de la section où LA PHRASE DU TAUX ELLE-MÊME apparaît, " +
-          "jamais une autre date du document (règlement, période de paiement). Sert à choisir le " +
-          "bon taux quand plusieurs documents successifs en donnent des différents : le plus récent " +
-          "l'emporte, jamais le premier trouvé ni le taux du document le plus récemment importé."
-      ),
+    // Le taux de prélèvement à la source n'est PLUS un champ de cette cible depuis le 02/08/2026 :
+    // un relevé/notification qui mentionne un taux produit désormais une proposition
+    // `taux_pas_historique` SÉPARÉE (une par section datée trouvée), exactement comme l'attestation
+    // dédiée ci-dessous — cf. Cible 6. Ferme le gap documenté dans CLAUDE.md (« sélection de la
+    // section la plus récente comme valeur primaire ») : plus de choix automatique d'une section au
+    // détriment des autres, par construction, quel que soit le document d'origine.
   }),
   confiance: z.record(niveauConfiance),
   justification: z.string(),
@@ -254,19 +243,18 @@ export const propositionAjReelleSchema = z.object({
 });
 
 // ─── Cible 6 : historique de taux PAS (attestation dédiée) ─────────────────
-// Document dédié à cette seule information (espace personnel impots.gouv.fr, rubrique « Gérer mon
-// prélèvement à la source » / « Mes attestations ») — à distinguer de
-// propositionOuvertureDroitsSchema.tauxPrelevementSource ci-dessus, qui capture un taux trouvé EN
-// PLUS sur une notification/relevé (une seule proposition par document, celle-ci retenant la
-// section la plus récente faute de mieux). Ici, le document PEUT lister plusieurs taux successifs
-// (un historique de changements DGFIP) : chaque taux/date devient sa PROPRE proposition, jamais une
-// proposition unique qui choisirait laquelle est "primaire" — fermeture délibérée, pour ce canal,
-// du gap documenté dans CLAUDE.md (sélection d'une section comme valeur primaire) : aucune
+// Cible désormais commune à DEUX familles de documents (unifiées le 02/08/2026) : l'attestation
+// dédiée (espace personnel impots.gouv.fr, rubrique « Gérer mon prélèvement à la source » / « Mes
+// attestations ») ET une notification/relevé qui mentionne un taux EN PLUS de ses autres
+// informations (Cible 2 ci-dessus ne porte plus aucun champ de taux). Dans les deux cas, le document
+// PEUT montrer plusieurs taux/sections datées (un historique de changements DGFIP, ou les deux
+// sections « Situation au [date] » d'un même relevé) : chaque taux/date devient sa PROPRE
+// proposition, jamais une proposition unique qui choisirait laquelle est "primaire" — fermeture
+// délibérée du gap documenté dans CLAUDE.md (sélection d'une section comme valeur primaire) : aucune
 // sélection automatique n'est possible par construction, l'utilisateur voit et applique chaque
-// entrée lui-même. `valeur` et `dateEffet` sont volontairement NON nullables (contrairement à
-// tauxPrelevementSource/tauxPrelevementSourceDateEffet) : ce document n'a qu'un seul rôle, donc rien
-// à défaut de champ — si un taux ou sa date de prise d'effet ne peut pas être cité littéralement,
-// aucune proposition ne doit être produite pour lui (cf. api/extract-document.ts).
+// entrée lui-même. `valeur` et `dateEffet` sont volontairement NON nullables : si un taux ou sa date
+// de prise d'effet ne peut pas être cité littéralement, aucune proposition ne doit être produite
+// pour lui (cf. api/extract-document.ts).
 export const propositionTauxPASHistoriqueSchema = z.object({
   cible: z.literal("taux_pas_historique"),
   donnees: z.object({

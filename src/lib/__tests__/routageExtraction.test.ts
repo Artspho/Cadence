@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Profil } from "../../types";
-import type { Proposition } from "../../types/extraction";
+import type { ExtractionResult, Proposition } from "../../types/extraction";
 import { contrat } from "../../engine/__tests__/testUtils";
 import { RAPPEL_AEM_FAIT_FOI } from "../../content/rappelAEM";
 import {
@@ -35,6 +35,18 @@ function propositionAj(natureMontant: "net" | "brut" | "indetermine", valeur = 6
     cible: "aj_reelle_historique",
     donnees: { dateEffet: "2026-03-01", valeur, natureMontant },
     confiance: { valeur: "haute" },
+    justification: "test",
+  };
+}
+
+// Partagée entre les deux describe ci-dessous : depuis le 02/08/2026, TOUT canal (relevé/notification
+// ou attestation dédiée) qui trouve un taux produit ce type de proposition, jamais un champ sur
+// profil_ouverture_droits (cf. types/extraction.ts, Cible 2 vs Cible 6).
+function propositionTaux(valeur: number, dateEffet: string): Proposition {
+  return {
+    cible: "taux_pas_historique",
+    donnees: { valeur, dateEffet },
+    confiance: { valeur: "haute", dateEffet: "haute" },
     justification: "test",
   };
 }
@@ -80,9 +92,12 @@ describe("aj_reelle_historique — le champ de l'app attend une AJ NETTE", () =>
 });
 
 describe("profil_ouverture_droits — refus si un chiffre qui change les montants manque", () => {
+  // Depuis le 02/08/2026, cette cible ne porte plus AUCUN champ de taux (cf. types/extraction.ts,
+  // Cible 2) : un relevé/notification qui en trouve un produit une proposition taux_pas_historique
+  // séparée (cf. describe ci-dessous), jamais un champ ici.
   const complete: Proposition = {
     cible: "profil_ouverture_droits",
-    donnees: { dateOuverture: "2026-02-01", franchiseCPTotale: 12, delaiAttenteInitial: 7, dateLimiteIndemnisation: "2027-01-31", tauxPrelevementSource: 7.2, tauxPrelevementSourceDateEffet: "2026-02-01" },
+    donnees: { dateOuverture: "2026-02-01", franchiseCPTotale: 12, delaiAttenteInitial: 7, dateLimiteIndemnisation: "2027-01-31" },
     confiance: {},
     justification: "test",
   };
@@ -95,7 +110,6 @@ describe("profil_ouverture_droits — refus si un chiffre qui change les montant
       franchiseCPTotale: 12,
       delaiAttenteInitial: 7,
       dateLimiteIndemnisation: "2027-01-31",
-      tauxPrelevementSourceHistorique: [{ dateEffet: "2026-02-01", valeur: 7.2 }],
     });
   });
 
@@ -111,119 +125,47 @@ describe("profil_ouverture_droits — refus si un chiffre qui change les montant
     expect(() => profilAvecProposition(profilBase, partielle)).toThrow();
   });
 
-  it("ne perd pas un taux déjà saisi quand le document n'en donne pas", () => {
+  it("ne touche jamais tauxPrelevementSourceHistorique, quel que soit son contenu (cette cible n'a plus aucun champ de taux)", () => {
     const profil: Profil = {
       ...profilBase,
       ouvertureDroits: { dateOuverture: "2025-02-01", franchiseCPTotale: 5, delaiAttenteInitial: 7, tauxPrelevementSourceHistorique: [{ dateEffet: "2025-02-01", valeur: 3.1 }], dateLimiteIndemnisation: "2026-01-31" },
     };
-    const sansTaux = { ...complete, donnees: { ...complete.donnees, tauxPrelevementSource: null, tauxPrelevementSourceDateEffet: null, dateLimiteIndemnisation: null } } as Proposition;
-    const resultat = profilAvecProposition(profil, sansTaux);
+    const sansDateLimite = { ...complete, donnees: { ...complete.donnees, dateLimiteIndemnisation: null } } as Proposition;
+    const resultat = profilAvecProposition(profil, sansDateLimite);
     expect(resultat.ouvertureDroits?.tauxPrelevementSourceHistorique).toEqual([{ dateEffet: "2025-02-01", valeur: 3.1 }]);
     expect(resultat.ouvertureDroits?.dateLimiteIndemnisation).toBe("2026-01-31");
   });
 
-  it("applicable si un champ utile est donné seul, quand ouvertureDroits existe déjà (ex. avis d'imposition seul)", () => {
+  it("applicable si dateLimiteIndemnisation est donné seul, quand ouvertureDroits existe déjà (ex. relevé qui ne redonne que la date limite)", () => {
     const profil: Profil = {
       ...profilBase,
       ouvertureDroits: { dateOuverture: "2025-02-01", franchiseCPTotale: 5, delaiAttenteInitial: 7 },
     };
-    const tauxSeul = {
+    const dateLimiteSeule = {
       ...complete,
-      donnees: { ...complete.donnees, dateOuverture: "", franchiseCPTotale: null, delaiAttenteInitial: null, dateLimiteIndemnisation: null, tauxPrelevementSource: 3.1, tauxPrelevementSourceDateEffet: "2025-06-01" },
+      donnees: { ...complete.donnees, dateOuverture: "", franchiseCPTotale: null, delaiAttenteInitial: null, dateLimiteIndemnisation: "2026-01-31" },
     } as Proposition;
-    expect(evaluerProposition(tauxSeul, profil).statut).toBe("applicable");
+    expect(evaluerProposition(dateLimiteSeule, profil).statut).toBe("applicable");
   });
 
-  it("récupère dateOuverture/franchiseCPTotale/delaiAttenteInitial du profil existant quand la proposition ne donne que le taux", () => {
+  it("récupère dateOuverture/franchiseCPTotale/delaiAttenteInitial du profil existant quand la proposition ne donne que dateLimiteIndemnisation", () => {
     const profil: Profil = {
       ...profilBase,
       ouvertureDroits: { dateOuverture: "2025-02-01", franchiseCPTotale: 5, delaiAttenteInitial: 7 },
     };
-    const tauxSeul = {
+    const dateLimiteSeule = {
       ...complete,
-      donnees: { ...complete.donnees, dateOuverture: "", franchiseCPTotale: null, delaiAttenteInitial: null, dateLimiteIndemnisation: null, tauxPrelevementSource: 3.1, tauxPrelevementSourceDateEffet: "2025-06-01" },
+      donnees: { ...complete.donnees, dateOuverture: "", franchiseCPTotale: null, delaiAttenteInitial: null, dateLimiteIndemnisation: "2026-01-31" },
     } as Proposition;
-    const resultat = profilAvecProposition(profil, tauxSeul);
+    const resultat = profilAvecProposition(profil, dateLimiteSeule);
     expect(resultat.ouvertureDroits?.dateOuverture).toBe("2025-02-01");
     expect(resultat.ouvertureDroits?.franchiseCPTotale).toBe(5);
     expect(resultat.ouvertureDroits?.delaiAttenteInitial).toBe(7);
-    expect(resultat.ouvertureDroits?.tauxPrelevementSourceHistorique).toEqual([{ dateEffet: "2025-06-01", valeur: 3.1 }]);
-  });
-
-  it("applicable même si le relevé redonne dateOuverture en plus du taux, franchise/délai non redonnés", () => {
-    const profil: Profil = {
-      ...profilBase,
-      ouvertureDroits: { dateOuverture: "2026-01-18", franchiseCPTotale: 5, delaiAttenteInitial: 7 },
-    };
-    const releve = {
-      ...complete,
-      donnees: { ...complete.donnees, dateOuverture: "2026-01-18", franchiseCPTotale: null, delaiAttenteInitial: null, dateLimiteIndemnisation: null, tauxPrelevementSource: 3.1, tauxPrelevementSourceDateEffet: "2026-01-18" },
-    } as Proposition;
-    expect(evaluerProposition(releve, profil).statut).toBe("applicable");
-  });
-
-  it("un relevé qui redonne dateOuverture met quand même à jour le taux sans perdre franchise/délai", () => {
-    const profil: Profil = {
-      ...profilBase,
-      ouvertureDroits: { dateOuverture: "2026-01-18", franchiseCPTotale: 5, delaiAttenteInitial: 7 },
-    };
-    const releve = {
-      ...complete,
-      donnees: { ...complete.donnees, dateOuverture: "2026-01-18", franchiseCPTotale: null, delaiAttenteInitial: null, dateLimiteIndemnisation: null, tauxPrelevementSource: 3.1, tauxPrelevementSourceDateEffet: "2026-01-18" },
-    } as Proposition;
-    const resultat = profilAvecProposition(profil, releve);
-    expect(resultat.ouvertureDroits?.dateOuverture).toBe("2026-01-18");
-    expect(resultat.ouvertureDroits?.franchiseCPTotale).toBe(5);
-    expect(resultat.ouvertureDroits?.delaiAttenteInitial).toBe(7);
-    expect(resultat.ouvertureDroits?.tauxPrelevementSourceHistorique).toEqual([{ dateEffet: "2026-01-18", valeur: 3.1 }]);
-  });
-
-  it("sans dateEffet lisible, le taux n'est pas appliqué (pas de date inventée, devoir n°2)", () => {
-    const sansDate = { ...complete, donnees: { ...complete.donnees, tauxPrelevementSourceDateEffet: null } } as Proposition;
-    const resultat = profilAvecProposition(profilBase, sansDate);
-    expect(resultat.ouvertureDroits?.tauxPrelevementSourceHistorique).toBeUndefined();
-  });
-
-  it("régression réelle 01/08/2026 : un second relevé plus récent AJOUTE une entrée, ne remplace jamais l'historique (3,30 % mi-2025 puis 3,10 % fin 2025/2026, cf. relevés réels du dossier)", () => {
-    const profilApresPremierReleve: Profil = {
-      ...profilBase,
-      ouvertureDroits: { dateOuverture: "2025-03-24", franchiseCPTotale: 5, delaiAttenteInitial: 7, tauxPrelevementSourceHistorique: [{ dateEffet: "2025-07-03", valeur: 3.3 }] },
-    };
-    const secondReleve = {
-      ...complete,
-      donnees: { ...complete.donnees, dateOuverture: "2025-03-24", franchiseCPTotale: null, delaiAttenteInitial: null, dateLimiteIndemnisation: null, tauxPrelevementSource: 3.1, tauxPrelevementSourceDateEffet: "2026-02-17" },
-    } as Proposition;
-    const resultat = profilAvecProposition(profilApresPremierReleve, secondReleve);
-    expect(resultat.ouvertureDroits?.tauxPrelevementSourceHistorique).toEqual([
-      { dateEffet: "2025-07-03", valeur: 3.3 },
-      { dateEffet: "2026-02-17", valeur: 3.1 },
-    ]);
-  });
-
-  it("un même document réimporté (même dateEffet) remplace l'entrée existante plutôt que d'en créer une seconde", () => {
-    const profilExistant: Profil = {
-      ...profilBase,
-      ouvertureDroits: { dateOuverture: "2025-03-24", franchiseCPTotale: 5, delaiAttenteInitial: 7, tauxPrelevementSourceHistorique: [{ dateEffet: "2026-02-17", valeur: 3.1 }] },
-    };
-    const memeDocument = {
-      ...complete,
-      donnees: { ...complete.donnees, dateOuverture: "2025-03-24", franchiseCPTotale: null, delaiAttenteInitial: null, dateLimiteIndemnisation: null, tauxPrelevementSource: 3.1, tauxPrelevementSourceDateEffet: "2026-02-17" },
-    } as Proposition;
-    const resultat = profilAvecProposition(profilExistant, memeDocument);
-    expect(resultat.ouvertureDroits?.tauxPrelevementSourceHistorique).toEqual([{ dateEffet: "2026-02-17", valeur: 3.1 }]);
+    expect(resultat.ouvertureDroits?.dateLimiteIndemnisation).toBe("2026-01-31");
   });
 });
 
-describe("taux_pas_historique — attestation dédiée, une proposition par taux, jamais un choix de valeur primaire", () => {
-  function propositionTaux(valeur: number, dateEffet: string): Proposition {
-    return {
-      cible: "taux_pas_historique",
-      donnees: { valeur, dateEffet },
-      confiance: { valeur: "haute", dateEffet: "haute" },
-      justification: "test",
-    };
-  }
-
+describe("taux_pas_historique — commun à tout canal depuis le 02/08/2026, une proposition par taux, jamais un choix de valeur primaire", () => {
   it("non applicable tant qu'aucune ouverture de droits n'est connue (rien où le rattacher)", () => {
     const evaluee = evaluerProposition(propositionTaux(3.1, "2026-01-01"), profilBase);
     expect(evaluee.statut).toBe("non_applicable");
@@ -260,6 +202,92 @@ describe("taux_pas_historique — attestation dédiée, une proposition par taux
     expect(resultat.ouvertureDroits?.franchiseCPTotale).toBe(5);
     expect(resultat.ouvertureDroits?.delaiAttenteInitial).toBe(7);
     expect(resultat.ouvertureDroits?.dateLimiteIndemnisation).toBe("2026-01-31");
+  });
+
+  it("un même dateEffet réappliqué remplace l'entrée existante plutôt que d'en créer une seconde (document réimporté)", () => {
+    const profilExistant: Profil = {
+      ...profilBase,
+      ouvertureDroits: { dateOuverture: "2025-03-24", franchiseCPTotale: 5, delaiAttenteInitial: 7, tauxPrelevementSourceHistorique: [{ dateEffet: "2026-02-17", valeur: 3.1 }] },
+    };
+    const resultat = profilAvecProposition(profilExistant, propositionTaux(3.1, "2026-02-17"));
+    expect(resultat.ouvertureDroits?.tauxPrelevementSourceHistorique).toEqual([{ dateEffet: "2026-02-17", valeur: 3.1 }]);
+  });
+
+  it("régression réelle 01/08/2026 : un second relevé plus récent AJOUTE une entrée, ne remplace jamais l'historique (3,30 % mi-2025 puis 3,10 % fin 2025/2026, cf. relevés réels du dossier)", () => {
+    const profilApresPremierReleve: Profil = {
+      ...profilBase,
+      ouvertureDroits: { dateOuverture: "2025-03-24", franchiseCPTotale: 5, delaiAttenteInitial: 7, tauxPrelevementSourceHistorique: [{ dateEffet: "2025-07-03", valeur: 3.3 }] },
+    };
+    const resultat = profilAvecProposition(profilApresPremierReleve, propositionTaux(3.1, "2026-02-17"));
+    expect(resultat.ouvertureDroits?.tauxPrelevementSourceHistorique).toEqual([
+      { dateEffet: "2025-07-03", valeur: 3.3 },
+      { dateEffet: "2026-02-17", valeur: 3.1 },
+    ]);
+  });
+
+  // Le cœur de CE chantier (02/08/2026) : un relevé/notification qui montre deux sections datées à
+  // des taux DIFFÉRENTS ne doit jamais en choisir une comme "primaire" — chaque section devient sa
+  // propre proposition taux_pas_historique, exactement comme pour l'attestation dédiée (cf. fixture
+  // attestation_taux_pas ci-dessous). Aucune fixture dédiée : construit inline, ce canal ne produit
+  // plus de champ de taux sur profil_ouverture_droits (cf. describe précédent).
+  it("relevé de situation à deux sections avec des taux DIFFÉRENTS : les deux propositions taux_pas_historique s'appliquent séparément, aucune n'est perdue ni choisie comme primaire", () => {
+    const ouverture: Proposition = {
+      cible: "profil_ouverture_droits",
+      donnees: { dateOuverture: "2026-01-18", franchiseCPTotale: 5, delaiAttenteInitial: 7, dateLimiteIndemnisation: "2027-01-17" },
+      confiance: {},
+      justification: "test",
+    };
+    const sectionAncienne = propositionTaux(2.9, "2026-06-28"); // « Situation au 28/06/2026 »
+    const sectionRecente = propositionTaux(3.45, "2026-07-13"); // « Situation au 13/07/2026 »
+
+    let profil = profilAvecProposition(profilBase, ouverture);
+    profil = profilAvecProposition(profil, sectionAncienne);
+    profil = profilAvecProposition(profil, sectionRecente);
+
+    expect(profil.ouvertureDroits?.tauxPrelevementSourceHistorique).toEqual([
+      { dateEffet: "2026-06-28", valeur: 2.9 },
+      { dateEffet: "2026-07-13", valeur: 3.45 },
+    ]);
+  });
+
+  // Répond à la question d'ordre posée avant la rédaction du prompt (étape 3) : evaluerExtraction
+  // est un simple .map() par proposition (cf. routageExtraction.ts), sans dépendance entre elles —
+  // l'ordre des deux propositions dans le tableau `propositions` n'a donc AUCUNE influence sur leur
+  // statut individuel. Testé dans les deux ordres pour le prouver, pas juste l'affirmer.
+  it.each([
+    ["profil_ouverture_droits avant taux_pas_historique", true],
+    ["taux_pas_historique avant profil_ouverture_droits", false],
+  ])("ordre dans le tableau propositions (%s) : chaque statut ne dépend que du profil actuel, jamais de la position dans le tableau", (_cas, ouvertureEnPremier) => {
+    const ouverture: Proposition = {
+      cible: "profil_ouverture_droits",
+      donnees: { dateOuverture: "2026-01-18", franchiseCPTotale: 5, delaiAttenteInitial: 7, dateLimiteIndemnisation: "2027-01-17" },
+      confiance: {},
+      justification: "test",
+    };
+    const taux = propositionTaux(3.1, "2026-01-18");
+    const resultat: ExtractionResult = {
+      typeDocumentDetecte: "releve_situation",
+      propositions: ouvertureEnPremier ? [ouverture, taux] : [taux, ouverture],
+      avertissementsGeneraux: [],
+    };
+
+    // Sans ouvertureDroits connue : la proposition profil_ouverture_droits est TOUJOURS applicable
+    // (elle ne dépend de rien d'autre), le taux TOUJOURS non_applicable (rien où le rattacher) —
+    // quel que soit l'ordre des deux dans le tableau.
+    const evaluees = evaluerExtraction(resultat, profilBase);
+    const evalueeOuverture = evaluees.find((e) => e.proposition.cible === "profil_ouverture_droits")!;
+    const evalueeTaux = evaluees.find((e) => e.proposition.cible === "taux_pas_historique")!;
+    expect(evalueeOuverture.statut).toBe("applicable");
+    expect(evalueeTaux.statut).toBe("non_applicable");
+
+    // Une fois profil_ouverture_droits appliqué (clic utilisateur sur cette carte), une réévaluation
+    // du MÊME tableau — RevueExtraction.tsx recalcule evaluerExtraction à chaque rendu, cf.
+    // routageExtraction.ts — fait immédiatement passer le taux à "applicable" : rien n'est perdu,
+    // l'utilisateur n'a qu'à appliquer les deux cartes dans l'ordre où elles se présentent à l'écran.
+    const profilApresOuverture = profilAvecProposition(profilBase, evalueeOuverture.proposition);
+    const evalueesApres = evaluerExtraction(resultat, profilApresOuverture);
+    const evalueeTauxApres = evalueesApres.find((e) => e.proposition.cible === "taux_pas_historique")!;
+    expect(evalueeTauxApres.statut).toBe("applicable");
   });
 
   // Le cœur du chantier (cf. types/extraction.ts) : une attestation qui liste plusieurs taux
@@ -699,9 +727,13 @@ describe("info_seule — jamais routée, jamais perdue", () => {
 });
 
 describe("fixtures de démonstration — couvrent bien chaque branche", () => {
-  it("la notification est entièrement applicable, hors information", () => {
+  it("la notification est applicable, hors information et hors le taux (qui attend que l'ouverture de droits soit d'abord appliquée)", () => {
+    // Le taux (proposition séparée depuis le 02/08/2026) est non_applicable ici car profilBase n'a
+    // pas encore d'ouvertureDroits — comportement attendu, pas un bug : cf. le test d'ordre plus haut
+    // (« ordre dans le tableau propositions »), il repasse à "applicable" dès que la proposition
+    // profil_ouverture_droits voisine est appliquée.
     const statuts = evaluerExtraction(extractionNotificationAdmission, profilBase).map((e) => e.statut);
-    expect(statuts).toEqual(["applicable", "applicable", "applicable", "information"]);
+    expect(statuts).toEqual(["applicable", "non_applicable", "applicable", "applicable", "information"]);
   });
 
   it("le relevé produit deux refus, une revue formulaire (periode_assimilee) et une information", () => {

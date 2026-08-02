@@ -122,53 +122,11 @@ NOTIFICATION D'ADMISSION ARE / RELEVÉ DE SITUATION
         → profil_ouverture_droits.delaiAttenteInitial = N  (presque toujours 7)
   « taux de prélèvement à la source : X % » / « Le montant de l'impôt sur le revenu prélevé à la
   source est de M €, calculé sur la base d'un taux personnalisé de X % [...] »
-        → profil_ouverture_droits.tauxPrelevementSource = X
-        Le document peut MENTIONNER le prélèvement à la source sans donner de taux : dans ce cas,
-        laisse null. La mention n'est pas un chiffre.
-
-  ⚠️⚠️ PIÈGE — LA PHRASE DU TAUX PAS NE CONTIENT JAMAIS DE DATE : LA DATE VIENT DE LA SECTION
-  Sur un relevé de situation, cette phrase apparaît une ou deux fois, une fois par section
-  « Situation au [date] » (le document peut aussi porter un titre global « RELEVE DE SITUATION DU
-  [date1] AU [date2] »). La phrase elle-même ne contient JAMAIS de date — ne cherche pas de date à
-  l'intérieur d'elle, et ne baisse pas ta confiance pour ce motif : une confiance "moyenne" par le
-  passé venait précisément de cette absence de date DANS LA PHRASE, alors que la date se lit juste
-  au-dessus, dans le titre de la section qui la contient.
-  Règle : la date d'effet du taux est celle de la section « Situation au [date] » qui contient
-  DIRECTEMENT la phrase du taux (celle qui la précède dans le document, sans autre titre de section
-  entre les deux). ⚠️ Ne confonds jamais cette section avec un titre de paragraphe voisin sans
-  rapport, par exemple « REGLEMENT DU [date] » (qui documente un virement bancaire, pas une section
-  « Situation au ») : s'il y a un autre titre entre la dernière section « Situation au [date] » et la
-  phrase du taux, remonte au dernier titre « Situation au [date] » rencontré, jamais à un autre type
-  de titre.
-  Si le document contient deux occurrences de cette phrase (donc deux sections « Situation au
-  [date] » distinctes), c'est un CAS NORMAL, pas une ambiguïté à fuir : traite chaque occurrence
-  séparément et cite, pour chacune, le nom exact de sa propre section — ne mélange jamais les deux
-  dans une même justification vague. Si le taux est identique dans les deux occurrences (cas
-  fréquent : même taux DGFIP sur toute la période), c'est une CONFIRMATION croisée qui AUGMENTE la
-  confiance (haute), jamais une raison de douter.
-  Pour profil_ouverture_droits.tauxPrelevementSource (une seule proposition, donc un seul couple
-  taux/date par document) : retiens le taux de la section « Situation au [date] » la PLUS RÉCENTE,
-  confiance "haute", justifié par la phrase ET le nom exact de cette section. ⚠️ « La plus récente »
-  se détermine en COMPARANT EXPLICITEMENT les deux dates elles-mêmes (jour/mois/année) — PAS en
-  supposant que la première section rencontrée en lisant le document est la plus ancienne ou la plus
-  récente. Exemple : entre « Situation au 28/06/2026 » et « Situation au 13/07/2026 », le 13/07/2026
-  est postérieur au 28/06/2026 (juillet après juin) → c'est la section « Situation au 13/07/2026 »
-  qui est la plus récente, même si elle apparaît plus loin dans le document.
-  tauxPrelevementSourceDateEffet DOIT porter la date ISO de CETTE section (celle du taux retenu),
-  jamais celle d'une autre section, ni une date devinée — c'est ce qui permet à Cadence de conserver
-  un historique de taux successifs plutôt qu'un scalaire unique écrasé à chaque import (bug réel
-  corrigé le 01/08/2026 : un utilisateur réel a eu 3,30 % mi-2025 puis 3,10 % dès fin 2025/2026, les
-  deux valeurs doivent survivre, pas seulement la plus récemment importée).
-  Si une autre section antérieure DU MÊME DOCUMENT porte un taux DIFFÉRENT (rare, mais possible en
-  cas de changement de taux DGFIP en cours de période), ajoute-la en info_seule (clé scalaire à
-  plat, ex. tauxPrelevementSourceSituationAu[date]) pour ne perdre aucune information — jamais une
-  deuxième proposition profil_ouverture_droits (le schéma n'en accepte qu'une par document).
-
-  ⚠️ GARDE-FOU — SI LA PHRASE N'EXISTE PAS : une section de paiement peut exister sans que la phrase
-  du taux personnalisé n'y figure (France Travail peut changer sa formulation ou la structure de son
-  courrier). Dans ce cas, NE DEVINE PAS et N'APPROXIME PAS de taux : range en info_seule avec une
-  justification explicite du type « mention du taux introuvable dans cette section, structure du
-  document possiblement modifiée depuis la dernière vérification du prompt (07/2026) ».
+        → NE remplis PAS ce champ ici : profil_ouverture_droits n'a PLUS AUCUN champ de taux depuis
+        le 02/08/2026. Produis à la place une proposition taux_pas_historique SÉPARÉE — cf. section
+        « TAUX DE PRÉLÈVEMENT À LA SOURCE (PAS) — commun à tout document » plus bas, qui couvre en
+        détail cette phrase précise (règle de date par section, piège de la section voisine sans
+        rapport, plusieurs sections/taux distincts).
 
   dateLimiteIndemnisation — DEUX FORMULATIONS ÉQUIVALENTES, selon le document :
         « La date limite de votre indemnisation est le X »        (relevé de situation)
@@ -396,39 +354,72 @@ JUSTIFICATIF DE DÉCLARATION DE SITUATION MENSUELLE (ACTUALISATION FRANCE TRAVAI
   arrêt de travail, d'une formation ou d'un congé justifierait d'envisager cette cible, et ce
   document-type ne contient par construction que des négations dans cette section.
 
-ATTESTATION DE TAUX DE PRÉLÈVEMENT À LA SOURCE (PAS) — ajouté 02/08/2026
+TAUX DE PRÉLÈVEMENT À LA SOURCE (PAS) — commun à tout document, unifié le 02/08/2026
 
-  Document DÉDIÉ, distinct de la notification/du relevé (qui ne rapportent qu'UN taux en plus de
-  leurs autres informations, cf. profil_ouverture_droits.tauxPrelevementSource plus haut) :
-  téléchargé par l'utilisateur depuis son espace personnel impots.gouv.fr, rubrique « Gérer mon
-  prélèvement à la source » / « Mes attestations ». Il ne contient RIEN d'autre qu'un ou plusieurs
-  taux datés — pas de franchise, pas de délai d'attente, pas d'allocation.
+  Cible UNIQUE pour tout taux PAS trouvé, quel que soit le document : l'attestation DÉDIÉE (espace
+  personnel impots.gouv.fr, rubrique « Gérer mon prélèvement à la source » / « Mes attestations »,
+  qui ne contient RIEN d'autre qu'un ou plusieurs taux datés — pas de franchise, pas de délai
+  d'attente, pas d'allocation) ET la notification/le relevé de situation (qui mentionnent un taux EN
+  PLUS de leurs autres informations, cf. section NOTIFICATION/RELEVÉ plus haut, qui renvoie ici).
+  profil_ouverture_droits n'a PLUS AUCUN champ de taux : chaque taux trouvé, sur QUELQUE document
+  que ce soit, devient sa PROPRE proposition taux_pas_historique, jamais un champ d'une autre cible.
 
-  « Votre taux de prélèvement à la source est de X % à compter du JJ/MM/AAAA »
-  « Taux personnalisé : X %, applicable depuis le JJ/MM/AAAA »
-        → UNE proposition taux_pas_historique par couple (taux, date) trouvé sur le document :
-          valeur = X, dateEffet = date ISO de la date de prise d'effet EXPLICITEMENT écrite à côté
-          de CE taux.
+  DEUX FORMULATIONS SELON LE DOCUMENT :
 
-  ⚠️ NE JAMAIS CALCULER UN TAUX. Le document peut aussi afficher un montant de retenue en euros
+  Attestation dédiée — « Votre taux de prélèvement à la source est de X % à compter du JJ/MM/AAAA »
+  / « Taux personnalisé : X %, applicable depuis le JJ/MM/AAAA » : la date de prise d'effet est
+  ÉCRITE EXPLICITEMENT à côté du taux → dateEffet = cette date, telle quelle.
+
+  Notification/relevé — « taux de prélèvement à la source : X % » / « Le montant de l'impôt sur le
+  revenu prélevé à la source est de M €, calculé sur la base d'un taux personnalisé de X % [...] » :
+  ⚠️⚠️ PIÈGE — CETTE PHRASE NE CONTIENT JAMAIS DE DATE : LA DATE VIENT DE LA SECTION QUI LA CONTIENT.
+  Sur un relevé de situation, cette phrase apparaît une ou deux fois, une fois par section
+  « Situation au [date] » (le document peut aussi porter un titre global « RELEVE DE SITUATION DU
+  [date1] AU [date2] »). Ne cherche pas de date à l'intérieur de la phrase elle-même, et ne baisse
+  pas ta confiance pour ce motif : une confiance "moyenne" par le passé venait précisément de cette
+  absence de date DANS LA PHRASE, alors que la date se lit juste au-dessus, dans le titre de la
+  section qui la contient. Règle : dateEffet est celle de la section « Situation au [date] » qui
+  contient DIRECTEMENT la phrase du taux (celle qui la précède dans le document, sans autre titre de
+  section entre les deux). ⚠️ Ne confonds jamais cette section avec un titre de paragraphe voisin
+  sans rapport, par exemple « REGLEMENT DU [date] » (qui documente un virement bancaire, pas une
+  section « Situation au ») : s'il y a un autre titre entre la dernière section « Situation au
+  [date] » et la phrase du taux, remonte au dernier titre « Situation au [date] » rencontré, jamais à
+  un autre type de titre. Le document peut MENTIONNER le prélèvement à la source sans donner de
+  taux : dans ce cas, aucune proposition (rien à lire).
+
+  ⚠️ NE JAMAIS CALCULER UN TAUX. Un document peut afficher un montant de retenue en euros
   (« Montant prélevé : 15,03 € ») sans le pourcentage à côté — dans ce cas, NE DÉDUIS AUCUN
   pourcentage à partir de ce montant et d'un revenu quelconque : cette ligne n'a pas de champ
   structuré, range-la en info_seule si tu veux la conserver, jamais dans valeur.
 
-  ⚠️⚠️ PIÈGE — SI L'ATTESTATION LISTE PLUSIEURS TAUX SUCCESSIFS, PRODUIS UNE PROPOSITION PAR TAUX,
-  JAMAIS UNE SEULE QUI EN CHOISIRAIT UN COMME « PRINCIPAL »
-  Contrairement à profil_ouverture_droits.tauxPrelevementSource (une seule proposition par
-  document, qui retient la section la plus récente comme valeur unique faute de mieux, cf. plus
-  haut), ce schéma-ci permet d'écrire tout l'historique tel quel : ne choisis JAMAIS un taux
-  « actuel » ou « le plus important » au détriment des autres. Si le document montre deux taux à
-  deux dates différentes, produis DEUX propositions taux_pas_historique, chacune avec sa propre
-  justification citant sa propre phrase — jamais une seule proposition, jamais une justification
-  vague du type « historique des taux » qui mélangerait les deux.
+  ⚠️⚠️ PIÈGE — SI PLUSIEURS TAUX/SECTIONS DATÉES COEXISTENT, PRODUIS UNE PROPOSITION PAR TAUX,
+  JAMAIS UNE SEULE QUI EN CHOISIRAIT UN COMME « PRIMAIRE » OU « LE PLUS RÉCENT »
+  Que ce soit une attestation qui liste plusieurs taux successifs, ou un relevé à deux sections
+  « Situation au [date] » distinctes : ne choisis JAMAIS un taux « actuel », « le plus important » ou
+  « le plus récent » au détriment des autres — ce schéma permet d'écrire tout l'historique tel quel,
+  c'est Cadence (getTauxPASAt, engine/ajReelleUtils.ts) qui détermine ensuite lequel s'applique à
+  quelle date, jamais le prompt. Si les dates diffèrent, produis UNE proposition PAR taux/section,
+  chacune avec sa propre justification citant sa propre phrase et le nom exact de sa propre section
+  — jamais une seule proposition, jamais une justification vague du type « historique des taux » qui
+  mélangerait les deux. Exemple : entre « Situation au 28/06/2026 » et « Situation au 13/07/2026 »,
+  si les deux portent des taux différents, produis DEUX propositions ({ valeur, dateEffet:
+  "2026-06-28" } et { valeur, dateEffet: "2026-07-13" }) — jamais une seule proposition qui aurait
+  retenu la section du 13/07 comme "la plus récente" au détriment de celle du 28/06 (bug réel corrigé
+  le 01/08/2026, cf. docs/reprise.md : un utilisateur a eu 3,30 % mi-2025 puis 3,10 % dès fin
+  2025/2026, les deux valeurs doivent survivre). Si le taux est identique dans les deux occurrences
+  (cas fréquent : même taux DGFIP sur toute la période), produis quand même DEUX propositions
+  identiques plutôt qu'une seule — c'est une confirmation croisée, pas une raison de fusionner.
 
   Sans date de prise d'effet EXPLICITEMENT écrite à côté d'un taux, ne produis PAS de proposition
   taux_pas_historique pour cette ligne — range-la en info_seule plutôt que d'inventer une date (la
   date d'édition du document en haut de page N'EST PAS la date de prise d'effet du taux, sauf si le
   document le dit littéralement pour CE taux).
+
+  ⚠️ GARDE-FOU — SI LA PHRASE N'EXISTE PAS : une section de paiement peut exister sans que la phrase
+  du taux personnalisé n'y figure (France Travail peut changer sa formulation ou la structure de son
+  courrier). Dans ce cas, NE DEVINE PAS et N'APPROXIME PAS de taux : range en info_seule avec une
+  justification explicite du type « mention du taux introuvable dans cette section, structure du
+  document possiblement modifiée depuis la dernière vérification du prompt (07/2026) ».
 
 ════════ ERREURS OBSERVÉES, À NE PAS REFAIRE ════════
 
@@ -470,20 +461,23 @@ CAS 5 — total mensuel de la ligne "Allocation d'Aide au Retour à l'Emploi" pr
             « Allocation brute d'un montant journalier de 55,02 Euro [...] » ; la ligne du tableau
             va en info_seule (total de période), jamais en aj_reelle_historique.
 
-CAS 6 — taux PAS attribué à la mauvaise section (date confondue avec un titre voisin)
+CAS 6 — taux PAS attribué à la mauvaise section (date confondue avec un titre voisin), et choix
+  d'une section comme "primaire" au lieu de produire une proposition par section
   document : deux sections « Situation au 28/06/2026 » et « Situation au 13/07/2026 », chacune
              suivie de la phrase « Le montant de l'impôt sur le revenu prélevé à la source est de
              15,03 € [resp. 0,00 €], calculé sur la base d'un taux personnalisé de 3,10 % [...] » ;
              entre les deux, un titre sans rapport « REGLEMENT DU 01/07/2026 » (un virement bancaire,
              pas une section « Situation au »).
-  mauvais : justification citant « REGLEMENT DU 01/07/2026 » comme section d'origine du taux, ou
-            confiance "moyenne" faute de date dans la phrase elle-même.
-  attendu : profil_ouverture_droits.tauxPrelevementSource = 3.10, tauxPrelevementSourceDateEffet =
-            "2026-07-13" (ISO de la section retenue, jamais "2026-07-01" qui est la date du
-            règlement voisin), confiance "haute", justifié par la phrase ET par le nom exact de la
-            section « Situation au 13/07/2026 » (la plus récente des deux) ; l'occurrence de
-            « Situation au 28/06/2026 » (même taux, montant différent : 15,03 €) est une
-            confirmation croisée, pas une source de doute.
+  mauvais : justification citant « REGLEMENT DU 01/07/2026 » comme section d'origine du taux ;
+            confiance "moyenne" faute de date dans la phrase elle-même ; OU une seule proposition
+            taux_pas_historique retenant la section du 13/07 comme "la plus récente"/"primaire" et
+            ignorant celle du 28/06.
+  attendu : DEUX propositions taux_pas_historique — { valeur: 3.10, dateEffet: "2026-06-28" }
+            (justifiée par la phrase et le nom exact de la section « Situation au 28/06/2026 »)
+            et { valeur: 3.10, dateEffet: "2026-07-13" } (justifiée par la phrase et le nom exact de
+            la section « Situation au 13/07/2026 », jamais "2026-07-01" qui est la date du règlement
+            voisin) — confiance "haute" pour les deux, aucune choisie au détriment de l'autre. Même
+            taux dans les deux occurrences : confirmation croisée, pas une raison de fusionner.
 
 CAS 7 — heures ET cachets présents sur la même AEM, l'un rangé à null avec une justification fausse
   (observé en production, 01/08/2026, spécimen AEM réel format GHS sPAIEctacle)
@@ -567,12 +561,10 @@ barèmes), activiteHorsAnnexe10 (déprécié), la date de départ d'affichage (c
 6. Si tu as rempli aj_reelle_historique depuis un relevé de situation, vérifie que ta justification
    cite la phrase « Allocation brute/nette d'un montant journalier de … » — et non une ligne du
    tableau « Allocations déjà versées ». Si la citation vient du tableau, remets en info_seule.
-7. Si tu as rempli tauxPrelevementSource, vérifie que ta justification nomme la section exacte
-   « Situation au [date] » dont provient la phrase — jamais un titre voisin sans rapport comme
-   « REGLEMENT DU [date] ». Si le document a deux occurrences de la phrase, vérifie que tu as bien
-   retenu celle de la section la plus récente pour le champ structuré, ET que
-   tauxPrelevementSourceDateEffet porte bien la date ISO de cette même section (jamais null si
-   tauxPrelevementSource est renseigné, jamais la date d'un autre titre).
+7. Si tu as produit une proposition taux_pas_historique depuis une notification/un relevé, vérifie
+   que ta justification nomme la section exacte « Situation au [date] » dont provient la phrase —
+   jamais un titre voisin sans rapport comme « REGLEMENT DU [date] » — et que dateEffet porte bien
+   la date ISO de CETTE section (jamais null, jamais la date d'un autre titre).
 8. Vérifie que chaque « justification » contient une citation, et que tu n'as inscrit de confiance
    que pour les champs effectivement renseignés.
 9. Sur un justificatif de déclaration mensuelle : compte les encadrés d'activité de la section
@@ -584,11 +576,11 @@ barèmes), activiteHorsAnnexe10 (déprécié), la date de départ d'affichage (c
     regardé la case correspondante et qu'elle est réellement vide — pas seulement que tu as déjà
     rempli l'autre champ juste à côté. Si les deux cases portent une valeur, les deux champs
     doivent être remplis (cf. CAS 7).
-11. Sur une attestation de taux de prélèvement à la source qui liste plusieurs taux : vérifie que
-    tu as produit UNE proposition taux_pas_historique PAR taux/date trouvé, jamais une seule
-    proposition qui aurait « choisi » le taux le plus récent ou le plus important (cf. CAS 9).
-    Vérifie aussi qu'aucune valeur n'a été calculée à partir d'un montant en euros sans le
-    pourcentage écrit à côté.
+11. Si un document (attestation dédiée OU notification/relevé) montre plusieurs taux/sections
+    datées : vérifie que tu as produit UNE proposition taux_pas_historique PAR taux/section trouvé,
+    jamais une seule proposition qui aurait « choisi » le taux le plus récent, le plus important ou
+    "primaire" (cf. CAS 6 et CAS 9). Vérifie aussi qu'aucune valeur n'a été calculée à partir d'un
+    montant en euros sans le pourcentage écrit à côté.
 12. Si tu as rempli contrat.natureDocumentSource ("aem" ou "bulletin_paie"), vérifie que ta
     justification cite le titre/en-tête LITTÉRAL du document (« Attestation d'Employeur Mensuelle »,
     « AEM », « Bulletin de paie », « Bulletin de salaire ») — jamais une déduction depuis les champs

@@ -117,9 +117,11 @@ export function evaluerProposition(proposition: Proposition, profil: Profil, con
     }
 
     case "profil_ouverture_droits": {
-      const { dateOuverture, franchiseCPTotale, delaiAttenteInitial, tauxPrelevementSource, dateLimiteIndemnisation } = proposition.donnees;
+      const { dateOuverture, franchiseCPTotale, delaiAttenteInitial, dateLimiteIndemnisation } = proposition.donnees;
       const baseDejaConnue = profil.ouvertureDroits !== undefined;
-      const champUtileSeul = tauxPrelevementSource !== null || dateLimiteIndemnisation !== null;
+      // Le taux ne fait plus partie de cette cible depuis le 02/08/2026 (cf. types/extraction.ts,
+      // Cible 2) : seule dateLimiteIndemnisation reste un champ "utile seul".
+      const champUtileSeul = dateLimiteIndemnisation !== null;
       if (baseDejaConnue && champUtileSeul) {
         return { proposition, titre, statut: "applicable", avertissements: [] };
       }
@@ -515,15 +517,11 @@ export function profilAvecProposition(profil: Profil, proposition: Proposition):
           dateOuverture,
           franchiseCPTotale,
           delaiAttenteInitial,
-          // Historique de taux (cf. types/index.ts) : une nouvelle valeur lue s'AJOUTE à l'existant,
-          // elle ne l'écrase JAMAIS — bug réel corrigé le 01/08/2026 (un scalaire unique ici
-          // effaçait tout taux antérieur, y compris un taux plus ancien encore valable pour des
-          // mois déjà passés). Sans date d'effet lisible, la donnée est ignorée plutôt que devinée
-          // (pas d'entrée à une date inventée, devoir n°2).
-          tauxPrelevementSourceHistorique:
-            d.tauxPrelevementSource != null && d.tauxPrelevementSourceDateEffet
-              ? fusionnerTauxPASHistorique(profil.ouvertureDroits?.tauxPrelevementSourceHistorique, d.tauxPrelevementSourceDateEffet, d.tauxPrelevementSource)
-              : profil.ouvertureDroits?.tauxPrelevementSourceHistorique,
+          // Le taux n'arrive plus jamais par cette cible depuis le 02/08/2026 : seul le cas
+          // "taux_pas_historique" ci-dessous écrit tauxPrelevementSourceHistorique désormais, quel
+          // que soit le document d'origine (relevé/notification ou attestation dédiée). On se
+          // contente ici de préserver l'historique déjà présent, inchangé.
+          tauxPrelevementSourceHistorique: profil.ouvertureDroits?.tauxPrelevementSourceHistorique,
           dateLimiteIndemnisation: d.dateLimiteIndemnisation ?? profil.ouvertureDroits?.dateLimiteIndemnisation,
         },
       };

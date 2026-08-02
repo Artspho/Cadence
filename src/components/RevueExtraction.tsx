@@ -111,8 +111,6 @@ export const LABELS_CHAMPS: Record<Proposition["cible"], Record<string, string>>
     franchiseCPTotale: "Franchise congés payés (jours)",
     delaiAttenteInitial: "Délai d'attente (jours)",
     dateLimiteIndemnisation: "Date limite d'indemnisation",
-    tauxPrelevementSource: "Prélèvement à la source (%)",
-    tauxPrelevementSourceDateEffet: "Date d'effet du taux",
   },
   profil_infos: {
     dateAnniversaire: "Date anniversaire",

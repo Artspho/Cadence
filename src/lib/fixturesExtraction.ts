@@ -29,17 +29,22 @@ export const extractionNotificationAdmission: ExtractionResult = {
         franchiseCPTotale: 12,
         delaiAttenteInitial: 7,
         dateLimiteIndemnisation: "2027-01-31",
-        tauxPrelevementSource: 7.2,
-        tauxPrelevementSourceDateEffet: "2026-02-01",
       },
       confiance: {
         dateOuverture: "haute",
         franchiseCPTotale: "haute",
         delaiAttenteInitial: "haute",
         dateLimiteIndemnisation: "haute",
-        tauxPrelevementSource: "moyenne",
       },
       justification: "Encadré « Votre indemnisation » page 1 ; date limite au paragraphe suivant.",
+    },
+    {
+      // Depuis le 02/08/2026, le taux arrive en proposition séparée, quel que soit le document
+      // d'origine (cf. types/extraction.ts, Cible 6).
+      cible: "taux_pas_historique",
+      donnees: { valeur: 7.2, dateEffet: "2026-02-01" },
+      confiance: { valeur: "moyenne", dateEffet: "haute" },
+      justification: "« Le montant de l'impôt sur le revenu prélevé à la source est de […], calculé sur la base d'un taux personnalisé de 7,2 % » — section « Situation au 01/02/2026 ».",
     },
     {
       cible: "profil_infos",
@@ -237,10 +242,8 @@ export const extractionReleveAvecRefus: ExtractionResult = {
         franchiseCPTotale: null,
         delaiAttenteInitial: null,
         dateLimiteIndemnisation: null,
-        tauxPrelevementSource: 5.4,
-        tauxPrelevementSourceDateEffet: "2026-03-01",
       },
-      confiance: { dateOuverture: "moyenne", tauxPrelevementSource: "haute" },
+      confiance: { dateOuverture: "moyenne" },
       justification: "Un relevé de situation rappelle la date d'ouverture mais pas le détail des franchises.",
     },
     {
