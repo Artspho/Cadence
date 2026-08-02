@@ -24,10 +24,19 @@ describe("trouverContratsCorrespondants", () => {
     expect(resultat).toEqual([]);
   });
 
-  it("ne propose PAS un contrat sans statutVerification connu (données anciennes, aucune preuve qu'il attend quelque chose)", () => {
+  // Régression réelle corrigée le 01/08/2026 : le filtre exigeait auparavant EXACTEMENT
+  // `=== "a_verifier"`, ce qui excluait silencieusement tout contrat sans `statutVerification` DU
+  // TOUT — la clé absente (pas `undefined` explicite assigné), exactement l'état des 56 vrais
+  // contrats de Benoît, tous créés avant l'ajout de ce champ. Un réimport de document ne détectait
+  // donc jamais aucun doublon potentiel sur eux. `statutVerification` absent doit désormais être
+  // traité comme équivalent à `"a_verifier"` pour cette détection — sans jamais le réécrire sur le
+  // contrat lui-même (devoir n°1, cf. types/index.ts).
+  it("trouve un contrat SANS statutVerification (clé absente, comme sur les vrais contrats antérieurs au 01/08/2026) — bug réel corrigé", () => {
     const ancien = contrat({ date: "2026-06-28", employeur: "Association Fictive", salaireBrut: 245 });
+    expect(ancien.statutVerification).toBeUndefined();
+    expect("statutVerification" in ancien).toBe(false);
     const resultat = trouverContratsCorrespondants({ employeur: "Association Fictive", date: "2026-06-28", dateDebut: "2026-06-26", salaireBrut: 245 }, [ancien]);
-    expect(resultat).toEqual([]);
+    expect(resultat).toEqual([ancien]);
   });
 
   it("ne propose PAS un employeur différent, même mois et montant identiques", () => {
@@ -59,5 +68,31 @@ describe("trouverContratsCorrespondants", () => {
     const existant = contrat({ date: "2026-01-15", employeur: "Association Fictive", salaireBrut: 245, statutVerification: "a_verifier" });
     const resultat = trouverContratsCorrespondants({ employeur: "Association Fictive", date: "2026-06-28", dateDebut: "2026-06-26", salaireBrut: 245 }, [existant]);
     expect(resultat).toEqual([]);
+  });
+
+  // Scénario réaliste inspiré d'un cas réel (01/08/2026, données anonymisées) : plusieurs contrats
+  // déjà saisis à la main par un utilisateur, sans champ statutVerification (comme tout contrat
+  // créé avant l'ajout de ce champ), face à des activités du même mois relues sur un justificatif
+  // de déclaration mensuelle — même employeur, mêmes dates, mêmes montants, mais aucun des deux
+  // employeurs concernés n'apparaît qu'une seule fois dans le mois (l'un des deux a deux périodes
+  // distinctes). Avant le correctif, aucun des 4 n'était détecté.
+  it("détecte plusieurs contrats déjà saisis sans statutVerification comme correspondance d'un justificatif de déclaration du même mois", () => {
+    const contratsExistants = [
+      contrat({ employeur: "Commune de Villefictive", dateDebut: "2026-05-01", date: "2026-05-31", salaireBrut: 400 }),
+      contrat({ employeur: "Orchestre Fictif de Testville", dateDebut: "2026-05-01", date: "2026-05-01", salaireBrut: 150 }),
+      contrat({ employeur: "Orchestre Fictif de Testville", dateDebut: "2026-05-10", date: "2026-05-15", salaireBrut: 700 }),
+      contrat({ employeur: "Ensemble Imaginaire du Sud", dateDebut: "2026-05-17", date: "2026-05-21", salaireBrut: 550 }),
+    ];
+    const activitesDeclarees = [
+      { employeur: "ORCHESTRE FICTIF DE TESTVILLE", dateDebut: "2026-05-01", date: "2026-05-01", salaireBrut: 150 },
+      { employeur: "COMMUNE DE VILLEFICTIVE", dateDebut: "2026-05-01", date: "2026-05-31", salaireBrut: 400 },
+      { employeur: "ORCHESTRE FICTIF DE TESTVILLE", dateDebut: "2026-05-10", date: "2026-05-15", salaireBrut: 700 },
+      { employeur: "Ensemble Imaginaire du Sud", dateDebut: "2026-05-17", date: "2026-05-21", salaireBrut: 550 },
+    ];
+
+    for (const activite of activitesDeclarees) {
+      const resultat = trouverContratsCorrespondants(activite, contratsExistants);
+      expect(resultat.map((c) => c.salaireBrut)).toContain(activite.salaireBrut);
+    }
   });
 });
