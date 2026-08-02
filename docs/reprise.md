@@ -9,13 +9,13 @@ Mémoire durable à consulter au démarrage : `CLAUDE.md`, `docs/SPEC.md`, `docs
 Deux devoirs sacrés : (1) ne jamais perdre les données ; (2) ne jamais afficher un chiffre faux (ni faux « feu vert » rassurant, ni faux « Bloqué », ni faux montant, ni fausse alerte, ni valeur sentinelle brute).
 
 État (mis à jour le 02/08/2026) : les deux devoirs sacrés sont tenus. **592 tests
-verts, `tsc -b` propre sur les deux tsconfig (src et api).** Dernier commit local : `2c000af`
+verts, `tsc -b` propre sur les deux tsconfig (src et api).** Dernier commit local : `8568c8a`
 (un commit docs supplémentaire, décrit ci-dessous, suit juste après). `master` reste la seule
 branche de travail. `origin/master` était à jour au dernier point de contrôle (poussé par Benoît
 lui-même en cours de session) — non revérifié depuis le commit `440d6c2`. Tous les items §11.A du
 SPEC restent traités.
 
-**Résumé de cette session (7 commits, `bcc4f6e` → `2c000af`)** :
+**Résumé de cette session (11 commits, `bcc4f6e` → `8568c8a`)** :
 1. `bcc4f6e` — doc : correction de la note périmée sur le déploiement/test PWA téléphone (l'app
    était déjà déployée sur Vercel et l'installation Android confirmée depuis le 01/08 ; `reprise.md`
    affirmait encore le contraire).
@@ -32,11 +32,24 @@ SPEC restent traités.
    second cas réel indépendant vérifié (24/03/2025, écart 2,27 %), et vérification directe sur les
    vraies données (`ajReelleHistorique` du profil réel) : déjà correct, aucune correction
    nécessaire. Écart réel confirmé 2,2-2,3 %, jamais ~5 % comme supposé initialement.
-6. `440d6c2` puis `2c000af` — feat : bouton unique « Récupérer un document sur France Travail »
-   (nouvel onglet, jamais une iframe — FranceConnect l'interdit explicitement) remplacé le même
-   jour par DEUX boutons vers des pages précises (URLs confirmées par Benoît), avec réorganisation
-   de l'onglet Import PDF en deux blocs numérotés. Remplace le point backlog « Webview France
-   Travail intégrée », bloqué par design depuis le 31/07.
+6. `440d6c2` → `2c000af` → `6fe6452` — feat + docs : bouton unique « Récupérer un document sur
+   France Travail » (nouvel onglet, jamais une iframe — FranceConnect l'interdit explicitement)
+   remplacé le même jour par DEUX boutons vers des pages précises (URLs confirmées par Benoît), avec
+   réorganisation de l'onglet Import PDF en deux blocs numérotés, puis routine de vérification
+   mensuelle des deux URLs (`docs/routine-mensuelle-veille.md` §6). Remplace le point backlog
+   « Webview France Travail intégrée », bloqué par design depuis le 31/07.
+7. `b13bd3d` — chore : suppression de `_a_supprimer/Nouveau Texte OpenDocument.odt` (fichier
+   LibreOffice vide, 0 octet, créé par erreur) après confirmation ; `_a_supprimer/` ajouté au
+   `.gitignore`.
+8. `40a3c59` — docs : nouveau point « Monétisation envisagée » dans `docs/SPEC.md` §11.B (intention
+   actée le 01/08/2026, architecture non tranchée — 2 mois d'essai gratuit puis app payante,
+   questions ouvertes sur le sort des données locales) + piste non-profit Supabase dans le backlog
+   `CLAUDE.md`, non confirmée officiellement.
+9. `8568c8a` — refactor : taux PAS unifié via `taux_pas_historique` pour tous les documents —
+   `profil_ouverture_droits` ne porte plus aucun champ de taux, un relevé/notification produit
+   désormais une proposition séparée par section datée, comme l'attestation dédiée. Ferme
+   **définitivement** le point backlog « Sélection de la section la plus récente comme valeur
+   primaire du taux PAS » — pas en corrigeant la sélection, en la supprimant.
 
 **Également cette session, deux audits de backlog sur preuve (aucun commit, vérification pure)** :
 - 5 points : PWA/téléphone (✅ fait et testé sur vrai appareil), périodes assimilées ALD (✅
@@ -68,7 +81,7 @@ SPEC restent traités.
   **588h** en conséquence — non re-vérifié avec un export frais cette session, seule la parole de
   Benoît fait foi ici.
 
-## Fait le 02/08/2026 (7 commits, `bcc4f6e` → `2c000af`, + deux audits de backlog)
+## Fait le 02/08/2026 (11 commits, `bcc4f6e` → `8568c8a`, + deux audits de backlog)
 
 Détail complet de chaque chantier dans `CLAUDE.md` (§ État actuel, entrées du 02/08/2026) ; ici,
 uniquement le résumé nécessaire pour reprendre.
@@ -142,6 +155,43 @@ des deux boutons (le projet n'a pas d'infra jsdom/testing-library, environnement
 le mock est posé directement sur `globalThis.window`, pas de nouvelle dépendance ajoutée) et
 vérifié en navigateur réel (les deux boutons ouvrent chacun la bonne URL avec `noopener,noreferrer`,
 l'onglet Cadence reste intact après le clic).
+
+**7. Nettoyage `_a_supprimer/`** (`b13bd3d`) : dossier non suivi visible dans `git status` depuis
+plusieurs sessions. Contenu vérifié avant suppression (demandé explicitement) : un seul fichier,
+`Nouveau Texte OpenDocument.odt`, vide (0 octet), créé par erreur — rien d'autre. Supprimé après
+confirmation ; `_a_supprimer/` ajouté au `.gitignore` pour qu'un dossier de ce nom ne réapparaisse
+plus dans `git status`.
+
+**8. Point backlog « Monétisation envisagée »** (`40a3c59`) : nouveau point dans `docs/SPEC.md`
+§11.B, à la suite de « Préremplissage automatique du revenu par IA ». Intention actée le 01/08/2026
+(2 mois d'essai gratuit puis app payante dans son ensemble, pas de séparation gratuit/premium) mais
+**architecture délibérément non tranchée** — décision explicite de ne pas trancher avant un premier
+signal d'usage de la bêta entre amis. Questions ouvertes documentées dans l'ordre : sort des données
+locales pour un non-payant (bloquer en préservant le local-first, ou backend obligatoire pour tous),
+nécessité d'un compte même léger pour fiabiliser la durée de l'essai, Stripe comme standard du
+secteur (~1,5 % + 0,25 €/transaction), coût d'hébergement estimé (~45 $/mois fixes hors commission
+Stripe : Vercel Pro + Supabase Pro). En parallèle, piste non-profit ajoutée au backlog `CLAUDE.md` :
+un programme Supabase pour association à but non lucratif existe (sources tierces, 40-80 % de
+réduction), mais vise un statut américain (501(c)(3)) — éligibilité d'une association loi 1901
+française non confirmée, à vérifier auprès du support Supabase le cas échéant, et seulement si la
+monétisation devient réelle (pas pendant la bêta).
+
+**9. Point backlog « Sélection de la section la plus récente comme valeur primaire du taux PAS »
+définitivement clos** (`8568c8a`) : contrairement au point 5 ci-dessus (un gap qui s'est révélé ne
+JAMAIS avoir été un bug), celui-ci était un vrai gap resté ouvert depuis le 31/07 — mais la
+résolution retenue n'est pas d'avoir enfin choisi correctement LA bonne section : c'est d'avoir
+supprimé l'idée même d'un choix. `profil_ouverture_droits` ne porte plus aucun champ de taux, sur
+AUCUN document : un relevé/une notification qui en mentionne un produit désormais une proposition
+`taux_pas_historique` séparée par section/couple (taux, date) trouvé — exactement le même mécanisme
+que l'attestation dédiée du point 3 ci-dessus, unifié pour les deux familles de documents. Schéma
+(`types/extraction.ts`), routage (`lib/routageExtraction.ts`) et prompt (`api/extract-document.ts`,
+CAS 6 réécrit) mis à jour ; tests migrés (même intention testée, nouvelle forme) + deux ajouts :
+un relevé à deux sections avec des taux DIFFÉRENTS (aucune n'est perdue ni choisie comme primaire),
+et l'indépendance du résultat à l'ordre d'application des deux propositions dans un même lot — testé
+dans les deux ordres, `evaluerExtraction` étant un simple `.map()` par proposition sans dépendance
+entre elles, et `RevueExtraction.tsx` réévaluant tout à chaque rendu (rien n'est jamais perdu si
+l'utilisateur clique dans un ordre plutôt que l'autre). 592 tests verts, `tsc -b` propre, vérifié en
+navigateur (5 propositions au lieu de 4 sur la fixture de démonstration, sans erreur console).
 
 **Audits de backlog (pas de commit)** : voir le résumé dans l'État ci-dessus.
 

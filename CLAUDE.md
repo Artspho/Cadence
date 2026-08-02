@@ -1557,14 +1557,25 @@ de situation ✅ — l'échec semble propre à ce format de bulletin, pas au can
   28/06" et "Situation au 13/07", même taux 3,10 % dans les deux) : confiance passée de "moyenne" à
   "haute", valeur correcte, aucune confusion avec l'en-tête voisin "REGLEMENT DU 01/07/2026", les deux
   occurrences correctement distinguées avec dates propres.
-- 🔶 Sélection de la section la plus récente comme valeur primaire du taux PAS — gap résiduel
-  documenté, non couvert par le fix ci-dessus : le prompt ne garantit pas de choisir systématiquement
-  la section la plus récente comme valeur "primaire" quand plusieurs sections coexistent — sur le
-  document testé, les deux sections portent le même taux donc le gap ne s'est jamais traduit par un
-  chiffre faux, mais un document où le taux change réellement entre deux sections (changement de taux
-  personnalisé DGFIP en cours de mois) pourrait révéler un choix de section incorrect comme valeur par
-  défaut. Aucun document réel ne montre encore ce cas — pas de correctif tant qu'on n'a pas de preuve
-  sur pièce.
+- ✅ **Sélection de la section la plus récente comme valeur primaire du taux PAS — résolu
+  (02/08/2026, commit `8568c8a`), pas en corrigeant la sélection : en la supprimant.** Le gap
+  décrit ci-dessus supposait qu'il fallait un jour choisir correctement LA bonne section "primaire"
+  quand plusieurs coexistent (changement de taux DGFIP en cours de période) — la résolution retenue
+  n'est pas ce choix, c'est son abandon : `profil_ouverture_droits` ne porte plus aucun champ de
+  taux du tout, sur AUCUN document. Un relevé/notification qui mentionne un taux produit désormais
+  une proposition `taux_pas_historique` séparée, une par section/couple (taux, date) trouvé — même
+  mécanisme, unifié, que l'attestation dédiée ci-dessus (§02/08/2026) : aucune sélection automatique
+  n'est plus possible par construction, quel que soit le document d'origine, l'utilisateur voit et
+  applique chaque entrée lui-même. C'est ensuite `getTauxPASAt` (`engine/ajReelleUtils.ts`, déjà
+  correct et déjà testé avant ce chantier) qui détermine quel taux s'applique à quelle date, jamais
+  le prompt. Schéma (`types/extraction.ts`), routage (`lib/routageExtraction.ts`) et prompt
+  (`api/extract-document.ts`, CAS 6 réécrit) mis à jour en conséquence ; tests migrés + deux ajouts :
+  un relevé à deux sections avec des taux DIFFÉRENTS (aucune n'est perdue ni choisie comme primaire),
+  et l'indépendance du résultat à l'ordre d'application des deux propositions dans un même lot
+  (`profil_ouverture_droits` puis `taux_pas_historique`, ou l'inverse — testé dans les deux ordres :
+  `evaluerExtraction` est un simple `.map()` par proposition, sans dépendance entre elles, et
+  `RevueExtraction.tsx` réévalue tout à chaque rendu, donc rien n'est jamais perdu si l'utilisateur
+  clique dans un ordre plutôt que l'autre).
 - ⬜ Vérifier données réelles — import JSON + Dashboard vs notification France Travail
 - ⬜ Phase 2 périodes assimilées — conditions ALD (en attente source réglementaire)
 
