@@ -1045,7 +1045,8 @@ synchronisée à chaque commit. 5 commits locaux cette session, rien poussé sur
 - ⬜ **Non traité (V2/V3) :** coordination européenne (périodes U1/PDU1) — même famille qu'Annexe 8/article 65, hors périmètre Annexe 10 pur. Aucune logique ni champ de données ne l'anticipe encore (détail dans `docs/SPEC.md` §10 et §11.C). Ne pas confondre avec le champ `territoire` du contrat, qui couvre un cas différent (cachet ponctuel joué en EEE/Suisse/UK mais déclaré en France).
 - 🔁 **Maintenance de la config** (récurrent, perso — hors app, pas de backend en bêta) : une fois
   par mois, vérifier à la source officielle SMIC (horaire / mensuel / journalier), PMSS, et les
-  plafonds ARE (AJ min 31,96 €, plancher 44 €, plafond 174,80 €) — au minimum à chaque
+  plafonds ARE (AJ min 31,96 €, plancher 44 €, plafond ARE Annexes VIII/X — historisé par année
+  civile dans `are.plafondHistorique`, actuellement 181,18 € pour 2026) — au minimum à chaque
   revalorisation connue (SMIC/PMSS au 1er janvier et lors des hausses en cours d'année, ex. 1er
   juin 2026) et à chaque nouvelle convention d'assurance chômage, re-vérifier **toutes** les
   valeurs de `franceTravailConfig.ts`. Si une valeur a bougé : mettre à jour
@@ -1593,14 +1594,22 @@ de situation ✅ — l'échec semble propre à ce format de bulletin, pas au can
   les trois appelants (App.tsx, Simulateur.tsx, renouvellementAnticipe.ts) — aucun de ces appelants
   n'a changé. `are.plafond` reste en config comme valeur courante de commodité (seuil de
   plausibilité de `MonProfil.tsx`), plus lu par aucun calcul métier.
-  **Deux réserves assumées, pas des oublis** : (1) `TODO` en config — aucune valeur certifiée
-  antérieure au 01/01/2024, et la date d'effet 01/01/2024 elle-même est reprise d'une note de
-  session, non re-vérifiée sur pièce ; (2) pour une date antérieure à toute entrée connue,
+  **Deux réserves, une refermée depuis** : (1) date d'effet 01/01/2024 confirmée sur pièce (Unédic,
+  « Paramètres utiles », janvier 2024, p.22 — « Maximum théorique du 1er janvier au 31 décembre
+  2024 » = 174,80 €) ; entrée 2025 (177,56 €) ajoutée le 03/08/2026 après vérification (Unédic,
+  « Paramètres utiles », janvier 2025 ET juillet 2025, p.23 — valeur identique dans les deux
+  éditions, la revalorisation de juillet ne touchant que l'allocation minimale / partie fixe) —
+  `plafondHistorique` compte désormais **3 entrées sourcées (2024/2025/2026)**, plus seulement 2.
+  Reste ouvert, assumé : aucune valeur certifiée antérieure à 2024 — recherche des éditions Unédic
+  archivées jusqu'à janvier 2024 seulement, rien de plus ancien trouvé en accès libre ; repli vers
+  174,80 € pour toute date antérieure, `TODO` volontairement laissé plutôt qu'une valeur devinée.
+  (2) pour une date antérieure à toute entrée connue,
   `getPlafondAreAt` retombe **explicitement** sur la plus ancienne valeur plutôt que de lever une
   exception (qui planterait Historique.tsx, aucun error boundary React dans l'app) ou de renvoyer
   `null` (qui supprimerait le clamp, donc laisserait passer une AJ trop HAUTE) — repli vers le bas,
-  jamais une extrapolation. 11 tests dédiés (`engine/__tests__/plafondAreUtils.test.ts`), dont la
-  date pivot exacte et le scénario de bout en bout via `calculerRenouvellementAnticipe`.
+  jamais une extrapolation. 13 tests dédiés (`engine/__tests__/plafondAreUtils.test.ts`), dont les
+  bornes de chaque année civile, la date pivot exacte et le scénario de bout en bout via
+  `calculerRenouvellementAnticipe`.
 - ⬜ Vérifier l'éligibilité à un programme associatif/non-profit pour réduire les coûts
   d'hébergement (Supabase notamment) — repéré comme piste possible le 01/08/2026, NON confirmé
   officiellement. Des sources tierces (pas la documentation officielle Supabase) évoquent des
@@ -1710,7 +1719,8 @@ module indemnisation mensuelle (franchises, seuils, PMSS), Annexe 8 / article 65
 - Enseignement : plafond **70 h** (< 50 ans) / **120 h** (≥ 50 ans) ; compte pour les 507 h,
   **jamais** dans le montant. Cumul enseignement + formation ≤ **338 h**.
 - ARE Annexe 10 : **AJ brute = A + B + C**, AJ min **31,96 €**, plancher **44 €**,
-  plafond **174,80 €**. (Coefficients dans la config.)
+  plafond **historisé par année civile** (`are.plafondHistorique`) — **181,18 € en 2026**.
+  Ne jamais recopier une valeur fixe ici : voir `franceTravailConfig.ts`.
 - Heures assimilées (maternité, adoption, AT, ALD, suspension) : **5 h/jour**.
   Maladie inter-contrat : **allonge** la fenêtre de 365 j (ne compte pas en heures).
 

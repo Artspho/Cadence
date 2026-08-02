@@ -59,7 +59,7 @@ export const franceTravailConfig = {
     // Valeur COURANTE, conservée pour la commodité d'affichage (ex. seuil de plausibilité de
     // MonProfil.tsx) : aucun calcul métier ne doit la lire. Le clamp de l'AJ brute passe par
     // `plafondHistorique` via `getPlafondAreAt` (engine/plafondAreUtils.ts) — cf. ci-dessous.
-    plafond: 181.18, // ✅ Unédic « Paramètres utiles » avril 2026, p.23 — en vigueur depuis le 01/01/2026, vérifié sur pièce le 03/08/2026 (ancienne valeur : 174,80 € au 01/01/2024)
+    plafond: 181.18, // ✅ Unédic « Paramètres utiles » avril 2026, p.23 — en vigueur depuis le 01/01/2026, vérifié sur pièce le 03/08/2026 (valeurs antérieures dans `plafondHistorique` ci-dessous)
     // Historique daté du plafond, sur le modèle de `valeursDatees.smicHoraireBrutHistorique` — même
     // raison d'être (devoir sacré n°2) : un calcul portant sur une FCT PASSÉE doit appliquer le
     // plafond en vigueur À CETTE DATE, jamais le plafond courant. Deux appelants exposés au cas :
@@ -67,15 +67,18 @@ export const franceTravailConfig = {
     // `engine/cycles.ts` (reconstruit jusqu'à 10 cycles en arrière). Avant le 03/08/2026, `plafond`
     // était un scalaire unique et ces deux chemins appliquaient 181,18 € à des dates où le plafond
     // réel était 174,80 € — limite corrigée ici, cf. CLAUDE.md.
-    // TODO: valeur(s) antérieure(s) au 01/01/2024 inconnues — aucune source certifiée à ce jour.
-    // Tant qu'elles manquent, `getPlafondAreAt` retombe explicitement sur la plus ancienne entrée
-    // connue pour toute date antérieure (repli documenté, jamais une extrapolation).
+    // TODO: valeur(s) antérieure(s) au 01/01/2024 inconnues — aucune source certifiée à ce jour
+    // (éditions Unédic archivées remontées jusqu'à janvier 2024, rien de plus ancien en accès
+    // libre). Tant qu'elles manquent, `getPlafondAreAt` retombe explicitement sur la plus ancienne
+    // entrée connue pour toute date antérieure (repli documenté, jamais une extrapolation).
     plafondHistorique: [
-      // ✅ valeur certifiée (Unédic « Paramètres utiles » avril 2026, p.23, qui rappelle l'ancienne
-      // valeur). ⚠️ La DATE d'effet 01/01/2024 est reprise de la note de config du 03/08/2026
-      // (« ancienne valeur : 174,80 € au 01/01/2024 ») et n'a PAS été re-vérifiée sur pièce depuis :
-      // si une revalorisation intermédiaire a existé entre 2024 et 2026, elle manque ici.
+      // ✅ Unédic « Paramètres utiles » janvier 2024, p.22 — « Maximum théorique du 1er janvier au
+      // 31 décembre 2024 » = 174,80 €. Date d'effet confirmée sur pièce le 03/08/2026.
       { dateEffet: "2024-01-01", valeur: 174.8 },
+      // ✅ Unédic « Paramètres utiles » janvier 2025 ET juillet 2025, p.23 — valeur identique dans
+      // les deux éditions (stable toute l'année malgré la revalorisation de juillet, qui ne touche
+      // que l'allocation minimale / partie fixe).
+      { dateEffet: "2025-01-01", valeur: 177.56 },
       { dateEffet: "2026-01-01", valeur: 181.18 }, // ✅ Unédic « Paramètres utiles » avril 2026, p.23, vérifié sur pièce le 03/08/2026
     ] as { dateEffet: string; valeur: number }[],
     partieA: { seuilSR: 13700, coeffSousSeuil: 0.36, coeffAuDelaSeuil: 0.05, diviseur: 5000 }, // ✅
