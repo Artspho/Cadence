@@ -114,9 +114,12 @@ export default defineConfig(({ command, mode }) => {
     }),
   ],
   test: {
+    // "node" reste le défaut : la quasi-totalité des tests sont des fonctions pures du moteur, sans
+    // DOM. Les rares tests de composant (jsdom) déclarent leur propre environnement via le pragma
+    // `// @vitest-environment jsdom` en tête de fichier, cf. components/__tests__/RevenusMensuels.test.tsx.
     environment: "node",
     globals: true,
-    include: ["src/**/*.test.ts"],
+    include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
   },
   };
 });
