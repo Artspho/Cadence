@@ -8,14 +8,15 @@ Mémoire durable à consulter au démarrage : `CLAUDE.md`, `docs/SPEC.md`, `docs
 
 Deux devoirs sacrés : (1) ne jamais perdre les données ; (2) ne jamais afficher un chiffre faux (ni faux « feu vert » rassurant, ni faux « Bloqué », ni faux montant, ni fausse alerte, ni valeur sentinelle brute).
 
-État (mis à jour le 02/08/2026) : les deux devoirs sacrés sont tenus. **592 tests
-verts, `tsc -b` propre sur les deux tsconfig (src et api).** Dernier commit local : `8568c8a`
-(un commit docs supplémentaire, décrit ci-dessous, suit juste après). `master` reste la seule
-branche de travail. `origin/master` était à jour au dernier point de contrôle (poussé par Benoît
-lui-même en cours de session) — non revérifié depuis le commit `440d6c2`. Tous les items §11.A du
-SPEC restent traités.
+État (mis à jour le 03/08/2026, fin de session) : les deux devoirs sacrés sont tenus. **602 tests
+verts, `tsc -b` propre sur les deux tsconfig (src et api).** Dernier commit local : `be09ee3`.
+`master` reste la seule branche de travail, working tree propre (rien en attente). `origin/master`
+était à jour au dernier point de contrôle (poussé par Benoît lui-même en cours de session) — non
+revérifié depuis le commit `440d6c2`, donc probablement en retard de plusieurs commits à ce stade
+(pousser reste à l'initiative de Benoît, jamais automatique, cf. mémoire longue durée
+`cadence_push_credentials.md`). Tous les items §11.A du SPEC restent traités.
 
-**Résumé de cette session (11 commits, `bcc4f6e` → `8568c8a`)** :
+**Résumé de cette session (15 commits, `bcc4f6e` → `be09ee3`)** :
 1. `bcc4f6e` — doc : correction de la note périmée sur le déploiement/test PWA téléphone (l'app
    était déjà déployée sur Vercel et l'installation Android confirmée depuis le 01/08 ; `reprise.md`
    affirmait encore le contraire).
@@ -50,6 +51,33 @@ SPEC restent traités.
    désormais une proposition séparée par section datée, comme l'attestation dédiée. Ferme
    **définitivement** le point backlog « Sélection de la section la plus récente comme valeur
    primaire du taux PAS » — pas en corrigeant la sélection, en la supprimant.
+10. `7216fb3` — docs : clôture du point backlog taux PAS dans `CLAUDE.md` (✅, précise que la
+    résolution est une suppression du mécanisme "primaire", pas une correction) + rattrapage de ce
+    fichier lui-même pour les 2 commits qui manquaient à son propre résumé (`b13bd3d`, `40a3c59`).
+11. `10e78fb` — feat : nouvelle alerte « Réexamen anticipé possible », déclenchée dès que
+    `heuresActuelles >= seuilHeures` ET `joursRestants > 0` (condition volontairement stricte sur
+    les heures déjà atteintes, pas sur `prediction.niveau === "securite"` seul, qui peut aussi
+    valoir "securite" via des contrats à venir non encore travaillés — devoir n°2). Maquette validée
+    avant code (carte reprenant les classes réelles d'`AlertCenter.tsx`). 5 nouveaux tests, dont le
+    cas limite exact (507h pile) et la distinction volontaire "sécurité via contrats à venir
+    uniquement" (qui ne doit PAS déclencher l'alerte).
+12. `e30c91a` — test : couverture du bouton « Modifier » de `SoldeRecap` (`RevenusMensuels.tsx`,
+    jamais vérifié ni testé depuis son ajout le 25/07). Étape 1 (navigateur, données synthétiques,
+    sauvegarde/restauration du storage réel octet pour octet) : aucune régression. Étape 2:
+    **premier test de composant du projet** — `jsdom`/`@testing-library/react` ajoutés (nouvelles
+    dépendances dev), environnement déclaré uniquement dans ce fichier via le pragma
+    `// @vitest-environment jsdom`, le reste de la suite reste en `node`. 5 tests.
+13. `be09ee3` — fix : `are.plafond` (Annexe 10) 174,80 € → **181,18 €**, en vigueur depuis le
+    01/01/2026 (Unédic « Paramètres utiles » avril 2026, p.23, PDF officiel lu directement — un
+    écart de 7 mois passé inaperçu au bump SMIC de juin). `pmssMensuel` renseigné pour la première
+    fois (4005 €, même source p.3), toujours non lu par le moteur. SMIC/AJ minimale/plancher
+    confirmés inchangés sur pièce — **une recherche automatisée préalable avait affirmé à tort un
+    changement de l'AJ minimale (31,96 → 32,13 €) par confusion avec un paramètre du régime général :
+    corrigé en lisant directement la source primaire avant toute modification, jamais pris pour
+    argent comptant.** Limite documentée (commentaire + backlog `CLAUDE.md`) : `plafond` reste un
+    scalaire unique, pas d'historique daté comme le SMIC — une simulation de renouvellement anticipé
+    sur une FCT antérieure au 01/01/2026 appliquerait à tort la nouvelle valeur (préexistant depuis
+    2024, non corrigé ici).
 
 **Également cette session, deux audits de backlog sur preuve (aucun commit, vérification pure)** :
 - 5 points : PWA/téléphone (✅ fait et testé sur vrai appareil), périodes assimilées ALD (✅
@@ -81,7 +109,34 @@ SPEC restent traités.
   **588h** en conséquence — non re-vérifié avec un export frais cette session, seule la parole de
   Benoît fait foi ici.
 
-## Fait le 02/08/2026 (11 commits, `bcc4f6e` → `8568c8a`, + deux audits de backlog)
+## Fait le 03/08/2026 (1 commit, `be09ee3`)
+
+Session continue depuis le 02/08/2026 (changement de date en cours de session, pas une nouvelle
+session) — détail complet dans `CLAUDE.md` (§ backlog « À faire — priorité normale »).
+
+**13. Plafond ARE Annexe 10 mis à jour** (`be09ee3`) : `are.plafond` 174,80 € → **181,18 €**, en
+vigueur depuis le 01/01/2026 (Unédic « Paramètres utiles » avril 2026, p.23 — PDF officiel lu
+directement, pas seulement le résumé d'un agent de recherche). `pmssMensuel` renseigné pour la
+première fois (4005 €, même source p.3), toujours non lu par le moteur (module « plafond de cumul
+118 % PMSS » reste V2, non construit). SMIC, AJ minimale (31,96 €) et plancher (44 €) confirmés
+inchangés sur pièce.
+
+⚠️ **Point de méthode important** : un agent de recherche lancé en amont avait affirmé à tort un
+changement de l'AJ minimale (31,96 → 32,13 €) — confusion entre le paramètre spécifique aux annexes
+VIII/X (celui que Cadence modélise, resté à 31,96 €) et un paramètre du régime général ARE (32,13 €,
+un chiffre réel mais qui ne concerne pas ce projet). Repéré et corrigé en lisant directement le PDF
+source avant toute modification de `franceTravailConfig.ts` — aucune affirmation d'agent n'a été
+prise pour argent comptant sans vérification sur pièce.
+
+Limite documentée (commentaire dans le code + nouveau point backlog `CLAUDE.md`, priorité normale) :
+`are.plafond` reste un scalaire unique, sans historique daté comme le SMIC
+(`smicHoraireBrutHistorique`) — une simulation de renouvellement anticipé sur une FCT antérieure au
+01/01/2026 appliquerait à tort la nouvelle valeur. Limite préexistante depuis 2024, non corrigée ici
+(chantier séparé si prioritaire).
+
+602 tests verts, `tsc -b` propre.
+
+## Fait le 02/08/2026 (14 commits, `bcc4f6e` → `e30c91a`, + deux audits de backlog)
 
 Détail complet de chaque chantier dans `CLAUDE.md` (§ État actuel, entrées du 02/08/2026) ; ici,
 uniquement le résumé nécessaire pour reprendre.
@@ -192,6 +247,36 @@ dans les deux ordres, `evaluerExtraction` étant un simple `.map()` par proposit
 entre elles, et `RevueExtraction.tsx` réévaluant tout à chaque rendu (rien n'est jamais perdu si
 l'utilisateur clique dans un ordre plutôt que l'autre). 592 tests verts, `tsc -b` propre, vérifié en
 navigateur (5 propositions au lieu de 4 sur la fixture de démonstration, sans erreur console).
+
+**10. Clôture backlog taux PAS + rattrapage de ce fichier** (`7216fb3`) : `CLAUDE.md` — le point
+« Sélection de la section la plus récente comme valeur primaire du taux PAS » passe à ✅, avec la
+précision que la résolution est une **suppression** du mécanisme "primaire" (point 9 ci-dessus), pas
+une correction de celui-ci. `docs/reprise.md` (ce fichier) rattrapé pour 2 commits qui manquaient à
+son propre résumé de session (`b13bd3d` nettoyage `_a_supprimer/`, `40a3c59` monétisation) — sans
+ce rattrapage, la liste numérotée aurait sauté silencieusement de `2c000af` à `8568c8a`.
+
+**11. Alerte « Réexamen anticipé possible »** (`10e78fb`) : nouvelle alerte de niveau "info"
+(`renouvellement_anticipe_possible`), déclenchée quand `heuresActuelles >= seuilHeures` **ET**
+`joursRestants > 0`. Condition volontairement stricte sur les heures **déjà** atteintes plutôt que
+sur `prediction.niveau === "securite"` seul — ce dernier peut aussi valoir "securite" via des
+contrats déjà signés mais pas encore travaillés (`heuresAvecCertain`), ce qui aurait annoncé un seuil
+atteint prématurément (devoir n°2). Maquette (carte reprenant les vraies classes/couleurs
+d'`AlertCenter.tsx`) validée avant tout code. Pointe vers l'outil de simulation déjà existant
+(« Mon profil » → « Renouvellement anticipé ») plutôt que de dupliquer l'instruction France Travail.
+5 tests : apparition au seuil, non-apparition avant le seuil, non-apparition après l'échéance, cas
+limite exact (507 h pile, `>=` inclusif), et la distinction volontaire "sécurité via contrats à venir
+uniquement" qui ne doit PAS déclencher l'alerte.
+
+**12. Couverture du bouton « Modifier » de `SoldeRecap`** (`e30c91a`) : ce bouton
+(`RevenusMensuels.tsx`, ajouté le 25/07/2026, commit `2edb88e`) n'avait jamais été vérifié en
+navigateur ni testé automatiquement. Étape 1 : vérifié à la main avec des données synthétiques
+injectées en `localStorage` (sauvegarde/restauration exactes, octet pour octet, avant/après) —
+édition, mise à jour du tableau, persistance, et « Annuler » sans effet de bord, tous corrects.
+Étape 2 : le comportement vit entièrement dans du state React, sans fonction pure à en extraire
+sans le vider de son sens — **premier test de composant du projet** : `jsdom` +
+`@testing-library/react` + `@testing-library/jest-dom` ajoutés (dev only), environnement `jsdom`
+déclaré uniquement dans ce fichier via `// @vitest-environment jsdom` (le reste de la suite reste en
+`node`, inchangé). 5 tests.
 
 **Audits de backlog (pas de commit)** : voir le résumé dans l'État ci-dessus.
 
