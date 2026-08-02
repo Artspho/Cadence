@@ -1117,6 +1117,20 @@ l'utilisateur — seul lui sait ce que dit son document, Cadence ne peut que l'i
 Complète (ne remplace pas) le garde-fou déjà en place côté IA (`natureMontant ≠ "net"` refusé à
 l'écriture, commit `d3ebb36`), qui ne couvrait que ce canal.
 
+**Addendum (02/08/2026) — vérification directe des vraies données, en plus de la formule.** La
+clôture du 31/07 ci-dessus prouvait la FORMULE (`calculerAJNette`) sur un seul cas ; elle n'avait
+pas vérifié que la VALEUR réellement saisie dans `Profil.ajReelleHistorique` était bien la nette,
+pas la brute recopiée par erreur — exactement le risque résiduel qu'elle décrit. Vérifié sur
+`docs/cadence-import-complet.json` (export réel le plus récent, 56 contrats) :
+`ajReelleHistorique` contient `{dateEffet: "2025-03-24", valeur: 53.31}` et
+`{dateEffet: "2026-01-18", valeur: 53.81}` — **les deux sont la nette, jamais la brute (54,55 €
+et 55,02 €)**. Aucune correction nécessaire, rien écrit.
+Second cas réel confirmé au passage, indépendant de celui du 31/07 : 24/03/2025, brut 54,55 € /
+SJR 133,53 € → net 53,31 € (écart 2,27 %), à ajouter à celui du 18/01/2026 (55,02 €→53,81 €,
+2,20 %) déjà cité. **Écart réel confirmé sur deux cas indépendants : ~2,2-2,3 %, jamais ~5 %**
+comme le supposait l'observation d'origine. Point 2 définitivement clos : formule ET donnée
+saisie vérifiées correctes.
+
 ## Fait (2026-07-31, suite de session — bug des 710h corrigé, gel des exercices clos, filtre par année)
 
 **Bug réel signalé par l'utilisateur : le Dashboard affichait 710 h au compteur des 507 h — le NH exact d'une notification France Travail PASSÉE, pas la progression réelle du cycle en cours.** Diagnostic confirmé en rejouant le calcul avec les vraies données importées (`docs/cadence-import-complet.json`, 56 contrats) : `Profil.dateAnniversaire` doit porter la **prochaine échéance** du cycle en cours (cf. tous les tests de `prediction.ts`, le module qui alimente le Dashboard, et l'UI de `MonProfil.tsx`), jamais la FCT qui l'a ouvert. Mais `RenouvellementAnticipe.tsx:44` lisait `profil.dateAnniversaire` directement comme la FCT — cohérent avec un commentaire erroné écrit lors du chantier « renouvellement anticipé » (session précédente, 31/07 matin), qui affirmait à tort que c'était l'usage général du champ dans toute l'app. Résultat : une fois la date stockée dépassée par « aujourd'hui », `calculerFenetreReference`/`calculerStatutPrediction` recalculaient exactement la fenêtre rétrospective qui avait déjà produit le droit en cours (24/03/2025→17/01/2026), au lieu de la fenêtre prospective (18/01/2026→17/01/2027).
