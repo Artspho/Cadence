@@ -22,10 +22,10 @@ describe("calculerAJBrute", () => {
     expect(resultat.plancherApplique).toBe(true);
   });
 
-  it("applique le plafond de 174,80 € pour de très hauts salaires/heures", () => {
+  it("applique le plafond pour de très hauts salaires/heures", () => {
     const resultat = calculerAJBrute({ salaireRetenu: 1_000_000, nht: 100_000, config: franceTravailConfig });
-    expect(resultat.brutAvantClamp).toBeGreaterThan(174.8);
-    expect(resultat.brut).toBe(174.8);
+    expect(resultat.brutAvantClamp).toBeGreaterThan(franceTravailConfig.are.plafond);
+    expect(resultat.brut).toBe(franceTravailConfig.are.plafond);
     expect(resultat.plafondApplique).toBe(true);
   });
 

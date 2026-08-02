@@ -578,7 +578,7 @@ function MonIndemnisationEnCours({
 // même période d'indemnisation, cf. types/index.ts). Aucun repli sur une AJ estimée : sans entrée
 // couvrant un mois donné, RevenusMensuels.tsx affiche honnêtement l'absence de montant pour ce mois.
 // Seuil de plausibilité pour le champ "AJ nette" ci-dessous : une AJ nette réelle ne peut pas
-// s'approcher du plafond de l'AJ BRUTE (config.are.plafond, 174,80 €) — au-delà de 60 €/j, la
+// s'approcher du plafond de l'AJ BRUTE (config.are.plafond, 181,18 €) — au-delà de 60 €/j, la
 // CSG/CRDS s'ajoute toujours à la retraite complémentaire (cf. engine/areNette.ts), donc un net
 // est structurellement inférieur au brut dont il découle. Avertissement de plausibilité seulement
 // (pas un blocage, pas un champ `natureMontant` déclaratif qui déplacerait le risque sans le

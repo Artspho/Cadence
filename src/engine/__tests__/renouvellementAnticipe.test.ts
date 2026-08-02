@@ -148,7 +148,7 @@ describe("cas fictifs B1/B2/B3/E1 — vérifiés au simulateur officiel du 31/07
     expect(r.nouveau.ajNette.net).toBeCloseTo(43.91, 2);
   });
 
-  it("B3b — touche le PLAFOND (174,80 € brut) : le clamp interne fonctionne, MAIS écart ouvert avec le simulateur avant clamp (cf. rapport de session — hors périmètre, pré-existant à areBrute.ts)", () => {
+  it("B3b — touche le PLAFOND (config.are.plafond) : le clamp interne fonctionne, MAIS écart ouvert avec le simulateur avant clamp (cf. rapport de session — hors périmètre, pré-existant à areBrute.ts)", () => {
     // SR volontairement irréaliste (400 000 €) pour forcer le dépassement du plafond. Le simulateur
     // officiel donne 155,77 € (AJ initiale, avant clamp) là où areBrute.ts donne 188,72 € — un écart
     // significatif, MAIS jamais rencontré à un SR réaliste (Fictif #3, docs/validation.md, SR 50 000 €,

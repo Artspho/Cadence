@@ -1580,6 +1580,12 @@ de situation ✅ — l'échec semble propre à ce format de bulletin, pas au can
 - ⬜ Phase 2 périodes assimilées — conditions ALD (en attente source réglementaire)
 
 ### À faire — priorité normale
+- ⬜ **Plafond ARE Annexe 10 : scalaire unique, pas d'historique daté** (contrairement au SMIC) —
+  un renouvellement anticipé simulé sur une FCT antérieure au 01/01/2026 utiliserait à tort le
+  plafond actuel (181,18 €) au lieu de l'ancien (174,80 €). Limite préexistante depuis 2024, jamais
+  corrigée — pas nouvelle avec la revalorisation du 03/08/2026 (cf. `config/franceTravailConfig.ts`,
+  commentaire au-dessus de `are.plafond`). Chantier séparé si prioritaire : construire un
+  `plafondHistorique` daté, sur le modèle de `smicHoraireBrutHistorique`.
 - ⬜ Vérifier l'éligibilité à un programme associatif/non-profit pour réduire les coûts
   d'hébergement (Supabase notamment) — repéré comme piste possible le 01/08/2026, NON confirmé
   officiellement. Des sources tierces (pas la documentation officielle Supabase) évoquent des

@@ -17,7 +17,9 @@ export const franceTravailConfig = {
   meta: {
     version: "2026.06",
     dateEntreeVigueur: "2026-06-01",
-    source: "Guide France Travail — Intermittents du spectacle, éd. mars 2026 (constantes du régime) ; arrêté du 22 mai 2026 (SMIC horaire brut)",
+    source:
+      "Guide France Travail — Intermittents du spectacle, éd. mars 2026 (constantes du régime) ; arrêté du 22 mai 2026 (SMIC horaire brut) ; " +
+      "Unédic, « Paramètres utiles » avril 2026 (plafond ARE annexes VIII/X, PMSS — vérifié le 03/08/2026)",
     avertissement:
       "Estimation indicative. Ne se substitue pas à une notification officielle de France Travail.",
     // Date déclarée jusqu'à laquelle ces règles sont réputées valides — PAS un seuil de durée
@@ -54,7 +56,17 @@ export const franceTravailConfig = {
   are: {
     ajMinimale: 31.96, // ✅ depuis 01/07/2023
     plancherAnnexe10: 44, // ✅ AJ brute minimale
-    plafond: 174.8, // ✅ depuis 01/01/2024
+    // ⚠️ Limite connue (préexistante, pas nouvelle avec cette valeur) : `plafond` est un scalaire
+    // UNIQUE, contrairement au SMIC qui a `smicHoraireBrutHistorique` (dateEffet + valeur) pour
+    // exactement cette raison. `calculerAJBrute` (areBrute.ts) applique donc TOUJOURS le plafond
+    // actuel, quelle que soit la date simulée. Sans incidence pour le cycle en cours (toujours
+    // orienté vers l'échéance à venir), mais `RenouvellementAnticipe.tsx` laisse choisir une FCT
+    // librement (aucune borne min/max sur l'input date) : simuler une FCT antérieure au 01/01/2026
+    // (date d'entrée en vigueur de la valeur actuelle) appliquerait à tort 181,18 € au lieu du
+    // plafond réellement en vigueur à cette date passée (174,80 € depuis le 01/01/2024, une valeur
+    // antérieure inconnue avant). Cf. CLAUDE.md (backlog, priorité normale) pour le chantier séparé
+    // si ça devient prioritaire : un `plafondHistorique` daté, sur le modèle du SMIC.
+    plafond: 181.18, // ✅ Unédic « Paramètres utiles » avril 2026, p.23 — en vigueur depuis le 01/01/2026, vérifié sur pièce le 03/08/2026 (ancienne valeur : 174,80 € au 01/01/2024)
     partieA: { seuilSR: 13700, coeffSousSeuil: 0.36, coeffAuDelaSeuil: 0.05, diviseur: 5000 }, // ✅
     partieB: { seuilNHT: 690, coeffSousSeuil: 0.26, coeffAuDelaSeuil: 0.08, diviseur: 507 }, // ✅
     partieC: { coeff: 0.7 }, // ✅ AJ minimale × 0,70 (Annexe 10)
@@ -218,7 +230,7 @@ export const franceTravailConfig = {
     // 🔶 Non certifié : dérivé de smicHoraireBrut × 7 — à confirmer depuis une source officielle
     // (utilisé pour la franchise salaires, cf. engine/indemnisationMensuelle.ts, docs/reprise.md).
     smicJournalierBrut: 86.17 as number | null,
-    pmssMensuel: null as number | null, // 🔶 TODO (plafond de cumul)
+    pmssMensuel: 4005 as number | null, // ✅ Unédic « Paramètres utiles » avril 2026, p.3 — en vigueur du 01/01/2026 au 31/12/2026, vérifié sur pièce le 03/08/2026. Toujours non lu par le moteur (plafond de cumul, module V2 non construit, cf. SPEC.md §11.B).
     // Historiques datés, réservés au module indemnisation mensuelle (V2) — distincts des valeurs
     // courantes ci-dessus (lues telles quelles par areBrute.ts pour la réadmission allongée ; ne
     // PAS y toucher, cf. docs/reprise.md). La franchise salaires exige le SMIC à la date de fin de
