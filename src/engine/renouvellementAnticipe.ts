@@ -15,6 +15,11 @@
 //    réutilisée telle quelle) prouve que la franchise CP de l'ancien droit est retombée à 0 un mois
 //    calendaire complet AVANT celui de la FCT retenue. En cas de doute (premier mois, mois de la FCT
 //    retenue lui-même, données insuffisantes), le risque reste signalé.
+//    Sourçage complété le 03/08/2026 (cf. le bloc « Trop-perçu » sur ComparaisonRenouvellementAnticipe
+//    plus bas et docs/validation.md) : le DÉCLENCHEUR est désormais confirmé à la source primaire, la
+//    FORMULE du montant l'est aussi au niveau réglementaire — mais elle reste NON CALCULABLE par
+//    Cadence aujourd'hui, pour trois raisons nommées là-bas. Aucun montant n'est donc câblé, et ce
+//    n'est pas un oubli.
 //  - la franchise salaires du nouveau droit n'est pas calculée ici : cf. F2 (content/renouvellementAnticipe.ts),
 //    affichée par l'écran, jamais un 0 qui laisserait croire qu'elle est nulle.
 import type { AJBruteResultat, AJNetteResultat, Contrat, PeriodeAssimilee, Profil } from "../types";
@@ -87,11 +92,59 @@ export interface ComparaisonRenouvellementAnticipe {
   /** true si ecartAJ est négatif au-delà d'un arrondi négligeable (cf. cas B2 : un écart de quelques
    * centimes dû aux arrondis de calcul n'est pas une "baisse" à signaler comme telle). */
   baisse: boolean;
-  /** Risque de trop-perçu au titre de la franchise CP de l'ANCIEN droit non épuisée — jamais un
-   * montant (cf. tropPercuChiffrable). */
+  /**
+   * ── Trop-perçu : ce qui est SOURCÉ, et pourquoi rien n'est chiffré ────────────────────────────
+   * Sourçage mené le 03/08/2026 sur pièces primaires (détail et citations : docs/validation.md).
+   *
+   * DÉCLENCHEUR — confirmé, et il correspond bien à ce que ce champ signale :
+   *   Guide France Travail « Intermittents du spectacle », éd. juillet 2026, p.19 : « La réadmission
+   *   expresse ou à date anniversaire peuvent entraîner : [...] Un trop-perçu si les franchises
+   *   précédentes n'ont pas été intégralement prélevées. »
+   *   Même guide, encadré « Attention » p.15 : « Lorsque les franchises congés payés et salaires
+   *   totales n'ont pu être intégralement déduites au terme de votre période d'indemnisation
+   *   (atteinte de votre date anniversaire ou demande de réadmission avant votre date anniversaire),
+   *   un trop-perçu équivalent au reliquat de franchises vous sera notifié (dans la limite de ce que
+   *   vous avez perçu). »
+   *   ⚠️ Ce n'est PAS le plafond de cumul à 118 % du PMSS (`indemnisationMensuelle.plafondCumulCoeffPMSS`) :
+   *   celui-là est un écrêtement PROSPECTIF du montant mensuel à verser (guide p.17, étape 5), calculé
+   *   avant paiement — il ne produit un indu que sur déclaration erronée, mécanisme distinct et non
+   *   modélisé ici.
+   *
+   * FORMULE — sourcée au niveau réglementaire, mais NON CALCULABLE par Cadence :
+   *   Annexe X au règlement général (convention d'assurance chômage), article 31 §2 — texte identique
+   *   à l'article 23 §2 de l'Annexe 8 : « Lorsque les franchises déterminées conformément aux
+   *   modalités de l'article 29 § 1er n'ont pu être intégralement appliquées au terme de la période
+   *   d'indemnisation, il est procédé à une récupération des allocations versées à tort, sur la base
+   *   du montant de l'allocation journalière déterminée à l'ouverture de droits ou de la réadmission. »
+   *   Soit : reliquat de franchises (en jours) × AJ de l'ouverture/réadmission, borné par les
+   *   allocations réellement versées. Trois verrous empêchent de l'appliquer honnêtement aujourd'hui :
+   *     1. ASSIETTE INCOMPLÈTE — le reliquat porte sur les franchises CP **et salaires** (art. 29 §1er).
+   *        Cadence ne calcule pas la franchise salaires (`FRANCHISE_SALAIRES_NON_CERTIFIEE` :
+   *        aucun appelant ne fournit SR/SJM à `calculerSerieDepuisContrats`) et `Profil.ouvertureDroits`
+   *        n'a pas de champ déclaratif pour son total. Chiffrer la seule part CP donnerait un montant
+   *        systématiquement SOUS-ESTIMÉ, présenté comme complet — un faux signal rassurant.
+   *     2. NATURE DE L'AJ NON TRANCHÉE — le règlement dit « allocation journalière déterminée à
+   *        l'ouverture de droits », mais récupère des « allocations versées à tort » (donc nettes).
+   *        Cadence ne stocke que l'AJ NETTE déclarée (`Profil.ajReelleHistorique`). Brute ou nette :
+   *        aucune source consultée ne le dit, et l'écart (~2,2 %) n'est pas négligeable sur 30 jours.
+   *     3. PLAFOND NON DISPONIBLE — « dans la limite de ce que vous avez perçu » exige le cumul
+   *        réellement versé depuis l'ouverture du droit ; la série mensuelle de Cadence démarre d'un
+   *        solde DÉCLARÉ à une date choisie par l'utilisateur, pas de l'ouverture.
+   *
+   * TODO (ordre de levée) : (1) câbler la franchise salaires (SR/SJM déjà calculés côté « montant
+   * ARE », cf. le paramètre optionnel `srSjmPourFranchiseSalaires`) OU ajouter un champ déclaratif
+   * `franchiseSalairesTotale` à `ouvertureDroits` ; (2) trancher brute/nette sur un relevé réel
+   * portant un trop-perçu notifié. Tant que (1) n'est pas levé, ne rien chiffrer.
+   */
   tropPercuRisque: boolean;
-  /** Toujours false : aucun calcul de montant de trop-perçu n'est câblé (cf. cas C1, en attente d'au
-   * moins 2 cas réels cohérents avant de chiffrer quoi que ce soit — devoir sacré n°2). */
+  /**
+   * Toujours false : aucun montant de trop-perçu n'est câblé — cf. les trois verrous ci-dessus.
+   * ⚠️ LIMITE CONNUE de `tropPercuRisque` lui-même, découverte par le sourçage du 03/08/2026 et
+   * NON corrigée ici (décision produit en attente, cf. CLAUDE.md) : la règle officielle vise les
+   * franchises CP **et salaires**, alors que `ancienneFranchiseCPEpuisee` ne regarde que la CP.
+   * `tropPercuRisque === false` signifie donc « franchise CP prouvée épuisée », pas « aucun risque » —
+   * si une franchise salaires non nulle subsistait, le risque existerait quand même.
+   */
   tropPercuChiffrable: false;
 }
 
@@ -147,6 +200,11 @@ export function delaiSeReapplique(dateOuvertureAncienne: string, fctRetenueNouve
  * épuisée. Le mois de la FCT retenue lui-même n'est jamais utilisé (la franchise pourrait s'y épuiser
  * APRÈS le jour exact de la FCT) ; l'absence de mois antérieur calculable (historique trop court)
  * renvoie `false` (non prouvée épuisée) plutôt qu'une présomption optimiste.
+ *
+ * ⚠️ Ne regarde QUE la franchise congés payés, alors que la règle officielle vise les franchises CP
+ * **et salaires** (cf. le bloc « Trop-perçu » sur ComparaisonRenouvellementAnticipe) : un `true`
+ * renvoyé ici ne prouve donc pas l'absence de tout reliquat. Écart connu, laissé tel quel faute de
+ * pouvoir calculer la franchise salaires — ne pas « simplifier » cette fonction sans lire ce bloc.
  */
 function ancienneFranchiseCPEpuisee(contrats: Contrat[], profil: Profil, ancien: AncienDroit, fctRetenue: string, config: FranceTravailConfig): boolean {
   const profilAncien: Profil = {

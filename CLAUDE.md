@@ -1532,6 +1532,19 @@ de situation ✅ — l'échec semble propre à ce format de bulletin, pas au can
 - ✅ Test import IA production : notification ARE ✅, relevé de situation ✅, bulletin GHS ⚠️
 
 ### À faire — priorité haute
+- ⚠️ **Contradiction de sources sur le plafond ARE — documentée, arbitrage pris, NON bloquante.**
+  Trouvée le 03/08/2026 en lisant le guide FT en entier pour le chantier trop-perçu (donc *après* les
+  commits `4b0105c` et `9f604f0`). Le **guide France Travail « Intermittents du spectacle »,
+  éd. juillet 2026** — plus récent que l'édition mars 2026 citée dans `meta.source` — et plusieurs
+  pages `cultureetspectacle.francetravail.fr` affirment « L'allocation journalière calculée ne peut
+  pas dépasser **174,80 € depuis le 1er janvier 2024** », sans mention de 177,56 € ni 181,18 €.
+  **Décision de Benoît (03/08/2026) : la config reste alignée sur Unédic** — organisme qui fixe
+  réellement ces paramètres, documents datés et cohérents sur 5 éditions vérifiées. `plafondHistorique`
+  n'est PAS modifié. Écart visible uniquement à SR proche du plafond de la partie A (13 700 €) — cas
+  extrême, même famille que l'écart de formule à SR extrême déjà déprioritisé. Non résolu avec
+  certitude à 100 % : un contact direct Unédic/France Travail reste nécessaire pour trancher
+  définitivement. Même texte en commentaire dans `franceTravailConfig.ts` et dans `docs/validation.md`
+  (« Dette tracée »).
 - ✅ Prompt GHS/sPAIEctacle — bulletins multi-colonnes couverts (commit 081a516)
 - ✅ Taux PAS depuis relevé de situation — enregistrement confirmé en prod (commits eb5a880 + d72ac18)
 - ✅ Prompt relevé de situation — 469,26 € (total mensuel net) extrait à tort comme AJ journalière :
@@ -1686,6 +1699,31 @@ de situation ✅ — l'échec semble propre à ce format de bulletin, pas au can
   module, avertissement affiché à la place). Détail complet (cas B1-E1 vérifiés simulateur, écart
   non résolu à SR extrême, deux bugs pré-existants découverts et corrigés au passage) :
   `docs/SPEC.md` §11.B, `docs/validation.md`.
+  **Sourçage du trop-perçu mené le 03/08/2026 — conclusion : TODO documenté, toujours aucun montant.**
+  Le déclencheur est désormais confirmé à la source primaire (guide FT éd. **juillet 2026** p.19 et
+  encadré p.15) et la formule aussi, au niveau réglementaire (**Annexe X art. 31 §2** = Annexe 8
+  art. 23 §2 : « récupération des allocations versées à tort, sur la base du montant de l'allocation
+  journalière déterminée à l'ouverture de droits ou de la réadmission », dans la limite de ce qui a
+  été perçu). Elle reste néanmoins **non calculable par Cadence** pour trois raisons de données, pas
+  de sourçage : (1) le reliquat porte sur les franchises CP **et salaires**, or la franchise salaires
+  n'est jamais calculée (`FRANCHISE_SALAIRES_NON_CERTIFIEE`, aucun appelant ne fournit SR/SJM) et
+  aucun champ déclaratif ne la porte — chiffrer la seule part CP sous-estimerait systématiquement ;
+  (2) AJ brute ou nette non tranchée par les sources ; (3) le plafond « dans la limite de ce que vous
+  avez perçu » exige un cumul versé depuis l'ouverture, que Cadence n'a pas. **Hypothèse de départ
+  écartée** : ce n'est PAS le plafond de cumul à 118 % du PMSS, qui est un écrêtement *prospectif* du
+  montant mensuel (guide p.17, étape 5), pas un mécanisme d'indu. Citations, sources consultées sans
+  succès et conditions de levée : `docs/validation.md` (section 2026-08-03).
+  **⚠️ Écart découvert au passage, NON corrigé — décision produit attendue** : la règle vise les
+  franchises CP **et salaires**, `ancienneFranchiseCPEpuisee` ne regarde que la CP, et
+  `franchiseSalairesRestante` vaut `0` *par défaut* (total absent), pas *parce qu'elle est épuisée*.
+  Donc `tropPercuRisque === false` veut dire « franchise CP prouvée épuisée », pas « aucun risque » :
+  faux feu vert au sens du devoir n°2 si une franchise salaires non nulle subsiste. Portée
+  probablement étroite (la franchise salaires tombe à 0 pour un SR ordinaire — la formule retranche
+  27 jours), mais réelle à SR élevé. Deux options, à trancher : passer `tropPercuRisque` en type
+  discriminé à trois états (`avéré` / `indéterminé` / `écarté`, sans montant) pour ne plus jamais
+  afficher de vert non prouvé — au prix d'un avertissement quasi permanent tant que la franchise
+  salaires n'est pas câblée ; ou laisser tel quel et lever d'abord la franchise salaires. Écart figé
+  par deux tests de caractérisation dans `renouvellementAnticipe.test.ts`.
 - ⬜ Module congés spectacle
 
 ---

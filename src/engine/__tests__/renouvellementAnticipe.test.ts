@@ -7,6 +7,7 @@ import { calculerAJBrutePourFenetre } from "../areBrute";
 import { calculerAJNette, calculerSJM } from "../areNette";
 import { ajouterJours, diffJours } from "../dateUtils";
 import { calculerFranchiseCPAcquise, calculerJoursTravaillesFenetre, calculerRenouvellementAnticipe, delaiSeReapplique, type AncienDroit } from "../renouvellementAnticipe";
+import { calculerSerieDepuisContrats } from "../indemnisationMensuelle";
 import { contrat, periode, profil } from "./testUtils";
 
 // Cas réel du 31/07/2026 (session Cadence, prompt produit) — deux notifications France Travail
@@ -204,6 +205,54 @@ describe("tropPercuRisque — cas C1 (franchise CP non épuisée) et son complé
   it("complémentaire — demande ~4 mois après l'ouverture : franchise CP épuisée (0 j restant depuis un mois complet), tropPercuRisque = false", () => {
     const r = calculerRenouvellementAnticipe([], [], profilBase, franceTravailConfig, ancienPetiteFranchise, "2026-05-15");
     expect(r.tropPercuRisque).toBe(false);
+  });
+
+  // Garde-fou de sourçage (03/08/2026) : la formule officielle du montant EXISTE et est citée dans
+  // renouvellementAnticipe.ts (Annexe X art. 31 §2), mais trois verrous la rendent non calculable par
+  // Cadence — assiette incomplète (franchise salaires jamais calculée), AJ brute/nette non tranchée,
+  // plafond « dans la limite de ce que vous avez perçu » indisponible. Ce test échoue dès que
+  // quelqu'un câble un montant : c'est le signal qu'il faut d'abord relire ces trois verrous et
+  // docs/validation.md, pas un test à contourner.
+  it("aucun montant de trop-perçu n'est exposé, quel que soit le scénario (devoir sacré n°2)", () => {
+    const scenarios = ["2026-03-01", "2026-05-15", "2026-08-01"].map((fct) => calculerRenouvellementAnticipe([], [], profilBase, franceTravailConfig, ancienPetiteFranchise, fct));
+
+    for (const r of scenarios) {
+      expect(r.tropPercuChiffrable).toBe(false);
+      // Aucune clé de la comparaison ne porte de montant de trop-perçu : ni maintenant, ni ajoutée
+      // discrètement plus tard sous un autre nom.
+      const clesMontant = Object.keys(r).filter((cle) => /^tropPercu/.test(cle) && !["tropPercuRisque", "tropPercuChiffrable"].includes(cle));
+      expect(clesMontant).toEqual([]);
+    }
+  });
+
+  // ⚠️ CARACTÉRISATION D'UNE LIMITE CONNUE, PAS UN COMPORTEMENT SOUHAITÉ. La règle officielle
+  // (guide FT juillet 2026, encadré p.15) vise « les franchises congés payés ET salaires totales » ;
+  // `ancienneFranchiseCPEpuisee` ne regarde que la CP. Un `tropPercuRisque === false` signifie donc
+  // « franchise CP prouvée épuisée », pas « aucun risque ». Ce test fige l'écart pour qu'il reste
+  // visible et documenté (cf. CLAUDE.md, décision produit en attente) — le jour où la franchise
+  // salaires devient calculable, c'est ce test qu'il faut réécrire, pas contourner.
+  it("limite connue : le verdict ignore la franchise salaires — franchiseSalairesRestante vaut 0 par défaut, jamais parce qu'elle est prouvée épuisée", () => {
+    const serie = calculerSerieDepuisContrats(
+      { ...profilBase, ouvertureDroits: { dateOuverture: ancienPetiteFranchise.dateOuverture, franchiseCPTotale: 6, delaiAttenteInitial: 7 } },
+      { dateDepart: ancienPetiteFranchise.dateOuverture },
+      [],
+      "2026-05-15",
+      franceTravailConfig,
+    );
+    expect(serie.calculable).toBe(true);
+    if (!serie.calculable) return;
+
+    const moisCalcules = serie.mois.filter((m) => m.calculable);
+    expect(moisCalcules.length).toBeGreaterThan(0);
+    for (const m of moisCalcules) {
+      if (!m.calculable) continue;
+      // 0 « par défaut » et non « épuisée » : le total lui-même est absent (valeur null).
+      expect(m.soldeFin.franchiseSalairesRestante).toBe(0);
+      const franchiseSalaires = m.franchiseSalaires;
+      expect(franchiseSalaires.valeur).toBeNull();
+      if (franchiseSalaires.valeur !== null) continue;
+      expect(franchiseSalaires.avertissement).toBe("franchise_salaires_non_certifiee");
+    }
   });
 });
 

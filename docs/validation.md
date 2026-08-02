@@ -128,6 +128,78 @@ postes (A+B+C, retraite, CSG/CRDS, net) : confirme la règle une seconde fois, s
 différente du #2. → **Corrigé dans le commit `f0d18ae`** : `areNette.ts` produit désormais ce
 résultat directement, cas #2 et #3 transformés en tests permanents (`areNette.test.ts`).
 
+#### 2026-08-03 — Trop-perçu (`tropPercuRisque`) : déclencheur sourcé, formule sourcée mais NON CALCULABLE
+
+Objectif de la session : sortir `tropPercuRisque` de son statut de « booléen de prudence sans règle
+derrière ». Résultat : le déclencheur ET la formule sont désormais sourcés à la source primaire, mais
+la formule reste inapplicable par Cadence — **aucun montant n'est câblé, et ce n'est plus un manque de
+sourçage, c'est un manque de données**.
+
+**Hypothèse de départ écartée.** Le chantier partait de l'idée que le risque de trop-perçu venait du
+plafond de cumul à 118 % du PMSS (`indemnisationMensuelle.plafondCumulCoeffPMSS`). C'est faux : le
+guide (éd. juillet 2026, p.17, étape 5 « Vérification du plafond mensuel de cumul de l'ARE à verser
+avec des rémunérations ») en fait un **écrêtement prospectif** du montant mensuel *avant* versement —
+« Si le cumul est supérieur au plafond : le montant mensuel de l'ARE à verser est recalculé = Montant
+du plafond – rémunérations brutes mensuelles. » Il ne produit un indu que par déclaration erronée.
+Mécanisme distinct, sans rapport avec `tropPercuRisque`, qui porte bien sur les franchises.
+
+**Déclencheur — confirmé (source primaire).**
+Guide France Travail « Intermittents du spectacle », éd. **juillet 2026** (mention de pied de page
+« France Travail services - Juillet 2026 »), p.19 :
+> « La réadmission expresse ou à date anniversaire peuvent entraîner : • Un montant d'allocation
+> inférieur, • L'application de nouvelles franchises, • Un trop-perçu si les franchises précédentes
+> n'ont pas été intégralement prélevées. »
+
+Même guide, encadré « Attention » p.15 (repris mot pour mot sur
+`cultureetspectacle.francetravail.fr/je-me-fais-accompagner/jour-de-carence-et-franchise`) :
+> « Lorsque les franchises congés payés et salaires totales n'ont pu être intégralement déduites au
+> terme de votre période d'indemnisation (atteinte de votre date anniversaire ou demande de
+> réadmission avant votre date anniversaire), un trop-perçu équivalent au reliquat de franchises vous
+> sera notifié (dans la limite de ce que vous avez perçu). »
+
+→ Ce que `tropPercuRisque` signale correspond bien à la règle officielle. Le booléen n'était pas un
+faux signal sur le principe.
+
+**Formule — sourcée au niveau réglementaire.**
+Annexe X au règlement général annexé à la convention d'assurance chômage, **article 31 §2** (texte
+identique à l'**article 23 §2** de l'Annexe 8, convention du 15/11/2024) :
+> « Lorsque les franchises déterminées conformément aux modalités de l'article 29 § 1er n'ont pu être
+> intégralement appliquées au terme de la période d'indemnisation, il est procédé à une récupération
+> des allocations versées à tort, sur la base du montant de l'allocation journalière déterminée à
+> l'ouverture de droits ou de la réadmission. »
+
+Soit : **reliquat de franchises (en jours) × AJ de l'ouverture/réadmission**, borné par les allocations
+réellement versées.
+
+**Pourquoi rien n'est chiffré malgré ça — trois verrous, aucun levable par du code seul :**
+
+| # | Verrou | Ce qui manque exactement |
+|---|---|---|
+| 1 | **Assiette incomplète** | Le reliquat porte sur les franchises CP **et salaires** (art. 29 §1er). Cadence ne calcule pas la franchise salaires — `calculerSerieDepuisContrats` retombe sur `FRANCHISE_SALAIRES_NON_CERTIFIEE` faute de SR/SJM (`srSjmPourFranchiseSalaires` n'est fourni par aucun appelant), et `Profil.ouvertureDroits` n'a pas de champ déclaratif pour son total. Chiffrer la seule part CP donnerait un montant **systématiquement sous-estimé présenté comme complet** — faux signal rassurant, devoir n°2. |
+| 2 | **AJ brute ou nette ?** | Le règlement dit « allocation journalière déterminée à l'ouverture de droits » mais récupère des « allocations versées à tort » (donc nettes). Aucune des sources consultées ne tranche. Cadence ne stocke que l'AJ **nette** déclarée (`ajReelleHistorique`). Écart ~2,2 % : sur un reliquat de 30 j, ce n'est pas un arrondi. |
+| 3 | **Plafond indisponible** | « dans la limite de ce que vous avez perçu » exige le cumul réellement versé depuis l'ouverture du droit. La série mensuelle de Cadence démarre d'un **solde déclaré** à une date choisie par l'utilisateur, pas de l'ouverture. |
+
+**Sources consultées sans succès** pour lever le verrou 2 : guide FT éd. juillet 2026 (lu en entier,
+extraction texte complète), Annexe 8 et Annexe X du règlement général (unedic.org), dossier de
+synthèse Unédic « L'indemnisation des intermittents du spectacle », circulaire Unédic n° 2025-03 du
+1er avril 2025. Aucun ne précise brute/nette ni ne donne d'exemple chiffré de trop-perçu.
+
+**Ce qu'il faudrait pour trancher** : (1) câbler la franchise salaires (le SR et le SJM existent déjà
+côté compteur « montant ARE », il « suffit » de les passer à `calculerSerieDepuisContrats`) **ou**
+ajouter un champ déclaratif `franchiseSalairesTotale` à `ouvertureDroits` ; (2) **un relevé réel
+portant un trop-perçu notifié** — c'est la seule pièce qui montrerait à la fois la base retenue et
+l'AJ utilisée. Aucun relevé de ce type n'a jamais été fourni au projet.
+
+**⚠️ Écart découvert au passage, non corrigé (décision produit en attente).** La règle vise les
+franchises CP **et salaires** ; `ancienneFranchiseCPEpuisee` ne regarde que la CP, et
+`franchiseSalairesRestante` vaut `0` **par défaut** (total absent) et non parce qu'elle serait prouvée
+épuisée. Donc `tropPercuRisque === false` signifie « franchise CP prouvée épuisée », pas « aucun
+risque » : si une franchise salaires non nulle subsistait, le risque existerait quand même — un faux
+feu vert au sens du devoir n°2. Portée réelle probablement étroite (la formule de la franchise
+salaires retranche 27 jours : elle tombe à 0 pour un SR ordinaire, cf. `calculerFranchiseSalaires`),
+mais non nulle à SR élevé. Deux tests de caractérisation figent l'écart dans
+`renouvellementAnticipe.test.ts` pour qu'il reste visible.
+
 #### 2026-07-20 — Règle CSG/CRDS établie (implémentée le 2026-07-20, commit `f0d18ae`)
 
 - **Assiette** : 98,25 % de l'AJ brute (abattement de 1,75 %), pas le SJM.
@@ -158,6 +230,14 @@ résultat directement, cas #2 et #3 transformés en tests permanents (`areNette.
 
 ### Dette tracée
 
+- **Plafond ARE — contradiction de sources non résolue (03/08/2026).** Le Guide France Travail
+  (éd. juillet 2026) et plusieurs pages cultureetspectacle.francetravail.fr affirment 174,80 € comme
+  plafond inchangé depuis 01/01/2024 — contradiction non résolue avec les valeurs Unédic retenues en
+  config (`are.plafondHistorique` : 174,80 € en 2024, 177,56 € en 2025, 181,18 € en 2026). Config
+  alignée sur Unédic (organisme gestionnaire des paramètres, documents datés et cohérents sur
+  5 éditions vérifiées), écart visible uniquement à SR proche du plafond de la partie A (13 700 €) —
+  cas extrême, même famille que l'écart de formule à SR extrême déjà déprioritisé. Non résolu avec
+  certitude à 100 %, contact direct Unédic/France Travail nécessaire pour trancher définitivement.
 - **`StatutPrediction.joursRestants` (champ brut) reste fragile** — il peut valoir `0` sans que
   ça signifie une vraie échéance atteinte : quand l'anniversaire est inconnu, `periodeReference.ts`
   referme la fenêtre sur une date sentinelle ("aujourd'hui", faute de mieux), et `joursRestants`

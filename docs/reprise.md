@@ -136,6 +136,48 @@ Limite documentée (commentaire dans le code + nouveau point backlog `CLAUDE.md`
 
 602 tests verts, `tsc -b` propre.
 
+**14. Plafond ARE historisé** (`4b0105c`, puis `9f604f0`) : la limite documentée au point 13 est
+corrigée. `are.plafondHistorique` (`{dateEffet, valeur}[]`, modèle `smicHoraireBrutHistorique`) +
+fonction pure `getPlafondAreAt` (`engine/plafondAreUtils.ts`) ; `calculerAJBrute` prend un `dateEffet`
+**obligatoire** (aucun défaut « aujourd'hui », qui recréerait le bug) et `calculerAJBrutePourFenetre`
+le dérive de `fenetre.dateFin` — App.tsx, Simulateur.tsx et renouvellementAnticipe.ts inchangés.
+Trois entrées sourcées : 174,80 € (2024) / 177,56 € (2025) / 181,18 € (2026). Pour une date antérieure
+à 2024, repli **explicite** sur la plus ancienne entrée : ni exception (planterait Historique.tsx,
+aucun error boundary React) ni `null` (supprimerait le clamp, donc AJ trop haute). 615 tests verts.
+
+**15. Trop-perçu (`tropPercuRisque`) — sourçage mené, conclusion : TODO documenté, aucun montant
+câblé.** Le déclencheur est maintenant confirmé à la source primaire (guide FT éd. **juillet 2026**
+p.19 et encadré p.15) et la formule aussi, au niveau réglementaire (**Annexe X art. 31 §2** :
+reliquat de franchises × AJ de l'ouverture/réadmission, dans la limite de ce qui a été perçu). Elle
+reste **non calculable par Cadence** — trois verrous de données, pas de sourçage : le reliquat porte
+sur les franchises CP **et salaires** (la franchise salaires n'est jamais calculée, et aucun champ
+déclaratif ne la porte) ; AJ brute ou nette non tranchée ; le plafond « dans la limite de ce que vous
+avez perçu » exige un cumul versé depuis l'ouverture, indisponible. **L'hypothèse de départ du prompt
+était fausse** : le risque de trop-perçu n'a rien à voir avec le plafond de cumul à 118 % du PMSS,
+qui est un écrêtement *prospectif* du montant mensuel (guide p.17, étape 5). Aucune ligne de calcul
+ajoutée ; commentaires sourcés dans `engine/renouvellementAnticipe.ts`, section datée dans
+`docs/validation.md` (citations verbatim + sources consultées sans succès + conditions de levée),
+2 tests de garde-fou. 617 tests verts, `tsc -b` propre.
+
+⚠️ **Écart découvert au passage, NON corrigé, décision produit attendue** : la règle vise les
+franchises CP **et salaires**, `ancienneFranchiseCPEpuisee` ne regarde que la CP, et
+`franchiseSalairesRestante` vaut `0` *par défaut* (total absent) et non *parce qu'elle est épuisée*.
+`tropPercuRisque === false` signifie donc « franchise CP prouvée épuisée », pas « aucun risque » —
+faux feu vert potentiel au sens du devoir n°2, de portée probablement étroite (la franchise salaires
+tombe à 0 pour un SR ordinaire) mais réelle à SR élevé. Deux options tracées dans `CLAUDE.md`.
+
+⚠️ **Contradiction de sources découverte sur le plafond ARE, postérieure aux points 13-14 —
+documentée, arbitrage pris, non bloquante** : le guide FT éd. **juillet 2026** (plus récent que
+l'édition mars 2026 citée dans `meta.source`) et plusieurs pages `cultureetspectacle.francetravail.fr`
+écrivent que l'allocation journalière « ne peut pas dépasser **174,80 € depuis le 1er janvier 2024** »,
+sans mentionner 177,56 € ni 181,18 € — qui viennent, eux, d'Unédic « Paramètres utiles ».
+**Décision de Benoît : la config reste alignée sur Unédic** (organisme qui fixe réellement ces
+paramètres, documents datés et cohérents sur 5 éditions vérifiées) — `plafondHistorique` inchangé.
+Écart visible uniquement à SR proche du plafond de la partie A (13 700 €), cas extrême de la même
+famille que l'écart de formule à SR extrême déjà déprioritisé. Non résolu à 100 % : contact direct
+Unédic/France Travail nécessaire pour trancher définitivement. Tracé aux trois endroits
+(`franceTravailConfig.ts`, `docs/validation.md` « Dette tracée », `CLAUDE.md`).
+
 ## Fait le 02/08/2026 (14 commits, `bcc4f6e` → `e30c91a`, + deux audits de backlog)
 
 Détail complet de chaque chantier dans `CLAUDE.md` (§ État actuel, entrées du 02/08/2026) ; ici,
