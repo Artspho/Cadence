@@ -1569,6 +1569,17 @@ de situation ✅ — l'échec semble propre à ce format de bulletin, pas au can
 - ⬜ Phase 2 périodes assimilées — conditions ALD (en attente source réglementaire)
 
 ### À faire — priorité normale
+- ⬜ Vérifier l'éligibilité à un programme associatif/non-profit pour réduire les coûts
+  d'hébergement (Supabase notamment) — repéré comme piste possible le 01/08/2026, NON confirmé
+  officiellement. Des sources tierces (pas la documentation officielle Supabase) évoquent des
+  réductions de 40 à 80 % pour les organisations à but non lucratif, mais mentionnent un statut
+  américain (501(c)(3)), pas une association loi 1901 française — à vérifier directement auprès
+  du support Supabase si une association loi 1901 serait éligible ou reconnue de façon
+  équivalente. Rappel : créer une association loi 1901 est un vrai engagement administratif
+  (statuts, gouvernance, potentiellement comptabilité), pas un acte anodin pour une simple
+  réduction — à ne considérer que si la monétisation devient réelle avec de vrais utilisateurs
+  payants, pas pendant la bêta actuelle. Priorité : basse, aucune urgence tant qu'aucun paiement
+  réel n'est en jeu.
 - ✅ **Webview France Travail intégrée — tranché en faveur de l'option (b), liens externes
   directs (02/08/2026, complété le même jour).** L'idée d'une fenêtre de navigation DANS Cadence
   (cookies/jeton chiffrés stockés sur l'appareil) restait bloquée par FranceConnect, qui interdit
