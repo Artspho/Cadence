@@ -391,7 +391,7 @@ export interface SoldeIndemnisationDepart {
 export type MontantMensuelResultat = { calculable: false; raison: "aj_manquante" } | { calculable: true; montant: number; ajUtilisee: number; montantNet?: number };
 
 export interface MoisIndemnisationResultat {
-  calculable: true; // discriminant partagé avec MoisReadmissionNonCalcule, cf. LigneSerieIndemnisation
+  calculable: true; // conservé : discriminant historique de LigneSerieIndemnisation, cf. ce type
   moisLabel: string;
   heuresDuMois: number; // repasse l'entrée (calculée depuis les contrats) pour affichage, cf. RevenusMensuels.tsx
   joursNonIndemnisables: number; // Math.floor(heuresDuMois × coeffJoursNonIndemnisables / diviseurJoursTravaillesA10), première opération du réducteur
@@ -404,32 +404,36 @@ export interface MoisIndemnisationResultat {
   // Somme des salaireBrut des contrats attribués à ce mois calendaire après repartirContratParMois.
   // Toujours >= 0. Inclut enseignement (Levallois etc.) et spectacle.
   salairesContratsBruts: number;
+  // Nombre de jours de la FENÊTRE réellement retenue pour ce mois. Égal aux jours calendaires du
+  // mois dans le cas courant ; strictement inférieur sur le mois d'ouverture partiel, où seuls les
+  // jours à partir de `dateOuverture` relèvent du droit (cf. `ouverturePartielle` ci-dessous).
+  joursDeLaFenetre: number;
+  // Renseigné UNIQUEMENT sur le mois d'ouverture partiel (dateOuverture ne tombe pas le 1er).
+  // Ce mois est désormais calculé — mais seulement sur la part du NOUVEAU droit : les jours qui
+  // précèdent l'ouverture ne sont pas couverts ici (ils relèvent du droit précédent en réadmission,
+  // ou de rien en première admission). Fondement : France Travail fait deux passes séparées sur ce
+  // mois (relevés réels de Benoît, janvier 2026 : ancien droit jusqu'au 17/01, nouveau à partir du
+  // 18/01, chacun son décompte) — Cadence calcule la seconde et ne devine jamais la première.
+  // Confirmé par l'exemple 9 du guide France Travail p.13 : un droit ouvert le 19/12 fait courir le
+  // délai d'attente du 19 au 25/12, pas du 1er au 7.
+  ouverturePartielle?: {
+    depuis: string; // ISO — `ouvertureDroits.dateOuverture`
+    messageTooltip: string; // cf. content/moisOuverturePartielle.ts, jamais reformulé côté UI
+  };
 }
 
-// Mois d'ouverture PARTIEL : `ouvertureDroits.dateOuverture` ne tombe pas le 1er du mois calendaire,
-// ce mois n'est donc indemnisé qu'en partie et n'est jamais simulé par le moteur — jamais un chiffre
-// deviné (devoir n°2), cf. engine/indemnisationMensuelle.ts (calculerSerieDepuisContrats).
+// Une ligne de la série mensuelle affichée. Depuis le 03/08/2026 il n'existe plus qu'UN seul cas :
+// tous les mois sont calculés, y compris le mois d'ouverture partiel — calculé sur sa vraie fenêtre
+// (`MoisIndemnisationResultat.joursDeLaFenetre` / `.ouverturePartielle`) au lieu d'être sauté par le
+// moteur puis recalculé comme un mois entier par l'affichage.
 //
-// Nommé « ouverture_partielle » et non « readmission » depuis le 2026-07-28 : le déclencheur est
-// purement calendaire, il vaut donc aussi pour une PREMIÈRE admission ouverte en cours de mois, à qui
-// rien ne permet d'affirmer un partage entre deux droits (il n'y a pas de droit antérieur). Ce qui
-// change selon `Profil.situation` est la CAUSE du caractère partiel, portée par `messageTooltip`
-// (cf. content/moisOuverturePartielle.ts) — pas le calcul, identique dans les deux cas.
-export interface MoisOuverturePartielleNonCalcule {
-  calculable: false;
-  type: "ouverture_partielle";
-  moisLabel: string; // ISO "YYYY-MM"
-  /** Libellé affiché tel quel par RevenusMensuels.tsx (title + aria-label) — jamais reformulé côté
-   * UI, sinon les deux textes divergent (c'était le cas avant le 2026-07-28). */
-  messageTooltip: string;
-  // Toujours 0 (jamais calculé pour ce mois) — présent uniquement pour que RevenusMensuels.tsx
-  // puisse itérer sur un seul tableau sans garde-fou spécifique à ce champ, cf. LigneSerieIndemnisation.
-  salairesContratsBruts: number;
-}
-
-// Une ligne de la série mensuelle affichée : soit un mois normalement calculé, soit le mois
-// d'ouverture partiel non calculé — discriminées par `calculable`, cf. RevenusMensuels.tsx.
-export type LigneSerieIndemnisation = MoisIndemnisationResultat | MoisOuverturePartielleNonCalcule;
+// Le type `MoisOuverturePartielleNonCalcule` (variante `calculable: false`, supprimée) portait
+// l'ancienne décision « ne pas calculer ce mois ». Elle reposait sur un fait exact — Cadence n'a pas
+// accès à l'ancien droit — mais en tirait une conclusion trop large : ne pas calculer la part du
+// NOUVEAU droit alors qu'elle est, elle, entièrement connue. Conséquence mesurée le 03/08/2026 sur
+// les données réelles de Benoît : 674,93 € d'ARE annoncés sur deux mois que son relevé chiffre à 0.
+// L'alias reste un type simple pour ne pas obliger chaque appelant à changer de nom.
+export type LigneSerieIndemnisation = MoisIndemnisationResultat;
 
 // Résultat de `calculerSerieDepuisContrats` : `calculable: false` quand `Profil.ouvertureDroits`
 // est absent — la simulation entière est bloquée plutôt que de deviner un point de départ

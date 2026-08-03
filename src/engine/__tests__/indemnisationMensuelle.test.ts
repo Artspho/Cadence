@@ -327,34 +327,38 @@ describe("calculerSerieDepuisContrats", () => {
   // ne fixait PAS `situation` — il tournait donc sur le défaut de la fabrique `profil()`, c'est-à-dire
   // "premiere_admission". Le concept qu'il prétendait couvrir (mois partagé avec un droit antérieur)
   // n'était en réalité jamais testé. `situation` est désormais explicite dans chacun des cas.
-  it("réadmission, dateOuverture le 18/01/2026 : premier élément = mois d'ouverture partiel non calculé, message de partage entre deux droits", () => {
+  // ⚠️ Ces deux tests ont changé de NATURE le 03/08/2026, pas seulement d'assertions. Ils vérifiaient
+  // que le mois d'ouverture n'était PAS calculé (`calculable: false`) ; ils vérifient maintenant qu'il
+  // l'est, sur sa vraie fenêtre. Le verrou de non-régression sur l'ancienne description
+  // (« traité ici comme un mois entier (approximation) ») est retiré volontairement : cette phrase
+  // décrivait exactement le comportement qui produisait le bug du point 21 (674,93 € annoncés sur deux
+  // mois que les relevés chiffrent à 0). La garder aurait figé une description devenue fausse.
+  it("réadmission, dateOuverture le 18/01/2026 : janvier est calculé sur la seule fenêtre du 18 au 31, avec le message de partage entre deux droits", () => {
     const p = profil({ situation: "readmission", ouvertureDroits: { dateOuverture: "2026-01-18", franchiseCPTotale: 0, delaiAttenteInitial: 0 } });
     const resultat = calculerSerieDepuisContrats(p, { dateDepart: "2026-01-01" }, [], "2026-02-28", franceTravailConfig);
     if (!resultat.calculable) throw new Error("devrait être calculable");
-    expect(resultat.mois.map((m) => m.moisLabel)).toEqual(["2026-01", "2026-02"]); // janvier partiel puis février calculé normalement
-    const premier = resultat.mois[0];
-    if (premier.calculable) throw new Error("janvier devrait être le mois d'ouverture partiel, non calculable");
-    expect(premier.type).toBe("ouverture_partielle");
-    // Chaîne littérale volontairement (pas la constante) : verrou de non-régression sur la
-    // description RÉELLEMENT affichée à un réadmis avant ce chantier. Elle n'a pas dérivé d'un
-    // caractère — elle reste le PRÉFIXE exact du libellé. Le seul ajout autorisé est le rappel du
-    // relevé officiel (2026-07-28), vérifié juste en dessous : un `toBe` strict interdirait
-    // désormais cet ajout, un simple `toContain` laisserait passer une réécriture du début.
-    expect(premier.messageTooltip.startsWith("Mois de réadmission — partagé entre deux droits, traité ici comme un mois entier (approximation).")).toBe(true);
-    expect(premier.messageTooltip).toContain("Consulte ton relevé France Travail pour le montant exact.");
-    expect(premier.messageTooltip).toBe(MOIS_OUVERTURE_PARTIELLE.avecDroitAnterieur);
+    expect(resultat.mois.map((m) => m.moisLabel)).toEqual(["2026-01", "2026-02"]);
+    const janvier = resultat.mois[0];
+    // 14 jours du 18 au 31 janvier inclus — jamais les 31 jours du mois civil.
+    expect(janvier.joursDeLaFenetre).toBe(14);
+    expect(janvier.joursIndemnises).toBe(14); // aucune franchise, aucun délai, aucun contrat ici
+    expect(janvier.ouverturePartielle?.depuis).toBe("2026-01-18");
+    expect(janvier.ouverturePartielle?.messageTooltip).toBe(MOIS_OUVERTURE_PARTIELLE.avecDroitAnterieur);
+    expect(janvier.ouverturePartielle?.messageTooltip).toContain("Consulte ton relevé France Travail pour le montant exact.");
+    // Février, lui, reste un mois civil entier.
+    expect(resultat.mois[1].joursDeLaFenetre).toBe(28);
+    expect(resultat.mois[1].ouverturePartielle).toBeUndefined();
   });
 
-  it("PREMIÈRE ADMISSION, dateOuverture le 18/01/2026 : même mois partiel, mais un message qui n'invente aucun droit antérieur", () => {
+  it("PREMIÈRE ADMISSION, dateOuverture le 18/01/2026 : même fenêtre, mais un message qui n'invente aucun droit antérieur", () => {
     const p = profil({ situation: "premiere_admission", ouvertureDroits: { dateOuverture: "2026-01-18", franchiseCPTotale: 0, delaiAttenteInitial: 0 } });
     const resultat = calculerSerieDepuisContrats(p, { dateDepart: "2026-01-01" }, [], "2026-02-28", franceTravailConfig);
     if (!resultat.calculable) throw new Error("devrait être calculable");
-    const premier = resultat.mois[0];
-    if (premier.calculable) throw new Error("janvier devrait être le mois d'ouverture partiel, non calculable");
-    expect(premier.type).toBe("ouverture_partielle");
-    expect(premier.messageTooltip).toBe(MOIS_OUVERTURE_PARTIELLE.sansDroitAnterieur);
-    expect(premier.messageTooltip).not.toMatch(/réadmission|deux droits/i); // jamais un droit antérieur qui n'existe pas
-    expect(premier.messageTooltip).toContain("Consulte ton relevé France Travail pour le montant exact.");
+    const janvier = resultat.mois[0];
+    expect(janvier.joursDeLaFenetre).toBe(14);
+    expect(janvier.ouverturePartielle?.messageTooltip).toBe(MOIS_OUVERTURE_PARTIELLE.sansDroitAnterieur);
+    expect(janvier.ouverturePartielle?.messageTooltip).not.toMatch(/réadmission|deux droits/i); // jamais un droit antérieur qui n'existe pas
+    expect(janvier.ouverturePartielle?.messageTooltip).toContain("Consulte ton relevé France Travail pour le montant exact.");
   });
 
   // Le rappel du document officiel ne doit jamais redevenir le privilège d'un seul des deux cas :
@@ -379,8 +383,9 @@ describe("calculerSerieDepuisContrats", () => {
     const readmission = serie("readmission");
     if (!premiereAdmission.calculable || !readmission.calculable) throw new Error("les deux devraient être calculables");
 
-    // Tout est identique hors messageTooltip : mêmes mois, mêmes jours, mêmes montants.
-    const sansMessage = (r: typeof premiereAdmission) => JSON.stringify(r.mois.map((m) => (m.calculable ? m : { ...m, messageTooltip: "<libellé>" })));
+    // Tout est identique hors le LIBELLÉ du mois d'ouverture : mêmes mois, mêmes jours, mêmes montants.
+    const sansMessage = (r: typeof premiereAdmission) =>
+      JSON.stringify(r.mois.map((m) => (m.ouverturePartielle ? { ...m, ouverturePartielle: { ...m.ouverturePartielle, messageTooltip: "<libellé>" } } : m)));
     expect(sansMessage(premiereAdmission)).toBe(sansMessage(readmission));
   });
 

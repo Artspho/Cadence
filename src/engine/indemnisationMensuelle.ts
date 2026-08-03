@@ -1,11 +1,25 @@
-// Calcule, mois par mois, le nombre de jours réellement indemnisés — pas seulement l'AJ
-// théorique. Part d'un solde de départ à une date connue (relevé France Travail réel) : ne
-// reconstruit JAMAIS l'historique depuis la réadmission (un mois de régularisation, transition de
-// droits en cours de mois, n'a pas de décomposition standard reconstituable — cf. docs/reprise.md).
+// Calcule, mois par mois, le nombre de jours réellement indemnisés — pas seulement l'AJ théorique.
+// MOTEUR UNIQUE du tableau mensuel depuis le 03/08/2026 : `engine/calculerSerie.ts` et
+// `engine/franchises.ts`, second moteur concurrent qui consommait la franchise CP AVANT le délai
+// d'attente, ont été supprimés (points 3 et 16 de docs/critique_2026-08-03.md). L'ordre inverse
+// qu'ils appliquaient est explicitement contredit par les deux sources officielles ci-dessous, et
+// par les relevés réels de Benoît (janvier 2026 : 2 jours de DÉLAI consommés, pas 2 de franchise ;
+// février 2026 : « franchise CP 4 / différé 5 / travail 19 »).
 //
-// Ordre de consommation, confirmé par le guide France Travail (p.12-17) et par les relevés réels
-// certifiés (fév-mai 2026) : jours non indemnisables → délai d'attente → franchise congés payés →
-// paiement du reliquat. Chaque poste ne mord que sur ce que le précédent a laissé.
+// Ordre de consommation — deux sources officielles concordantes :
+//  - Annexe X au règlement annexé à la convention du 15/11/2024, article 23 §1er : « L'application
+//    des dispositions des articles 21 et 22 s'effectue dans l'ordre suivant : différé
+//    d'indemnisation, délai d'attente, franchise de congés payés, franchise. »
+//  - Guide France Travail « Intermittents du spectacle », p.12 : « S'appliquent ensuite sur des
+//    jours indemnisables (soit après la prise en compte d'activités professionnelles), dans l'ordre
+//    suivant : un délai d'attente, une franchise mensuelle congés payés, une franchise mensuelle
+//    salaires. » — décomposé en cinq étapes p.17, cf. `calculerMoisIndemnisation`.
+// Soit : jours non indemnisables → délai d'attente → franchise CP du mois → franchise salaires du
+// mois → reliquats reportés. Chaque poste ne mord que sur ce que le précédent a laissé.
+//
+// Le différé d'indemnisation spécifique (étape 0 de l'ordre officiel) n'est pas modélisé : guide
+// p.12, « les intermittents du spectacle étant principalement employés sous CDD d'usage ne
+// prévoyant pas le versement d'indemnités de rupture, ce différé est rarement appliqué ».
 //
 // Franchise CP : plafonnée par un forfait mensuel (2j ou 3j selon le palier, cf.
 // franceTravailConfig.ts) qui se reporte d'un mois sur l'autre s'il n'est pas intégralement
@@ -15,9 +29,9 @@
 // par l'absence de plafond).
 import type { Contrat, FranchiseSalairesResultat, LigneSerieIndemnisation, MoisIndemnisationEntree, MoisIndemnisationResultat, MontantMensuelResultat, Profil, SerieIndemnisationResultat, SoldeIndemnisation, SoldeIndemnisationDepart } from "../types";
 import type { FranceTravailConfig } from "../config/franceTravailConfig";
-import { bornesDuMois, joursDansMois, moisCle, moisSuivant } from "./dateUtils";
+import { bornesDuMois, diffJours, joursDansMois, moisCle, moisSuivant } from "./dateUtils";
 import { getAjReelleAt, getTauxPASAt } from "./ajReelleUtils";
-import { repartirContratParMois } from "./decoupageMensuel";
+import { heuresContratsSurFenetre, repartirContratParMois } from "./decoupageMensuel";
 import { messageMoisOuverturePartielle } from "../content/moisOuverturePartielle";
 
 const FRANCHISE_SALAIRES_NON_CERTIFIEE: FranchiseSalairesResultat = {
@@ -55,15 +69,19 @@ function calculerMontantMensuel(
 // Mois de transition — décisions actées, pas encore câblées (TODO d'implémentation, pas de
 // question ouverte) :
 //
-// Q1 — Mois chevauchant deux droits (réadmission) : DÉCISION — ne pas calculer ce mois. Le moteur
-// démarre à `ouvertureDroits.dateOuverture` du nouveau droit ; si le premier mois du tableau
-// contient cette date et qu'il reste des jours avant elle dans le même mois calendaire, ce mois
-// doit être affiché comme "mois de réadmission" non calculé (cf. Q3), jamais calculé comme si le
-// mois entier relevait du nouveau droit. Fondement : relevés réels de Benoît, janvier 2026 —
-// France Travail fait deux passes séparées (ancien droit 54,55 €/j jusqu'au 17/01, nouveau droit
-// 55,02 €/j à partir du 18/01, chacun avec son propre décompte), jamais une moyenne. Cadence n'a
-// structurellement pas accès à l'ancien droit (ni ses paramètres ni son historique de contrats),
-// donc ce mois ne peut être reconstitué sans deviner (devoir n°2).
+// Q1 — Mois chevauchant deux droits (réadmission) : DÉCISION RÉVISÉE le 03/08/2026. Le fait
+// fondateur est confirmé et inchangé : France Travail fait DEUX PASSES SÉPARÉES sur ce mois
+// (relevés réels de Benoît, janvier 2026 — ancien droit 54,55 €/j jusqu'au 17/01, nouveau droit
+// 55,02 €/j à partir du 18/01, chacun son propre décompte), jamais une moyenne, et Cadence n'a
+// structurellement pas accès à l'ancien droit. La décision qui en était tirée — « ne pas calculer ce
+// mois du tout » — allait trop loin : elle jetait aussi la seconde passe, celle du NOUVEAU droit,
+// dont tous les paramètres sont connus (date d'ouverture, franchises, contrats).
+// Nouvelle règle : Cadence calcule la passe du nouveau droit, sur la fenêtre `dateOuverture` → fin
+// du mois, et ne devine JAMAIS celle de l'ancien (devoir n°2 intact). Confirmé par l'exemple 9 du
+// guide France Travail p.13 : un droit ouvert le 19/12/22 fait courir le délai d'attente « du 19 au
+// 25/12/22 », pas du 1er au 7 — le mois d'ouverture démarre bien à la date d'ouverture. Et vérifié
+// par la mesure : cette règle reproduit les 4 mois certifiés sans écart, là où aucune des deux
+// implémentations antérieures n'y parvenait.
 //
 // Q2 — Taux PAS multi-années : DÉCISION RENVERSÉE le 01/08/2026 — le besoin réel envisagé ici s'est
 // confirmé (relevés de situation réels d'un utilisateur : 3,30 % mi-2025, 3,10 % dès fin
@@ -75,15 +93,15 @@ function calculerMontantMensuel(
 // correctif). L'alerte de vigilance annuelle envisagée initialement n'est plus le mécanisme
 // retenu : un historique correct rend inutile un simple rappel "vérifie en janvier".
 //
-// Q3 — Affichage du mois de transition (RevenusMensuels.tsx) : DÉCISION — une ligne non calculée par
-// ce moteur, avec un tooltip expliquant pourquoi. Le texte vit dans
+// Q3 — Affichage du mois de transition (RevenusMensuels.tsx) : une ligne CALCULÉE depuis le
+// 03/08/2026 (cf. Q1 révisé), portant `ouverturePartielle` — la fenêtre retenue et un tooltip qui
+// dit ce que ce mois couvre et ce qu'il ne couvre pas. Le texte vit dans
 // content/moisOuverturePartielle.ts et dépend de l'existence d'un droit antérieur (réadmission) ou
-// non (première admission ouverte en cours de mois) — cf. `MoisOuverturePartielleNonCalcule`. La
-// ligne reste présente (pas retirée du tableau) pour que la chronologie mois par mois reste
-// continue, sans trou silencieux.
+// non (première admission ouverte en cours de mois). La ligne reste toujours présente pour que la
+// chronologie mois par mois reste continue, sans trou silencieux.
 //
-// Q1, Q2 et Q3 sont désormais câblés (cf. `calculerSerieDepuisContrats` plus bas,
-// `LigneSerieIndemnisation` dans types/index.ts, `getTauxPASAt`).
+// Q1, Q2 et Q3 sont câblés (cf. `calculerSerieDepuisContrats` plus bas, `LigneSerieIndemnisation`
+// dans types/index.ts, `getTauxPASAt`).
 
 // Palier bas/haut du forfait mensuel de franchise CP, décidé par la franchise TOTALE accordée à
 // l'ouverture des droits (Profil.ouvertureDroits.franchiseCPTotale) — pas par le restant courant.
@@ -130,22 +148,42 @@ export function calculerMoisIndemnisation(
   const joursNonIndemnisables = Math.floor((entree.heuresDuMois * config.indemnisationMensuelle.coeffJoursNonIndemnisables) / config.indemnisationMensuelle.diviseurJoursTravaillesA10);
   const reliquatApresTravail = Math.max(0, entree.joursDuMois - joursNonIndemnisables);
 
+  // Ordre officiel en CINQ étapes, cité mot pour mot du guide France Travail p.17, étape 6
+  // (« Votre nombre de jours indemnisables obtenu après la prise en compte d'une activité
+  // professionnelle, est réduit dans l'ordre suivant ») :
+  //   1. Déduction du délai d'attente.
+  //   2. Déduction de la franchise congés payés mensuelle applicable.
+  //   3. Déduction de la franchise salaire mensuelle applicable.
+  //   4. Déduction du reliquat éventuel de franchise congés payés mensuelle non appliqué sur les
+  //      mois antérieurs.
+  //   5. Déduction du reliquat éventuel de franchise salaire mensuelle non appliqué sur les mois
+  //      antérieurs.
+  // Corrigé le 03/08/2026 : le code fondait auparavant le REPORT dans le plafond mensuel
+  // (`quotaCPCarryOver + forfaitMensuel` en une seule borne), ce qui déduisait le reliquat de
+  // franchise CP AVANT la franchise salaires du mois courant, à l'inverse des étapes 3 et 4.
+  // Sans effet tant que la franchise salaires est inactive (quota 0 -> étapes 3 et 5 neutres, les
+  // deux formulations sont alors mathématiquement identiques) ; l'écart apparaît dès qu'elle est
+  // câblée ET que les jours disponibles sont la contrainte mordante — et il porte sur la
+  // RÉPARTITION entre les deux franchises, donc sur le reliquat qui fonde le trop-perçu.
   const delaiConsomme = Math.min(soldeDepart.delaiRestant, reliquatApresTravail);
-  const reliquatApresDelai = reliquatApresTravail - delaiConsomme;
+  const apresDelai = reliquatApresTravail - delaiConsomme;
 
   const forfaitMensuel = forfaitMensuelCP(franchiseCPTotale, config);
-  const quotaDisponible = soldeDepart.quotaCPCarryOver + forfaitMensuel;
-  const franchiseCPConsommee = Math.min(quotaDisponible, soldeDepart.franchiseCPRestante, reliquatApresDelai);
-  const reliquatApresFranchiseCP = reliquatApresDelai - franchiseCPConsommee;
+  const cpForfaitConsomme = Math.min(forfaitMensuel, soldeDepart.franchiseCPRestante, apresDelai);
+  const apresCPDuMois = apresDelai - cpForfaitConsomme;
 
-  // Franchise salaires : APRÈS le délai d'attente ET la franchise CP (ordre confirmé par le guide
-  // officiel, point 3 de la liste page 17) — même mécanisme de carry-over que la franchise CP
-  // ci-dessus (report du non-consommé, plafonné par le restant réel ET par les jours du mois
-  // encore disponibles, jamais de jours indemnisés négatifs).
   const quotaMensuel = quotaMensuelSalaires(franchiseSalaires, dureeDroitsMois, config);
-  const quotaSalairesDisponible = soldeDepart.quotaSalairesCarryOver + quotaMensuel;
-  const franchiseSalairesConsommee = Math.min(quotaSalairesDisponible, soldeDepart.franchiseSalairesRestante, reliquatApresFranchiseCP);
-  const joursIndemnises = reliquatApresFranchiseCP - franchiseSalairesConsommee;
+  const salairesForfaitConsomme = Math.min(quotaMensuel, soldeDepart.franchiseSalairesRestante, apresCPDuMois);
+  const apresSalairesDuMois = apresCPDuMois - salairesForfaitConsomme;
+
+  const cpReliquatConsomme = Math.min(soldeDepart.quotaCPCarryOver, soldeDepart.franchiseCPRestante - cpForfaitConsomme, apresSalairesDuMois);
+  const apresReliquatCP = apresSalairesDuMois - cpReliquatConsomme;
+
+  const salairesReliquatConsomme = Math.min(soldeDepart.quotaSalairesCarryOver, soldeDepart.franchiseSalairesRestante - salairesForfaitConsomme, apresReliquatCP);
+  const joursIndemnises = apresReliquatCP - salairesReliquatConsomme;
+
+  const franchiseCPConsommee = cpForfaitConsomme + cpReliquatConsomme;
+  const franchiseSalairesConsommee = salairesForfaitConsomme + salairesReliquatConsomme;
 
   return {
     calculable: true,
@@ -155,12 +193,16 @@ export function calculerMoisIndemnisation(
     delaiConsomme,
     franchiseCPConsommee,
     joursIndemnises,
+    joursDeLaFenetre: entree.joursDuMois,
     soldeFin: {
       delaiRestant: soldeDepart.delaiRestant - delaiConsomme,
       franchiseCPRestante: soldeDepart.franchiseCPRestante - franchiseCPConsommee,
-      quotaCPCarryOver: quotaDisponible - franchiseCPConsommee,
+      // Report = ce qui restait en report, plus le forfait du mois, moins tout ce qui a été
+      // effectivement déduit au titre de la franchise CP ce mois-ci. Jamais négatif : chaque
+      // déduction est bornée par la part qu'elle consomme.
+      quotaCPCarryOver: soldeDepart.quotaCPCarryOver + forfaitMensuel - franchiseCPConsommee,
       franchiseSalairesRestante: soldeDepart.franchiseSalairesRestante - franchiseSalairesConsommee,
-      quotaSalairesCarryOver: quotaSalairesDisponible - franchiseSalairesConsommee,
+      quotaSalairesCarryOver: soldeDepart.quotaSalairesCarryOver + quotaMensuel - franchiseSalairesConsommee,
     },
     franchiseSalaires,
     montantMensuel: MONTANT_MENSUEL_INDISPONIBLE,
@@ -232,13 +274,27 @@ export function calculerSerieDepuisContrats(
   const moisOuverture = moisCle(ouvertureDroits.dateOuverture);
   const moisAffichageDebut = moisCle(soldeDepart.dateDepart);
 
-  // Mois d'ouverture PARTIEL (Q1, cf. commentaire "Mois de transition" plus haut) : dateOuverture ne
-  // tombe pas le 1er du mois calendaire -> ce mois n'est indemnisé qu'en partie, jamais simulé. La
-  // simulation réelle démarre au mois suivant. Critère purement calendaire, valable en réadmission
-  // (mois partagé avec l'ancien droit) comme en première admission (jours antérieurs à l'ouverture,
-  // non indemnisables) — seul le libellé distingue les deux, cf. messageMoisOuverturePartielle.
-  const moisOuverturePartiel = ouvertureDroits.dateOuverture !== bornesDuMois(moisOuverture).debut;
-  const moisDebutCalcul = moisOuverturePartiel ? moisSuivant(moisOuverture) : moisOuverture;
+  // Mois d'ouverture PARTIEL : dateOuverture ne tombe pas le 1er du mois calendaire -> ce mois n'est
+  // indemnisé qu'en partie. Critère purement calendaire, valable en réadmission (mois partagé avec
+  // l'ancien droit) comme en première admission (jours antérieurs à l'ouverture, non indemnisables)
+  // — seul le libellé distingue les deux, cf. messageMoisOuverturePartielle.
+  //
+  // Corrigé le 03/08/2026 (points 3, 4 et 21 de docs/critique_2026-08-03.md). Ce mois était
+  // auparavant SAUTÉ ici (`moisDebutCalcul = moisSuivant(moisOuverture)`) au motif que Cadence n'a
+  // pas accès à l'ancien droit. Le motif est exact, la conclusion était trop large : la part du
+  // NOUVEAU droit, elle, est entièrement connue (sa date de début, ses franchises, ses contrats).
+  // La sauter avait deux effets, tous deux mesurés sur les données réelles de Benoît :
+  //  - le moteur repartait au mois suivant avec franchise et délai INTACTS, donc décalés d'un mois ;
+  //  - l'affichage, lui, recalculait ce mois comme un mois calendaire ENTIER avec un second moteur
+  //    (`calculerSerie`, supprimé le même jour), en y déduisant du travail effectué sous le droit
+  //    précédent — 129 h au lieu de 93 h en janvier 2026.
+  // Résultat : 674,93 € d'ARE annoncés sur janvier et février 2026, deux mois que les relevés
+  // France Travail chiffrent à 0. Le mois est désormais simulé sur sa VRAIE fenêtre
+  // (`dateOuverture` -> fin du mois), ce qui reproduit exactement les 4 mois certifiés
+  // (cf. engine/__tests__/moisOuvertureCertifie.test.ts).
+  const bornesMoisOuverture = bornesDuMois(moisOuverture);
+  const moisOuverturePartiel = ouvertureDroits.dateOuverture !== bornesMoisOuverture.debut;
+  const moisDebutCalcul = moisOuverture;
 
   const heuresParMois = new Map<string, number>();
   // Salaires bruts des contrats attribués à chaque mois (repartirContratParMois prorate déjà
@@ -267,7 +323,19 @@ export function calculerSerieDepuisContrats(
 
   const mois: MoisIndemnisationEntree[] = [];
   for (let curseur = moisDebutCalcul; curseur <= moisFin; curseur = moisSuivant(curseur)) {
-    mois.push({ moisLabel: curseur, joursDuMois: joursDansMois(curseur), heuresDuMois: heuresParMois.get(curseur) ?? 0 });
+    // Seul le mois d'ouverture partiel a une fenêtre plus courte que son mois civil : elle démarre à
+    // `dateOuverture`. Ses heures sont reprises des contrats sur CETTE fenêtre (jamais sur le mois
+    // entier, sinon on déduit du travail relevant du droit précédent), cf. heuresContratsSurFenetre.
+    const estMoisOuverturePartiel = curseur === moisOuverture && moisOuverturePartiel;
+    mois.push(
+      estMoisOuverturePartiel
+        ? {
+            moisLabel: curseur,
+            joursDuMois: diffJours(ouvertureDroits.dateOuverture, bornesMoisOuverture.fin) + 1,
+            heuresDuMois: heuresContratsSurFenetre(contrats, ouvertureDroits.dateOuverture, bornesMoisOuverture.fin, config),
+          }
+        : { moisLabel: curseur, joursDuMois: joursDansMois(curseur), heuresDuMois: heuresParMois.get(curseur) ?? 0 },
+    );
   }
 
   // Franchise salaires : calculée une seule fois, au démarrage de la série (c'est un TOTAL fixé à
@@ -300,32 +368,26 @@ export function calculerSerieDepuisContrats(
   // moisLabel provient ici d'un vrai "YYYY-MM" énuméré ci-dessus, contrairement au moisLabel
   // purement informatif de calculerMoisIndemnisation/calculerSerieIndemnisation — recalcul du
   // montant mensuel sûr uniquement à ce niveau.
+  // `situation` est lu ICI et nulle part ailleurs dans ce moteur : uniquement pour dire s'il existe
+  // un droit antérieur avec lequel le mois d'ouverture est partagé — le calcul, lui, est identique
+  // dans les deux cas.
   const resultatsAffiches: LigneSerieIndemnisation[] = resultatsComplets
     .filter((resultat) => resultat.moisLabel >= moisAffichageDebut)
     .map((resultat) => ({
       ...resultat,
       montantMensuel: calculerMontantMensuel(resultat.joursIndemnises, `${resultat.moisLabel}-01`, profil.ajReelleHistorique, ouvertureDroits.tauxPrelevementSourceHistorique),
       salairesContratsBruts: salairesParMois.get(resultat.moisLabel) ?? 0,
+      ...(resultat.moisLabel === moisOuverture && moisOuverturePartiel
+        ? {
+            ouverturePartielle: {
+              depuis: ouvertureDroits.dateOuverture,
+              messageTooltip: messageMoisOuverturePartielle(profil.situation === "readmission"),
+            },
+          }
+        : {}),
     }));
 
-  // Ligne du mois d'ouverture partiel (Q3) : seulement si ce mois entre dans la plage affichée
-  // (dateDepart peut être choisi après lui, auquel cas il ne doit jamais apparaître). `situation` est
-  // lu ICI et nulle part ailleurs dans ce moteur : uniquement pour dire s'il existe un droit
-  // antérieur avec lequel le mois est partagé — le calcul, lui, est identique dans les deux cas.
-  const ligneOuverturePartielle: LigneSerieIndemnisation[] =
-    moisOuverturePartiel && moisOuverture >= moisAffichageDebut
-      ? [
-          {
-            calculable: false,
-            type: "ouverture_partielle",
-            moisLabel: moisOuverture,
-            messageTooltip: messageMoisOuverturePartielle(profil.situation === "readmission"),
-            salairesContratsBruts: 0,
-          },
-        ]
-      : [];
-
-  return { calculable: true, mois: [...ligneOuverturePartielle, ...resultatsAffiches] };
+  return { calculable: true, mois: resultatsAffiches };
 }
 
 // Cherche la valeur historique la plus récente dont la date d'effet est ≤ la date cible — null si

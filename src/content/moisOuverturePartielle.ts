@@ -1,7 +1,7 @@
 // Textes du MOIS D'OUVERTURE PARTIEL de la série mensuelle : le mois où `dateOuverture` ne tombe pas
-// le 1er du mois calendaire, donc jamais simulé par le moteur
-// (engine/indemnisationMensuelle.ts, `calculerSerieDepuisContrats`) et recalculé comme un mois
-// entier à l'affichage (RevenusMensuels.tsx, `construireLignesAffichage`).
+// le 1er du mois calendaire. Ce mois EST calculé par le moteur
+// (engine/indemnisationMensuelle.ts, `calculerSerieDepuisContrats`), mais sur la seule fenêtre qui
+// relève du nouveau droit — `dateOuverture` → fin du mois.
 //
 // Deux libellés, parce que la CAUSE du caractère partiel n'est pas la même :
 // - `avecDroitAnterieur` (réadmission) : le mois est partagé entre l'ancien et le nouveau droit, et
@@ -13,25 +13,24 @@
 // Le déclencheur reste purement calendaire ; c'est `profil.situation` qui décide du TEXTE, seul
 // endroit où ce champ dit réellement quelque chose ici : y a-t-il eu un droit précédent, oui ou non.
 //
-// Source unique : jusqu'au 2026-07-28 ce fait était rédigé DEUX fois, avec deux contenus différents
-// — un `messageTooltip` produit par le moteur (« …jamais simulé, consulte ton relevé France
-// Travail ») que personne n'affichait, et un `title` codé en dur dans RevenusMensuels.tsx
-// (« …traité ici comme un mois entier ») qui était le seul réellement visible. C'est ce dernier qui
-// décrit correctement ce que l'utilisateur a sous les yeux (l'affichage recalcule bien ce mois comme
-// un mois entier) : sa description est donc reprise mot pour mot ci-dessous.
+// Le RAPPEL du relevé officiel est commun aux deux cas depuis le 2026-07-28 : c'est la seule
+// indication gratuite qui dit où trouver le chiffre qui fait foi.
 //
-// En revanche le RAPPEL du relevé officiel, lui, n'existait que dans la version morte côté moteur —
-// donc jamais affiché à personne, ni en réadmission ni en première admission. Il est réintégré ici
-// (2026-07-28, sur demande explicite) : c'est la seule indication gratuite qui dit où trouver le vrai
-// chiffre d'un mois que Cadence ne sait pas simuler. Conséquence assumée : le libellé de réadmission
-// n'est plus identique au caractère près à celui d'avant le chantier — il est strictement augmenté
-// (la description d'origine reste son préfixe exact, ce que le test vérifie).
+// ⚠️ Les deux descriptions ont été RÉÉCRITES le 03/08/2026, et pas seulement retouchées. Elles
+// disaient « traité ici comme un mois entier (approximation) », ce qui décrivait fidèlement le
+// comportement de l'époque — l'affichage recalculait bel et bien ce mois sur 31 jours. Ce
+// comportement était la cause du bug chiffré du point 21 (674,93 € d'ARE annoncés sur deux mois que
+// les relevés chiffrent à 0) ; il a été supprimé. Conserver l'ancienne phrase reviendrait donc à
+// décrire à l'utilisateur un calcul qui n'existe plus — le contraire de ce que ces textes servent à
+// faire. Le mois est maintenant calculé sur sa vraie fenêtre : ce que ces libellés doivent dire,
+// c'est ce que la fenêtre couvre, et ce qu'elle ne couvre pas.
 const RAPPEL_RELEVE = "Consulte ton relevé France Travail pour le montant exact.";
 
-const descriptionAvecDroitAnterieur = "Mois de réadmission — partagé entre deux droits, traité ici comme un mois entier (approximation).";
+const descriptionAvecDroitAnterieur =
+  "Mois de réadmission — seuls les jours à partir de l'ouverture de tes droits sont comptés ici. Le début du mois relève de ton droit précédent, que Cadence ne connaît pas : son montant n'est pas inclus.";
 
 const descriptionSansDroitAnterieur =
-  "Mois d'ouverture de tes droits — traité ici comme un mois entier (approximation) : les jours qui précèdent l'ouverture ne sont pas indemnisables, et Cadence ne sait pas les distinguer.";
+  "Mois d'ouverture de tes droits — seuls les jours à partir de l'ouverture sont comptés ici : ceux qui précèdent ne sont pas indemnisables.";
 
 export const MOIS_OUVERTURE_PARTIELLE = {
   /** Rappel du document officiel, commun aux deux cas — jamais reformulé ailleurs. */

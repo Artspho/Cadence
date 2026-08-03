@@ -1,11 +1,8 @@
 import { useMemo, useState } from "react";
-import type { Contrat, LigneSerieIndemnisation, MoisIndemnisationResultat, MoisOuverturePartielleNonCalcule, PeriodeAssimilee, Profil, SoldeIndemnisationDepart } from "../types";
+import type { Contrat, PeriodeAssimilee, Profil, SoldeIndemnisationDepart } from "../types";
 import type { FranceTravailConfig } from "../config/franceTravailConfig";
 import { calculerSerieDepuisContrats } from "../engine/indemnisationMensuelle";
-import { calculerJoursTravailes, calculerSerie } from "../engine/calculerSerie";
-import { getAjReelleAt, getTauxPASAt } from "../engine/ajReelleUtils";
-import { joursDansMois } from "../engine/dateUtils";
-import { repartirContratParMois } from "../engine/decoupageMensuel";
+import { construireLignesAffichage, type LigneAffichage } from "../lib/lignesRevenusMensuels";
 import { calculerNetEstime } from "../engine/estimationPaie";
 import { calculerFenetreEnCours } from "../engine/periodeReference";
 import { calculerSalaireReference } from "../engine/salaireReference";
@@ -167,111 +164,6 @@ function SoldeRecap({ solde, onConfigurer }: { solde: SoldeIndemnisationDepart; 
   );
 }
 
-// Une ligne affichée du tableau — mois d'ouverture partiel ou mois normal, TOUJOURS calculée (plus
-// aucun mois grisé/non calculé, cf. pivot documenté en tête de calculerSerie.ts). `estimation` est
-// vrai tant que la franchise CP OU le délai d'attente n'était pas encore intégralement épuisé à
-// l'ENTRÉE de ce mois (donc encore susceptible d'être affecté par l'incertitude du découpage
-// jour-mois du mois d'ouverture, cf. `messageOuverturePartielle`) — jamais un flou, un simple badge.
-interface LigneAffichage {
-  moisLabel: string;
-  heuresDuMois: number;
-  joursNonIndemnisables: number;
-  delaiConsomme: number;
-  franchiseCPConsommee: number;
-  joursIndemnisables: number;
-  montant: number | null;
-  montantNet: number | null;
-  salairesContratsBruts: number;
-  estimation: boolean;
-  /** Libellé du mois d'ouverture partiel, tel que produit par le moteur (source unique,
-   * content/moisOuverturePartielle.ts) — `null` sur un mois normal. Jamais reformulé ici. */
-  messageOuverturePartielle: string | null;
-}
-
-function construireLignesAffichage(profil: Profil, contrats: Contrat[], config: FranceTravailConfig, mois: LigneSerieIndemnisation[], ouvertureDroits: NonNullable<Profil["ouvertureDroits"]>): LigneAffichage[] {
-  const ligneOuverturePartielle = mois.find((m): m is MoisOuverturePartielleNonCalcule => !m.calculable);
-  const moisCalcules = mois.filter((m): m is MoisIndemnisationResultat => m.calculable);
-
-  // Heures du mois d'ouverture partiel : pas exposées par calculerSerieDepuisContrats (mois jamais
-  // simulé par indemnisationMensuelle.ts, cf. Q1 dans ce fichier moteur) — recalculées ici
-  // directement depuis les vrais contrats, même fonction que le pipeline existant
-  // (repartirContratParMois), traitées comme un mois calendaire entier (approximation assumée,
-  // cf. calculerSerie.ts).
-  const heuresMoisOuverture = ligneOuverturePartielle
-    ? contrats.reduce((total, c) => total + repartirContratParMois(c, config).filter((part) => part.moisCle === ligneOuverturePartielle.moisLabel).reduce((s, part) => s + part.heures, 0), 0)
-    : 0;
-
-  const entrees = [
-    ...(ligneOuverturePartielle
-      ? [
-          {
-            moisLabel: ligneOuverturePartielle.moisLabel,
-            joursDuMois: joursDansMois(ligneOuverturePartielle.moisLabel),
-            joursTravailes: calculerJoursTravailes([{ heures: heuresMoisOuverture, cachets: 0 }], config),
-            heuresDuMois: heuresMoisOuverture,
-            // Libellé produit par le moteur, transporté tel quel jusqu'à l'affichage.
-            messageOuverturePartielle: ligneOuverturePartielle.messageTooltip as string | null,
-          },
-        ]
-      : []),
-    ...moisCalcules.map((m) => ({
-      moisLabel: m.moisLabel,
-      joursDuMois: joursDansMois(m.moisLabel),
-      joursTravailes: m.joursNonIndemnisables,
-      heuresDuMois: m.heuresDuMois,
-      messageOuverturePartielle: null as string | null,
-    })),
-  ];
-
-  // Un seul appel, sur toute la série depuis la réadmission incluse : franchiseCPTotale/
-  // delaiAttente sont de purs paramètres d'entrée (jamais recalculés, cf. Profil.ouvertureDroits) —
-  // l'état (franchise CP restante, délai restant) se propage correctement mois après mois, y
-  // compris à travers le mois de réadmission. ajNetteAvantPAS/tauxPAS à 0 : l'AJ réelle peut varier
-  // dans le temps (plusieurs taux successifs), le montant est recalculé mois par mois ci-dessous
-  // plutôt que par calculerSerie (qui suppose un taux unique pour toute la série).
-  const serie = calculerSerie({
-    mois: entrees.map(({ joursDuMois, joursTravailes }) => ({ joursDuMois, joursTravailes })),
-    ajNetteAvantPAS: 0,
-    tauxPAS: 0,
-    franchiseCPTotale: ouvertureDroits.franchiseCPTotale,
-    delaiAttente: ouvertureDroits.delaiAttenteInitial,
-    config,
-  });
-
-  return entrees.map((entree, i) => {
-    const s = serie[i];
-    // Estimation tant qu'il restait quelque chose à consommer à l'ENTRÉE de ce mois (avant sa
-    // propre consommation) — l'état précédent (ou les totaux initiaux pour le tout premier mois).
-    const avant = i === 0 ? { cp: ouvertureDroits.franchiseCPTotale, delai: ouvertureDroits.delaiAttenteInitial } : { cp: serie[i - 1].franchiseCPRestante, delai: serie[i - 1].delaiRestant };
-    const estimation = avant.cp > 0 || avant.delai > 0;
-
-    const ajNetteAvantPAS = getAjReelleAt(profil.ajReelleHistorique, `${entree.moisLabel}-01`);
-    const ajConnue = ajNetteAvantPAS !== null;
-    const montant = ajConnue ? Math.round(s.joursIndemnisables * ajNetteAvantPAS * 100) / 100 : null;
-    // Taux applicable CE mois-là (getTauxPASAt), jamais un taux courant unique réappliqué à tous
-    // les mois passés — cf. types/index.ts, tauxPrelevementSourceHistorique, bug réel corrigé le
-    // 01/08/2026 (un utilisateur réel a eu 3,30 % mi-2025 puis 3,10 % dès fin 2025/2026, jamais les
-    // deux en même temps sur un seul mois).
-    const tauxPASDuMois = getTauxPASAt(ouvertureDroits.tauxPrelevementSourceHistorique, `${entree.moisLabel}-01`);
-    const montantNet = ajConnue && tauxPASDuMois != null ? Math.round((montant as number) * (1 - tauxPASDuMois / 100) * 100) / 100 : null;
-
-    const mCalculable = moisCalcules.find((m) => m.moisLabel === entree.moisLabel);
-
-    return {
-      moisLabel: entree.moisLabel,
-      heuresDuMois: entree.heuresDuMois,
-      joursNonIndemnisables: entree.joursTravailes,
-      delaiConsomme: s.delaiConsomme,
-      franchiseCPConsommee: s.franchiseCPConsommee,
-      joursIndemnisables: s.joursIndemnisables,
-      montant,
-      montantNet,
-      salairesContratsBruts: mCalculable?.salairesContratsBruts ?? 0,
-      estimation,
-      messageOuverturePartielle: entree.messageOuverturePartielle,
-    };
-  });
-}
 
 function TableauResultats({
   profil,
@@ -347,15 +239,15 @@ function TableauResultats({
   // tauxPrelevementSourceHistorique vit sur ouvertureDroits (renseigné une fois dans "Mon profil",
   // potentiellement plusieurs fois si le taux a changé) — s'il est vide, on ne peut structurellement
   // pas calculer de montant net ici. Sert seulement à décider d'afficher la colonne « Net » (une
-  // colonne, pas un chiffre) : la valeur réellement appliquée à CHAQUE mois est recalculée dans
-  // construireLignesAffichage via getTauxPASAt, jamais ce booléen global.
+  // colonne, pas un chiffre) : la valeur réellement appliquée à CHAQUE mois est celle que le moteur a
+  // retenue pour ce mois-là (getTauxPASAt), jamais ce booléen global.
   const tauxRenseigne = (ouvertureDroits.tauxPrelevementSourceHistorique?.length ?? 0) > 0;
   // franchiseSalaires est un TOTAL (pas une valeur qui varie mois par mois) : le même objet est
   // porté par chaque mois calculé de la série, un seul suffit pour l'afficher une fois en pied de
   // tableau (cf. calculerSerieDepuisContrats, engine/indemnisationMensuelle.ts).
-  const franchiseSalaires = mois.find((m) => m.calculable)?.franchiseSalaires;
+  const franchiseSalaires = mois[0]?.franchiseSalaires;
 
-  const lignes = construireLignesAffichage(profil, contrats, config, mois, ouvertureDroits);
+  const lignes = construireLignesAffichage(mois);
 
   const desMoisEnEstimation = lignes.some((l) => l.estimation);
   const desMoisSansAj = lignes.some((l) => l.montant === null);
@@ -471,11 +363,19 @@ function TableauResultats({
       <div className="px-4 py-3 border-t border-line text-xs space-y-1">
         <p className="text-faint">Montant calculé sur l'AJ indiquée sur ton relevé France Travail.</p>
         {desMoisSansAj && <p className="text-amber">Certains mois n'ont pas de taux d'AJ connu pour leur période (« — ») — ajoute une période dont la date d'effet les couvre dans « Mon profil ».</p>}
+        {/* Formulation revue le 03/08/2026. L'ancienne disait « ce mois-là, et les suivants tant que
+            franchise/délai ne sont pas épuisés, restent approximatifs » — ce qui laissait entendre
+            qu'au-delà les chiffres devenaient certains. Ils ne le sont jamais : cinq réserves connues
+            et documentées subsistent (plafond de cumul 118 % du PMSS non appliqué, formule des jours
+            non indemnisables calée sur 4 relevés et non déduite du texte, total de franchise salaires
+            déclaré et non calculé, jours d'inscription supposés couvrir le mois entier, modèle validé
+            sur un seul droit — cf. docs/critique_2026-08-03.md). Et les mois à venir reposent sur des
+            contrats pas encore travaillés. Le chiffre qui fait foi reste celui du relevé. */}
         {desMoisEnEstimation && (
           <p className="text-faint">
-            <strong className="text-ink font-medium">Estimation</strong> : basée sur la franchise congés payés et le délai d'attente indiqués sur ta notification France Travail (« Mon profil »).
-            {messageMoisPartiel ? ` ${messageMoisPartiel} Ce mois-là, et les suivants tant que franchise/délai ne sont pas épuisés, restent approximatifs.` : ""} Montant exact disponible en
-            Premium (upload de ton relevé France Travail, analyse IA).
+            <strong className="text-ink font-medium">Estimation</strong> : chaque ligne est une estimation calculée depuis la franchise congés payés et le délai d'attente de ta notification France
+            Travail (« Mon profil »), tant que tu n'as pas importé le relevé du mois. Les mois à venir supposent en plus que les contrats déjà saisis seront bien travaillés.
+            {messageMoisPartiel ? ` ${messageMoisPartiel}` : ""} Montant exact disponible en Premium (upload de ton relevé France Travail, analyse IA).
           </p>
         )}
         {!tauxRenseigne && <p className="text-amber">Renseigne ton taux PAS dans le profil pour voir le montant réellement viré.</p>}
