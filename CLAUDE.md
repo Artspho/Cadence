@@ -171,12 +171,15 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 >    d'URL (`/?maj=<hash>`). Avant de conclure « le correctif ne marche pas », vérifier lequel des
 >    deux est en cause.
 >
-> **▶ Prochaine action — finir le chantier 4 (l'honnêteté d'affichage) par le point 9** : le texte de
-> consentement affirme une chose qui n'est pas encore vraie (`docs/critique_2026-08-03.md`, point 9).
-> ⚠️ **Ce point n'est pas purement technique** : il faut d'abord faire trancher à Benoît ce que le
-> texte peut affirmer aujourd'hui, avant de le réécrire. Ne pas commencer par le code.
-> Puis **13** (la bannière « Règles à vérifier » ne peut jamais s'afficher) et **14** (la source
-> réglementaire affichée à l'utilisateur est périmée), tous deux purement techniques.
+> **▶ Prochaine action — le point 13** (la bannière « Règles à vérifier » ne peut jamais s'afficher),
+> puis **14** (la source réglementaire affichée à l'utilisateur est périmée) : tous deux purement
+> techniques.
+>
+> **Le point 9 n'est plus la prochaine action** — il a été posé à Benoît le 03/08/2026 et **reporté
+> sciemment** : le texte de consentement IA reste inchangé, la bascule de `MISTRAL_API_KEY` sur le plan
+> payant se fera à la toute fin du projet et clôra le point. Ne pas le rouvrir, ne pas « corriger » le
+> texte (détail et limite de validité de la décision : entrée 🔶 sur la mention d'entraînement, et
+> point 9 de `docs/critique_2026-08-03.md`).
 >
 > ### ⚠️ Chantier tracé, non fait : brancher l'onboarding sur `validerProfilPourEcriture`
 >
@@ -1569,6 +1572,16 @@ synchronisée à chaque commit. 5 commits locaux cette session, rien poussé sur
   nouveau possible), **c'est cette mention qu'il faut corriger en premier** : annoncer une absence
   d'entraînement qui n'est plus garantie serait aussi faux que taire un entraînement qui a lieu
   (devoir n°2, dans les deux sens).
+
+  **🔴 Décision du 03/08/2026 — l'écart est REPORTÉ SCIEMMENT, ce n'est plus un oubli.** Le point 9
+  de `docs/critique_2026-08-03.md` a été posé à Benoît, qui a tranché : **le texte reste inchangé** et
+  la bascule sur le plan payant se fera **à la toute fin du projet**. Motif recevable en l'état : il
+  est le seul utilisateur, les documents envoyés sont les siens, il sait ce qu'il envoie — la phrase
+  inexacte n'est dite qu'à lui-même, en connaissance de cause. **Ne pas rouvrir ce débat à chaque
+  session, et ne pas « corriger » le texte en croyant réparer un oubli.** ⚠️ En revanche la décision
+  cesse de tenir **dès qu'un tiers peut envoyer un document** : le canal IA est monté sans
+  interrupteur (`App.tsx:501`), donc toute ouverture à d'autres utilisateurs (déjà interdite en l'état
+  par le point 8 de la critique) rend la phrase fausse envers quelqu'un qui n'a pas choisi.
 - ✅ **Consentement avant tout envoi + point d'entrée réel de l'import IA (29/07/2026, commits
   `ecca2c8` puis `d4906d5`)** — le chemin est désormais complet et en ligne droite :
   **dépôt → contrôles locaux → CONSENTEMENT → envoi → revue**. Pièces : `content/mentionEnvoiIA.ts`
@@ -1934,10 +1947,15 @@ de situation ✅ — l'échec semble propre à ce format de bulletin, pas au can
   et à chaque nouvelle convention d'assurance chômage). Objectif : garantir que
   `franceTravailConfig.ts` reste à jour et que le bandeau « règles vérifiées au JJ/MM/AAAA » ne
   vieillit pas silencieusement.
-- ⬜ Basculer MISTRAL_API_KEY sur le plan payant Mistral (Scale) — une fois fait, repasser l'entrée
-  ci-dessus de 🔶 à ✅ et vérifier que le texte de consentement (déjà corrigé, sans mention
-  d'entraînement) est enfin exact en pratique, pas seulement en intention. Coût estimé : ~260-350 $/an
-  pour 100 utilisateurs à 100-200 documents/an chacun (voir calcul de session).
+- ⬜ **Basculer MISTRAL_API_KEY sur le plan payant Mistral (Scale) — À LA TOUTE FIN, décidé le
+  03/08/2026 par Benoît.** C'est LE geste qui clôt le point 9 de la critique : tant qu'il n'est pas
+  fait, le texte de consentement annonce une absence d'entraînement qui n'est pas garantie, et c'est
+  assumé (Benoît seul utilisateur, ses propres documents). À faire avant toute ouverture à un autre
+  utilisateur, jamais après. Une fois fait : vérifier le plan réellement appliqué à la clé, repasser
+  l'entrée 🔶 ci-dessus en ✅, et clore le point 9. ⚠️ Vérifier aussi à ce moment-là, depuis la source
+  officielle, que le plan souscrit exclut bien l'entraînement (source citée le 31/07 :
+  help.mistral.ai/articles/347617 — **non revérifiée depuis**). Coût estimé : ~260-350 $/an pour
+  100 utilisateurs à 100-200 documents/an chacun (voir calcul de session).
 
 ### Post-bêta
 - ⬜ Refonte design (couleurs, placement onglets — à préciser)

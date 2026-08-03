@@ -17,6 +17,17 @@
 // gratuit), c'est CE fichier qu'il faut corriger en premier : annoncer une absence d'entraînement qui
 // n'est pas garantie serait aussi faux que taire un entraînement qui a lieu (devoir n°2).
 //
+// 🔴 DÉCISION DU 03/08/2026 — l'écart ci-dessus est REPORTÉ SCIEMMENT, ce n'est plus un oubli.
+// Benoît a tranché : on ne touche pas au texte, et la bascule sur le plan payant se fera à la toute
+// fin du projet. Le motif est recevable en l'état — il est le seul utilisateur, les documents envoyés
+// sont les siens, et il sait exactement ce qu'il envoie : l'affirmation inexacte n'est faite qu'à
+// lui-même, en connaissance de cause. Donc : ne PAS « corriger » ce texte en croyant réparer un
+// oubli, et ne pas rouvrir le débat à chaque session (cf. point 9 de docs/critique_2026-08-03.md).
+// ⚠️ MAIS la décision cesse de tenir dès qu'un autre utilisateur peut envoyer un document : ce
+// canal est monté sans interrupteur (App.tsx), donc à la première ouverture à des tiers, ce fichier
+// redevient le premier à corriger — envers quelqu'un qui n'a pas choisi, la phrase est simplement
+// fausse.
+//
 // Texte BRUT volontairement (même principe que content/contradictionHorsA10.ts) : ni balisage à
 // parser, ni fragments à recoller. L'emphase reste l'affaire du composant.
 
