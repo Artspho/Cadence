@@ -95,11 +95,17 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 
 ## État actuel
 
-> **Repère au 03/08/2026, fin de session** — **627 tests verts** (50 fichiers), `tsc -b` propre sur les
-> deux tsconfig (`tsconfig.json` et `tsconfig.api.json`). Dernier commit : **`3e0d3c8`**, poussé sur
-> `origin/master` ; `master` aligné sur `origin/master`, working tree propre, rien en attente.
+> **Repère au 03/08/2026** — **646 tests verts** (52 fichiers), `tsc -b` propre sur les deux tsconfig
+> (`tsconfig.json` et `tsconfig.api.json`).
 >
-> **▶ Prochaine action — trancher l'architecture de stockage des PDF : Supabase seul vs hybride
+> **▶ Prochaine action — traiter les 🔴 restants de `docs/critique_2026-08-03.md`** (revue complète du
+> 03/08 : 11 🔴, 9 🟡, avec un tableau de suivi en fin de document). Ordre suggéré : points **3 et 4**
+> ensemble (deux moteurs concurrents pour le tableau mensuel, et l'écran qui annonce une franchise
+> salaires qu'il ne déduit pas — même cause racine), puis **5 et 6** (les badges « Sécurité » et
+> « Bloqué », qui traduisent une projection en certitude). Le point **1** est résolu, le **2** n'a
+> qu'un filet minimal et reste ouvert.
+>
+> **▶ Ensuite — trancher l'architecture de stockage des PDF : Supabase seul vs hybride
 > Workspace.** C'est le sujet le plus mûr du backlog et le prérequis de plusieurs autres (étape 3 du
 > module frais réels, gate premium, `api/extract-document.ts` en production). Éléments déjà présents
 > dans le dépôt pour instruire la décision : `docs/spec_frais_reels_cadence.md` §9 (deux modes déjà
@@ -113,7 +119,47 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 > faite ailleurs (fil Claude.ai, notes hors dépôt), en déposer la conclusion ici avant de trancher —
 > sinon la décision repartirait de zéro sans le savoir.
 
-### Le plus récent d'abord — 03/08/2026 (plafond ARE historisé, trop-perçu sourcé puis fiabilisé)
+### Le plus récent d'abord — 03/08/2026 (perte de données sur lecture ratée : corrigée)
+
+- 🔴→✅ **Bug réel de devoir sacré n°1, corrigé : une lecture ratée du stockage local effaçait
+  définitivement toutes les données, sans aucune action de l'utilisateur.** Trouvé par la revue
+  complète du 03/08 (`docs/critique_2026-08-03.md`, point n°1).
+  **Le défaut** : `chargerDonnees` renvoyait le même état vide pour « il n'y a rien » et pour « il y
+  a quelque chose que je n'arrive pas à lire ». `App.tsx` plaçait cet état vide dans son état, et son
+  effet de sauvegarde — dont la seule garde était un `useRef` déjà passé à `true` — le réécrivait
+  aussitôt **par-dessus** le contenu d'origine. Trois portes menaient là : échec Zod (la plus
+  probable — toute évolution du schéma rend illisible l'existant), `JSON.parse` en échec, migration
+  qui lève. Le contenu détruit était souvent parfaitement récupérable à la main.
+  **Mesuré avant correctif, pas supposé** : un test jetable a montré la clé passer de
+  `{"profil":{...},"contrats":[{...}]}` à `{"profil":null,"contrats":[],...}` au simple rendu de
+  `<App/>`, sans un clic.
+  **Correctif** : `chargerDonnees` renvoie un `ResultatChargement` à trois issues (`ok` / `vide` /
+  `illisible`, cette dernière transportant le texte brut, le détail technique et la copie de secours
+  si elle est lisible). Le verrou d'écriture porte sur **cet état**, jamais sur un drapeau — une
+  lecture illisible ne peut structurellement plus déclencher d'écriture. Nouvel écran bloquant
+  `components/EcranDonneesIllisibles.tsx` : téléchargement du brut et zone copiable **en premier**,
+  détail technique replié (il nomme le champ fautif, ex. `contrats.0.type : Invalid enum value…`),
+  restauration de la copie de secours, et « repartir de zéro » — seule action autorisée à écrire —
+  gaté par une case à cocher décochée par défaut. Le contenu illisible part en quarantaine
+  (`cadence:v1:donnees.illisible`) avant d'être remplacé.
+  **Copie de secours** : `cadence:v1:donnees.backup` reçoit la version précédant chaque écriture
+  réussie. Écrite APRÈS le succès de l'écriture principale (son propre échec ne compromet jamais la
+  donnée de record), et **jamais consommée par une réécriture à l'identique** — sans quoi chaque
+  démarrage de l'app l'aurait écrasée par une copie du présent.
+  **Filet minimal du point n°2 inclus** (`sauvegarderDonnees` renvoie son échec, bandeau rouge non
+  refermable) parce que la copie de secours double l'espace occupé : créer ce risque en laissant
+  l'échec invisible aurait été irresponsable. **Le point n°2 reste OUVERT** (quota plein, purge,
+  export de secours automatique).
+  **Preuves** : test de régression `components/__tests__/App.donneesIllisibles.test.tsx` (5 tests,
+  échouait avant le correctif), `storage/__tests__/chargementEtSauvegarde.test.ts` (13 tests : trois
+  issues, rotation de la copie, échec d'écriture remonté, quarantaine), 646 tests verts, `tsc -b`
+  propre. **Vérifié dans le vrai navigateur** : données plantées → contrat ajouté via l'interface →
+  copie de secours créée avec la version précédente → clé corrompue (`type` de contrat inconnu, JSON
+  valide) → rechargement → écran d'erreur affiché, **clé toujours à 876 octets avec ses 3 contrats et
+  son profil**, aucune navigation rendue, bouton « repartir de zéro » désactivé → restauration
+  cliquée → app repartie sur les 2 contrats précédents.
+
+### 03/08/2026 (plafond ARE historisé, trop-perçu sourcé puis fiabilisé)
 
 Session longue, 5 commits (`4b0105c` → `3e0d3c8`), tous poussés. Détail complet dans
 `docs/reprise.md` (points 14 à 17) et `docs/validation.md` (sections datées du 03/08).

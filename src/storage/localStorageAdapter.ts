@@ -6,7 +6,11 @@ import { z } from "zod";
 import type { Contrat, Exercice, PeriodeAssimilee, Profil, SoldeIndemnisationDepart } from "../types";
 import { profilSchema, profilSchemaForme } from "../lib/coherenceProfil";
 
-const CLE_STOCKAGE = "cadence:v1:donnees";
+export const CLE_STOCKAGE = "cadence:v1:donnees";
+/** Version précédant l'écriture en cours — filet de restauration, cf. `sauvegarderDonnees`. */
+export const CLE_SAUVEGARDE = "cadence:v1:donnees.backup";
+/** Contenu illisible mis de côté avant un « repartir de zéro », cf. `reinitialiserDonnees`. */
+export const CLE_QUARANTAINE = "cadence:v1:donnees.illisible";
 
 /**
  * Version du SCHÉMA du fichier export/import JSON — distincte de
@@ -29,7 +33,11 @@ export interface DonneesApp {
   exercicesGeles: Record<string, Exercice>;
 }
 
-const donneesVides: DonneesApp = { profil: null, contrats: [], periodes: [], soldeIndemnisationDepart: null, exercicesGeles: {} };
+/** Fabrique (et non constante partagée) : chaque appelant reçoit son propre objet, jamais une
+ * référence commune qu'une mutation accidentelle propagerait partout. */
+export function creerDonneesVides(): DonneesApp {
+  return { profil: null, contrats: [], periodes: [], soldeIndemnisationDepart: null, exercicesGeles: {} };
+}
 
 // Validation à la frontière (import JSON, lecture localStorage) : un
 // utilisateur peut importer un fichier corrompu ou modifié à la main.
@@ -204,23 +212,151 @@ function migrer(brut: unknown) {
   return migrerTauxPASHistorique(migrerSoldeVersDateDepart(migrerAjReelleHistoriqueVersProfil(migrerContratsDateDebut(migrerAjReelleHistorique(brut)))));
 }
 
-export async function chargerDonnees(): Promise<DonneesApp> {
+/**
+ * Issue d'une tentative de lecture — TROIS cas distincts, jamais confondus (correctif du
+ * 03/08/2026, point 🔴 n°1 de docs/critique_2026-08-03.md).
+ *
+ * Avant ce correctif, `chargerDonnees` renvoyait le même état vide pour « il n'y a rien » et pour
+ * « il y a quelque chose que je n'arrive pas à lire ». L'appelant ne pouvait donc pas se comporter
+ * différemment : `App.tsx` plaçait cet état vide dans son état, et son effet de sauvegarde le
+ * réécrivait aussitôt PAR-DESSUS le contenu d'origine, sans le moindre clic de l'utilisateur. Un
+ * contenu souvent parfaitement récupérable à la main (un JSON complet dont un seul champ gêne Zod)
+ * était détruit en silence — violation directe du devoir sacré n°1.
+ *
+ * La distinction `vide` / `illisible` EST le correctif : elle seule permet à l'appelant de savoir
+ * qu'il n'a pas le droit d'écrire.
+ */
+export type ResultatChargement =
+  /** Contenu lu et validé. Écriture autorisée. */
+  | { statut: "ok"; donnees: DonneesApp }
+  /** Aucune clé en stockage : vrai premier lancement. Écriture autorisée. */
+  | { statut: "vide" }
+  /**
+   * Une clé existe mais son contenu est refusé (JSON invalide, schéma non respecté, migration en
+   * échec, accès au stockage refusé). **Écriture formellement interdite** tant que l'utilisateur n'a
+   * pas tranché : `brut` transporte le texte intact pour qu'il puisse le sauvegarder ailleurs,
+   * `detail` la raison technique, `sauvegarde` la copie de secours si elle est exploitable.
+   */
+  | { statut: "illisible"; brut: string | null; detail: string; sauvegarde: DonneesApp | null };
+
+/** Issue d'une tentative d'écriture — l'échec REMONTE, il n'est plus avalé (filet minimal du point n°2). */
+export type ResultatSauvegarde = { ok: true } | { ok: false; message: string };
+
+function detailErreur(erreur: unknown): string {
+  if (erreur instanceof Error) return `${erreur.name} : ${erreur.message}`;
+  return String(erreur);
+}
+
+/** Lecture brute qui ne lève jamais — `null` si la clé est absente OU si le stockage est inaccessible. */
+function lireBrut(cle: string): string | null {
   try {
-    const brut = window.localStorage.getItem(CLE_STOCKAGE);
-    if (!brut) return donneesVides;
-    const parse = donneesAppSchemaLecture.safeParse(migrer(JSON.parse(brut)));
-    if (!parse.success) {
-      console.error("Données locales corrompues, réinitialisation.", parse.error);
-      return donneesVides;
-    }
-    return parse.data;
-  } catch (erreur) {
-    console.error("Impossible de lire les données locales.", erreur);
-    return donneesVides;
+    return window.localStorage.getItem(cle);
+  } catch {
+    return null;
   }
 }
 
-export async function sauvegarderDonnees(donnees: DonneesApp): Promise<void> {
+/**
+ * Copie de secours exploitable, ou `null`. Ne lève jamais : une sauvegarde elle-même illisible est
+ * traitée comme absente — on ne va pas faire échouer l'écran de secours avec un second échec.
+ */
+function lireSauvegarde(): DonneesApp | null {
+  const brut = lireBrut(CLE_SAUVEGARDE);
+  if (brut === null) return null;
+  try {
+    const parse = donneesAppSchemaLecture.safeParse(migrer(JSON.parse(brut)));
+    return parse.success ? parse.data : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function chargerDonnees(): Promise<ResultatChargement> {
+  let brut: string | null;
+  try {
+    brut = window.localStorage.getItem(CLE_STOCKAGE);
+  } catch (erreur) {
+    // Stockage inaccessible (navigation privée verrouillée, réglages restrictifs). On ne prétend
+    // PAS que l'utilisateur est nouveau : on ne sait rien, donc on n'écrit rien.
+    return { statut: "illisible", brut: null, detail: detailErreur(erreur), sauvegarde: null };
+  }
+
+  // `null` = la clé n'existe pas du tout. Une chaîne vide, elle, n'est PAS un stockage vide : c'est
+  // une clé présente et illisible (elle tombera dans le catch de JSON.parse ci-dessous).
+  if (brut === null) return { statut: "vide" };
+
+  try {
+    const parse = donneesAppSchemaLecture.safeParse(migrer(JSON.parse(brut)));
+    if (!parse.success) {
+      return { statut: "illisible", brut, detail: parse.error.issues.map((i) => `${i.path.join(".") || "(racine)"} : ${i.message}`).join(" · "), sauvegarde: lireSauvegarde() };
+    }
+    return { statut: "ok", donnees: parse.data };
+  } catch (erreur) {
+    // Couvre JSON.parse ET une migration qui lèverait sur une donnée inattendue.
+    return { statut: "illisible", brut, detail: detailErreur(erreur), sauvegarde: lireSauvegarde() };
+  }
+}
+
+/**
+ * Écrit l'état, après avoir fait glisser la version précédente dans la copie de secours
+ * (`CLE_SAUVEGARDE`) — filet ajouté le 03/08/2026 pour permettre une restauration si l'écriture qui
+ * suit s'avérait mauvaise.
+ *
+ * Ordre délibéré — la copie de secours est écrite APRÈS le succès de l'écriture principale :
+ *  - si l'écriture principale échoue (stockage plein), rien n'a bougé, l'existant est intact ;
+ *  - la copie n'est qu'un bonus, son propre échec ne doit jamais compromettre la donnée de record.
+ *
+ * Écrire un contenu identique à celui déjà en place n'est PAS une écriture : on sort tôt. Sans ça,
+ * chaque ouverture de l'app (qui réécrit ce qu'elle vient de lire) écraserait la copie de secours
+ * par une copie du présent — la version précédente serait perdue à chaque démarrage.
+ */
+export async function sauvegarderDonnees(donnees: DonneesApp): Promise<ResultatSauvegarde> {
+  const serialise = JSON.stringify(donnees);
+  const precedent = lireBrut(CLE_STOCKAGE);
+  if (precedent === serialise) return { ok: true };
+
+  try {
+    window.localStorage.setItem(CLE_STOCKAGE, serialise);
+  } catch (erreur) {
+    return { ok: false, message: detailErreur(erreur) };
+  }
+
+  if (precedent !== null) {
+    try {
+      window.localStorage.setItem(CLE_SAUVEGARDE, precedent);
+    } catch {
+      // Copie de secours non écrite (stockage plein) : la donnée principale, elle, est bien
+      // enregistrée. On ne transforme pas un bonus manquant en échec.
+    }
+  }
+  return { ok: true };
+}
+
+/**
+ * Repartir de zéro depuis l'écran de données illisibles — SEULE action de tout ce chemin autorisée
+ * à écrire, et seulement après confirmation explicite de l'utilisateur (cf.
+ * `EcranDonneesIllisibles.tsx` : case à cocher obligatoire, bouton désactivé sans elle).
+ *
+ * Le contenu illisible est déplacé dans une clé de quarantaine avant d'être remplacé : même après
+ * ce geste volontaire, rien n'est réellement détruit tant que le navigateur n'est pas vidé.
+ */
+export async function reinitialiserDonnees(): Promise<DonneesApp> {
+  const brut = lireBrut(CLE_STOCKAGE);
+  if (brut !== null) {
+    try {
+      window.localStorage.setItem(CLE_QUARANTAINE, brut);
+    } catch {
+      // Quarantaine impossible (stockage plein) : l'utilisateur a déjà été invité à télécharger le
+      // brut avant d'arriver ici, on ne bloque pas son redémarrage pour autant.
+    }
+  }
+  const vides = creerDonneesVides();
+  window.localStorage.setItem(CLE_STOCKAGE, JSON.stringify(vides));
+  return vides;
+}
+
+/** Réinstalle la copie de secours comme donnée courante (bouton « restaurer la version précédente »). */
+export async function restaurerSauvegarde(donnees: DonneesApp): Promise<void> {
   window.localStorage.setItem(CLE_STOCKAGE, JSON.stringify(donnees));
 }
 

@@ -111,7 +111,10 @@ describe("isolation vis-à-vis de exporterJSON / importerJSON", () => {
     await sauvegarderIdentiteDeclarative(IDENTITE);
 
     expect(window.localStorage.getItem("cadence:v1:donnees")).toBe(avant);
-    expect(await chargerDonnees()).toEqual(DONNEES_VIDES);
+    // `chargerDonnees` renvoie désormais une issue typée (03/08/2026, cf. ResultatChargement) :
+    // « ok » + les données, au lieu des données nues. La garantie testée ici est inchangée —
+    // sauvegarder l'identité déclarative ne pollue pas la clé de données de l'app.
+    expect(await chargerDonnees()).toEqual({ statut: "ok", donnees: DONNEES_VIDES });
   });
 
   it("les deux clés sont bien distinctes et coexistent", async () => {

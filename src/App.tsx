@@ -1,7 +1,20 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Contrat, PeriodeAssimilee, Profil, SoldeIndemnisationDepart } from "./types";
 import { franceTravailConfig } from "./config/franceTravailConfig";
-import { chargerDonnees, creerContrat, creerPeriode, exporterJSON, importerJSON, sauvegarderDonnees, type DonneesApp } from "./storage/localStorageAdapter";
+import {
+  chargerDonnees,
+  creerContrat,
+  creerDonneesVides,
+  creerPeriode,
+  exporterJSON,
+  importerJSON,
+  reinitialiserDonnees,
+  restaurerSauvegarde,
+  sauvegarderDonnees,
+  type DonneesApp,
+  type ResultatChargement,
+} from "./storage/localStorageAdapter";
+import { EcranDonneesIllisibles } from "./components/EcranDonneesIllisibles";
 import { calculerFenetreEnCours } from "./engine/periodeReference";
 import { calculerDecompteHeures } from "./engine/decompteHeures";
 import { calculerSalaireReference } from "./engine/salaireReference";
@@ -50,21 +63,36 @@ export default function App() {
   // ci-dessous doit disparaître pendant une édition, sinon deux <ContractForm> coexistent avec les
   // mêmes `id` de champs (bug trouvé en vérifiant dans le navigateur, 01/08/2026).
   const [contratEnEdition, setContratEnEdition] = useState<Contrat | null>(null);
-  const chargementTermine = useRef(false);
+  // Issue de la lecture initiale — `null` tant qu'elle n'a pas répondu. C'est CET état, et non un
+  // `useRef`, qui autorise ou interdit l'écriture (correctif du 03/08/2026, point 🔴 n°1 de
+  // docs/critique_2026-08-03.md) : l'ancien drapeau `chargementTermine` passait à `true` même après
+  // une lecture ratée, et l'effet de sauvegarde écrasait alors les données d'origine par un état
+  // vide, sans aucun clic de l'utilisateur.
+  const [chargement, setChargement] = useState<ResultatChargement | null>(null);
+  const [erreurSauvegarde, setErreurSauvegarde] = useState<string | null>(null);
   const inputImportRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    chargerDonnees().then((d) => {
-      setDonnees(d);
-      chargementTermine.current = true;
+    chargerDonnees().then((resultat) => {
+      setChargement(resultat);
+      if (resultat.statut === "ok") setDonnees(resultat.donnees);
+      else if (resultat.statut === "vide") setDonnees(creerDonneesVides());
+      // "illisible" : `donnees` reste `null`, donc l'app ne rend jamais son interface normale et
+      // l'effet de sauvegarde ci-dessous ne peut structurellement pas s'exécuter.
     });
   }, []);
 
+  // Verrou d'écriture. Les deux conditions sont nécessaires : `donnees` non nul (il ne l'est jamais
+  // en statut "illisible") ET une lecture explicitement saine. Une lecture illisible ne peut donc
+  // JAMAIS déclencher d'écriture — c'est la règle que ce correctif installe.
+  const lectureSaine = chargement !== null && chargement.statut !== "illisible";
+
   useEffect(() => {
-    if (donnees && chargementTermine.current) {
-      sauvegarderDonnees(donnees);
-    }
-  }, [donnees]);
+    if (!lectureSaine || !donnees) return;
+    // L'échec d'écriture remonte désormais à l'écran au lieu d'être avalé (filet minimal du point
+    // n°2 de la critique — le sujet complet, quota plein et purge, reste ouvert).
+    sauvegarderDonnees(donnees).then((resultat) => setErreurSauvegarde(resultat.ok ? null : resultat.message));
+  }, [donnees, lectureSaine]);
 
   const calculs = useMemo(() => {
     if (!donnees?.profil) return null;
@@ -119,6 +147,32 @@ export default function App() {
       return { ...d, exercicesGeles: nouveauxGeles };
     });
   }, [calculs?.aGeler]);
+
+  // Écran bloquant : ni navigation, ni onboarding, ni tableau de bord à vide — l'utilisateur ne doit
+  // jamais voir une app « neuve » alors que ses données sont peut-être intactes et récupérables.
+  if (chargement?.statut === "illisible") {
+    return (
+      <EcranDonneesIllisibles
+        brut={chargement.brut}
+        detail={chargement.detail}
+        sauvegarde={chargement.sauvegarde}
+        onRestaurer={() => {
+          const restaurees = chargement.sauvegarde;
+          if (!restaurees) return;
+          restaurerSauvegarde(restaurees).then(() => {
+            setDonnees(restaurees);
+            setChargement({ statut: "ok", donnees: restaurees });
+          });
+        }}
+        onRepartirDeZero={() => {
+          reinitialiserDonnees().then((vides) => {
+            setDonnees(vides);
+            setChargement({ statut: "ok", donnees: vides });
+          });
+        }}
+      />
+    );
+  }
 
   if (!donnees) {
     return <div className="min-h-screen flex items-center justify-center text-muted">Chargement…</div>;
@@ -248,6 +302,16 @@ export default function App() {
 
   return (
     <div className="min-h-screen">
+      {/* Filet minimal du point n°2 de la critique : une écriture qui échoue (stockage plein,
+          navigation privée) ne disparaît plus dans la console. Bandeau non refermable — tant qu'il
+          est là, ce que l'utilisateur saisit n'est PAS enregistré, et il doit pouvoir l'exporter.
+          Le sujet complet (purge, export de secours automatique) reste ouvert. */}
+      {erreurSauvegarde !== null && (
+        <div role="alert" className="bg-red/15 text-red px-6 py-3 text-sm">
+          <strong className="font-medium">Tes dernières modifications n'ont PAS été enregistrées.</strong> Le stockage de ce navigateur a refusé l'écriture ({erreurSauvegarde}). Utilise « Exporter
+          mes données » sans tarder pour ne rien perdre, puis libère de l'espace ou change de navigateur.
+        </div>
+      )}
       <TopBar
         ongletActif={onglet}
         onChangerOnglet={setOnglet}
