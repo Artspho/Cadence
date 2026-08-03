@@ -109,6 +109,42 @@ revérifié depuis le commit `440d6c2`, donc probablement en retard de plusieurs
   **588h** en conséquence — non re-vérifié avec un export frais cette session, seule la parole de
   Benoît fait foi ici.
 
+## Fait le 03/08/2026 — seconde partie : revue complète du code et premiers correctifs
+
+**18. Revue complète du projet, sur demande** → `docs/critique_2026-08-03.md` : 11 🔴 + 9 🟡, puis
+1 🔴 de plus découvert en instruisant les corrections. Le thème qui ressort : la rigueur du projet
+porte sur les *formules*, pas sur les *chemins* (deux moteurs concurrents, un écran qui annonce ce
+qu'il ne déduit pas, des badges qui présentent une projection comme une certitude, un stockage sans
+filet). Tableau de suivi des corrections en fin de document.
+
+**19. Point 🔴 n°1 corrigé — une lecture ratée du stockage effaçait tout** (`89c4d04`, complété par
+`f3ad049`). `chargerDonnees` renvoie désormais trois issues (`ok`/`vide`/`illisible`), le verrou
+d'écriture porte sur cet état et non plus sur un `useRef`, écran bloquant avec téléchargement du brut,
+copie de secours `cadence:v1:donnees.backup`, quarantaine à clé unique écrasée. Mesuré avant correctif :
+la clé passait de 876 octets à un état vide au simple rendu de `<App/>`, sans un clic. Filet minimal
+posé aussi sur l'échec d'écriture (point n°2), qui reste ouvert pour tout ce qui dépasse.
+
+**20. Point 🔴 n°4 remis en état sûr** (`bf5df37`) : l'écran annonçait « Franchise salaires : X jours à
+déduire » alors que les montants du tableau ne la déduisent pas. Régression du jour même (le champ
+déclaratif l'avait rendue atteignable). Bloc masqué + garde-fou vérifié non décoratif.
+
+**21. Motif du point 🔴 n°3 corrigé** (`368060b`) : ma formulation d'origine (« deux montants en euros
+différents ») était fausse — 7056 scénarios donnent les mêmes jours indemnisés, pour une raison
+mathématique. Le vrai risque est la **répartition** entre délai et franchise CP (1016 divergences sur
+1400 scénarios de fin de période), qui décide de l'existence d'un trop-perçu. 🔴 conservé.
+
+🔴 **NOUVEAU, non traité — le mois d'ouverture partiel est mal traité par les deux moteurs**
+(point 21 de la critique). Aucun des deux ne reproduit les 4 mois certifiés sur le chemin de
+production : `calculerSerie` traite le mois d'ouverture comme un mois entier et y consomme 9 jours là
+où le relevé réel n'en montre que 2 ; `calculerSerieDepuisContrats` l'ignore et repart sur les totaux
+intacts. **Probable : 7 jours indemnisés affichés en février au lieu de 0, ~376 € de trop.**
+
+⚠️ **Question laissée ouverte à Benoît, à trancher en priorité** : l'export `cadence-import-complet.json`
+(31/07) reflète-t-il l'état actuel de ses données ? Toute la suite en dépend — il faut un export frais
+ou la lecture du localStorage réel **avant** de coder.
+
+⚠️ **2 commits non poussés** au changement de fil : `bf5df37`, `368060b`. Décision de push en suspens.
+
 ## Fait le 03/08/2026 (1 commit, `be09ee3`)
 
 Session continue depuis le 02/08/2026 (changement de date en cours de session, pas une nouvelle

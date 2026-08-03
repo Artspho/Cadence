@@ -95,15 +95,23 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 
 ## État actuel
 
-> **Repère au 03/08/2026** — **646 tests verts** (52 fichiers), `tsc -b` propre sur les deux tsconfig
-> (`tsconfig.json` et `tsconfig.api.json`).
+> **Repère au 03/08/2026, fin de session** — **648 tests verts** (52 fichiers), `tsc -b` propre sur les
+> deux tsconfig. Working tree propre. ⚠️ **2 commits committés mais NON POUSSÉS** : `bf5df37`
+> (point 4) et `368060b` (motif du point 3) — décision de push laissée en suspens au changement de
+> fil, à trancher au démarrage du suivant (`git status -sb` pour confirmer).
 >
-> **▶ Prochaine action — traiter les 🔴 restants de `docs/critique_2026-08-03.md`** (revue complète du
-> 03/08 : 11 🔴, 9 🟡, avec un tableau de suivi en fin de document). Ordre suggéré : points **3 et 4**
-> ensemble (deux moteurs concurrents pour le tableau mensuel, et l'écran qui annonce une franchise
-> salaires qu'il ne déduit pas — même cause racine), puis **5 et 6** (les badges « Sécurité » et
-> « Bloqué », qui traduisent une projection en certitude). Le point **1** est résolu, le **2** n'a
-> qu'un filet minimal et reste ouvert.
+> **▶ Prochaine action — répondre à la question laissée ouverte : l'export du 31/07 reflète-t-il l'état
+> actuel des données de Benoît ?** Tout le reste en dépend. Un montant faux est probablement affiché
+> aujourd'hui dans l'onglet « Revenus mensuels » : **7 jours indemnisés en février 2026 au lieu de 0
+> certifiés**, soit ~376 € de trop (point **21** de `docs/critique_2026-08-03.md`, découvert en fin de
+> session). Mesuré sur `docs/cadence-import-complet.json`, mais ce fichier date du 31/07 — il faut un
+> export frais, ou la lecture du localStorage du vrai navigateur, **avant** de coder quoi que ce soit.
+>
+> **▶ Ensuite — les 🔴 restants de `docs/critique_2026-08-03.md`** (tableau de suivi en fin de
+> document). Points **3, 4 et 21 partagent une même racine** — le mois d'ouverture partiel — et le
+> chantier de fusion des deux moteurs doit les englober tous les trois : ne pas les traiter séparément.
+> ⚠️ Le filet minimal envisagé pour 3+4 a été **validé puis invalidé par la mesure** (cf. point 12 bis) :
+> ne pas le reprendre tel quel. Puis **5 et 6** (badges « Sécurité » / « Bloqué »), indépendants.
 >
 > **▶ Ensuite — trancher l'architecture de stockage des PDF : Supabase seul vs hybride
 > Workspace.** C'est le sujet le plus mûr du backlog et le prérequis de plusieurs autres (étape 3 du
@@ -119,7 +127,30 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 > faite ailleurs (fil Claude.ai, notes hors dépôt), en déposer la conclusion ici avant de trancher —
 > sinon la décision repartirait de zéro sans le savoir.
 
-### Le plus récent d'abord — 03/08/2026 (perte de données sur lecture ratée : corrigée)
+### Le plus récent d'abord — 03/08/2026 (revue complète du code, et ce qu'elle a déclenché)
+
+- 📋 **Revue complète du projet menée à la demande de Benoît : `docs/critique_2026-08-03.md`**
+  (11 🔴 + 9 🟡 à l'origine, + 1 🔴 découvert ensuite). Thème dominant : le projet est rigoureux sur
+  les *formules* (constantes sourcées, écarts tracés) et beaucoup moins sur les *chemins* — deux
+  moteurs concurrents, un écran qui annonce ce qu'il ne déduit pas, des badges qui traduisent une
+  projection en certitude, un stockage sans filet. Tableau de suivi des corrections en fin de document.
+- 🔴 **NOUVEAU, non traité — le mois d'ouverture partiel est mal traité par les DEUX moteurs**
+  (point 21). Mesuré sur données réelles : aucun des deux ne reproduit les 4 mois certifiés sur le
+  chemin de production. `calculerSerie` traite le mois d'ouverture comme un mois entier de 31 jours et
+  y consomme 9 jours (7 délai + 2 CP) là où le relevé réel n'en montre que 2 ; `calculerSerieDepuisContrats`
+  l'ignore complètement et redémarre le mois suivant sur les totaux intacts de la notification. Le test
+  certifié ne passe qu'avec un solde de mi-parcours saisi à la main. **Conséquence probable : 7 jours
+  indemnisés affichés en février au lieu de 0, ~376 € de trop** — à confirmer sur un export frais avant
+  tout code.
+- ⚠️ **Filet minimal pour les points 3+4 : validé puis abandonné après mesure** (point 12 bis). Faire
+  autorité à A sur les colonnes « Délai »/« Franchise CP » produirait un tableau consommant 7 jours de
+  franchise sur 5 notifiés, et changerait les montants — mon argument « aucun montant ne bouge » était
+  faux, l'identité symétrique invoquée ne vaut qu'à soldes de départ égaux. Deux autres options rejetées
+  par Benoît, motifs consignés. **Aucun filet viable avant l'arbitrage du mois partiel.**
+- ✅ **Points 1 et 4 traités, 2 sous filet minimal, 3 avec motif corrigé** — détail dans les entrées
+  ci-dessous et dans le tableau de suivi de la critique.
+
+### 03/08/2026 (perte de données sur lecture ratée : corrigée)
 
 - 🔴→✅ **Bug réel de devoir sacré n°1, corrigé : une lecture ratée du stockage local effaçait
   définitivement toutes les données, sans aucune action de l'utilisateur.** Trouvé par la revue
