@@ -130,3 +130,35 @@ describe("SoldeRecap — bouton Modifier (RevenusMensuels.tsx, jamais vérifié 
     expect(onConfigurerSolde).not.toHaveBeenCalled();
   });
 });
+
+// Garde-fou du point 🔴 n°4 (docs/critique_2026-08-03.md), remis en état sûr le 03/08/2026 : l'écran
+// annonçait « Franchise salaires : X jours à déduire de ton indemnisation » alors que les montants du
+// tableau, calculés par `calculerSerie`, ne la déduisent pas — ce moteur ne la connaît pas du tout.
+// Deux chiffres contradictoires sur le même écran (devoir sacré n°2). Ce test échoue si quelqu'un
+// réaffiche ce bloc avant que la déduction soit réellement câblée.
+describe("franchise salaires déclarée — ne rien annoncer que le tableau ne déduit pas", () => {
+  const profilAvecFranchiseSalaires = profil({
+    dateAnniversaire: "2027-01-01",
+    regimeDeclare: "annexe10_pur",
+    ouvertureDroits: { dateOuverture: "2026-01-01", franchiseCPTotale: 10, delaiAttenteInitial: 7, franchiseSalairesTotale: 16 },
+    ajReelleHistorique: [{ dateEffet: "2026-01-01", valeur: 50 }],
+  });
+
+  it("n'annonce JAMAIS « X jours à déduire » tant que la déduction n'est pas câblée dans le moteur affiché", () => {
+    render(
+      <RevenusMensuels
+        profil={profilAvecFranchiseSalaires}
+        soldeDepart={{ dateDepart: "2026-01-01" }}
+        contrats={contrats}
+        periodes={[]}
+        config={franceTravailConfig}
+        onConfigurerSolde={vi.fn()}
+        onAllerVersProfil={() => {}}
+        dateDuJour="2026-08-01"
+      />,
+    );
+
+    expect(screen.queryByText(/à déduire de ton indemnisation/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Franchise salaires sous-estimée/i)).not.toBeInTheDocument();
+  });
+});

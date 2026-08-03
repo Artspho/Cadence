@@ -482,16 +482,20 @@ function TableauResultats({
         {franchiseSalaires?.valeur === null && (
           <p className="text-faint">Franchise salaires non calculée par Cadence pour l'instant (formule non certifiée sur une source fiable) — vérifie ce point directement sur ton relevé France Travail.</p>
         )}
-        {franchiseSalaires && franchiseSalaires.valeur !== null && franchiseSalaires.valeur > 0 && (
-          <>
-            <p className="text-faint">
-              Franchise salaires : {franchiseSalaires.valeur} jour{franchiseSalaires.valeur > 1 ? "s" : ""} à déduire de ton indemnisation (formule officielle, guide France Travail p.14).
-            </p>
-            {franchiseSalaires.sousEstimeeHorsA10 && (
-              <p className="text-amber">⚠️ Franchise salaires sous-estimée : renseigne tes salaires hors Annexe 10 dans le profil pour un calcul complet.</p>
-            )}
-          </>
-        )}
+        {/* ⚠️ RETOUR À L'ÉTAT SÛR (03/08/2026, point 🔴 n°4 de docs/critique_2026-08-03.md).
+            Ce bloc annonçait « Franchise salaires : X jours à déduire de ton indemnisation » alors que
+            les montants du tableau ci-dessus ne la déduisent PAS : ils viennent de `calculerSerie`
+            (engine/calculerSerie.ts), qui ne connaît pas du tout la franchise salaires. Deux chiffres
+            contradictoires sur le même écran, dont un faux (devoir sacré n°2).
+            Le cas est devenu atteignable le 03/08/2026 avec le champ déclaratif
+            `ouvertureDroits.franchiseSalairesTotale` : avant, `valeur` était toujours `null` et ce
+            bloc ne s'affichait jamais. C'est donc une régression de ce jour-là, remise ici en état sûr.
+            À NE PAS réactiver tel quel : le rétablissement passe par le câblage de la déduction dans
+            le réducteur mensuel de `calculerSerie` (chantier séparé, à spécifier — décision de Benoît
+            du 03/08/2026 : ne pas apprendre le mois partiel au moteur A, ce qui contredirait la
+            décision actée sur l'indécomposabilité des mois de régularisation).
+            La branche `valeur === null` ci-dessus, elle, reste affichée : dire « non calculée » est
+            exact et n'a jamais rien promis. */}
       </div>
     </div>
   );
