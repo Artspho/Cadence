@@ -95,7 +95,48 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 
 ## État actuel
 
-### Le plus récent d'abord — 02/08/2026 (alerte AEM vs bulletin de paie, cohérente sur les deux flux d'import)
+> **Repère au 03/08/2026, fin de session** — **627 tests verts** (50 fichiers), `tsc -b` propre sur les
+> deux tsconfig (`tsconfig.json` et `tsconfig.api.json`). Dernier commit : **`3e0d3c8`**, poussé sur
+> `origin/master` ; `master` aligné sur `origin/master`, working tree propre, rien en attente.
+>
+> **▶ Prochaine action — trancher l'architecture de stockage des PDF : Supabase seul vs hybride
+> Workspace.** C'est le sujet le plus mûr du backlog et le prérequis de plusieurs autres (étape 3 du
+> module frais réels, gate premium, `api/extract-document.ts` en production). Éléments déjà présents
+> dans le dépôt pour instruire la décision : `docs/spec_frais_reels_cadence.md` §9 (deux modes déjà
+> spécifiés — localStorage par défaut, Google Drive optionnel, champ `driveFileId` prévu),
+> `src/lib/googleDriveAuth.ts` + `src/lib/googleDriveStorage.ts` (déjà écrits, opt-in, cantonnés au
+> module frais réels), `docs/SPEC.md` §11.B (chiffrage d'hébergement : ~45 $/mois Vercel Pro +
+> Supabase Pro, documents supposés rester en local dans ce chiffrage), et le point backlog « programme
+> non-profit Supabase » (non confirmé).
+> ⚠️ **Je n'ai trouvé aucune trace écrite dans le dépôt d'une étude comparative « Supabase seul vs
+> hybride Workspace » proprement dite** (recherche sur `CLAUDE.md`, `docs/`). Si cette recherche a été
+> faite ailleurs (fil Claude.ai, notes hors dépôt), en déposer la conclusion ici avant de trancher —
+> sinon la décision repartirait de zéro sans le savoir.
+
+### Le plus récent d'abord — 03/08/2026 (plafond ARE historisé, trop-perçu sourcé puis fiabilisé)
+
+Session longue, 5 commits (`4b0105c` → `3e0d3c8`), tous poussés. Détail complet dans
+`docs/reprise.md` (points 14 à 17) et `docs/validation.md` (sections datées du 03/08).
+
+- ✅ **Plafond ARE daté** (`4b0105c`, `9f604f0`) — `are.plafondHistorique` + `getPlafondAreAt`
+  (`engine/plafondAreUtils.ts`), `dateEffet` obligatoire sur `calculerAJBrute`. Trois entrées sourcées
+  (174,80 € en 2024 / 177,56 € en 2025 / 181,18 € en 2026). Corrige un vrai faux chiffre : toute
+  simulation sur une FCT passée appliquait le plafond courant.
+- ⚠️ **Contradiction de sources sur ce plafond**, découverte ensuite : le guide FT éd. juillet 2026
+  écrit « 174,80 € depuis le 1er janvier 2024 ». Arbitrage pris (config alignée sur Unédic),
+  documenté aux trois endroits, **non refermé** — cf. backlog priorité haute.
+- ✅ **Trop-perçu (`tropPercu`) sourcé puis fiabilisé** (`d47720c`, `54cb1de`, `7ae6913`, `3e0d3c8`) —
+  déclencheur et formule confirmés à la source primaire ; **aucun montant câblé**
+  (`tropPercuChiffrable: false`, garde-fou testé). Le booléen `tropPercuRisque` est devenu un type à
+  trois états (`avere` / `ecarte` / `indetermine` + `raison`), ce qui a fermé un **faux feu vert** :
+  l'absence de bandeau couvrait aussi « Cadence ne sait pas ». Puis la franchise salaires est devenue
+  déclarative (`ouvertureDroits.franchiseSalairesTotale`, `undefined` ≠ `0`), rendant `ecarte`
+  réellement atteignable.
+- ⬜ **Reste ouvert, sans blocage** : verrou brut/net du montant de trop-perçu (attend une source
+  explicite ou un relevé portant un trop-perçu notifié — à trancher seulement si un montant est
+  demandé) ; contradiction plafond ci-dessus.
+
+### 02/08/2026 (alerte AEM vs bulletin de paie, cohérente sur les deux flux d'import)
 
 - ✅ **L'alerte « l'AEM fait foi, pas le bulletin de paie » couvre maintenant les deux flux
   d'import, avec un seul texte de référence.** Avant ce chantier : le rappel n'existait qu'en
