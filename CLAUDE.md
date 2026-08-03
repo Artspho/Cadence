@@ -95,11 +95,15 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 
 ## État actuel
 
-> **Repère au 03/08/2026, fin de session (3)** — **679 tests verts** (55 fichiers), `tsc -b` propre
+> **Repère au 03/08/2026, fin de session (4)** — **693 tests verts** (57 fichiers), `tsc -b` propre
 > sur les deux tsconfig, `npm run build` propre. Working tree propre. **`master` poussé sur
-> `origin/master`** (`f8f52cf`) et **déployé — vérifié** : le bundle servi par
-> `cadence-git-master-benoit3.vercel.app` est `index-Dg3R5vLT.js` et contient bien le chemin de
-> récupération du point 23 (« Restaurer une sauvegarde », « rien ne sera écrasé »).
+> `origin/master`** (`54caeff`, vérifié : `HEAD` et `origin/master` sur le même hash).
+>
+> ⚠️ **DÉPLOIEMENT NON VÉRIFIÉ** pour `54caeff` (ni pour `21bbb17`) : le push vient d'être fait, le
+> bundle déployé n'a pas été sondé, et rien n'a été contrôlé à l'écran. **Première chose à faire au
+> prochain fil** si l'écran doit être cru. Le dernier déploiement réellement vérifié reste `f8f52cf`
+> (bundle `index-Dg3R5vLT.js`, contenant le chemin de récupération du point 23 — « Restaurer une
+> sauvegarde », « rien ne sera écrasé »).
 > À noter pour la prochaine fois : juste après un push, l'URL sert encore l'ancien bundle — le
 > déploiement Vercel prend un moment (constaté : trois sondages à 25 s au commit `501ca53`). Sonder en
 > boucle plutôt que conclure « pas déployé » au premier essai. Et si le hash du bundle déployé est
@@ -109,8 +113,16 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 >
 > **Six points clos dans cette session**, dans l'ordre : **5** et **6** (`f2ec278`, chantier 3),
 > puis **7** (`501ca53`) et **23** (`a12ae14`, chantier 4), puis **13** et **14** ensemble
-> (chantier 5). Le **9** a été instruit puis **reporté sciemment** (`4a33baa`, décision de Benoît :
-> la bascule Mistral se fera à la toute fin). Détail plus bas.
+> (chantier 5, `21bbb17`). Deux points ont été **instruits puis fermés sans code**, chacun sur une
+> décision de Benoît : le **9** est **reporté sciemment** (`4a33baa` — la bascule Mistral se fera à la
+> toute fin) et le **10** est **écarté** (`54caeff` — la vraisemblance d'un chiffre saisi est la
+> responsabilité de l'utilisateur, pas de l'app ; ne pas le reproposer). Détail plus bas.
+>
+> **État des 29 points de `docs/critique_2026-08-03.md`** — 15 clos · 1 à moitié (**2**, échec
+> d'écriture silencieux, devoir n°1) · 1 reporté (**9**) · 1 écarté (**10**) · **11 ouverts** :
+> 🔴 8, 11, 12 ter, 25, 26 et 🟡 12, 15, 17, 18, 19, 20. **Sur ces 11, neuf attendent autre chose que
+> du code** — une source, un document, ou une règle à trancher. Seuls **15** et **17** sont codables
+> sans rien attendre, plus le **2** à finir.
 >
 > **Chantier 5, points 13 et 14 — le bandeau des règles.** Traités ensemble : ils touchaient les
 > mêmes deux lignes de `TopBar.tsx` et `MonProfil.tsx`.
@@ -207,12 +219,19 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 >    d'URL (`/?maj=<hash>`). Avant de conclure « le correctif ne marche pas », vérifier lequel des
 >    deux est en cause.
 >
-> **▶ Prochaine action — à choisir dans `docs/critique_2026-08-03.md`.** Les points 13 et 14 sont
-> clos (03/08/2026). Restent notamment **10** (bornes de plausibilité à l'import JSON, chemin
-> d'écriture uniquement), **15** (`dateUtils.ts` sans test dédié), et les deux 🔴 trouvés en cours de
-> route : **25** (plafond de cumul 118 % du PMSS jamais appliqué) et **26** (le plafond de 28
-> cachets/mois ne plafonne rien) — ces deux-là ne sont **pas sourcés**, ne rien coder avant d'avoir
-> tranché la règle.
+> **▶ Prochaine action — le point 15 : donner des tests dédiés à `src/engine/dateUtils.ts`.** C'est le
+> seul fichier de `src/engine/` sans `__tests__/<nom>.test.ts`, alors que ses dix fonctions portent
+> toute l'arithmétique de calendrier du projet (fenêtres de 12 mois, chevauchements, découpage
+> mensuel, âge). Elles ne sont aujourd'hui exercées qu'indirectement. **Aucun arbitrage à demander à
+> Benoît, aucune source à trouver, aucun comportement à modifier** : on ajoute un filet là où il n'y
+> en a pas — donc à faire à comportement constant, et si un test révèle un bug, le signaler avant de
+> corriger quoi que ce soit.
+>
+> Ensuite, par ordre d'intérêt : le **17** (un contrat EEE sans jours saisis compte zéro heure, en
+> silence — l'app perd une donnée, elle ne conteste pas un chiffre : à ne pas confondre avec le point
+> 10 écarté), puis le **2** (une écriture qui échoue ne le dit pas — le plus important des trois, et
+> le plus lourd). ⚠️ Ne **pas** attaquer 25 ni 26 sans avoir fait trancher la règle à Benoît : elles
+> ne sont pas sourcées.
 >
 > **Le point 9 n'est pas une prochaine action** — il a été posé à Benoît le 03/08/2026 et **reporté
 > sciemment** : le texte de consentement IA reste inchangé, la bascule de `MISTRAL_API_KEY` sur le plan
