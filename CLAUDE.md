@@ -95,23 +95,46 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 
 ## État actuel
 
-> **Repère au 03/08/2026, fin de session** — **648 tests verts** (52 fichiers), `tsc -b` propre sur les
-> deux tsconfig. Working tree propre. ⚠️ **2 commits committés mais NON POUSSÉS** : `bf5df37`
-> (point 4) et `368060b` (motif du point 3) — décision de push laissée en suspens au changement de
-> fil, à trancher au démarrage du suivant (`git status -sb` pour confirmer).
+> **Repère au 03/08/2026, fin de session (2)** — **641 tests verts** (51 fichiers), `tsc -b` propre
+> sur les deux tsconfig, `npm run build` propre. Working tree propre. **`master` poussé sur
+> `origin/master`** (`ca0c86e`) et déployé — vérifié sur l'écran réel de Benoît.
 >
-> **▶ Prochaine action — répondre à la question laissée ouverte : l'export du 31/07 reflète-t-il l'état
-> actuel des données de Benoît ?** Tout le reste en dépend. Un montant faux est probablement affiché
-> aujourd'hui dans l'onglet « Revenus mensuels » : **7 jours indemnisés en février 2026 au lieu de 0
-> certifiés**, soit ~376 € de trop (point **21** de `docs/critique_2026-08-03.md`, découvert en fin de
-> session). Mesuré sur `docs/cadence-import-complet.json`, mais ce fichier date du 31/07 — il faut un
-> export frais, ou la lecture du localStorage du vrai navigateur, **avant** de coder quoi que ce soit.
+> Le nombre de tests BAISSE de 648 à 641 volontairement : `engine/calculerSerie.ts` et
+> `engine/franchises.ts` ont été supprimés avec leurs 16 tests, et 9 tests neufs ajoutés.
 >
-> **▶ Ensuite — les 🔴 restants de `docs/critique_2026-08-03.md`** (tableau de suivi en fin de
-> document). Points **3, 4 et 21 partagent une même racine** — le mois d'ouverture partiel — et le
-> chantier de fusion des deux moteurs doit les englober tous les trois : ne pas les traiter séparément.
-> ⚠️ Le filet minimal envisagé pour 3+4 a été **validé puis invalidé par la mesure** (cf. point 12 bis) :
-> ne pas le reprendre tel quel. Puis **5 et 6** (badges « Sécurité » / « Bloqué »), indépendants.
+> **Deux chantiers clos dans cette session** :
+> - **Données récupérées** (point 22, `c6c8d8a`) — les contrats avaient disparu. Fusion des deux
+>   lignées parallèles en un fichier unique versionné, `docs/cadence-fusion-2026-08-03.json`,
+>   **62 contrats**, importé et vérifié à l'écran (588 h / 507 h).
+> - **Fusion des moteurs** (points 3, 4, 16, 21, 12 bis, 12 quater — `ca0c86e`) —
+>   `engine/indemnisationMensuelle.ts` est le **moteur unique** du tableau mensuel. L'ordre de
+>   consommation est tranché par deux sources officielles (Annexe X art. 23 §1er ; guide FT p.12 et
+>   p.17 étape 6) et par deux relevés réels. Le mois d'ouverture est calculé sur sa vraie fenêtre.
+>   **674,93 € d'ARE faux retirés** de l'écran de Benoît (total 14 961,77 € → 14 286,84 €).
+>
+> ⚠️ **Deux pièges opérationnels vérifiés ce jour, à connaître avant de « constater » quoi que ce
+> soit dans le navigateur** :
+> 1. **L'origine canonique est `https://cadence-git-master-benoit3.vercel.app/`** — une URL de
+>    BRANCHE, stable à chaque push. Les URLs de déploiement (`cadence-kfgelhf98…`) et les
+>    `localhost:517x` sont autant de `localStorage` distincts : c'est la cause probable de la perte du
+>    point 22. Ne jamais faire saisir de vraies données ailleurs.
+> 2. **Le service worker de la PWA sert l'ancien bundle après un push.** Constaté : le déploiement
+>    était correct (vérifié en `curl`ant le bundle déployé et en y cherchant les chaînes du nouveau
+>    code) mais l'écran affichait encore les anciens chiffres, et `navigator.serviceWorker.
+>    getRegistrations()` ne répondait plus. Contournement qui a marché : recharger avec un paramètre
+>    d'URL (`/?maj=<hash>`). Avant de conclure « le correctif ne marche pas », vérifier lequel des
+>    deux est en cause.
+>
+> **▶ Prochaine action — chantier 3 : les points 5 et 6 de `docs/critique_2026-08-03.md`**, les deux
+> badges qui mentent, tous deux dans `engine/prediction.ts` : « Sécurité » s'affiche sur une simple
+> projection du rythme passé (pas sur un droit acquis), et « Bloqué » s'affiche dès 30 jours de
+> l'échéance même s'il ne manque qu'un cachet. Indépendants du reste, regroupables.
+>
+> **▶ Ensuite — les 🔴 restants**, par lots (tableau de suivi en fin de `docs/critique_2026-08-03.md`) :
+> sécurité des entrées (**8** endpoint IA ouvert, **10** JSON non borné, reste du **2**) ; honnêteté
+> d'affichage (**7** fausse alerte cachets, **9** consentement inexact, **23** import inaccessible
+> avant onboarding, **13**, **14**) ; puis **25** (plafond de cumul 118 % du PMSS jamais appliqué,
+> découvert le 03/08 — portée nulle sur les données actuelles de Benoît, réelle sur un gros mois).
 >
 > **▶ Ensuite — trancher l'architecture de stockage des PDF : Supabase seul vs hybride
 > Workspace.** C'est le sujet le plus mûr du backlog et le prérequis de plusieurs autres (étape 3 du
