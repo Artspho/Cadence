@@ -96,7 +96,12 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 ## État actuel
 
 > **Repère au 03/08/2026, fin de session (3)** — **660 tests verts** (52 fichiers), `tsc -b` propre
-> sur les deux tsconfig, `npm run build` propre.
+> sur les deux tsconfig, `npm run build` propre. Working tree propre. **`master` poussé sur
+> `origin/master`** (`f2ec278`) et **déployé — vérifié** : le bundle servi par
+> `cadence-git-master-benoit3.vercel.app` est `index-DHVafHPA.js`, contient la chaîne « En bonne voie »
+> et porte le même hash que le build local. À noter pour la prochaine fois : juste après le push,
+> l'URL servait encore l'ancien bundle (`index-DillsIsv.js`) — le déploiement Vercel prend un moment,
+> sonder en boucle plutôt que conclure « pas déployé » au premier essai.
 >
 > **Chantier 3 clos : les deux badges qui mentaient** (points 5 et 6 de
 > `docs/critique_2026-08-03.md`). L'échelle `NiveauStatut` passe de 3 à **4 états** — `securite`
