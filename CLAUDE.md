@@ -148,10 +148,21 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 > France Travail. Imposée à l'écriture en un point unique (`lib/contratUnSeulMois.ts`), branchée sur
 > les trois fonctions d'écriture d'`App.tsx` qui sont le seul passage commun aux quatre portes
 > (formulaire, édition en liste, import de bulletin, revue d'extraction IA), **jamais à la lecture**.
+> Point **23 clos** aussi : l'écran d'accueil propose « Restaurer une sauvegarde » **avant** le
+> formulaire. Vérifié d'abord que l'import n'avait aucune dépendance technique au profil
+> (`confirmerImport` teste `!donnees`, jamais `donnees.profil` ; `profil` est nullable dans le schéma
+> d'écriture) — donc **aucun « profil minimal » créé, aucun cinquième chemin d'écriture** : la
+> machinerie d'import existante est simplement rendue dans les deux branches. Le modal ne dit plus
+> « Action irréversible » quand il n'y a rien à écraser.
 > Reste à faire :
-> - **23** (🔴) — l'import est inaccessible avant d'avoir créé un profil : trou du chemin de
->   récupération (devoir n°1), correctif d'UI seul.
 > - **9** (🔴), **13**, **14** — consentement inexact et les deux autres points d'affichage.
+>
+> ⚠️ **Repéré en instruisant le 23, non corrigé** : `App.tsx:188` écrit le profil d'onboarding par un
+> `setDonnees` direct, **sans passer par `validerProfilPourEcriture`** — contrairement aux deux autres
+> portes (édition, import JSON). Risque réel faible (l'objet est construit sur place, TypeScript en
+> garantit la forme, et `Onboarding` valide déjà la cohérence via `validerCoherenceProfil`), mais c'est
+> un porteur d'écriture parallèle de plus. Le brancher demande de gérer l'échec de validation dans
+> `Onboarding` (sinon « Commencer » deviendrait un no-op silencieux) : petit chantier à part.
 >
 > ⚠️ **Point 26 ouvert, découvert en corrigeant le 7 — à instruire avant de coder** : le plafond de
 > 28 cachets/mois ne plafonne aucun décompte (il ne sert qu'à trois avertissements), alors que

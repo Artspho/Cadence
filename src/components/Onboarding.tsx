@@ -5,13 +5,21 @@ import type { Profil } from "../types";
 
 interface OnboardingProps {
   onTerminer: (profil: Profil) => void;
+  /**
+   * Ouvre le sélecteur de fichier pour restaurer une sauvegarde JSON — point 23 de
+   * docs/critique_2026-08-03.md. Optionnel pour ne pas casser les appels existants (RevueExtractionDemo,
+   * tests) : sans ce callback, l'écran se comporte exactement comme avant.
+   */
+  onRestaurerSauvegarde?: () => void;
+  /** Erreur du dernier import tenté depuis cet écran — sinon un fichier invalide échouerait en silence. */
+  erreurImport?: string | null;
 }
 
 // Premier écran vu par un compte vierge (§11.A). Gère explicitement le cas
 // "je ne sais pas" pour la date anniversaire : une première admission n'a
 // par construction pas encore de cycle ouvert, et le moteur (periodeReference.ts)
 // sait fonctionner avec une date anniversaire vide.
-export function Onboarding({ onTerminer }: OnboardingProps) {
+export function Onboarding({ onTerminer, onRestaurerSauvegarde, erreurImport }: OnboardingProps) {
   const [dateNaissance, setDateNaissance] = useState("");
   const [situation, setSituation] = useState<Profil["situation"]>("premiere_admission");
   const [dateAnniversaireConnue, setDateAnniversaireConnue] = useState(true);
@@ -43,6 +51,29 @@ export function Onboarding({ onTerminer }: OnboardingProps) {
         <h1 className="font-display text-2xl font-semibold tracking-tight">Bienvenue sur Cadence</h1>
         <p className="text-muted mt-2">Quelques informations pour estimer où tu en es dans tes droits Annexe 10.</p>
       </div>
+
+      {/* Chemin de récupération (devoir sacré n°1), point 23 de docs/critique_2026-08-03.md. Placé
+          AVANT le formulaire, et non en pied de page : le scénario visé est quelqu'un qui vient de
+          tout perdre. Constaté en conditions réelles le 03/08/2026 — il avait fallu ressaisir quatre
+          champs que le fichier de sauvegarde contenait déjà, juste pour atteindre le bouton d'import.
+          Le vrai risque n'était pas la friction mais l'ordre des gestes : remplir l'onboarding « pour
+          voir », commencer à saisir des contrats, et ne penser à l'import qu'après — l'import écrasant
+          alors du travail déjà refait. */}
+      {onRestaurerSauvegarde && (
+        <div className="bg-surface border border-line rounded-card p-5 mb-4">
+          <p className="text-sm text-ink font-medium">Tu as déjà une sauvegarde Cadence&nbsp;?</p>
+          <p className="text-xs text-muted mt-1 leading-relaxed">
+            Restaure-la maintenant, avant de remplir ce formulaire : elle contient déjà ton profil et tes contrats. Inutile de les ressaisir.
+          </p>
+          <button
+            onClick={onRestaurerSauvegarde}
+            className="mt-3 w-full rounded-lg border border-mint/40 bg-mint/10 text-mint font-medium py-2.5 text-sm transition-colors hover:bg-mint/15"
+          >
+            Restaurer une sauvegarde (fichier JSON)
+          </button>
+          {erreurImport && <p className="text-xs text-red mt-2">{erreurImport}</p>}
+        </div>
+      )}
 
       <div className="bg-surface border border-line rounded-card p-6 space-y-6">
         <div>

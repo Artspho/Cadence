@@ -184,8 +184,47 @@ export default function App() {
     return <div className="min-h-screen flex items-center justify-center text-muted">Chargement…</div>;
   }
 
+  // Machinerie d'import, définie UNE fois et rendue dans les deux branches (onboarding et app
+  // complète) — point 23 de docs/critique_2026-08-03.md. Aucune logique ici : le sélecteur de
+  // fichier et la confirmation ne font que remplir `fichierEnAttenteImport` puis appeler
+  // `confirmerImport`, exactement le même chemin qu'avant. C'est le fond du correctif : l'import
+  // n'était pas techniquement dépendant du profil (`confirmerImport` teste `!donnees`, jamais
+  // `donnees.profil`, et le schéma d'écriture déclare `profil` nullable) — seul un `return`
+  // anticipé de rendu le rendait inatteignable. On lève la contrainte d'affichage, on ne crée pas
+  // un second chemin d'écriture.
+  const machinerieImport = (
+    <>
+      <input
+        ref={inputImportRef}
+        type="file"
+        accept="application/json"
+        className="hidden"
+        onChange={(e) => {
+          const fichier = e.target.files?.[0];
+          if (fichier) setFichierEnAttenteImport(fichier);
+          e.target.value = ""; // permet de resélectionner le même fichier ensuite
+        }}
+      />
+      {fichierEnAttenteImport && (
+        <ConfirmationImport
+          nbContratsActuels={donnees.contrats.length}
+          profilActuel={Boolean(donnees.profil)}
+          nomFichier={fichierEnAttenteImport.name}
+          enCours={importEnCours}
+          onAnnuler={() => setFichierEnAttenteImport(null)}
+          onConfirmer={confirmerImport}
+        />
+      )}
+    </>
+  );
+
   if (!donnees.profil) {
-    return <Onboarding onTerminer={(profil: Profil) => setDonnees({ ...donnees, profil })} />;
+    return (
+      <>
+        <Onboarding onTerminer={(profil: Profil) => setDonnees({ ...donnees, profil })} onRestaurerSauvegarde={() => inputImportRef.current?.click()} erreurImport={erreurImport} />
+        {machinerieImport}
+      </>
+    );
   }
 
   const profil = donnees.profil;
@@ -377,31 +416,11 @@ export default function App() {
             <button onClick={() => inputImportRef.current?.click()} className="px-3 py-1.5 rounded-full border border-line text-muted hover:text-ink transition-colors">
               Importer
             </button>
-            <input
-              ref={inputImportRef}
-              type="file"
-              accept="application/json"
-              className="hidden"
-              onChange={(e) => {
-                const fichier = e.target.files?.[0];
-                if (fichier) setFichierEnAttenteImport(fichier);
-                e.target.value = ""; // permet de resélectionner le même fichier ensuite
-              }}
-            />
           </div>
         </div>
         {erreurImport && <p className="text-sm text-red">{erreurImport}</p>}
 
-        {fichierEnAttenteImport && (
-          <ConfirmationImport
-            nbContratsActuels={donnees.contrats.length}
-            profilActuel={Boolean(donnees.profil)}
-            nomFichier={fichierEnAttenteImport.name}
-            enCours={importEnCours}
-            onAnnuler={() => setFichierEnAttenteImport(null)}
-            onConfirmer={confirmerImport}
-          />
-        )}
+        {machinerieImport}
 
         {onglet === "dashboard" &&
           calculs &&
