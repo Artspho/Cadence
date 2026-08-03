@@ -154,15 +154,47 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 > d'écriture) — donc **aucun « profil minimal » créé, aucun cinquième chemin d'écriture** : la
 > machinerie d'import existante est simplement rendue dans les deux branches. Le modal ne dit plus
 > « Action irréversible » quand il n'y a rien à écraser.
-> Reste à faire :
-> - **9** (🔴), **13**, **14** — consentement inexact et les deux autres points d'affichage.
+> **Reste au chantier 4** : **9** (🔴 le texte de consentement affirme une chose qui n'est pas encore
+> vraie — demandera de trancher avec Benoît ce qui est vrai aujourd'hui), **13** (la bannière « Règles à
+> vérifier » ne peut jamais s'afficher), **14** (la source réglementaire affichée est périmée).
 >
-> ⚠️ **Repéré en instruisant le 23, non corrigé** : `App.tsx:188` écrit le profil d'onboarding par un
-> `setDonnees` direct, **sans passer par `validerProfilPourEcriture`** — contrairement aux deux autres
-> portes (édition, import JSON). Risque réel faible (l'objet est construit sur place, TypeScript en
-> garantit la forme, et `Onboarding` valide déjà la cohérence via `validerCoherenceProfil`), mais c'est
-> un porteur d'écriture parallèle de plus. Le brancher demande de gérer l'échec de validation dans
-> `Onboarding` (sinon « Commencer » deviendrait un no-op silencieux) : petit chantier à part.
+> ### ⚠️ Chantier tracé, non fait : brancher l'onboarding sur `validerProfilPourEcriture`
+>
+> Repéré le 03/08/2026 en instruisant le point 23. **Écrit pour être repris sans relire le contexte de
+> cette session** — le raisonnement compte plus que la conclusion.
+>
+> **Le constat.** `App.tsx:188` écrit le profil issu de l'onboarding par un `setDonnees({ ...donnees,
+> profil })` **direct**. Les deux autres portes d'écriture du profil passent, elles, par
+> `profilSchema` : `validerProfilPourEcriture` (édition depuis « Mon profil », via `modifierProfil`
+> dans `App.tsx`) et `importerJSON` (`storage/localStorageAdapter.ts`). Le dépôt le documente
+> lui-même en `lib/coherenceProfil.ts:99-101`, qui énumère ces deux portes — et n'y met pas
+> l'onboarding. Ce n'est donc pas une régression : cette porte n'a jamais été branchée.
+>
+> **Ce que ça apporterait vraiment — et c'est peu.** `validerProfilPourEcriture` ne fait qu'un
+> `profilSchema.safeParse`, et `profilSchema` = forme (Zod) + cohérence (`.refine` qui rappelle
+> `validerCoherenceProfil`). Or `Onboarding.tsx:24` appelle **déjà** `validerCoherenceProfil` et
+> désactive « Commencer » tant que le profil est incohérent. Le seul gain net est donc le contrôle de
+> **forme**, lui-même déjà garanti par TypeScript puisque l'objet est construit en littéral au point
+> d'appel (`Onboarding.tsx`, fonction `valider`). **Aucun bug connu n'est corrigé par ce chantier** :
+> l'intérêt est d'avoir un point de passage unique, pas de réparer un défaut observable. À arbitrer
+> comme tel — ne pas le vendre comme un correctif de bug.
+>
+> **Le piège, avec son mécanisme.** Remplacer naïvement la ligne 188 par `modifierProfil(profil)` crée
+> un **no-op silencieux**. Pourquoi : `modifierProfil` renvoie un `ResultatEcritureProfil`
+> (`{ ok: false, erreur }` en cas de refus, cf. `lib/coherenceProfil.ts:110`) et **n'écrit rien** si la
+> validation échoue. Mais la prop `onTerminer` d'`Onboarding` est typée `(profil: Profil) => void` : le
+> composant **ne peut pas voir** le refus. Résultat, l'utilisateur clique « Commencer », rien ne se
+> passe, aucun message — un bouton mort. Le cas de divergence est précisément « forme invalide mais
+> cohérence valide » (le seul que l'onboarding ne filtre pas déjà), donc rare — ce qui le rend d'autant
+> plus difficile à remarquer si on ne l'a pas prévu.
+>
+> **Ce qu'il faut faire pour le brancher proprement.** Il existe déjà un précédent dans ce même
+> composant, introduit au point 23 : la prop `erreurImport` d'`Onboarding` remonte l'échec d'un import
+> et l'affiche. Reproduire ce motif — soit faire remonter le `ResultatEcritureProfil` par le retour
+> d'`onTerminer`, soit ajouter une prop d'erreur — et **afficher le message dans le formulaire**.
+>
+> **Critère de recette** : un test qui rend `Onboarding` avec un profil de forme invalide, clique
+> « Commencer », et vérifie qu'un message d'erreur s'affiche — jamais un bouton qui ne fait rien.
 >
 > ⚠️ **Point 26 ouvert, découvert en corrigeant le 7 — à instruire avant de coder** : le plafond de
 > 28 cachets/mois ne plafonne aucun décompte (il ne sert qu'à trois avertissements), alors que
