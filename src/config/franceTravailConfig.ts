@@ -6,7 +6,9 @@ import { z } from "zod";
  * ailleurs. Aucune fonction du moteur (src/engine) ne doit contenir de
  * valeur numérique réglementaire en dur : elle doit toujours la lire ici.
  *
- * Source : Guide France Travail — Intermittents du spectacle, éd. mars 2026.
+ * Source : Guide France Travail — Intermittents du spectacle, éd. juillet 2026 (édition lue en
+ * entier, cf. docs/validation.md). L'édition mars 2026 était citée ici jusqu'au 03/08/2026 alors que
+ * le projet travaillait déjà sur celle de juillet — cf. point 14 de docs/critique_2026-08-03.md.
  *
  * Les valeurs marquées ✅ sont certifiées par le guide. Les valeurs
  * marquées 🔶 TODO sont volatiles (revalorisées régulièrement, ex. SMIC,
@@ -15,18 +17,36 @@ import { z } from "zod";
  */
 export const franceTravailConfig = {
   meta: {
-    version: "2026.06",
+    // Révision de CE FICHIER, pas des règles qu'il décrit. Sans rôle fonctionnel : le refus d'un
+    // fichier importé se joue sur `SCHEMA_VERSION_DONNEES` (storage/localStorageAdapter.ts), qui est
+    // une autre chose — la bousculer ne peut donc pas faire rejeter une sauvegarde existante.
+    version: "2026.08",
+    // Date d'entrée en vigueur du SMIC actuellement configuré (12,31 € — arrêté du 22 mai 2026), et
+    // rien d'autre : ce n'est NI la date d'édition du guide France Travail, NI la date à laquelle ces
+    // constantes ont été vérifiées. C'est exactement cette confusion qui faisait afficher « Règles
+    // vérifiées au 2026-06-01 » à l'utilisateur (point 14 de docs/critique_2026-08-03.md) : le
+    // libellé promettait une date de vérification, le champ livrait une date d'entrée en vigueur.
+    // Volontairement PLUS AFFICHÉE : le bandeau ne montre que `dateDerniereVerification`, et chaque
+    // source porte sa propre date dans `source`.
     dateEntreeVigueur: "2026-06-01",
+    // Date à laquelle ces constantes ont été confrontées à leurs sources pour la dernière fois — un
+    // FAIT DÉCLARÉ à la main, jamais recalculé ni déduit. C'est cette date, et elle seule, que le
+    // bandeau « Règles vérifiées le… » affiche. À mettre à jour en même temps que `source`, à chaque
+    // passage de la routine de veille (docs/routine-mensuelle-veille.md).
+    dateDerniereVerification: "2026-08-03",
     source:
-      "Guide France Travail — Intermittents du spectacle, éd. mars 2026 (constantes du régime) ; arrêté du 22 mai 2026 (SMIC horaire brut) ; " +
-      "Unédic, « Paramètres utiles » avril 2026 (plafond ARE annexes VIII/X, PMSS — vérifié le 03/08/2026)",
+      "Guide France Travail — Intermittents du spectacle, éd. juillet 2026 (constantes du régime) ; arrêté du 22 mai 2026 (SMIC horaire brut) ; " +
+      "Unédic, « Paramètres utiles » avril 2026 (plafond ARE annexes VIII/X, PMSS)",
     avertissement:
       "Estimation indicative. Ne se substitue pas à une notification officielle de France Travail.",
-    // Date déclarée jusqu'à laquelle ces règles sont réputées valides — PAS un seuil de durée
-    // inventé (ex. "> 6 mois = périmé"), qui mentirait dans les deux sens. Reste `null` tant
-    // qu'aucune date certaine n'est connue (aucune échéance officielle publiée à ce jour) :
-    // même discipline que `valeursDatees` (non certain = null, jamais deviné).
-    valableJusquau: null as string | null,
+    // ⚠️ NE PAS RÉINTRODUIRE de champ `valableJusquau` ni de fonction `estPerime`. Ils ont existé
+    // ici jusqu'au 03/08/2026 pour allumer une bannière « ⚠ Règles à vérifier », mais `valableJusquau`
+    // valait `null` (aucune échéance officielle n'étant publiée) et la bannière ne pouvait donc
+    // JAMAIS s'afficher : un mécanisme d'alerte inerte, qui donnait l'illusion d'une veille
+    // automatique. Point 13 de docs/critique_2026-08-03.md, arbitrage de Benoît : supprimer plutôt
+    // que remplacer. La veille est faite à la main et assumée comme telle
+    // (docs/routine-mensuelle-veille.md) ; l'app ne prétend plus la faire. Le remplacer par un seuil
+    // de durée (« plus de 6 mois = périmé ») serait pire : ce serait une péremption inventée.
   },
 
   // ── Conditions d'affiliation ──────────────────────────────────
@@ -284,9 +304,9 @@ export const franceTravailConfigSchema = z.object({
   meta: z.object({
     version: z.string(),
     dateEntreeVigueur: z.string(),
+    dateDerniereVerification: z.string(),
     source: z.string(),
     avertissement: z.string(),
-    valableJusquau: z.string().nullable(),
   }),
   seuilHeures: z.number().positive(),
   periodeReferenceJours: z.number().positive(),
@@ -429,21 +449,19 @@ export type FranceTravailConfig = z.infer<typeof franceTravailConfigSchema>;
 // plutôt que de produire un calcul silencieusement faux.
 franceTravailConfigSchema.parse(franceTravailConfig);
 
-/** Nombre de jours écoulés depuis la dernière mise à jour de la config — purement informatif (bandeau "règles vérifiées au…"), jamais un jugement de péremption. */
-export function joursDepuisMiseAJourConfig(dateDuJour: Date): number {
-  const entreeVigueur = new Date(franceTravailConfig.meta.dateEntreeVigueur);
-  const diffMs = dateDuJour.getTime() - entreeVigueur.getTime();
-  return Math.floor(diffMs / (1000 * 60 * 60 * 24));
-}
-
 /**
- * Les règles sont-elles réputées périmées ? Compare `valableJusquau` (un
- * FAIT déclaré en config, jamais un seuil de durée deviné) à `dateDuJour`,
- * passée en paramètre — jamais `new Date()` interne, pour rester testable.
- * `null` (rien de déclaré) ou date future -> pas périmé : on ne porte aucun
- * jugement sans base déclarée.
+ * Nombre de jours écoulés depuis la dernière VÉRIFICATION des constantes — purement informatif
+ * (« Règles vérifiées le … (il y a N jours) » dans MonProfil.tsx), jamais un jugement de péremption :
+ * ce nombre ne déclenche rien, aucun seuil ne lui est appliqué.
+ *
+ * Elle s'appelait `joursDepuisMiseAJourConfig` et comptait depuis `meta.dateEntreeVigueur` — soit
+ * l'entrée en vigueur du SMIC, pas une vérification. Son nom et son commentaire annonçaient déjà
+ * « dernière mise à jour » : c'est le CALCUL qui était faux, pas l'intention (point 14 de
+ * docs/critique_2026-08-03.md). `dateDuJour` reste un paramètre, jamais un `new Date()` interne,
+ * pour que la fonction soit testable.
  */
-export function estPerime(dateDuJour: Date, valableJusquau: string | null): boolean {
-  if (!valableJusquau) return false;
-  return dateDuJour.getTime() > new Date(valableJusquau).getTime();
+export function joursDepuisDerniereVerification(dateDuJour: Date): number {
+  const derniereVerification = new Date(franceTravailConfig.meta.dateDerniereVerification);
+  const diffMs = dateDuJour.getTime() - derniereVerification.getTime();
+  return Math.floor(diffMs / (1000 * 60 * 60 * 24));
 }

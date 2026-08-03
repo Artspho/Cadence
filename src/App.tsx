@@ -398,7 +398,6 @@ export default function App() {
         ongletActif={onglet}
         onChangerOnglet={setOnglet}
         periodeLabel={profil.dateAnniversaire ? `Cycle → ${profil.dateAnniversaire}` : "Première admission"}
-        dateDuJour={dateDuJour}
       />
 
       <main className="max-w-[1040px] mx-auto px-6 py-8 space-y-6">

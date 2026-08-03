@@ -107,8 +107,44 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 > celui-là ; un hash différent, en revanche, ne prouve rien (chercher alors une chaîne de caractères
 > introduite par le correctif).
 >
-> **Quatre points clos dans cette session**, dans l'ordre : **5** et **6** (`f2ec278`, chantier 3),
-> puis **7** (`501ca53`) et **23** (`a12ae14`, chantier 4). Détail des deux derniers plus bas.
+> **Six points clos dans cette session**, dans l'ordre : **5** et **6** (`f2ec278`, chantier 3),
+> puis **7** (`501ca53`) et **23** (`a12ae14`, chantier 4), puis **13** et **14** ensemble
+> (chantier 5). Le **9** a été instruit puis **reporté sciemment** (`4a33baa`, décision de Benoît :
+> la bascule Mistral se fera à la toute fin). Détail plus bas.
+>
+> **Chantier 5, points 13 et 14 — le bandeau des règles.** Traités ensemble : ils touchaient les
+> mêmes deux lignes de `TopBar.tsx` et `MonProfil.tsx`.
+> - **14 — le libellé et le champ ne disaient pas la même chose.** « Règles vérifiées au … » affichait
+>   `meta.dateEntreeVigueur`, qui date en réalité **l'entrée en vigueur du SMIC configuré** (12,31 €,
+>   arrêté du 22 mai 2026) — pas une vérification. Un champ **`meta.dateDerniereVerification`** a été
+>   ajouté (fait déclaré, jamais recalculé) : c'est lui, et lui seul, que les deux écrans affichent.
+>   `dateEntreeVigueur` est conservée mais **n'est plus affichée** — l'exposer sous un libellé correct
+>   supposait de savoir ce qu'elle date, ce que seul Benoît a pu confirmer. `meta.source` citait
+>   l'édition **mars 2026** du guide alors que le projet travaillait sur celle de **juillet 2026**
+>   depuis fin juillet (`renouvellementAnticipe.ts`, `types/index.ts`, `docs/validation.md`) :
+>   corrigé. Même confusion dans `joursDepuisMiseAJourConfig`, qui annonçait « depuis la dernière mise
+>   à jour » et comptait depuis l'entrée en vigueur : **c'était le calcul qui était faux, pas
+>   l'intention** — renommée `joursDepuisDerniereVerification`. Les dates ISO nues (`2026-06-01`)
+>   affichées en format machine passent par un `lib/dateLisible.ts` (« 3 août 2026 », « 1er juin
+>   2026 »).
+> - **13 — la bannière « ⚠ Règles à vérifier » ne pouvait jamais s'allumer** (`valableJusquau` valant
+>   `null`, faute d'échéance officielle publiée). **Arbitrage de Benoît : option B — supprimer, pas
+>   remplacer.** `valableJusquau`, `estPerime` et les deux branches conditionnelles sont partis ;
+>   la veille est faite à la main, assumée comme telle, et `docs/routine-mensuelle-veille.md` est
+>   désormais le **seul** filet (le document le dit explicitement). L'option écartée était un champ
+>   `prochaineVerificationPrevue` déclaré : refusée parce que Benoît ne veut pas d'un bandeau
+>   automatique de plus à maintenir. ⚠️ Ne pas réintroduire de seuil de durée.
+> - `dateDuJour` a disparu des props de `TopBar` (elle ne servait qu'à `estPerime`), donc du point
+>   d'appel dans `App.tsx`. Tests : **679 → 693** (−4 `estPerime`, +6 `dateLisible`, +3 config,
+>   +9 rendu des bandeaux).
+> - ⚠️ **La vérification manuelle au navigateur n'a PAS été faite** (Benoît a demandé d'enchaîner).
+>   Elle a été remplacée par `components/__tests__/bandeauRegles.test.tsx`, qui rend réellement les
+>   deux composants et lit le texte affiché : libellé, édition citée, accord singulier/pluriel du
+>   compteur, absence de `dateEntreeVigueur` et de toute date en format machine, absence de la
+>   bannière supprimée. **Contrôle négatif exécuté** : en remettant l'ancien libellé dans `TopBar`,
+>   2 tests rougissent (le libellé et l'interdiction d'afficher `2026-06-01`) — la garantie n'est pas
+>   décorative. Ces tests lisent le conteneur de leur propre rendu, pas `document.body`, pour ne pas
+>   dépendre du nettoyage entre tests : sinon les assertions négatives passeraient sans rien vérifier.
 >
 > **Chantier 4, points 7 et 23.**
 > - **7 — la fausse alerte « plafond de cachets dépassé »**, corrigée **en amont plutôt que dans le
@@ -171,11 +207,14 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 >    d'URL (`/?maj=<hash>`). Avant de conclure « le correctif ne marche pas », vérifier lequel des
 >    deux est en cause.
 >
-> **▶ Prochaine action — le point 13** (la bannière « Règles à vérifier » ne peut jamais s'afficher),
-> puis **14** (la source réglementaire affichée à l'utilisateur est périmée) : tous deux purement
-> techniques.
+> **▶ Prochaine action — à choisir dans `docs/critique_2026-08-03.md`.** Les points 13 et 14 sont
+> clos (03/08/2026). Restent notamment **10** (bornes de plausibilité à l'import JSON, chemin
+> d'écriture uniquement), **15** (`dateUtils.ts` sans test dédié), et les deux 🔴 trouvés en cours de
+> route : **25** (plafond de cumul 118 % du PMSS jamais appliqué) et **26** (le plafond de 28
+> cachets/mois ne plafonne rien) — ces deux-là ne sont **pas sourcés**, ne rien coder avant d'avoir
+> tranché la règle.
 >
-> **Le point 9 n'est plus la prochaine action** — il a été posé à Benoît le 03/08/2026 et **reporté
+> **Le point 9 n'est pas une prochaine action** — il a été posé à Benoît le 03/08/2026 et **reporté
 > sciemment** : le texte de consentement IA reste inchangé, la bascule de `MISTRAL_API_KEY` sur le plan
 > payant se fera à la toute fin du projet et clôra le point. Ne pas le rouvrir, ne pas « corriger » le
 > texte (détail et limite de validité de la décision : entrée 🔶 sur la mention d'entraînement, et
@@ -895,14 +934,18 @@ synchronisée à chaque commit. 5 commits locaux cette session, rien poussé sur
   (`confirmerImport`), pas seulement documenté. Testé en round-trip (y compris sur l'état vide
   d'un tout premier utilisateur) et manuellement dans le navigateur (import valide, JSON corrompu,
   état préservé après refus).
-- ✅ **Bandeau « règles vérifiées » + péremption** (§11.A) : `franceTravailConfig.meta.valableJusquau`
-  (date ISO nullable, laissée à `null` — aucune échéance officielle connue à ce jour, même
-  discipline que `valeursDatees`) comparée à la date du jour par la fonction pure `estPerime`
-  (date injectée, jamais `new Date()` interne). `TopBar.tsx` (visible en permanence) et
-  `MonProfil.tsx` (détaillé) lisent tous les deux `estPerime` — une seule source de vérité,
-  icône + mot quand périmé (jamais la couleur seule, §8.6). **Corrigé au passage** : `MonProfil.tsx`
-  contenait depuis plusieurs sessions un seuil `SEUIL_PEREMPTION_JOURS = 365` codé en dur — un
-  seuil réglementaire deviné, jamais corrigé jusqu'ici. Supprimé, remplacé par `estPerime`.
+- ✅ **Bandeau « règles vérifiées » — la péremption automatique a été SUPPRIMÉE le 03/08/2026**
+  (points 13 et 14, cf. l'entrée détaillée dans « Ce qui a été fait »). Ce que dit le bandeau
+  aujourd'hui : `Règles vérifiées le <meta.dateDerniereVerification> — <meta.source>`, dans
+  `TopBar.tsx` (permanent) et `MonProfil.tsx` (détaillé, + « il y a N jours »). Plus aucun jugement
+  de péremption, plus de branche conditionnelle, plus d'ambre.
+  **Historique, pour ne pas refaire le chemin** : le mécanisme reposait sur `meta.valableJusquau`
+  (laissé à `null`, faute d'échéance officielle publiée) comparé au jour courant par `estPerime` —
+  donc une bannière « ⚠ Règles à vérifier » qui ne pouvait **jamais** s'afficher. Avant lui,
+  `MonProfil.tsx` portait un `SEUIL_PEREMPTION_JOURS = 365` codé en dur, un seuil réglementaire
+  deviné. Les deux sont partis : le premier parce qu'inerte, le second parce qu'inventé. La veille
+  est faite à la main et assumée (`docs/routine-mensuelle-veille.md`) — l'app ne prétend plus la
+  faire. ⚠️ Ne pas réintroduire de seuil de durée : ce serait revenir au `SEUIL_PEREMPTION_JOURS`.
 - ✅ **Bouton de feedback** (§11.A) : `config/contact.ts` — `EMAIL_FEEDBACK` (`null` tant que non
   renseigné, jamais un placeholder ; renseigné à `benoit.zahra@orange.fr`) + `construireLienFeedback(email)`,
   fonction pure sans accès à `donnees`/`profil`/`contrats` (sujet et gabarit de corps fixes,
@@ -1308,12 +1351,14 @@ synchronisée à chaque commit. 5 commits locaux cette session, rien poussé sur
   revalorisation connue (SMIC/PMSS au 1er janvier et lors des hausses en cours d'année, ex. 1er
   juin 2026) et à chaque nouvelle convention d'assurance chômage, re-vérifier **toutes** les
   valeurs de `franceTravailConfig.ts`. Si une valeur a bougé : mettre à jour
-  `franceTravailConfig.ts` (+ `meta.version`, `dateEntreeVigueur`, et `valableJusquau` du bandeau)
-  et rejouer tous les cas de `docs/validation.md` contre le simulateur officiel. Ferme le risque
-  « maintenance de la config non attribuée » identifié au SPEC §10. Objectif : garantir dans la
-  durée les deux devoirs sacrés (pas de perte de données, pas de chiffre faux). La config est
-  actuellement datée « 2026.06 » (alignée sur la revalorisation SMIC du 1er juin 2026) — prochaine
-  échéance connue : la revalorisation SMIC/PMSS du 1er janvier suivant.
+  `franceTravailConfig.ts` (+ `meta.version`, `meta.source`, et `meta.dateEntreeVigueur` si c'est le
+  SMIC qui change) et rejouer tous les cas de `docs/validation.md` contre le simulateur officiel.
+  **À chaque passage, même sans changement : `meta.dateDerniereVerification` à la date du jour** —
+  c'est la seule date que l'app affiche. (`valableJusquau` n'existe plus, supprimé le 03/08/2026 avec
+  la bannière de péremption inerte, cf. point 13.) Ferme le risque « maintenance de la config non
+  attribuée » identifié au SPEC §10. Objectif : garantir dans la durée les deux devoirs sacrés (pas
+  de perte de données, pas de chiffre faux). La config est actuellement datée « 2026.08 » —
+  prochaine échéance connue : la revalorisation SMIC/PMSS du 1er janvier 2027.
 - ⬜ **Chantier import IA premium — analyse du périmètre de scan faite, aucun code produit
   (28/07/2026).** Extension prévue de l'import PDF (aujourd'hui local/pdfjs) vers un import IA
   premium via Mistral Document AI, routant vers des « propositions d'écriture » validées une par une
@@ -1803,7 +1848,8 @@ de situation ✅ — l'échec semble propre à ce format de bulletin, pas au can
 - ⚠️ **Contradiction de sources sur le plafond ARE — documentée, arbitrage pris, NON bloquante.**
   Trouvée le 03/08/2026 en lisant le guide FT en entier pour le chantier trop-perçu (donc *après* les
   commits `4b0105c` et `9f604f0`). Le **guide France Travail « Intermittents du spectacle »,
-  éd. juillet 2026** — plus récent que l'édition mars 2026 citée dans `meta.source` — et plusieurs
+  éd. juillet 2026** — l'édition désormais citée par `meta.source` (elle y annonçait encore mars 2026
+  jusqu'au 03/08/2026, cf. point 14) — et plusieurs
   pages `cultureetspectacle.francetravail.fr` affirment « L'allocation journalière calculée ne peut
   pas dépasser **174,80 € depuis le 1er janvier 2024** », sans mention de 177,56 € ni 181,18 €.
   **Décision de Benoît (03/08/2026) : la config reste alignée sur Unédic** — organisme qui fixe

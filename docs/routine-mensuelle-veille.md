@@ -59,16 +59,29 @@ Point le plus sensible pour Cadence : toute valeur ici alimente
       les montants) — chercher « nouvelle convention assurance chômage
       intermittents » + année en cours.
 - [ ] Vérifier si le Guide France Travail a une édition plus récente que celle
-      actuellement sourcée dans le projet (mars 2026) — comparer la date en
+      actuellement sourcée dans le projet (**juillet 2026**) — comparer la date en
       page de garde du PDF avec celle citée dans `franceTravailConfig.ts`.
 
 **Sources** : francetravail.fr (rubrique Spectacle), unedic.org (publications),
 service-public.gouv.fr, info.gouv.fr
 
 **Si une valeur a changé** : mettre à jour `franceTravailConfig.ts`
-(`meta.version`, `dateEntreeVigueur`, `valableJusquau`), puis rejouer tous les
-cas de `docs/validation.md` contre le simulateur officiel France Travail avant
-de considérer le changement terminé.
+(`meta.version`, `meta.source`, et `meta.dateEntreeVigueur` si c'est le SMIC qui
+change), puis rejouer tous les cas de `docs/validation.md` contre le simulateur
+officiel France Travail avant de considérer le changement terminé.
+
+**À chaque passage, même si rien n'a changé** : mettre `meta.dateDerniereVerification`
+à la date du jour. C'est cette date — et elle seule — que l'app affiche à l'écran
+sous « Règles vérifiées le … ». La laisser en arrière ferait dire à l'app que les
+règles sont plus vieilles qu'elles ne le sont ; l'avancer sans avoir vraiment
+regardé les sources serait un faux gage de fraîcheur.
+
+> Le champ `valableJusquau` et la bannière automatique « ⚠ Règles à vérifier » ont
+> été **supprimés le 03/08/2026** (point 13 de `docs/critique_2026-08-03.md`). Ils ne
+> pouvaient jamais s'activer, faute d'échéance officielle publiée : l'app donnait
+> l'illusion d'une veille automatique. C'est désormais **cette routine, à la main,
+> qui tient ce rôle** — et elle est le seul filet. Ne pas réintroduire de seuil de
+> durée (« plus de 6 mois = périmé ») : ce serait une péremption inventée.
 
 ---
 

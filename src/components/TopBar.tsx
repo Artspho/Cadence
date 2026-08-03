@@ -1,13 +1,16 @@
-import { estPerime, franceTravailConfig } from "../config/franceTravailConfig";
+import { franceTravailConfig } from "../config/franceTravailConfig";
 import { EMAIL_FEEDBACK, construireLienFeedback } from "../config/contact";
+import { formaterDateLisible } from "../lib/dateLisible";
 
 export type Onglet = "dashboard" | "profil" | "contrats" | "import" | "historique" | "simulateur" | "revenus" | "fraisPro";
 
+// `dateDuJour` a été retirée des props le 03/08/2026 : elle ne servait qu'à `estPerime`, supprimé
+// avec la bannière de péremption (point 13). Le bandeau n'énonce plus qu'un fait déclaré en config,
+// qui ne dépend pas du jour où on le lit.
 interface TopBarProps {
   ongletActif: Onglet;
   onChangerOnglet: (onglet: Onglet) => void;
   periodeLabel: string;
-  dateDuJour: string;
 }
 
 const ONGLETS: { id: Onglet; label: string }[] = [
@@ -21,9 +24,7 @@ const ONGLETS: { id: Onglet; label: string }[] = [
   { id: "fraisPro", label: "Frais pro" },
 ];
 
-export function TopBar({ ongletActif, onChangerOnglet, periodeLabel, dateDuJour }: TopBarProps) {
-  const perime = estPerime(new Date(dateDuJour), franceTravailConfig.meta.valableJusquau);
-
+export function TopBar({ ongletActif, onChangerOnglet, periodeLabel }: TopBarProps) {
   return (
     <header className="border-b border-line bg-bg/80 backdrop-blur sticky top-0 z-10">
       <div className="max-w-[1040px] mx-auto px-6 py-4 flex items-center gap-4">
@@ -48,13 +49,11 @@ export function TopBar({ ongletActif, onChangerOnglet, periodeLabel, dateDuJour 
         </nav>
       </div>
       <div className="max-w-[1040px] mx-auto px-6 pb-2 -mt-1 flex items-center justify-between gap-3 flex-wrap">
-        <p className={`text-[11px] flex items-center gap-1.5 ${perime ? "text-amber" : "text-faint"}`}>
-          {perime && (
-            <span className="inline-flex items-center gap-1 font-medium" aria-hidden={false}>
-              <span aria-hidden>⚠</span> Règles à vérifier —
-            </span>
-          )}
-          Règles vérifiées au {franceTravailConfig.meta.dateEntreeVigueur} — {franceTravailConfig.meta.source}
+        {/* Une seule date affichée, et c'est bien celle de la dernière vérification — plus
+            `dateEntreeVigueur`, qui datait l'entrée en vigueur du SMIC et n'avait rien à faire
+            derrière ce libellé (point 14). Chaque source porte sa propre date dans `meta.source`. */}
+        <p className="text-[11px] flex items-center gap-1.5 text-faint">
+          Règles vérifiées le {formaterDateLisible(franceTravailConfig.meta.dateDerniereVerification)} — {franceTravailConfig.meta.source}
         </p>
         {EMAIL_FEEDBACK && (
           <a href={construireLienFeedback(EMAIL_FEEDBACK)} className="text-[11px] text-faint hover:text-muted transition-colors shrink-0">

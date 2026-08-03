@@ -1,6 +1,6 @@
 /**
  * Coordonnées de contact pour la bêta (§11.A — bouton de feedback). Pas une
- * valeur réglementaire, mais même discipline que `valeursDatees`/`valableJusquau` :
+ * valeur réglementaire, mais même discipline que `franceTravailConfig.valeursDatees` :
  * `null` tant que non renseigné, jamais un placeholder qui ressemble à une
  * vraie adresse. Le feedback ne s'affiche NULLE PART (TopBar, Mon profil) tant
  * que cette valeur est `null` — maintenant comme plus tard.

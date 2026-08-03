@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { estPerime, franceTravailConfig, joursDepuisMiseAJourConfig } from "../config/franceTravailConfig";
+import { franceTravailConfig, joursDepuisDerniereVerification } from "../config/franceTravailConfig";
+import { formaterDateLisible } from "../lib/dateLisible";
 import { EMAIL_FEEDBACK, construireLienFeedback } from "../config/contact";
 import { profilHorsPerimetre, regimeEffectif } from "../lib/profilHorsPerimetre";
 import { CONTRADICTION_HORS_A10 } from "../content/contradictionHorsA10";
@@ -26,11 +27,9 @@ interface MonProfilProps {
 
 export function MonProfil({ dateDuJour, profil, onModifierProfil, contrats, periodes, onAjouterPeriode, onSupprimerPeriode }: MonProfilProps) {
   const [formPeriodeOuvert, setFormPeriodeOuvert] = useState(false);
-  const jours = joursDepuisMiseAJourConfig(new Date(dateDuJour));
-  // estPerime compare franceTravailConfig.meta.valableJusquau (un fait déclaré, jamais un
-  // seuil de durée deviné) à dateDuJour — même fonction que TopBar.tsx, une seule source de
-  // vérité pour la péremption, plus jamais deux logiques qui divergent.
-  const perime = estPerime(new Date(dateDuJour), franceTravailConfig.meta.valableJusquau);
+  // Compté depuis la dernière VÉRIFICATION des constantes, pas depuis l'entrée en vigueur du SMIC
+  // (point 14). Purement informatif : aucun seuil ne lui est appliqué, il ne déclenche rien.
+  const jours = joursDepuisDerniereVerification(new Date(dateDuJour));
   const regime = regimeEffectif(profil);
 
   const [dateNaissance, setDateNaissance] = useState(profil.dateNaissance);
@@ -258,14 +257,13 @@ export function MonProfil({ dateDuJour, profil, onModifierProfil, contrats, peri
         <PeriodeList periodes={periodes} onSupprimer={onSupprimerPeriode} />
       </section>
 
-      <div className={`rounded-card border p-5 text-sm ${perime ? "border-amber/30 bg-amber/5 text-amber" : "border-line bg-surface text-muted"}`}>
-        {perime && (
-          <span className="inline-flex items-center gap-1 font-medium mr-1">
-            <span aria-hidden>⚠</span> Règles à vérifier —
-          </span>
-        )}
-        Règles vérifiées au {franceTravailConfig.meta.dateEntreeVigueur} ({jours} jours) — {franceTravailConfig.meta.source}.
-        {perime && ` Ces règles ont peut-être changé depuis le ${franceTravailConfig.meta.valableJusquau} : vérifie auprès de France Travail avant de t'y fier.`}
+      {/* Bandeau neutre : il énonce une date de vérification et ses sources, il ne porte plus aucun
+          jugement de péremption (point 13 — la bannière « Règles à vérifier » ne pouvait jamais
+          s'allumer, elle a été supprimée plutôt que rafistolée). Le compteur de jours n'apparaît
+          qu'à partir d'un jour révolu : « (il y a 0 jour) » le jour même serait vrai mais absurde. */}
+      <div className="rounded-card border p-5 text-sm border-line bg-surface text-muted">
+        Règles vérifiées le {formaterDateLisible(franceTravailConfig.meta.dateDerniereVerification)}
+        {jours >= 1 && ` (il y a ${jours} jour${jours > 1 ? "s" : ""})`} — {franceTravailConfig.meta.source}.
       </div>
 
       <DocumentsUtiles />

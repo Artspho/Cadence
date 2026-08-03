@@ -239,8 +239,9 @@ Ne bloque rien tant que `RisqueTropPercu` reste sans montant — c'est le cas, e
 quelqu'un en câble un.
 
 ⚠️ **Contradiction de sources découverte sur le plafond ARE, postérieure aux points 13-14 —
-documentée, arbitrage pris, non bloquante** : le guide FT éd. **juillet 2026** (plus récent que
-l'édition mars 2026 citée dans `meta.source`) et plusieurs pages `cultureetspectacle.francetravail.fr`
+documentée, arbitrage pris, non bloquante** : le guide FT éd. **juillet 2026** (l'édition désormais
+citée par `meta.source`, qui annonçait encore mars 2026 jusqu'au 03/08/2026) et plusieurs pages
+`cultureetspectacle.francetravail.fr`
 écrivent que l'allocation journalière « ne peut pas dépasser **174,80 € depuis le 1er janvier 2024** »,
 sans mentionner 177,56 € ni 181,18 € — qui viennent, eux, d'Unédic « Paramètres utiles ».
 **Décision de Benoît : la config reste alignée sur Unédic** (organisme qui fixe réellement ces
@@ -573,7 +574,7 @@ plus jamais une condition de blocage.
 
 - areNette.ts corrigé (bug CSG/CRDS calculée sur SJM au lieu de l'allocation, facteur ~8) : assiette = 98,25 % de l'allocation après retraite + écrêtement au plancher. Champ dédié `cotisations.plancherEcretementJournalier` = 62,00 (PAS dans `smicJournalierBrut`, réservé franchise salaires). Cas #2 et #3 → « ✅ code conforme » dans validation.md.
 - Export/import JSON (devoir n°1) : ordre sauvegarde de secours → validation Zod → écriture ; 3 messages d'erreur distincts ; import remplace (pas fusion) avec sauvegarde auto avant.
-- Bandeau règles datées + péremption honnête : `meta.valableJusquau` (null tant que pas de date sourcée), fonction pure `estPerime(date, valableJusquau)`. Supprimé un `SEUIL_PEREMPTION_JOURS = 365` inventé. Un seul juge de péremption désormais.
+- Bandeau règles datées + péremption honnête : `meta.valableJusquau` (null tant que pas de date sourcée), fonction pure `estPerime(date, valableJusquau)`. Supprimé un `SEUIL_PEREMPTION_JOURS = 365` inventé. Un seul juge de péremption désormais. **⚠️ Périmé depuis le 03/08/2026** : `valableJusquau` et `estPerime` ont été SUPPRIMÉS (point 13 de `docs/critique_2026-08-03.md`) — restés à `null`, ils rendaient la bannière incapable de s'afficher. Le bandeau n'affiche plus qu'une date de dernière vérification déclarée.
 - Bouton feedback : `mailto:` vers benoit.zahra@orange.fr, corps neutre sans aucune donnée utilisateur, `config/contact.ts`. Adresse null → rien affiché.
 - État vide du Dashboard : déclencheur `contrats.length === 0` (PAS `decompte.total === 0` — un profil enseignement-seul garde un dashboard normal). Masque carte allocation (fini le faux 44 €), graphe, AlertCenter + chip résumé (finie la fausse alerte « 507 h » sur compte neuf). Composant `DashboardVide`, prédicat `dashboardEstVide()` dans `lib/`.
 
