@@ -95,13 +95,41 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 
 ## État actuel
 
-> **Repère au 03/08/2026, fin de session (3)** — **660 tests verts** (52 fichiers), `tsc -b` propre
+> **Repère au 03/08/2026, fin de session (3)** — **679 tests verts** (55 fichiers), `tsc -b` propre
 > sur les deux tsconfig, `npm run build` propre. Working tree propre. **`master` poussé sur
-> `origin/master`** (`f2ec278`) et **déployé — vérifié** : le bundle servi par
-> `cadence-git-master-benoit3.vercel.app` est `index-DHVafHPA.js`, contient la chaîne « En bonne voie »
-> et porte le même hash que le build local. À noter pour la prochaine fois : juste après le push,
-> l'URL servait encore l'ancien bundle (`index-DillsIsv.js`) — le déploiement Vercel prend un moment,
-> sonder en boucle plutôt que conclure « pas déployé » au premier essai.
+> `origin/master`** (`f8f52cf`) et **déployé — vérifié** : le bundle servi par
+> `cadence-git-master-benoit3.vercel.app` est `index-Dg3R5vLT.js` et contient bien le chemin de
+> récupération du point 23 (« Restaurer une sauvegarde », « rien ne sera écrasé »).
+> À noter pour la prochaine fois : juste après un push, l'URL sert encore l'ancien bundle — le
+> déploiement Vercel prend un moment (constaté : trois sondages à 25 s au commit `501ca53`). Sonder en
+> boucle plutôt que conclure « pas déployé » au premier essai. Et si le hash du bundle déployé est
+> identique à celui du `npm run build` local, c'est une preuve valable que le code servi est bien
+> celui-là ; un hash différent, en revanche, ne prouve rien (chercher alors une chaîne de caractères
+> introduite par le correctif).
+>
+> **Quatre points clos dans cette session**, dans l'ordre : **5** et **6** (`f2ec278`, chantier 3),
+> puis **7** (`501ca53`) et **23** (`a12ae14`, chantier 4). Détail des deux derniers plus bas.
+>
+> **Chantier 4, points 7 et 23.**
+> - **7 — la fausse alerte « plafond de cachets dépassé »**, corrigée **en amont plutôt que dans le
+>   calcul**. Règle tranchée par Benoît : **un contrat ne couvre jamais deux mois civils**, chaque mois
+>   se déclarant séparément à France Travail. Imposée à l'**écriture** en un point unique
+>   (`lib/contratUnSeulMois.ts`, `validerContratsPourEcriture`), branché sur les trois fonctions
+>   d'écriture d'`App.tsx` — seul passage commun aux quatre portes (formulaire, édition en liste,
+>   import de bulletin, revue IA). **Jamais à la lecture** : ni schéma Zod de lecture, ni
+>   `donneesAppSchemaEcriture` (qui valide le jeu de données ENTIER à chaque sauvegarde — un seul
+>   contrat à cheval hérité y bloquerait toute sauvegarde, devoir n°1 violé en miroir).
+>   `moisCle(contrat.date)` redevient exact par construction. Deux pistes écartées et documentées dans
+>   ce fichier pour ne pas être re-tentées : le prorata au jour (inventerait une règle non sourcée, cf.
+>   `docs/SPEC.md:534`, et peut créer une AUTRE fausse alerte) et la fourchette certain/possible (gère
+>   une ambiguïté qui ne doit pas exister).
+> - **23 — l'import inaccessible avant d'avoir créé un profil.** Vérifié d'abord qu'il n'y avait
+>   **aucune dépendance technique** au profil (`confirmerImport` teste `!donnees`, jamais
+>   `donnees.profil` ; `profil` est nullable dans le schéma d'écriture) : c'était une pure contrainte
+>   d'affichage, un `return <Onboarding/>` anticipé. Donc **aucun « profil minimal » créé, aucun
+>   cinquième chemin d'écriture** — la machinerie d'import existante est rendue dans les deux branches.
+>   L'invite est placée **avant** le formulaire. Le modal ne dit plus « Action irréversible » quand il
+>   n'y a rien à écraser : un avertissement sans objet est un faux avertissement.
 >
 > **Chantier 3 clos : les deux badges qui mentaient** (points 5 et 6 de
 > `docs/critique_2026-08-03.md`). L'échelle `NiveauStatut` passe de 3 à **4 états** — `securite`
@@ -143,20 +171,12 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 >    d'URL (`/?maj=<hash>`). Avant de conclure « le correctif ne marche pas », vérifier lequel des
 >    deux est en cause.
 >
-> **▶ Chantier 4 en cours — l'honnêteté d'affichage.** Point **7 clos** : règle d'intégrité tranchée
-> par Benoît — **un contrat ne couvre jamais deux mois civils**, chaque mois se déclarant séparément à
-> France Travail. Imposée à l'écriture en un point unique (`lib/contratUnSeulMois.ts`), branchée sur
-> les trois fonctions d'écriture d'`App.tsx` qui sont le seul passage commun aux quatre portes
-> (formulaire, édition en liste, import de bulletin, revue d'extraction IA), **jamais à la lecture**.
-> Point **23 clos** aussi : l'écran d'accueil propose « Restaurer une sauvegarde » **avant** le
-> formulaire. Vérifié d'abord que l'import n'avait aucune dépendance technique au profil
-> (`confirmerImport` teste `!donnees`, jamais `donnees.profil` ; `profil` est nullable dans le schéma
-> d'écriture) — donc **aucun « profil minimal » créé, aucun cinquième chemin d'écriture** : la
-> machinerie d'import existante est simplement rendue dans les deux branches. Le modal ne dit plus
-> « Action irréversible » quand il n'y a rien à écraser.
-> **Reste au chantier 4** : **9** (🔴 le texte de consentement affirme une chose qui n'est pas encore
-> vraie — demandera de trancher avec Benoît ce qui est vrai aujourd'hui), **13** (la bannière « Règles à
-> vérifier » ne peut jamais s'afficher), **14** (la source réglementaire affichée est périmée).
+> **▶ Prochaine action — finir le chantier 4 (l'honnêteté d'affichage) par le point 9** : le texte de
+> consentement affirme une chose qui n'est pas encore vraie (`docs/critique_2026-08-03.md`, point 9).
+> ⚠️ **Ce point n'est pas purement technique** : il faut d'abord faire trancher à Benoît ce que le
+> texte peut affirmer aujourd'hui, avant de le réécrire. Ne pas commencer par le code.
+> Puis **13** (la bannière « Règles à vérifier » ne peut jamais s'afficher) et **14** (la source
+> réglementaire affichée à l'utilisateur est périmée), tous deux purement techniques.
 >
 > ### ⚠️ Chantier tracé, non fait : brancher l'onboarding sur `validerProfilPourEcriture`
 >
