@@ -21,9 +21,19 @@ const LARGEUR = 1000;
 const HAUTEUR = 300;
 const MARGE = { haut: 24, bas: 36, gauche: 16, droite: 16 };
 
+// Un libellé et une couleur par état, sans zone grise (cf. NiveauStatut dans types/index.ts).
+// Le VERT est réservé à "securite" : heures réellement acquises ou contrats déjà signés. Une simple
+// extrapolation du rythme passé ("en_bonne_voie") ne peut plus l'obtenir — c'était le faux feu vert
+// du point 5 de docs/critique_2026-08-03.md.
+// Choix du violet pour "en_bonne_voie" plutôt que du bleu (`teal`) : sur CE graphique, le teal
+// désigne déjà le segment « confirmé à venir » (contrats signés, un fait). Réutiliser le teal pour la
+// projection remettrait la même couleur sur « fait » et sur « projeté » — précisément la confusion
+// qu'on est en train de défaire. `violet` est le seul token froid libre de la charte (§8.1) ; la
+// charte interdisant les couleurs inventées, on n'introduit aucun hex hors palette.
 const LABELS_STATUT: Record<NiveauStatut, { texte: string; classeFond: string; classeTexte: string; classeCourbe: string }> = {
   securite: { texte: "Sécurité", classeFond: "bg-mint/15", classeTexte: "text-mint", classeCourbe: "#3FD69B" },
-  alerte: { texte: "Alerte", classeFond: "bg-amber/15", classeTexte: "text-amber", classeCourbe: "#F5C46B" },
+  en_bonne_voie: { texte: "En bonne voie", classeFond: "bg-violet/15", classeTexte: "text-violet", classeCourbe: "#9B8CFF" },
+  a_rattraper: { texte: "À rattraper", classeFond: "bg-amber/15", classeTexte: "text-amber", classeCourbe: "#F5C46B" },
   bloque: { texte: "Bloqué", classeFond: "bg-red/15", classeTexte: "text-red", classeCourbe: "#F2726B" },
 };
 

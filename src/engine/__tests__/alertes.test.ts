@@ -38,6 +38,44 @@ describe("detecterAlertes", () => {
     expect(codes(alertes)).toContain("eligible_rattrapage");
   });
 
+  // Refonte des badges du 03/08/2026 (points 5 et 6 de docs/critique_2026-08-03.md) : l'échéance
+  // imminente ne colore plus l'écran en rouge quand la situation reste rattrapable, mais le centre
+  // d'alertes doit garder EXACTEMENT les mêmes alertes qu'avant — l'urgence était réelle, seule sa
+  // traduction visuelle mentait. Ces trois tests verrouillent cette non-régression.
+  describe("échéance imminente mais encore rattrapable : l'alerte critique est conservée", () => {
+    it("l'alerte critique « Échéance imminente » est toujours levée alors que le badge n'est plus « Bloqué »", () => {
+      const p = profil({ dateAnniversaire: "2026-12-31" });
+      const contrats = [contrat({ date: "2026-02-01", nbCachets: 34 })]; // 408 h : il manque 99 h en 25 j
+      const alertes = detecterAlertes(p, contrats, [], franceTravailConfig, "2026-12-06");
+      expect(codes(alertes)).toContain("anniversaire_imminent");
+      expect(alertes.find((a) => a.code === "anniversaire_imminent")!.niveau).toBe("critique");
+    });
+
+    it("une seule alerte pour cette situation : pas de doublon « Rythme insuffisant » à côté de l'alerte critique", () => {
+      const p = profil({ dateAnniversaire: "2026-12-31" });
+      const contrats = [contrat({ date: "2026-02-01", nbCachets: 34 })];
+      const alertes = detecterAlertes(p, contrats, [], franceTravailConfig, "2026-12-06");
+      expect(codes(alertes)).not.toContain("rythme_insuffisant");
+    });
+
+    it("l'action suggérée ne renvoie pas au guichet quand c'est encore atteignable : elle chiffre les cachets à trouver", () => {
+      const p = profil({ dateAnniversaire: "2026-12-31" });
+      const contrats = [contrat({ date: "2026-02-01", nbCachets: 34 })]; // 99 h manquantes = 9 cachets (12 h)
+      const alerte = detecterAlertes(p, contrats, [], franceTravailConfig, "2026-12-06").find((a) => a.code === "anniversaire_imminent")!;
+      expect(alerte.actionSuggeree).toMatch(/9 cachets/);
+      expect(alerte.actionSuggeree).toMatch(/encore atteignable/i);
+      expect(alerte.actionSuggeree).not.toMatch(/contacte france travail/i);
+    });
+
+    it("contrôle négatif — vraiment hors de portée : l'action redevient « contacte France Travail »", () => {
+      const p = profil({ dateAnniversaire: "2026-12-31" });
+      const contrats = [contrat({ date: "2026-02-01", nbCachets: 8 })]; // 96 h : il manque 411 h en 25 j
+      const alerte = detecterAlertes(p, contrats, [], franceTravailConfig, "2026-12-06").find((a) => a.code === "anniversaire_imminent")!;
+      expect(alerte.actionSuggeree).toMatch(/contacte france travail/i);
+      expect(alerte.actionSuggeree).not.toMatch(/encore atteignable/i);
+    });
+  });
+
   it("profil neuf sans date anniversaire connue : aucune alerte de rythme (rien n'est imminent), et jamais de fuite Infinity", () => {
     const p = profil({ dateAnniversaire: "", situation: "premiere_admission" });
     const alertes = detecterAlertes(p, [], [], franceTravailConfig, "2026-06-01");

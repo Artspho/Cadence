@@ -95,14 +95,27 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 
 ## État actuel
 
-> **Repère au 03/08/2026, fin de session (2)** — **641 tests verts** (51 fichiers), `tsc -b` propre
-> sur les deux tsconfig, `npm run build` propre. Working tree propre. **`master` poussé sur
-> `origin/master`** (`ca0c86e`) et déployé — vérifié sur l'écran réel de Benoît.
+> **Repère au 03/08/2026, fin de session (3)** — **660 tests verts** (52 fichiers), `tsc -b` propre
+> sur les deux tsconfig, `npm run build` propre.
 >
-> Le nombre de tests BAISSE de 648 à 641 volontairement : `engine/calculerSerie.ts` et
-> `engine/franchises.ts` ont été supprimés avec leurs 16 tests, et 9 tests neufs ajoutés.
+> **Chantier 3 clos : les deux badges qui mentaient** (points 5 et 6 de
+> `docs/critique_2026-08-03.md`). L'échelle `NiveauStatut` passe de 3 à **4 états** — `securite`
+> (vert, acquis ou contrats signés) · `en_bonne_voie` (violet, projection) · `a_rattraper` (ambre,
+> encore atteignable) · `bloque` (rouge, hors de portée). L'ancien `alerte` est absorbé par
+> `a_rattraper` (décision de Benoît : un 4ᵉ état, pas un 5ᵉ).
+> - Le vert ne récompense plus une extrapolation du rythme passé (point 5).
+> - Le rouge exige que l'écart dépasse le **plafond de l'Annexe 10** (28 cachets × 12 h = 336 h/mois,
+>   déjà sourcé dans la config) sur le temps restant — plus de « Bloqué » quand il manque un cachet
+>   (point 6). Le seuil des 30 jours ne colore plus le badge : il vit dans `echeanceImminente`, et le
+>   centre d'alertes garde son alerte critique **à l'identique** (vérifié par 4 tests dédiés).
+> - +19 tests, dont 6 qui rendent réellement le composant et lisent le mot affiché
+>   (`src/components/__tests__/ProjectionChart.badge.test.tsx`) : les tests du moteur prouvaient le
+>   niveau calculé, pas le mot à l'écran — or c'était le mot qui mentait.
+> - ⚠️ **Sans effet sur l'écran de Benoît aujourd'hui** : à 588 h acquises / 507 h, son badge reste
+>   « Sécurité » vert (premier cas). Le correctif protège les cycles en cours, pas celui-ci.
 >
-> **Deux chantiers clos dans cette session** :
+> **Deux chantiers clos dans la session précédente** (`master` poussé sur `origin/master`,
+> `729d410`, déployé — vérifié sur l'écran réel de Benoît) :
 > - **Données récupérées** (point 22, `c6c8d8a`) — les contrats avaient disparu. Fusion des deux
 >   lignées parallèles en un fichier unique versionné, `docs/cadence-fusion-2026-08-03.json`,
 >   **62 contrats**, importé et vérifié à l'écran (588 h / 507 h).
@@ -125,16 +138,21 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 >    d'URL (`/?maj=<hash>`). Avant de conclure « le correctif ne marche pas », vérifier lequel des
 >    deux est en cause.
 >
-> **▶ Prochaine action — chantier 3 : les points 5 et 6 de `docs/critique_2026-08-03.md`**, les deux
-> badges qui mentent, tous deux dans `engine/prediction.ts` : « Sécurité » s'affiche sur une simple
-> projection du rythme passé (pas sur un droit acquis), et « Bloqué » s'affiche dès 30 jours de
-> l'échéance même s'il ne manque qu'un cachet. Indépendants du reste, regroupables.
+> **▶ Prochaine action — chantier 4 : l'honnêteté d'affichage, le lot le plus proche de ce qui vient
+> d'être fait.** Dans l'ordre suggéré :
+> - **7** (🔴) — fausse alerte « plafond de cachets dépassé ». Tous les cachets d'un contrat sont
+>   attribués au mois de FIN (`decompteHeures.ts:170-173`), donc une tournée à cheval sur deux mois
+>   peut annoncer « 30 cachets en mars » là où la réalité est 15 + 15. Le correctif existe déjà dans le
+>   dépôt et n'est pas branché ici : `decoupageMensuel.ts`, `repartirContratParMois`.
+> - **23** (🔴) — l'import est inaccessible avant d'avoir créé un profil : trou du chemin de
+>   récupération (devoir n°1), correctif d'UI seul.
+> - **9** (🔴), **13**, **14** — consentement inexact et les deux autres points d'affichage.
 >
-> **▶ Ensuite — les 🔴 restants**, par lots (tableau de suivi en fin de `docs/critique_2026-08-03.md`) :
-> sécurité des entrées (**8** endpoint IA ouvert, **10** JSON non borné, reste du **2**) ; honnêteté
-> d'affichage (**7** fausse alerte cachets, **9** consentement inexact, **23** import inaccessible
-> avant onboarding, **13**, **14**) ; puis **25** (plafond de cumul 118 % du PMSS jamais appliqué,
-> découvert le 03/08 — portée nulle sur les données actuelles de Benoît, réelle sur un gros mois).
+> **▶ Ensuite — sécurité des entrées** : **8** (endpoint IA ouvert), **10** (JSON non borné), reste
+> du **2** (échec d'écriture silencieux, filet minimal seulement).
+>
+> **▶ Ensuite — 25** : plafond de cumul 118 % du PMSS jamais appliqué. Portée nulle sur les données
+> actuelles de Benoît (2 957 € contre 4 725,90 €), réelle sur un mois à forte activité.
 >
 > **▶ Ensuite — trancher l'architecture de stockage des PDF : Supabase seul vs hybride
 > Workspace.** C'est le sujet le plus mûr du backlog et le prérequis de plusieurs autres (étape 3 du

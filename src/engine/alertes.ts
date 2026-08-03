@@ -109,7 +109,11 @@ export function detecterAlertes(
     }
   }
 
-  if (prediction.niveau === "alerte" && prediction.rythmeRequis.atteignable) {
+  // `!echeanceImminente` : sinon ce cas recevrait DEUX alertes quasi identiques (celle-ci en
+  // "attention" + l'alerte critique « Échéance imminente » ci-dessous). Avant la refonte de
+  // NiveauStatut, la répartition était la même — mais portée par le niveau lui-même, qui basculait à
+  // "bloque" dès 30 jours ; l'imminence vit désormais dans son propre champ (cf. prediction.ts).
+  if (prediction.niveau === "a_rattraper" && !prediction.echeanceImminente && prediction.rythmeRequis.atteignable) {
     alertes.push({
       code: "rythme_insuffisant",
       niveau: "attention",
@@ -118,21 +122,34 @@ export function detecterAlertes(
       actionSuggeree: `Vise environ ${Math.ceil(prediction.rythmeRequis.heuresParMois)} h/mois d'ici l'échéance pour rattraper le rythme.`,
     });
   }
-  // prediction.rythmeRequis.atteignable === false ET niveau === "alerte" signifie forcément
+  // prediction.rythmeRequis.atteignable === false ET niveau === "a_rattraper" signifie forcément
   // raison "anniversaire_inconnu" (le cas "delai_expire" bascule toujours en niveau "bloque",
   // cf. prediction.ts) : rien n'est "imminent" pour un profil dont la date anniversaire est
   // inconnue, donc aucune alerte de rythme ici — l'invite à renseigner la date vit dans
   // Dashboard.tsx (branche atteignable:false), pas dans une alerte.
 
-  if (prediction.niveau === "bloque") {
+  // Deux situations distinctes, une seule alerte critique — c'est exactement l'ensemble que couvrait
+  // `niveau === "bloque"` avant la refonte (échéance dépassée, OU échéance à moins de 30 jours avec un
+  // rythme insuffisant). Ce qui change : le second cas n'affiche plus « Bloqué » en rouge à l'écran
+  // s'il reste atteignable (point 6), mais il continue de lever une alerte critique — l'urgence était
+  // réelle, seule sa traduction visuelle mentait.
+  if (prediction.niveau === "bloque" || (prediction.niveau === "a_rattraper" && prediction.echeanceImminente)) {
     alertes.push({
       code: "anniversaire_imminent",
       niveau: "critique",
       titre: prediction.joursRestants > 0 ? "Échéance imminente" : "Échéance atteinte",
       message: prediction.message,
-      actionSuggeree: prediction.eligibleRattrapage
-        ? "Vérifie ton éligibilité à la clause de rattrapage auprès de France Travail."
-        : "Contacte France Travail pour étudier tes options avant l'échéance.",
+      // « Contacte France Travail pour étudier tes options » est la bonne action quand c'est
+      // effectivement hors de portée, mais elle sonne comme un renoncement quand il ne manque qu'un
+      // ou deux cachets — exactement le risque nommé au point 6. Pour un cas encore atteignable, on
+      // chiffre donc ce qu'il reste à trouver (conversion en cachets via config.heuresParCachet,
+      // 12 h, Annexe 10) au lieu d'envoyer vers le guichet.
+      actionSuggeree:
+        prediction.niveau === "a_rattraper"
+          ? `Il te reste ${prediction.joursRestants} j pour trouver ${Math.ceil(prediction.heuresRestantesApresCertain)} h, soit environ ${Math.ceil(prediction.heuresRestantesApresCertain / config.heuresParCachet)} cachets : c'est encore atteignable.`
+          : prediction.eligibleRattrapage
+            ? "Vérifie ton éligibilité à la clause de rattrapage auprès de France Travail."
+            : "Contacte France Travail pour étudier tes options avant l'échéance.",
     });
   }
 

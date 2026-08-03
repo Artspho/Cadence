@@ -24,7 +24,7 @@ describe("calculerStatutPrediction", () => {
     const resultat = calculerStatutPrediction(p, [], [], franceTravailConfig, "2026-06-01");
     expect(resultat.heuresActuelles).toBe(0);
     expect(resultat.niveau).not.toBe("bloque");
-    expect(resultat.niveau).toBe("alerte");
+    expect(resultat.niveau).toBe("a_rattraper");
     expect(resultat.message).not.toMatch(/échéance/i);
   });
 
@@ -188,6 +188,122 @@ describe("calculerStatutPrediction", () => {
       expect(sansCertain.dateFranchissementProjetee).not.toBeNull();
       expect(avecCertain.dateFranchissementProjetee).not.toBeNull();
       expect(avecCertain.dateFranchissementProjetee! <= sansCertain.dateFranchissementProjetee!).toBe(true);
+    });
+  });
+
+  // ── Point 5 de docs/critique_2026-08-03.md : le vert ne s'affiche plus sur une projection ──
+  describe("le badge vert « Sécurité » n'est jamais accordé à une simple projection (point 5)", () => {
+    it("projection au rythme passé suffisante mais aucune heure acquise : niveau « en_bonne_voie », jamais « securite »", () => {
+      const p = profil({ dateAnniversaire: "2026-12-31" });
+      // 300 h acquises au 1er juillet, soit ~50 h/mois : à ce rythme les 507 h tombent début novembre,
+      // avant l'échéance. AVANT la correction, cet écran affichait « Sécurité » en vert — alors qu'il
+      // manque 207 h et qu'il suffit de ne plus rien signer pour ne jamais les faire.
+      const contrats = [contrat({ date: "2026-02-01", nbCachets: 25 })]; // 300 h
+      const resultat = calculerStatutPrediction(p, contrats, [], franceTravailConfig, "2026-07-01");
+
+      expect(resultat.heuresActuelles).toBe(300);
+      expect(resultat.heuresCertainesAVenir).toBe(0); // rien de signé à venir : c'est bien une pure projection
+      expect(resultat.dateFranchissementProjetee).not.toBeNull();
+      expect(resultat.dateFranchissementProjetee! <= "2026-12-31").toBe(true); // la projection franchit bien le seuil à temps
+      expect(resultat.niveau).toBe("en_bonne_voie");
+      expect(resultat.niveau).not.toBe("securite"); // le cœur du point 5
+    });
+
+    it("le message d'un « en_bonne_voie » ne promet rien : il dit explicitement que rien n'est acquis et chiffre ce qui manque", () => {
+      const p = profil({ dateAnniversaire: "2026-12-31" });
+      const contrats = [contrat({ date: "2026-02-01", nbCachets: 25 })]; // 300 h
+      const resultat = calculerStatutPrediction(p, contrats, [], franceTravailConfig, "2026-07-01");
+
+      expect(resultat.niveau).toBe("en_bonne_voie");
+      expect(resultat.message).toMatch(/rien n'est encore acquis/i);
+      expect(resultat.message).toMatch(/207 h/); // l'écart réel, pas seulement une date rassurante
+      // Conditionnel obligatoire : « tu atteindrais », jamais « tu atteins ».
+      expect(resultat.message).not.toMatch(/tu atteins/i);
+    });
+
+    it("contrôle négatif — les 507 h réellement travaillées gardent le vert, et le message ne parle pas de rythme", () => {
+      const p = profil({ dateAnniversaire: "2026-12-31" });
+      const contrats = [contrat({ date: "2026-02-01", nbCachets: 45 })]; // 540 h acquises
+      const resultat = calculerStatutPrediction(p, contrats, [], franceTravailConfig, "2026-07-01");
+
+      expect(resultat.niveau).toBe("securite");
+      expect(resultat.message).toMatch(/tu as atteint/i);
+      expect(resultat.message).not.toMatch(/rythme/i);
+    });
+
+    it("contrôle négatif — des contrats déjà SIGNÉS qui suffisent gardent le vert (un fait, pas une projection), et le message le dit", () => {
+      const p = profil({ dateAnniversaire: "2026-12-31" });
+      const contrats = [contrat({ date: "2026-09-01", nbCachets: 45 })]; // 540 h, tout à venir mais déjà signé
+      const resultat = calculerStatutPrediction(p, contrats, [], franceTravailConfig, "2026-07-01");
+
+      expect(resultat.heuresActuelles).toBe(0);
+      expect(resultat.niveau).toBe("securite");
+      expect(resultat.message).toMatch(/contrats déjà signés/i); // ne laisse pas croire que les heures sont faites
+    });
+  });
+
+  // ── Point 6 de docs/critique_2026-08-03.md : plus de « Bloqué » sur une situation rattrapable ──
+  describe("le badge rouge « Bloqué » exige que l'objectif soit vraiment hors de portée (point 6)", () => {
+    it("il ne manque qu'un seul cachet à 25 jours de l'échéance : jamais « bloque »", () => {
+      // Le scénario nommé dans la critique. AVANT la correction : « Bloqué » en rouge, parce que
+      // joursRestants <= 30 suffisait — sans jamais regarder qu'il ne manquait qu'un cachet.
+      const p = profil({ dateAnniversaire: "2026-12-31" });
+      const contrats = [contrat({ date: "2026-02-01", nbCachets: 41 })]; // 492 h : il manque 15 h, soit un cachet
+      const resultat = calculerStatutPrediction(p, contrats, [], franceTravailConfig, "2026-12-06");
+
+      expect(resultat.joursRestants).toBe(25);
+      expect(resultat.heuresRestantesApresCertain).toBe(15);
+      expect(resultat.niveau).not.toBe("bloque"); // le cœur du point 6
+      expect(resultat.message).not.toMatch(/hors de portée/i);
+    });
+
+    it("échéance à 25 jours, rythme insuffisant, mais l'écart reste atteignable : « a_rattraper » et non « bloque »", () => {
+      const p = profil({ dateAnniversaire: "2026-12-31" });
+      // 408 h acquises (~36 h/mois) : la projection n'atteint plus le seuil à temps, mais les 99 h
+      // manquantes restent très en dessous des 280 h que le plafond de l'Annexe 10 autorise en 25 j.
+      const contrats = [contrat({ date: "2026-02-01", nbCachets: 34 })]; // 408 h
+      const resultat = calculerStatutPrediction(p, contrats, [], franceTravailConfig, "2026-12-06");
+
+      expect(resultat.heuresRestantesApresCertain).toBe(99);
+      expect(resultat.niveau).toBe("a_rattraper");
+      expect(resultat.echeanceImminente).toBe(true); // l'urgence reste signalée, elle ne colore juste plus en rouge
+      expect(resultat.message).toMatch(/encore atteignable/i);
+    });
+
+    it("contrôle négatif — écart réellement hors de portée du plafond Annexe 10 : « bloque », avec le motif affiché", () => {
+      const p = profil({ dateAnniversaire: "2026-12-31" });
+      // 96 h acquises : il manque 411 h en 25 j, quand le plafond légal (28 cachets × 12 h = 336 h/mois)
+      // n'en permet que 280. Là, « Bloqué » est mérité — la correction ne doit pas l'avoir supprimé.
+      const contrats = [contrat({ date: "2026-02-01", nbCachets: 8 })]; // 96 h
+      const resultat = calculerStatutPrediction(p, contrats, [], franceTravailConfig, "2026-12-06");
+
+      expect(resultat.heuresRestantesApresCertain).toBe(411);
+      expect(resultat.niveau).toBe("bloque");
+      expect(resultat.message).toMatch(/hors de portée/i);
+      expect(resultat.message).toMatch(/336 h\/mois/); // le seuil du jugement est affiché, donc contestable
+    });
+
+    it("contrôle négatif — échéance réellement dépassée sans les heures : toujours « bloque », quel que soit l'écart", () => {
+      const p = profil({ dateAnniversaire: "2026-12-31" });
+      const contrats = [contrat({ date: "2026-02-01", nbCachets: 42 })]; // 504 h : il ne manque que 3 h…
+      const resultat = calculerStatutPrediction(p, contrats, [], franceTravailConfig, "2027-01-15"); // …mais l'échéance est passée
+
+      expect(resultat.joursRestants).toBe(0);
+      expect(resultat.niveau).toBe("bloque"); // le temps, lui, ne se rattrape pas
+      expect(resultat.echeanceImminente).toBe(false); // pas "imminente" : dépassée
+    });
+
+    it("anniversaire inconnu : le plafond d'atteignabilité ne peut jamais produire un « bloque » (fenêtre fictive, joursRestants = 0)", () => {
+      // Garde-fou : sans date anniversaire, joursRestants vaut 0 par artifice de calcul, donc le
+      // plafond atteignable vaut 0 h — sans la garde `anniversaireConnu`, tout profil neuf afficherait
+      // « Bloqué » dès l'installation de l'app.
+      const p = profil({ dateAnniversaire: "", situation: "premiere_admission" });
+      const resultat = calculerStatutPrediction(p, [], [], franceTravailConfig, "2026-06-01");
+
+      expect(resultat.joursRestants).toBe(0);
+      expect(resultat.anniversaireConnu).toBe(false);
+      expect(resultat.niveau).not.toBe("bloque");
+      expect(resultat.echeanceImminente).toBe(false);
     });
   });
 });

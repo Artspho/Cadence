@@ -274,7 +274,26 @@ export interface AJNetteResultat {
   detailCotisations: DetailCotisation[];
 }
 
-export type NiveauStatut = "securite" | "alerte" | "bloque";
+// Échelle d'affichage du suivi des 507 h — 4 états. Refonte du 03/08/2026 (points 5 et 6 de
+// docs/critique_2026-08-03.md) : l'ancienne échelle à 3 états ("securite" | "alerte" | "bloque")
+// mentait deux fois, dans les deux sens interdits par le devoir sacré n°2.
+//   - Faux feu vert : "securite" (vert) s'affichait AUSSI sur une simple extrapolation du rythme
+//     passé. « Sécurité » se lit « c'est bon, tes droits sont assurés » — alors que rien n'était
+//     acquis et qu'il suffisait de ne plus rien signer pour ne jamais atteindre les 507 h.
+//   - Faux « Bloqué » : "bloque" (rouge) s'affichait dès 30 jours de l'échéance sans jamais regarder
+//     COMBIEN d'heures manquaient. Il manquait 10 h (un seul cachet) à 25 jours ? Rouge. Risque
+//     concret : renoncer à chercher un cachet parce que l'app annonce que c'est fini.
+// L'ancien "alerte" est absorbé par "a_rattraper" (décision de Benoît : un 4e état, pas un 5e).
+//   - "securite"      : les 507 h sont ACQUISES (heures réellement travaillées) ou déjà couvertes
+//                       par des contrats SIGNÉS. Un fait, jamais une projection. Seul état vert.
+//   - "en_bonne_voie" : la projection au rythme passé suffirait, mais rien n'est acquis. Jamais vert.
+//   - "a_rattraper"   : la projection ne suffit pas, mais l'écart restant est encore atteignable dans
+//                       le temps restant (plafond Annexe 10, cf. engine/prediction.ts).
+//   - "bloque"        : réellement hors de portée — échéance déjà dépassée, ou écart supérieur à ce
+//                       que le plafond légal de l'Annexe 10 permet de faire d'ici l'échéance.
+// Jamais persisté (recalculé à chaque affichage) : absent du stockage et de tout schéma Zod, donc
+// faire évoluer cette union ne peut pas rendre illisibles des données déjà enregistrées.
+export type NiveauStatut = "securite" | "en_bonne_voie" | "a_rattraper" | "bloque";
 
 // Raison pour laquelle un rythme mensuel requis ne peut pas être calculé :
 // - "anniversaire_inconnu" : donnée manquante (profil neuf sans date anniversaire), pas une
@@ -317,6 +336,13 @@ export interface StatutPrediction {
   rythmeRequis: RythmeRequis; // h/mois requis pour atteindre le seuil avant l'anniversaire, ou raison si inatteignable
   dateFranchissementProjetee: string | null; // date projetée d'atteinte du seuil au rythme actuel
   eligibleRattrapage: boolean; // 338–506 h : clause de rattrapage potentiellement mobilisable
+  // true quand une VRAIE échéance (anniversaire connu, pas encore atteinte) tombe dans moins de
+  // SEUIL_JOURS_ANNIVERSAIRE_IMMINENT jours et que le seuil n'est pas encore assuré. Depuis la refonte
+  // de NiveauStatut, l'imminence ne colore plus le badge en rouge (elle ne dit rien du caractère
+  // atteignable ou non) : elle vit ici, pour que le centre d'alertes garde son alerte critique
+  // « Échéance imminente » sans que l'écran, lui, affiche un faux « Bloqué ». Toujours false quand
+  // l'anniversaire est inconnu : la fenêtre fictive « se terminant aujourd'hui » n'est pas une échéance.
+  echeanceImminente: boolean;
   message: string; // phrase courte, orientée utilisateur (cf. charte §8.7)
 }
 
