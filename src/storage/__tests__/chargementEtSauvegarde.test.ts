@@ -188,4 +188,21 @@ describe("reinitialiserDonnees — le seul chemin autorisé à écrire depuis l'
     expect(window.localStorage.getItem(CLE_QUARANTAINE)).toBe(CONTENU_REFUSE_PAR_LE_SCHEMA);
     expect(JSON.parse(window.localStorage.getItem(CLE_STOCKAGE) as string)).toEqual(creerDonneesVides());
   });
+
+  // Garantie de NON-ACCUMULATION : une clé unique et fixe, écrasée à chaque incident — jamais une
+  // clé horodatée par incident. Deux quarantaines successives ne peuvent donc pas faire enfler le
+  // stockage indéfiniment (ce qui rejoindrait le point n°2 de la critique, saturation). Le coût est
+  // borné à UNE copie du jeu de données, quel que soit le nombre d'incidents.
+  it("une seule quarantaine à la fois : un second incident écrase le premier, jamais d'accumulation", async () => {
+    window.localStorage.setItem(CLE_STOCKAGE, CONTENU_REFUSE_PAR_LE_SCHEMA);
+    await reinitialiserDonnees();
+
+    const secondIncident = '{"encore casse":true}';
+    window.localStorage.setItem(CLE_STOCKAGE, secondIncident);
+    await reinitialiserDonnees();
+
+    expect(window.localStorage.getItem(CLE_QUARANTAINE)).toBe(secondIncident);
+    const clesQuarantaine = Object.keys(window.localStorage).filter((c) => c.includes("illisible"));
+    expect(clesQuarantaine).toEqual([CLE_QUARANTAINE]);
+  });
 });

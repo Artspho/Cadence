@@ -140,8 +140,22 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
   `components/EcranDonneesIllisibles.tsx` : téléchargement du brut et zone copiable **en premier**,
   détail technique replié (il nomme le champ fautif, ex. `contrats.0.type : Invalid enum value…`),
   restauration de la copie de secours, et « repartir de zéro » — seule action autorisée à écrire —
-  gaté par une case à cocher décochée par défaut. Le contenu illisible part en quarantaine
-  (`cadence:v1:donnees.illisible`) avant d'être remplacé.
+  gaté par une case à cocher décochée par défaut.
+  **Quarantaine — mécanisme de sûreté supplémentaire, hors du principe initialement validé, gardé
+  après arbitrage de Benoît le 03/08/2026.** *Quand* : uniquement au clic sur « repartir de zéro »,
+  donc après que l'utilisateur a coché la case — jamais à la lecture, jamais automatiquement.
+  *Quoi* : le contenu illisible est recopié tel quel sous la clé `cadence:v1:donnees.illisible` juste
+  avant que `cadence:v1:donnees` soit remplacée par un état vide. *Pourquoi* : le téléchargement du
+  brut est proposé en premier sur l'écran, mais rien ne garantit que l'utilisateur l'ait fait — la
+  quarantaine est le dernier filet derrière le seul geste destructeur de tout le correctif.
+  ⚠️ Ne pas confondre avec l'issue de lecture `illisible` : celle-là est un DIAGNOSTIC qui interdit
+  d'écrire, celle-ci est un EFFET DE BORD d'écriture au seul moment où écrire est autorisé.
+  **Clé unique et fixe, écrasée à chaque incident** — jamais une clé horodatée par incident : le coût
+  reste borné à UNE copie du jeu de données quel que soit le nombre d'incidents, ce qui évite de
+  transformer ce filet en cause de saturation. Garanti par un test dédié (« une seule quarantaine à
+  la fois »). **Dette résiduelle, rattachée au point n°2** : cette clé n'est jamais purgée ensuite —
+  après un « repartir de zéro », une copie du jeu de données reste indéfiniment dans le navigateur.
+  Coût borné mais permanent, à traiter avec le reste du point n°2 (que purger, dans quel ordre).
   **Copie de secours** : `cadence:v1:donnees.backup` reçoit la version précédant chaque écriture
   réussie. Écrite APRÈS le succès de l'écriture principale (son propre échec ne compromet jamais la
   donnée de record), et **jamais consommée par une réécriture à l'identique** — sans quoi chaque
