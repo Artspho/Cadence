@@ -3,6 +3,7 @@ import type { Contrat, DecompteHeuresResultat, Profil, Territoire, TypeContrat, 
 import type { FranceTravailConfig } from "../config/franceTravailConfig";
 import { heuresBrutesContrat } from "../engine/decompteHeures";
 import { champAEffacerEnModeExclusif, detecterActiviteMixteInitiale } from "../lib/activiteMixteFormulaire";
+import { MESSAGE_CONTRAT_DEUX_MOIS, contratSurPlusieursMois } from "../lib/contratUnSeulMois";
 import { ContractFormRecurrent } from "./ContractFormRecurrent";
 
 interface ContractFormProps {
@@ -55,6 +56,10 @@ export function ContractForm({ profil, config, decompteActuel, valeurInitiale, o
   // l'utilisateur n'a pas explicitement modifié `dateDebut` — cf. changerDateFin ci-dessous.
   const dateFinEffective = date || new Date().toISOString().slice(0, 10);
   const dateDebutInvalide = Boolean(dateDebut) && dateDebut > dateFinEffective;
+  // Un contrat ne couvre jamais deux mois civils (cf. lib/contratUnSeulMois.ts) : on bloque ici pour
+  // EXPLIQUER avant de refuser, mais la règle est réellement tenue par le garde d'App.tsx — ce
+  // formulaire n'est qu'une des portes d'écriture (import de bulletin, revue IA, édition en liste).
+  const contratADeuxMois = contratSurPlusieursMois({ dateDebut: dateDebut || dateFinEffective, date: dateFinEffective });
 
   function changerDateFin(nouvelleDate: string) {
     if (dateDebut === date || dateDebut === "") {
@@ -130,7 +135,7 @@ export function ContractForm({ profil, config, decompteActuel, valeurInitiale, o
 
   function soumettre(e: React.FormEvent) {
     e.preventDefault();
-    if (dateDebutInvalide) return;
+    if (dateDebutInvalide || contratADeuxMois) return;
     onValider({
       dateDebut: dateDebut || brouillon.date,
       date: brouillon.date,
@@ -218,6 +223,7 @@ export function ContractForm({ profil, config, decompteActuel, valeurInitiale, o
         </div>
       </div>
       {dateDebutInvalide && <p className="text-xs rounded-lg px-3 py-2 bg-amber/10 text-amber">La date de début doit être avant ou égale à la date de fin.</p>}
+      {contratADeuxMois && <p className="text-xs rounded-lg px-3 py-2 bg-amber/10 text-amber">{MESSAGE_CONTRAT_DEUX_MOIS}</p>}
 
       <div>
         <span className="block text-xs uppercase tracking-[.03em] text-muted mb-1">Territoire</span>
@@ -316,7 +322,7 @@ export function ContractForm({ profil, config, decompteActuel, valeurInitiale, o
       {alerteCachets && <p className="text-xs rounded-lg px-3 py-2 bg-amber/10 text-amber">{alerteCachets}</p>}
 
       <div className="flex gap-2 pt-2">
-        <button type="submit" disabled={dateDebutInvalide} className="flex-1 bg-mint text-bg font-medium rounded-lg py-2.5 disabled:opacity-40 disabled:cursor-not-allowed">
+        <button type="submit" disabled={dateDebutInvalide || contratADeuxMois} className="flex-1 bg-mint text-bg font-medium rounded-lg py-2.5 disabled:opacity-40 disabled:cursor-not-allowed">
           Enregistrer le contrat
         </button>
         {onAnnuler && (

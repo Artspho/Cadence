@@ -168,6 +168,15 @@ export function calculerDecompteHeures(
     // cachets, cf. heuresBrutesContrat ci-dessus) doit compter ses cachets pour l'alerte
     // plafond_cachets_mois même si typeRemuneration vaut "heures" pour ce contrat.
     if (contrat.territoire !== "eee_suisse_uk" && contrat.nbCachets != null && contrat.type !== "enseignement" && contrat.type !== "formation") {
+      // `moisCle(contrat.date)` (mois de FIN) est exact PARCE QU'un contrat ne couvre plus deux mois
+      // civils : la règle est imposée à l'écriture depuis le 03/08/2026 (lib/contratUnSeulMois.ts),
+      // date de début et date de fin tombent donc dans le même mois. C'est ce qui clôt le point 7 de
+      // docs/critique_2026-08-03.md : l'alerte « 30 cachets en mars » sur une réalité de 15 + 15
+      // venait d'un contrat à cheval, une saisie qui ne peut plus entrer.
+      // Réserve assumée : un contrat à cheval ENREGISTRÉ avant cette règle serait encore compté sur
+      // son seul mois de fin ici. Aucun cas dans les données de Benoît (vérifié le 03/08/2026 sur les
+      // 62 contrats de docs/cadence-fusion-2026-08-03.json : zéro contrat à cheval) — et surtout, la
+      // règle ne doit pas s'appliquer à la lecture, qui rejetterait des données légitimes (devoir n°1).
       const cle = moisCle(contrat.date);
       cachetsParMois[cle] = (cachetsParMois[cle] ?? 0) + contrat.nbCachets;
     }

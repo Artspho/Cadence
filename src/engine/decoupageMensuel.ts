@@ -26,6 +26,12 @@ export interface RepartitionMensuelle {
  * (heures/salaire totaux − déjà distribués) plutôt qu'un arrondi indépendant, pour garantir que
  * la somme des mois égale toujours exactement le total du contrat (jamais de perte ni de surplus
  * par accumulation d'arrondis).
+ *
+ * ⚠️ Depuis le 03/08/2026, un contrat ne peut plus être ENREGISTRÉ à cheval sur deux mois civils
+ * (lib/contratUnSeulMois.ts) : pour toute saisie nouvelle, cette fonction renvoie donc un seul mois
+ * portant le total. La répartition multi-mois n'est PAS pour autant du code mort — elle reste le
+ * traitement correct des contrats déjà enregistrés avant la règle, qui doivent continuer à se lire
+ * sans être rejetés (devoir sacré n°1). Ne pas la supprimer sur la foi de la nouvelle contrainte.
  */
 /**
  * Heures apportées par un lot de contrats sur une fenêtre de dates ARBITRAIRE (pas forcément un mois

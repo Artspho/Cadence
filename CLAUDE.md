@@ -143,15 +143,29 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 >    d'URL (`/?maj=<hash>`). Avant de conclure « le correctif ne marche pas », vérifier lequel des
 >    deux est en cause.
 >
-> **▶ Prochaine action — chantier 4 : l'honnêteté d'affichage, le lot le plus proche de ce qui vient
-> d'être fait.** Dans l'ordre suggéré :
-> - **7** (🔴) — fausse alerte « plafond de cachets dépassé ». Tous les cachets d'un contrat sont
->   attribués au mois de FIN (`decompteHeures.ts:170-173`), donc une tournée à cheval sur deux mois
->   peut annoncer « 30 cachets en mars » là où la réalité est 15 + 15. Le correctif existe déjà dans le
->   dépôt et n'est pas branché ici : `decoupageMensuel.ts`, `repartirContratParMois`.
+> **▶ Chantier 4 en cours — l'honnêteté d'affichage.** Point **7 clos** : règle d'intégrité tranchée
+> par Benoît — **un contrat ne couvre jamais deux mois civils**, chaque mois se déclarant séparément à
+> France Travail. Imposée à l'écriture en un point unique (`lib/contratUnSeulMois.ts`), branchée sur
+> les trois fonctions d'écriture d'`App.tsx` qui sont le seul passage commun aux quatre portes
+> (formulaire, édition en liste, import de bulletin, revue d'extraction IA), **jamais à la lecture**.
+> Reste à faire :
 > - **23** (🔴) — l'import est inaccessible avant d'avoir créé un profil : trou du chemin de
 >   récupération (devoir n°1), correctif d'UI seul.
 > - **9** (🔴), **13**, **14** — consentement inexact et les deux autres points d'affichage.
+>
+> ⚠️ **Point 26 ouvert, découvert en corrigeant le 7 — à instruire avant de coder** : le plafond de
+> 28 cachets/mois ne plafonne aucun décompte (il ne sert qu'à trois avertissements), alors que
+> `decoupageMensuel.ts:8-9` affirme qu'il « gouverne l'affiliation aux 507 h ». Si c'est le commentaire
+> qui a raison, l'app surcompte les heures d'un mois chargé et peut afficher un faux « Sécurité ».
+> Non sourcé. Même zone d'ombre que `docs/SPEC.md:534` (proratisation sur mois partiel).
+>
+> **⏸ Bloqués — pas par le code, ne pas les ouvrir en croyant coder** : **11** (contradiction Unédic /
+> France Travail sur le plafond ARE — « rien à faire dans le code d'ici là », il faut une réponse d'un
+> organisme) · **12** (attribution d'un contrat à son seul mois de fin pour le salaire de référence :
+> sa fiche dit « la règle officielle peut très bien être *à la date de fin*, **ne rien changer sans
+> source** » — c'est une recherche, pas une tâche de code ; sorti du chantier 4 le 03/08) · **12 ter**
+> (il manque les contrats réels depuis le 24/03/2025 et les justificatifs de déclaration mensuelle —
+> c'est Benoît qui débloque) · **18**, **19**, **20** et désormais **26** (valeurs à sourcer).
 >
 > **▶ Ensuite — sécurité des entrées** : **8** (endpoint IA ouvert), **10** (JSON non borné), reste
 > du **2** (échec d'écriture silencieux, filet minimal seulement).

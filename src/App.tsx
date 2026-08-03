@@ -50,6 +50,7 @@ import { perimetreBloquant, profilHorsPerimetre } from "./lib/profilHorsPerimetr
 import { AvertissementContradictionHorsA10 } from "./components/AvertissementContradictionHorsA10";
 import { centreAlertesPourEcran } from "./lib/alertesAffichage";
 import { validerProfilPourEcriture } from "./lib/coherenceProfil";
+import { validerContratsPourEcriture } from "./lib/contratUnSeulMois";
 
 const dateDuJour = new Date().toISOString().slice(0, 10);
 
@@ -70,6 +71,11 @@ export default function App() {
   // vide, sans aucun clic de l'utilisateur.
   const [chargement, setChargement] = useState<ResultatChargement | null>(null);
   const [erreurSauvegarde, setErreurSauvegarde] = useState<string | null>(null);
+  // Écriture de contrat refusée (contrat à cheval sur deux mois, cf. lib/contratUnSeulMois.ts).
+  // Remonté ici et non dans un composant : le refus peut venir du formulaire, de l'import de
+  // bulletin ou de la revue d'extraction IA — le bandeau doit être visible depuis n'importe quel
+  // onglet, comme celui de `erreurSauvegarde`. Un rejet silencieux serait pire que le bug d'origine.
+  const [refusEcriture, setRefusEcriture] = useState<string | null>(null);
   const inputImportRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -184,7 +190,23 @@ export default function App() {
 
   const profil = donnees.profil;
 
+  /**
+   * Refuse un contrat couvrant deux mois civils (cf. lib/contratUnSeulMois.ts pour la règle et son
+   * pourquoi). Placé ici, sur les fonctions d'écriture, et NON dans un schéma Zod : celui de lecture
+   * rendrait illisible un fichier légitime, celui d'écriture valide le jeu de données entier et
+   * bloquerait toute sauvegarde à cause d'un seul contrat hérité (devoir sacré n°1 dans les deux cas).
+   * Ces trois fonctions sont le seul point de passage commun à toutes les portes d'écriture :
+   * ContractForm, ContractList (édition), ImportBulletins, RevueExtraction (IA).
+   * Retourne `false` et affiche le bandeau quand le contrat est refusé — jamais un rejet silencieux.
+   */
+  function refuserSiDeuxMois(contrats: Omit<Contrat, "id">[]): boolean {
+    const verdict = validerContratsPourEcriture(contrats);
+    setRefusEcriture(verdict.ok ? null : verdict.message);
+    return !verdict.ok;
+  }
+
   function ajouterContrat(partiel: Omit<Contrat, "id">) {
+    if (refuserSiDeuxMois([partiel])) return;
     setDonnees((d) => (d ? { ...d, contrats: [...d.contrats, creerContrat(partiel)] } : d));
   }
 
@@ -201,6 +223,7 @@ export default function App() {
    * fonction ne fait que remplacer, aucune règle métier ici (même esprit que ajouterContrat).
    */
   function modifierContrat(id: string, nouveauContrat: Omit<Contrat, "id">) {
+    if (refuserSiDeuxMois([nouveauContrat])) return;
     setDonnees((d) => (d ? { ...d, contrats: d.contrats.map((c) => (c.id === id ? { ...nouveauContrat, id } : c)) } : d));
   }
 
@@ -227,6 +250,9 @@ export default function App() {
   }
 
   function ajouterContratsRecurrents(contrats: Contrat[]) {
+    // Le générateur (lib/contratRecurrent.ts) cale déjà chaque contrat sur un mois civil ; ce garde
+    // est là pour que la règle ne dépende pas de cette promesse, et tienne si le générateur change.
+    if (refuserSiDeuxMois(contrats)) return;
     setDonnees((d) => (d ? { ...d, contrats: [...d.contrats, ...contrats] } : d));
   }
 
@@ -310,6 +336,23 @@ export default function App() {
         <div role="alert" className="bg-red/15 text-red px-6 py-3 text-sm">
           <strong className="font-medium">Tes dernières modifications n'ont PAS été enregistrées.</strong> Le stockage de ce navigateur a refusé l'écriture ({erreurSauvegarde}). Utilise « Exporter
           mes données » sans tarder pour ne rien perdre, puis libère de l'espace ou change de navigateur.
+        </div>
+      )}
+      {/* Contrat refusé parce qu'il couvre deux mois civils (cf. lib/contratUnSeulMois.ts). Même motif
+          que le bandeau de sauvegarde ci-dessus, mais surtout PAS le même texte : ce sont deux échecs
+          de nature différente, et les confondre dirait à l'utilisateur une raison fausse (le devoir
+          sacré n°2 vaut aussi pour « dire la bonne raison », pas seulement pour les chiffres).
+          « Refusé » et non « non enregistré » : Cadence a délibérément décliné une saisie, le stockage
+          n'a rien à voir là-dedans. Ambre et refermable, là où le bandeau de stockage est rouge et
+          permanent : ici rien n'est en péril, il y a juste une saisie à refaire en deux fois. */}
+      {refusEcriture !== null && (
+        <div role="alert" className="bg-amber/15 text-amber px-6 py-3 text-sm flex items-start justify-between gap-4">
+          <span>
+            <strong className="font-medium">Contrat refusé.</strong> {refusEcriture} Aucune de tes données existantes n'a été modifiée.
+          </span>
+          <button type="button" onClick={() => setRefusEcriture(null)} className="text-amber/70 hover:text-amber shrink-0" aria-label="Fermer l'avertissement">
+            ✕
+          </button>
         </div>
       )}
       <TopBar

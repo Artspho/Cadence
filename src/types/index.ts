@@ -14,8 +14,13 @@ export type Territoire = "france" | "eee_suisse_uk"; // EEE : 6 h/jour (artistes
 
 export interface Contrat {
   id: string;
-  // Plage couverte par le contrat — nécessaire pour répartir heures/salaire au prorata des jours
-  // calendaires quand le contrat chevauche deux mois civils (cf. engine/decoupageMensuel.ts).
+  // Plage couverte par le contrat. Depuis le 03/08/2026, un contrat ne peut plus couvrir deux mois
+  // civils À L'ÉCRITURE (cf. lib/contratUnSeulMois.ts : chaque mois se déclare séparément à France
+  // Travail) — `dateDebut` sert donc désormais à situer le contrat DANS son mois, ce dont le mois
+  // d'ouverture partiel a besoin (engine/decoupageMensuel.ts, heuresContratsSurFenetre : droits
+  // ouverts le 18/01 → seuls les jours du 18 au 31 comptent). La répartition multi-mois de
+  // `repartirContratParMois` reste, elle, nécessaire pour les contrats DÉJÀ enregistrés : la règle ne
+  // s'applique jamais à la lecture, sous peine de rendre illisibles des données légitimes (devoir n°1).
   // Migration silencieuse à la lecture pour un contrat enregistré avant l'ajout de ce champ :
   // dateDebut = date (contrat traité comme un contrat d'un seul jour), cf. localStorageAdapter.ts.
   dateDebut: string; // ISO (premier jour du contrat)
