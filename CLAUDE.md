@@ -1730,6 +1730,25 @@ de situation ✅ — l'échec semble propre à ce format de bulletin, pas au can
   par `raison` dans `content/renouvellementAnticipe.ts` : le silence ne couvre plus jamais un « on ne
   sait pas ». 5 tests dédiés, dont un garde-fou qui échouera le jour où `ecarte` deviendra atteignable
   (signal qu'il faudra écrire un vrai cas « écarté », pas supprimer le test). Détail : `docs/validation.md`.
+  **✅ Verrou 1 levé le 03/08/2026 (même journée) — franchise salaires DÉCLARATIVE.** Le SJM de la
+  formule est tranché par la source primaire (guide FT éd. juillet 2026, p.14, encadré « Légendes des
+  paramètres ») : SJM = SR / (NHTM/10), le SJM habituel, pas une grandeur distincte. Le piège est
+  ailleurs — **le premier facteur utilise le PRC (tous régimes), le second le SR (annexes 8/10)**, deux
+  numérateurs différents ; `calculerFranchiseSalaires` le faisait déjà correctement, il n'y avait donc
+  aucune formule à écrire. Choix **déclaratif** (`Profil.ouvertureDroits.franchiseSalairesTotale?:
+  number`) et non calculé : le PRC exige toutes les rémunérations tous régimes confondus, hors de
+  portée de Cadence, et tous les autres paramètres d'ouverture sont déjà déclarés depuis la
+  notification. `undefined` = inconnu, `0` = aucune franchise notifiée — **deux états jamais
+  confondus**, c'est la distinction qui permet de conclure. Optionnel, aucune migration (devoir sacré
+  n°1, round-trip testé). **`RisqueTropPercu.ecarte` est désormais atteignable** ; le garde-fou
+  « inatteignable » a été remplacé par de vrais cas, pas supprimé.
+  ⚠️ `Notification_admission_ARE_20260205_2.pdf` **n'est pas dans le projet** — le document réel
+  (`Notification admission ARE 20260205.pdf`, cache Outlook) ne porte **aucun PRC** ni aucune ligne de
+  franchise salaires, cohérent avec le calcul (≈ 0). Il confirme la règle du trop-perçu (3ᵉ source
+  indépendante) et la convention du 15/11/2024, mais reste muet sur brute/nette.
+  **Verrou 2 (brut/net) toujours ouvert** : argument en faveur du brut consigné dans
+  `docs/validation.md` comme **raisonnement, pas source qui tranche**. Ne bloque rien tant qu'aucun
+  montant n'est câblé.
 - ⬜ Module congés spectacle
 
 ---

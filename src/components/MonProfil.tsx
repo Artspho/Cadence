@@ -405,6 +405,11 @@ function MonIndemnisationEnCours({
   const [dateOuverture, setDateOuverture] = useState(ouverture?.dateOuverture ?? "");
   const [franchiseCPTotale, setFranchiseCPTotale] = useState(ouverture?.franchiseCPTotale ?? 0);
   const [delaiAttenteInitial, setDelaiAttenteInitial] = useState(ouverture?.delaiAttenteInitial ?? 7);
+  // Chaîne et non nombre, délibérément : "" (non renseigné) et "0" (aucune franchise notifiée) sont
+  // deux états DIFFÉRENTS, et c'est cette différence qui permet au verdict de trop-perçu de conclure
+  // « écarté » au lieu de « indéterminé » (cf. engine/renouvellementAnticipe.ts, RisqueTropPercu).
+  // Un `?? 0` comme pour la franchise CP ci-dessus les écraserait l'un sur l'autre.
+  const [franchiseSalairesTotale, setFranchiseSalairesTotale] = useState(ouverture?.franchiseSalairesTotale?.toString() ?? "");
   const [dateLimiteIndemnisation, setDateLimiteIndemnisation] = useState(ouverture?.dateLimiteIndemnisation ?? "");
   // Mémorise la dernière date acceptée pour ne pas réafficher la même suggestion en boucle après un
   // clic — mais la refaire apparaître si `dateLimiteIndemnisation` change vers une autre valeur.
@@ -433,6 +438,7 @@ function MonIndemnisationEnCours({
         // quel, jamais écrasé par ce formulaire qui ne le touche pas.
         tauxPrelevementSourceHistorique: ouverture?.tauxPrelevementSourceHistorique,
         dateLimiteIndemnisation: dateLimiteIndemnisation.trim() === "" ? undefined : dateLimiteIndemnisation,
+        franchiseSalairesTotale: franchiseSalairesTotale.trim() === "" ? undefined : Math.max(0, Number(franchiseSalairesTotale)),
       },
     });
     if (!resultat.ok) {
@@ -490,6 +496,28 @@ function MonIndemnisationEnCours({
             className="w-full bg-surface-2 border border-line rounded-lg px-3 py-2 text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-mint"
           />
           <p className="text-xs text-faint mt-1">Sur ta notification, rubrique « Franchises » → « Franchise congés payés totale ». Pas le solde restant — le total initial, ex. « 18 jours ».</p>
+        </div>
+
+        <div>
+          <label className="block text-xs uppercase tracking-[.03em] text-muted mb-2" htmlFor="profil-franchise-salaires-totale">
+            Franchise salaires (total)
+          </label>
+          <input
+            id="profil-franchise-salaires-totale"
+            type="number"
+            min={0}
+            value={franchiseSalairesTotale}
+            onChange={(e) => setFranchiseSalairesTotale(e.target.value)}
+            placeholder="non renseignée"
+            className="w-full bg-surface-2 border border-line rounded-lg px-3 py-2 text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-mint"
+          />
+          {/* Champ déclaratif, jamais recalculé : le total exige les salaires de TOUS les régimes, que
+              Cadence ne suit pas (cf. types/index.ts). Laisser vide ≠ saisir 0 — d'où la consigne
+              explicite, sans quoi personne ne penserait à écrire un zéro. */}
+          <p className="text-xs text-faint mt-1">
+            Sur ta notification, rubrique « Franchises » → « Franchise salaires totale ». <strong>Beaucoup de notifications n'en mentionnent aucune : dans ce cas, saisis 0.</strong> Laisser vide
+            signifie « je ne sais pas », et Cadence ne pourra pas écarter le risque de trop-perçu lors d'un renouvellement anticipé.
+          </p>
         </div>
 
         <div>

@@ -136,6 +136,26 @@ export interface Profil {
     // d'affichage) : cf. calculerSerieDepuisContrats, engine/indemnisationMensuelle.ts — aucun mois
     // au-delà n'est simulé, jamais montré comme s'il faisait partie de droits qui n'existent plus.
     dateLimiteIndemnisation?: string;
+    // Franchise SALAIRES totale, en jours — chiffre exact de la notification France Travail, jamais
+    // recalculé par Cadence (03/08/2026, levée du verrou 1 du trop-perçu, cf.
+    // engine/renouvellementAnticipe.ts et docs/validation.md).
+    //
+    // Pourquoi DÉCLARÉ et non calculé, alors que la formule est sourcée et déjà implémentée
+    // (`calculerFranchiseSalaires`) : son premier facteur exige les « salaires de la période de
+    // référence », définis par le guide (éd. juillet 2026, p.14) comme « le total de vos
+    // rémunérations brutes non plafonnées sur la période QUEL QUE SOIT LE RÉGIME DE L'ACTIVITÉ ».
+    // Cadence ne suit que les contrats Annexe 10 ; `salairesHorsAnnexe10PRA` est un complément
+    // optionnel, admis comme non fiable (cf. `sousEstimeeHorsA10`). Un total recalculé pourrait donc
+    // diverger de la notification, qui est la pièce qui fait foi — même doctrine que
+    // `franchiseCPTotale` et `delaiAttenteInitial` juste au-dessus : le moteur consomme un fait
+    // déclaré, il ne le devine pas.
+    //
+    // `undefined` = NON RENSEIGNÉ (inconnu) ; `0` = notification consultée, AUCUNE franchise
+    // salaires notifiée. La distinction est signifiante et ne doit jamais être aplatie : c'est elle
+    // qui permet à `RisqueTropPercu` de conclure « écarté » plutôt que « indéterminé ». Un vrai cas
+    // observé (notification du 05/02/2026, cf. docs/validation.md) ne porte aucune ligne de
+    // franchise salaires — `0` est donc un cas courant, pas théorique.
+    franchiseSalairesTotale?: number;
   };
 }
 
@@ -347,7 +367,12 @@ export interface MoisIndemnisationEntree {
 //   Annexe 10, potentiellement sous-estimé).
 export type FranchiseSalairesResultat =
   | { valeur: null; avertissement: "franchise_salaires_non_certifiee" }
-  | { valeur: number; totalNonVerifie: true; sousEstimeeHorsA10: boolean };
+  | { valeur: number; totalNonVerifie: true; sousEstimeeHorsA10: boolean }
+  // Total DÉCLARÉ depuis la notification France Travail (ouvertureDroits.franchiseSalairesTotale),
+  // pas recalculé : `totalNonVerifie: false` et `sousEstimeeHorsA10: false` par construction — c'est
+  // le chiffre de la pièce qui fait foi, il ne peut pas être sous-estimé par un PRA incomplet.
+  // Ajouté le 03/08/2026 (levée du verrou 1 du trop-perçu) — cf. Profil.ouvertureDroits.
+  | { valeur: number; totalNonVerifie: false; sousEstimeeHorsA10: false; declaree: true };
 
 // Choisi une seule fois par l'utilisateur : à partir de quel mois le tableau mensuel devient
 // visible (cf. RevenusMensuels.tsx). Ne porte plus aucun solde depuis le 2026-07-25 — l'état

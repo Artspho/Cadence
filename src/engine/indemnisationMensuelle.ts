@@ -273,9 +273,18 @@ export function calculerSerieDepuisContrats(
   // Franchise salaires : calculée une seule fois, au démarrage de la série (c'est un TOTAL fixé à
   // l'ouverture des droits, pas une valeur qui varie mois par mois). `valeur: null` -> restante à 0,
   // aucune application (devoir n°2) — cf. quotaMensuelSalaires, qui donne alors un quota de 0.
-  const franchiseSalaires: FranchiseSalairesResultat = srSjmPourFranchiseSalaires
-    ? calculerFranchiseSalaires(srSjmPourFranchiseSalaires.srContrats, srSjmPourFranchiseSalaires.sjm, profil, config)
-    : FRANCHISE_SALAIRES_NON_CERTIFIEE;
+  // Ordre de priorité (03/08/2026) : le total DÉCLARÉ depuis la notification l'emporte toujours sur
+  // un total recalculé — c'est la pièce qui fait foi, et le calcul ne peut de toute façon pas
+  // reconstituer fidèlement les « salaires de la période de référence, quel que soit le régime »
+  // (cf. Profil.ouvertureDroits.franchiseSalairesTotale). `0` déclaré est une VALEUR, pas une
+  // absence : `?? undefined` serait faux ici, d'où le test explicite sur `undefined`.
+  const totalDeclare = ouvertureDroits.franchiseSalairesTotale;
+  const franchiseSalaires: FranchiseSalairesResultat =
+    totalDeclare !== undefined
+      ? { valeur: totalDeclare, totalNonVerifie: false, sousEstimeeHorsA10: false, declaree: true }
+      : srSjmPourFranchiseSalaires
+        ? calculerFranchiseSalaires(srSjmPourFranchiseSalaires.srContrats, srSjmPourFranchiseSalaires.sjm, profil, config)
+        : FRANCHISE_SALAIRES_NON_CERTIFIEE;
   const dureeDroitsMois = profil.dureeDroitsMois ?? 12;
 
   const soldeInitial: SoldeIndemnisation = {

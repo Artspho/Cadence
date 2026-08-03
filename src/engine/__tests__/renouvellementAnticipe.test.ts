@@ -208,7 +208,7 @@ describe("tropPercu — cas C1 (franchise CP non épuisée) et son complémentai
   // « les franchises congés payés ET salaires totales »). Le verdict correct est « indéterminé ».
   it("complémentaire — demande ~4 mois après l'ouverture : franchise CP épuisée, mais verdict INDÉTERMINÉ (franchise salaires inconnue), jamais « écarté »", () => {
     const r = calculerRenouvellementAnticipe([], [], profilBase, franceTravailConfig, ancienPetiteFranchise, "2026-05-15");
-    expect(r.tropPercu).toEqual({ etat: "indetermine", raison: "franchise_salaires_non_calculee" });
+    expect(r.tropPercu).toEqual({ etat: "indetermine", raison: "franchise_salaires_inconnue" });
   });
 
   it("demande dans le mois même de l'ouverture : aucun mois complet observable, verdict INDÉTERMINÉ (jamais « avéré » par défaut, ni « écarté »)", () => {
@@ -216,18 +216,45 @@ describe("tropPercu — cas C1 (franchise CP non épuisée) et son complémentai
     expect(r.tropPercu).toEqual({ etat: "indetermine", raison: "historique_mensuel_insuffisant" });
   });
 
-  // Garde-fou structurel du correctif : `ecarte` exige que les DEUX franchises soient prouvées
-  // épuisées. La franchise salaires n'étant jamais calculée (verrou 1, cf. renouvellementAnticipe.ts),
-  // cet état est INATTEIGNABLE aujourd'hui — et c'est le comportement voulu, pas un manque. Ce test
-  // tombera le jour où la franchise salaires sera câblée : ce sera alors le signal qu'il faut le
-  // remplacer par un vrai cas « écarté », pas le supprimer.
-  it("aucun scénario ne produit « écarté » tant que la franchise salaires n'est pas calculée", () => {
+  // Ex-garde-fou « ecarte inatteignable » (03/08/2026, matin) : il vérifiait qu'aucun scénario ne
+  // produisait `ecarte` tant que la franchise salaires n'était pas disponible, en annonçant qu'il
+  // tomberait une fois le verrou 1 levé. Le verrou est levé (champ déclaratif
+  // `ouvertureDroits.franchiseSalairesTotale`) : remplacé ici par les vrais cas « écarté », comme
+  // annoncé. La garantie de fond est conservée par le premier test ci-dessous.
+  it("franchise salaires NON déclarée : jamais « écarté », quel que soit le scénario", () => {
     const fcts = ["2026-01-25", "2026-03-01", "2026-05-15", "2026-08-01", "2026-11-30"];
     const etats = fcts.map((fct) => calculerRenouvellementAnticipe([], [], profilBase, franceTravailConfig, ancienPetiteFranchise, fct).tropPercu.etat);
 
     expect(etats).not.toContain("ecarte");
     // …et jamais un silence non plus : chaque scénario porte un état explicite que l'écran sait rendre.
     for (const etat of etats) expect(["avere", "indetermine"]).toContain(etat);
+  });
+
+  // Cas réel : la notification du 05/02/2026 (docs/validation.md) ne porte AUCUNE ligne de franchise
+  // salaires — l'utilisateur saisit donc 0. Les deux franchises sont alors prouvées épuisées et le
+  // risque peut enfin être écarté honnêtement.
+  it("franchise salaires déclarée à 0 + franchise CP épuisée : risque ÉCARTÉ", () => {
+    const ancien: AncienDroit = { ...ancienPetiteFranchise, franchiseSalairesTotale: 0 };
+    const r = calculerRenouvellementAnticipe([], [], profilBase, franceTravailConfig, ancien, "2026-05-15");
+    expect(r.tropPercu).toEqual({ etat: "ecarte" });
+  });
+
+  it("franchise salaires déclarée à 0 mais franchise CP encore due : reste AVÉRÉ (la CP suffit à établir le risque)", () => {
+    const ancien: AncienDroit = { ...ancienPetiteFranchise, franchiseSalairesTotale: 0 };
+    const r = calculerRenouvellementAnticipe([], [], profilBase, franceTravailConfig, ancien, "2026-03-01");
+    expect(r.tropPercu).toEqual({ etat: "avere" });
+  });
+
+  it("franchise salaires déclarée à 40 j (répartie sur 8 mois) : encore due bien après l'épuisement de la CP, donc AVÉRÉ", () => {
+    const ancien: AncienDroit = { ...ancienPetiteFranchise, franchiseSalairesTotale: 40 };
+    const r = calculerRenouvellementAnticipe([], [], profilBase, franceTravailConfig, ancien, "2026-05-15");
+    expect(r.tropPercu).toEqual({ etat: "avere" });
+  });
+
+  it("déclarer la franchise salaires ne fabrique jamais un « écarté » prématuré : sans mois complet observable, on reste INDÉTERMINÉ", () => {
+    const ancien: AncienDroit = { ...ancienPetiteFranchise, franchiseSalairesTotale: 0 };
+    const r = calculerRenouvellementAnticipe([], [], profilBase, franceTravailConfig, ancien, "2026-01-25");
+    expect(r.tropPercu).toEqual({ etat: "indetermine", raison: "historique_mensuel_insuffisant" });
   });
 
   // Garde-fou de sourçage (03/08/2026) : la formule officielle du montant EXISTE et est citée dans
@@ -248,12 +275,12 @@ describe("tropPercu — cas C1 (franchise CP non épuisée) et son complémentai
     }
   });
 
-  // Preuve du fait sur lequel repose tout le correctif : dans ce chemin, `franchiseSalairesRestante`
+  // Preuve du fait sur lequel repose tout le correctif : SANS total déclaré, `franchiseSalairesRestante`
   // vaut 0 parce que le TOTAL est absent (`valeur: null` = franchise_salaires_non_certifiee), pas
   // parce que la franchise serait consommée. C'est exactement pour ça que `evaluerRisqueTropPercu`
-  // refuse de lire ce 0 comme une preuve et renvoie `indetermine`. Le jour où la franchise salaires
-  // sera câblée, ce test doit être réécrit (le 0 voudra alors dire quelque chose), pas contourné.
-  it("le 0 de franchiseSalairesRestante est une absence d'information, pas une franchise épuisée", () => {
+  // refuse de lire ce 0 comme une preuve et renvoie `indetermine`. Le test suivant montre le
+  // contraste : avec un total déclaré, le même 0 devient une information exploitable.
+  it("sans total déclaré, le 0 de franchiseSalairesRestante est une absence d'information, pas une franchise épuisée", () => {
     const serie = calculerSerieDepuisContrats(
       { ...profilBase, ouvertureDroits: { dateOuverture: ancienPetiteFranchise.dateOuverture, franchiseCPTotale: 6, delaiAttenteInitial: 7 } },
       { dateDepart: ancienPetiteFranchise.dateOuverture },
@@ -275,6 +302,36 @@ describe("tropPercu — cas C1 (franchise CP non épuisée) et son complémentai
       if (franchiseSalaires.valeur !== null) continue;
       expect(franchiseSalaires.avertissement).toBe("franchise_salaires_non_certifiee");
     }
+  });
+
+  // Contraste avec le test précédent : le total déclaré prend le pas sur tout calcul, et la série le
+  // consomme comme n'importe quelle franchise. `declaree: true` distingue ce chiffre d'un total
+  // recalculé — il vient de la notification, la pièce qui fait foi (cf. FranchiseSalairesResultat).
+  it("avec un total déclaré, la franchise salaires devient une vraie donnée consommée mois par mois", () => {
+    const serie = calculerSerieDepuisContrats(
+      { ...profilBase, ouvertureDroits: { dateOuverture: ancienPetiteFranchise.dateOuverture, franchiseCPTotale: 6, delaiAttenteInitial: 7, franchiseSalairesTotale: 16 } },
+      { dateDepart: ancienPetiteFranchise.dateOuverture },
+      [],
+      "2026-12-31",
+      franceTravailConfig,
+    );
+    expect(serie.calculable).toBe(true);
+    if (!serie.calculable) return;
+
+    const moisCalcules = serie.mois.filter((m) => m.calculable);
+    const premier = moisCalcules[0];
+    const dernier = moisCalcules[moisCalcules.length - 1];
+    expect(premier?.calculable && premier.franchiseSalaires).toEqual({ valeur: 16, totalNonVerifie: false, sousEstimeeHorsA10: false, declaree: true });
+    // Consommée puis épuisée sur la durée du droit — un vrai 0 cette fois, pas une absence.
+    expect(premier?.calculable && premier.soldeFin.franchiseSalairesRestante).toBeGreaterThan(0);
+    expect(dernier?.calculable && dernier.soldeFin.franchiseSalairesRestante).toBe(0);
+  });
+
+  // Devoir sacré n°1 : un profil enregistré avant l'ajout du champ n'a pas `franchiseSalairesTotale`.
+  // Il doit continuer de fonctionner exactement comme avant, sans migration.
+  it("profil sans le champ (données antérieures au 03/08/2026) : comportement inchangé, aucune migration requise", () => {
+    const r = calculerRenouvellementAnticipe([], [], profilBase, franceTravailConfig, ancienPetiteFranchise, "2026-05-15");
+    expect(r.tropPercu).toEqual({ etat: "indetermine", raison: "franchise_salaires_inconnue" });
   });
 });
 

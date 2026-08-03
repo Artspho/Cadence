@@ -173,6 +173,35 @@ exige les DEUX franchises prouvées épuisées : **inatteignable aujourd'hui, et
 pas ». 5 tests dédiés, dont un garde-fou qui échouera quand `ecarte` deviendra atteignable.
 619 tests verts, `tsc -b` propre.
 
+**17. Verrou 1 levé — franchise salaires déclarative, `ecarte` devient atteignable.** Le SJM de la
+formule de franchise salaires est tranché par la source primaire (guide FT éd. juillet 2026, p.14,
+encadré « Légendes des paramètres ») : c'est le SJM habituel bâti sur le **SR** (annexes 8/10), pas
+une grandeur distincte — le vrai piège est ailleurs, **le premier facteur de la formule utilise le PRC
+(tous régimes) et le second le SR (annexes 8/10 seulement)**, deux numérateurs différents.
+`calculerFranchiseSalaires` l'implémentait déjà correctement : il n'y avait aucune formule à écrire,
+seulement un **total à obtenir**.
+Décision : **déclaratif**, `Profil.ouvertureDroits.franchiseSalairesTotale?: number` — le PRC exige
+toutes les rémunérations tous régimes confondus, que Cadence ne suit pas, et tous les autres
+paramètres d'ouverture sont déjà déclarés depuis la notification. `undefined` = inconnu, `0` = aucune
+franchise notifiée : deux états jamais confondus, c'est ce qui permet de conclure. Champ optionnel,
+aucune migration (devoir sacré n°1, deux tests de round-trip dont un sur la survie du `0`).
+`RisqueTropPercu.ecarte` est désormais **atteignable** ; le garde-fou « inatteignable » a été remplacé
+par de vrais cas, comme annoncé quand il avait été écrit. 627 tests verts, `tsc -b` propre.
+
+⚠️ **Le fichier `Notification_admission_ARE_20260205_2.pdf` n'est pas dans le projet** (recherche sur
+le dépôt, le dossier OneDrive et le profil entier). Le document réellement disponible est
+`Notification admission ARE 20260205.pdf`, dans le cache de pièces jointes Outlook. Lu : **aucun PRC
+n'y figure**, et **aucune ligne de franchise salaires** — cohérent avec le calcul (≈ −24 → 0), premier
+point de confrontation réel de `calculerFranchiseSalaires`. Elle confirme en revanche la règle du
+trop-perçu (troisième source indépendante) et la convention applicable (15 novembre 2024), mais reste
+muette sur brute/nette.
+
+**Verrou 2 (brut/net) : toujours ouvert, hypothèse documentée.** Argument en faveur du brut (SR défini
+comme des salaires bruts ; l'AJ brute est la valeur figée à l'ouverture, l'AJ nette est recalculée à
+chaque versement) consigné dans `docs/validation.md` comme **raisonnement, pas source qui tranche**.
+Ne bloque rien tant que `RisqueTropPercu` reste sans montant — c'est le cas, et un garde-fou échoue si
+quelqu'un en câble un.
+
 ⚠️ **Contradiction de sources découverte sur le plafond ARE, postérieure aux points 13-14 —
 documentée, arbitrage pris, non bloquante** : le guide FT éd. **juillet 2026** (plus récent que
 l'édition mars 2026 citée dans `meta.source`) et plusieurs pages `cultureetspectacle.francetravail.fr`

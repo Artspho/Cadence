@@ -24,6 +24,38 @@ describe("exporterJSON / importerJSON — round-trip", () => {
     expect(reimporte).toEqual(donnees);
   });
 
+  // Champ ajouté le 03/08/2026 (levée du verrou 1 du trop-perçu). Deux garanties distinctes :
+  // le 0 déclaré doit SURVIVRE au round-trip (il signifie « aucune franchise notifiée », pas
+  // « champ vide » — l'aplatir en `undefined` ferait retomber le verdict de trop-perçu en
+  // « indéterminé »), et un export antérieur au champ doit s'importer sans perte (devoir sacré n°1).
+  it("round-trip : franchiseSalairesTotale à 0 survit — 0 déclaré et champ absent restent deux états distincts", () => {
+    const avecZero: DonneesApp = {
+      profil: profil({ ouvertureDroits: { dateOuverture: "2026-01-18", franchiseCPTotale: 10, delaiAttenteInitial: 7, franchiseSalairesTotale: 0 } }),
+      contrats: [],
+      periodes: [],
+      soldeIndemnisationDepart: null,
+      exercicesGeles: {},
+    };
+
+    const reimporte = importerJSON(exporterJSON(avecZero, DATE_EXPORT_FIXE));
+    expect(reimporte).toEqual(avecZero);
+    expect(reimporte.profil?.ouvertureDroits?.franchiseSalairesTotale).toBe(0);
+  });
+
+  it("importe sans perte un export antérieur à franchiseSalairesTotale (03/08/2026) : champ absent, pas de migration, pas d'échec", () => {
+    const sansChamp: DonneesApp = {
+      profil: profil({ ouvertureDroits: { dateOuverture: "2026-01-18", franchiseCPTotale: 10, delaiAttenteInitial: 7 } }),
+      contrats: [],
+      periodes: [],
+      soldeIndemnisationDepart: null,
+      exercicesGeles: {},
+    };
+
+    const reimporte = importerJSON(exporterJSON(sansChamp, DATE_EXPORT_FIXE));
+    expect(reimporte).toEqual(sansChamp);
+    expect(reimporte.profil?.ouvertureDroits?.franchiseSalairesTotale).toBeUndefined();
+  });
+
   it("round-trip sur l'état vide (tout premier utilisateur de la bêta) : ne lève pas, redonne le même état", () => {
     const donneesVides: DonneesApp = { profil: null, contrats: [], periodes: [], soldeIndemnisationDepart: null, exercicesGeles: {} };
 

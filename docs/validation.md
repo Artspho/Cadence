@@ -214,6 +214,89 @@ formule de la franchise salaires retranche 27 jours, elle tombe à 0 pour un SR 
 dont un garde-fou qui échouera le jour où `ecarte` deviendra atteignable — signal qu'il faudra alors
 écrire un vrai cas « écarté », pas supprimer le test.
 
+#### 2026-08-03 (suite) — Verrou 1 levé : franchise salaires déclarative ; verrou 2 documenté, non résolu
+
+**Verrou 1 — définition du SJM : tranchée par la source primaire, aucune ambiguïté.**
+Le guide FT éd. juillet 2026 définit les trois paramètres de la formule dans un encadré
+« Légendes des paramètres » accolé à la formule elle-même (p.14) :
+
+> « **Salaires de la période de référence** : total de vos rémunérations brutes non plafonnées sur la
+> période quel que soit le régime de l'activité. »
+> « **SMIC mensuel et SMIC journalier** : Valeurs à la date de fin de la période de référence. »
+> « **Salaire journalier moyen (SJM)** : SJM (annexe 8) = SR / (NHTM/8) · SJM (annexe 10) = SR / (NHTM/10) »
+> (note de bas de page : « NHTM = heures travaillées plafonnées au titre des annexes 8 et 10 en France
+> et d'un PTP, heures assimilées au titre de l'affection de longue durée (ALD), ainsi que celles
+> assimilées au titre du congé maternité et du congé d'adoption hors contrat de travail. »)
+
+Réponse à la question posée : le SJM de cette formule n'est **pas** une grandeur distincte — c'est le
+SJM habituel, bâti sur le **SR** (annexes 8/10 uniquement), identique à celui déjà utilisé pour les
+cotisations (`calculerSJM`, `config.cotisations.diviseurSJM_Annexe10`). Le point à ne pas manquer est
+ailleurs : **dans une même formule, le premier facteur utilise le PRC (tous régimes) et le second le
+SR (annexes 8/10 seulement)**. Deux numérateurs différents. La formule ARTCENA citée dans le prompt
+correspond mot pour mot à celle du guide, et `calculerFranchiseSalaires` l'implémente déjà
+correctement depuis le 2026-07-24 (`srContrats + salairesHorsAnnexe10PRA` pour le PRC, `sjm` séparé).
+**Il n'y avait donc aucune formule à écrire — seulement un total à obtenir.**
+
+**Notification réelle du 05/02/2026 — ce qu'elle contient, ce qu'elle ne contient pas.**
+⚠️ Le fichier `Notification_admission_ARE_20260205_2.pdf` n'existe pas dans le projet (recherche sur
+le dépôt, le dossier OneDrive et le profil utilisateur entier). Le document réellement disponible est
+`Notification admission ARE 20260205.pdf`, dans le cache de pièces jointes Outlook — même document
+selon toute vraisemblance, nom légèrement différent.
+
+- **Aucun PRC n'y figure**, ni sous ce nom ni sous un équivalent. La notification ne publie que :
+  SR 9 229,35 €, 710 heures, 7 j de délai d'attente, **5 j de franchise congés payés**.
+- **Aucune ligne de franchise salaires.** Cohérent avec le calcul : SJM = 9 229,35 / (710/10) ≈ 130 €,
+  (9 229,35 / 1 823,03) × (130 / (3 × 84,14)) − 27 ≈ −24 → **0**. Premier point de confrontation de
+  `calculerFranchiseSalaires` à un cas réel : la formule ne fabrique pas de franchise là où France
+  Travail n'en notifie aucune.
+- Elle confirme en revanche la règle du trop-perçu, **troisième source indépendante** et cette fois
+  nominative : « Si au terme de l'indemnisation les franchises n'ont pu être intégralement
+  appliquées, vous nous devrez la somme équivalente aux jours de franchises restants sur la base de
+  votre allocation journalière déterminée à l'ouverture de droits, dans la limite de ce que vous avez
+  perçu. » Elle référence la **convention du 15 novembre 2024** (articles 9 §1er et 11 à 20 des
+  annexes VIII et X), ce qui confirme la convention applicable. Toujours **aucune mention brute/nette**.
+
+**Décision : déclaratif, pas calculé.** Quatre raisons, dans l'ordre de poids :
+1. Le PRC exige « toutes les rémunérations quel que soit le régime » ; Cadence ne suit que l'Annexe 10,
+   et `salairesHorsAnnexe10PRA` est un complément optionnel explicitement admis comme non fiable
+   (`sousEstimeeHorsA10`). Un total recalculé pourrait diverger de la notification.
+2. Tous les autres paramètres d'ouverture (franchise CP, délai d'attente, date limite) sont déjà
+   déclarés depuis la notification, jamais recalculés — cohérence de doctrine.
+3. Pour le trop-perçu, c'est la franchise de l'**ancien** droit qui compte : la recalculer supposerait
+   de reconstituer une fenêtre de référence passée, exactement la reconstruction bannie ailleurs
+   (`engine/cycles.ts`).
+4. La notification est la pièce qui fait foi.
+
+**Implémentation** : `Profil.ouvertureDroits.franchiseSalairesTotale?: number` (optionnel, aucune
+migration — devoir sacré n°1, deux tests de round-trip). `undefined` = inconnu, `0` = notification
+consultée, aucune franchise notifiée : **deux états jamais confondus**, c'est ce qui permet de conclure.
+`calculerSerieDepuisContrats` donne la priorité au total déclaré sur tout calcul, via une troisième
+variante de `FranchiseSalairesResultat` (`declaree: true`, `totalNonVerifie: false`). Saisie dans
+« Mon indemnisation en cours » avec une consigne explicite : *beaucoup de notifications n'en
+mentionnent aucune, dans ce cas saisir 0*.
+
+**Conséquence sur `RisqueTropPercu`** : `ecarte` devient **atteignable** — c'était l'objectif. 6 tests
+supplémentaires (`ecarte` réel avec 0 déclaré, `avere` maintenu quand la CP reste due, `avere` avec
+40 j de franchise salaires déclarés, pas d'`ecarte` prématuré sans mois complet observable, profil
+sans le champ inchangé). Le garde-fou « `ecarte` inatteignable » a été **remplacé, pas supprimé**,
+comme annoncé quand il avait été écrit.
+
+**Verrou 2 — brut/net : raisonnement, PAS une source qui tranche. Toujours ouvert.**
+Aucune des sources consultées (guide FT éd. juillet 2026, Annexes 8 et X du règlement, dossier de
+synthèse Unédic, circulaire 2025-03, et désormais une notification réelle) ne dit si « l'allocation
+journalière déterminée à l'ouverture de droits » s'entend brute ou nette. Argument en faveur du
+**brut**, à considérer comme une hypothèse de travail :
+- le SR est explicitement défini comme un total de salaires **bruts** (source : taux-intermittent.net) ;
+- l'AJ **brute** est la valeur réellement déterminée et figée à l'ouverture de droits, tandis que l'AJ
+  nette est recalculée à chaque versement selon des taux de cotisation qui peuvent varier en cours de
+  droit — elle n'est donc pas « déterminée à l'ouverture » au même sens.
+
+Ce raisonnement **ne vaut pas source**. Aucun montant ne doit être codé sur cette base tant qu'une
+source explicite ou un relevé réel portant un trop-perçu notifié ne l'a pas confirmé. **Ce verrou ne
+bloque rien aujourd'hui** : `RisqueTropPercu` ne porte aucun montant (`tropPercuChiffrable: false`),
+et le garde-fou correspondant échoue si quelqu'un en câble un. Il faudra trancher le jour où un
+montant sera demandé — pas avant.
+
 #### 2026-07-20 — Règle CSG/CRDS établie (implémentée le 2026-07-20, commit `f0d18ae`)
 
 - **Assiette** : 98,25 % de l'AJ brute (abattement de 1,75 %), pas le SJM.

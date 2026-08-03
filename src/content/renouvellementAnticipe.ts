@@ -40,8 +40,8 @@ export const RENOUVELLEMENT_ANTICIPE = {
       "⚠ Risque de trop-perçu : une franchise de ton droit actuel n'était pas encore épuisée à cette date. France Travail peut te réclamer un trop-perçu — montant non chiffré par Cadence, vérifie sur simucalcul.pole-emploi-services.fr ou directement auprès de France Travail.",
     // Un message par raison : « on ne sait pas » n'est utile que si on dit POURQUOI on ne sait pas.
     indetermine: {
-      franchise_salaires_non_calculee:
-        "Risque de trop-perçu indéterminé : ta franchise congés payés semble épuisée à cette date, mais une franchise salaires peut aussi rester due — Cadence ne la calcule pas encore, elle ne peut donc pas conclure. Ce n'est pas « aucun risque » : vérifie sur simucalcul.pole-emploi-services.fr ou auprès de France Travail.",
+      franchise_salaires_inconnue:
+        "Risque de trop-perçu indéterminé : ta franchise congés payés semble épuisée à cette date, mais une franchise salaires peut aussi rester due — Cadence ne connaît pas son total. Ce n'est pas « aucun risque ». Renseigne « Franchise salaires totale » dans « Mon indemnisation en cours » en recopiant ta notification (indique 0 si elle n'en mentionne aucune) : Cadence pourra alors conclure.",
       simulation_mensuelle_impossible:
         "Risque de trop-perçu indéterminé : Cadence n'a pas pu simuler la consommation de tes franchises depuis l'ouverture de ton droit actuel (paramètres d'ouverture manquants dans « Mon indemnisation en cours »). Ce n'est pas « aucun risque » : complète ces informations, ou vérifie directement auprès de France Travail.",
       historique_mensuel_insuffisant:

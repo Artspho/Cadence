@@ -54,6 +54,13 @@ export interface AncienDroit {
   ajNette: number;
   /** Franchise CP totale notifiée à l'ouverture (Profil.ouvertureDroits.franchiseCPTotale). */
   franchiseCPTotale: number;
+  /**
+   * Franchise SALAIRES totale notifiée à l'ouverture
+   * (`Profil.ouvertureDroits.franchiseSalairesTotale`) — `undefined` si l'utilisateur ne l'a pas
+   * renseignée, `0` si sa notification n'en porte aucune. Sans elle, `RisqueTropPercu` ne peut jamais
+   * conclure « écarté » : la règle officielle vise les franchises CP ET salaires.
+   */
+  franchiseSalairesTotale?: number;
   /** Délai d'attente notifié à l'ouverture (Profil.ouvertureDroits.delaiAttenteInitial). */
   delaiAttenteInitial: number;
 }
@@ -92,10 +99,12 @@ export interface NouveauDroitCalcule {
  *  - `avere`        : un reliquat de franchise est PROUVÉ à la date de la FCT retenue.
  *  - `ecarte`       : les DEUX franchises (CP et salaires) sont prouvées épuisées. La règle
  *                     officielle vise « les franchises congés payés et salaires totales » : écarter
- *                     le risque sur la seule franchise CP serait un faux feu vert. Tant que la
- *                     franchise salaires n'est pas calculée par Cadence, cet état est **inatteignable
- *                     en pratique** — c'est voulu, pas un oubli : un `ecarte` qu'on ne peut pas
- *                     prouver ne doit jamais s'afficher (devoir sacré n°2).
+ *                     le risque sur la seule franchise CP serait un faux feu vert. Atteignable depuis
+ *                     le 03/08/2026, dès que l'utilisateur a renseigné
+ *                     `ouvertureDroits.franchiseSalairesTotale` depuis sa notification — y compris à
+ *                     `0` (aucune franchise salaires notifiée, cas réel courant). Sans cette
+ *                     déclaration, on reste en `indetermine` : un `ecarte` qu'on ne peut pas prouver
+ *                     ne doit jamais s'afficher (devoir sacré n°2).
  *  - `indetermine`  : Cadence ne peut pas conclure. À afficher comme tel, jamais en silence.
  *
  * Aucun montant, dans aucun état : cf. `tropPercuChiffrable` et les trois verrous documentés plus bas.
@@ -108,16 +117,17 @@ export type RisqueTropPercu =
       /**
        * Union littérale plutôt que `string` libre, comme `SeuilReadmission.raison` : l'écran doit
        * pouvoir formuler un message précis par cause, pas afficher une chaîne technique brute.
-       *  - `franchise_salaires_non_calculee` : franchise CP prouvée épuisée, mais la franchise
-       *    salaires n'est jamais calculée (cf. verrou 1) — donc rien ne prouve l'absence de reliquat.
-       *    C'est le cas NOMINAL aujourd'hui pour tout dossier dont la franchise CP est soldée.
+       *  - `franchise_salaires_inconnue` : franchise CP prouvée épuisée, mais la franchise salaires
+       *    totale n'est ni déclarée (`ouvertureDroits.franchiseSalairesTotale`) ni calculable — donc
+       *    rien ne prouve l'absence de reliquat. Levable par l'utilisateur : il lui suffit de
+       *    recopier le chiffre de sa notification (ou 0 si elle n'en porte aucune).
        *  - `simulation_mensuelle_impossible` : `calculerSerieDepuisContrats` n'a pas pu tourner
        *    (ouverture de droits manquante, etc.).
        *  - `historique_mensuel_insuffisant` : aucun mois calendaire COMPLET avant celui de la FCT
        *    retenue — le mois de la FCT lui-même n'est jamais utilisé (la franchise peut s'y épuiser
        *    après le jour exact de la FCT).
        */
-      raison: "franchise_salaires_non_calculee" | "simulation_mensuelle_impossible" | "historique_mensuel_insuffisant";
+      raison: "franchise_salaires_inconnue" | "simulation_mensuelle_impossible" | "historique_mensuel_insuffisant";
     };
 
 export interface ComparaisonRenouvellementAnticipe {
@@ -245,7 +255,12 @@ function evaluerRisqueTropPercu(contrats: Contrat[], profil: Profil, ancien: Anc
   const profilAncien: Profil = {
     ...profil,
     dateAnniversaire: ancien.dateAnniversaire,
-    ouvertureDroits: { dateOuverture: ancien.dateOuverture, franchiseCPTotale: ancien.franchiseCPTotale, delaiAttenteInitial: ancien.delaiAttenteInitial },
+    ouvertureDroits: {
+      dateOuverture: ancien.dateOuverture,
+      franchiseCPTotale: ancien.franchiseCPTotale,
+      delaiAttenteInitial: ancien.delaiAttenteInitial,
+      franchiseSalairesTotale: ancien.franchiseSalairesTotale,
+    },
   };
   const serie = calculerSerieDepuisContrats(profilAncien, { dateDepart: ancien.dateOuverture }, contrats, fctRetenue, config);
   if (!serie.calculable) return { etat: "indetermine", raison: "simulation_mensuelle_impossible" };
@@ -260,7 +275,7 @@ function evaluerRisqueTropPercu(contrats: Contrat[], profil: Profil, ancien: Anc
 
   // Franchise CP soldée. La franchise salaires est-elle seulement connue ? `valeur: null` =
   // `franchise_salaires_non_certifiee`, donc son reliquat est inconnu, donc on ne conclut pas.
-  if (dernier.franchiseSalaires.valeur === null) return { etat: "indetermine", raison: "franchise_salaires_non_calculee" };
+  if (dernier.franchiseSalaires.valeur === null) return { etat: "indetermine", raison: "franchise_salaires_inconnue" };
 
   // Total connu (y compris 0 : aucune franchise salaires due) — là seulement le solde a un sens.
   return dernier.soldeFin.franchiseSalairesRestante > 0 ? { etat: "avere" } : { etat: "ecarte" };

@@ -87,6 +87,10 @@ export const profilSchemaForme = z.object({
       delaiAttenteInitial: z.number(),
       tauxPrelevementSourceHistorique: z.array(z.object({ dateEffet: z.string(), valeur: z.number() })).optional(), // historique de taux PAS, cf. types/index.ts
       dateLimiteIndemnisation: z.string().optional(), // fin de la période d'indemnisation, cf. types/index.ts
+      // Franchise salaires totale DÉCLARÉE (jours), cf. types/index.ts. Optionnel : absent =
+      // inconnu, 0 = aucune franchise notifiée — deux états distincts, jamais confondus. Aucune
+      // migration requise pour un profil enregistré avant l'ajout de ce champ (devoir sacré n°1).
+      franchiseSalairesTotale: z.number().min(0).optional(),
     })
     .optional(),
 });

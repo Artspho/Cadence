@@ -48,6 +48,9 @@ export function RenouvellementAnticipe({ profil, contrats, periodes, config }: R
             dateAnniversaire: profil.dateAnniversaire,
             ajNette: derniereAJ.valeur,
             franchiseCPTotale: ouverture.franchiseCPTotale,
+            // Transmis tel quel, `undefined` compris : c'est l'absence de déclaration qui fait
+            // basculer le verdict en « indéterminé » plutôt qu'en « écarté » (cf. RisqueTropPercu).
+            franchiseSalairesTotale: ouverture.franchiseSalairesTotale,
             delaiAttenteInitial: ouverture.delaiAttenteInitial,
           };
           return calculerRenouvellementAnticipe(contrats, periodes, profil, config, ancien, fctRetenue);
