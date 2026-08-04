@@ -95,18 +95,22 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 
 ## État actuel
 
-> **Repère au 04/08/2026, session (5)** — **742 tests verts** (58 fichiers), `tsc -b` propre
+> **Repère au 04/08/2026, session (5)** — **778 tests verts** (62 fichiers), `tsc -b` propre
 > sur les deux tsconfig, `npm run build` propre. Working tree propre. **`master` poussé sur
-> `origin/master`** (`f21f872` + ce commit de documentation).
+> `origin/master`** (`f94ed2c` + ce commit de documentation).
 >
-> ⚠️ **DÉPLOIEMENT NON VÉRIFIÉ pour tout ce qui suit `f8f52cf`** — soit `21bbb17`, `54caeff`,
-> `ffb0ad3`, `f21f872` et ce commit : le bundle déployé n'a pas été sondé, et rien n'a été contrôlé à
-> l'écran. **Première chose à faire au prochain fil** si l'écran doit être cru. Le dernier déploiement
-> réellement vérifié reste `f8f52cf` (bundle `index-Dg3R5vLT.js`, contenant le chemin de récupération
-> du point 23 — « Restaurer une sauvegarde », « rien ne sera écrasé »).
-> À noter : sur les cinq commits en écart, **trois ne peuvent rien changer à l'écran** (`ffb0ad3` et
-> celui-ci sont de la documentation, `f21f872` un fichier de tests qui ne part pas dans le bundle).
-> L'écart réel porte donc sur `21bbb17` (bandeau des règles) et `54caeff` (documentation également).
+> ⚠️ **DÉPLOIEMENT NON VÉRIFIÉ pour tout ce qui suit `f8f52cf`** : le bundle déployé n'a pas été sondé.
+> Dernier déploiement réellement vérifié : `f8f52cf` (bundle `index-Dg3R5vLT.js`, contenant le chemin
+> de récupération du point 23 — « Restaurer une sauvegarde », « rien ne sera écrasé »).
+> Mais l'écart est plus étroit qu'il n'y paraît, et il faut le dire précisément :
+> - **vérifié à l'écran en local** (`npm run dev`, port 5182) : le point **17** (`0a08c26`) et le garde
+>   des **nombres négatifs** (`f94ed2c`) — les deux ont été exercés champ par champ dans le vrai
+>   navigateur, cf. leurs messages de commit. Ce qui reste inconnu pour eux, c'est le DÉPLOIEMENT, pas
+>   le comportement ;
+> - **ne peuvent rien changer à l'écran** : `54caeff`, `ffb0ad3`, `2ebd349` et ce commit (documentation),
+>   `f21f872` (fichier de tests, jamais dans le bundle) ;
+> - **jamais contrôlé, ni en local ni déployé** : `21bbb17` (bandeau des règles) — c'est le seul vrai
+>   angle mort de comportement. Ses garanties reposent sur `components/__tests__/bandeauRegles.test.tsx`.
 > À noter pour la prochaine fois : juste après un push, l'URL sert encore l'ancien bundle — le
 > déploiement Vercel prend un moment (constaté : trois sondages à 25 s au commit `501ca53`). Sonder en
 > boucle plutôt que conclure « pas déployé » au premier essai. Et si le hash du bundle déployé est
@@ -114,7 +118,9 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 > celui-là ; un hash différent, en revanche, ne prouve rien (chercher alors une chaîne de caractères
 > introduite par le correctif).
 >
-> **Session (5), un seul point clos : le 15** (chantier 6, `f21f872` — détail plus bas).
+> **Session (5) : deux points clos, 15 (`f21f872`) et 17 (`0a08c26`)**, plus un chantier demandé
+> directement par Benoît, hors critique — l'**interdiction des nombres négatifs en saisie manuelle**
+> (`f94ed2c`). Détail des trois plus bas.
 >
 > **Six points clos dans la session (4)**, dans l'ordre : **5** et **6** (`f2ec278`, chantier 3),
 > puis **7** (`501ca53`) et **23** (`a12ae14`, chantier 4), puis **13** et **14** ensemble
@@ -123,11 +129,40 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 > toute fin) et le **10** est **écarté** (`54caeff` — la vraisemblance d'un chiffre saisi est la
 > responsabilité de l'utilisateur, pas de l'app ; ne pas le reproposer). Détail plus bas.
 >
-> **État des 29 points de `docs/critique_2026-08-03.md`** — **16 clos** · 1 à moitié (**2**, échec
-> d'écriture silencieux, devoir n°1) · 1 reporté (**9**) · 1 écarté (**10**) · **10 ouverts** :
-> 🔴 8, 11, 12 ter, 25, 26 et 🟡 12, 17, 18, 19, 20. **Sur ces 10, neuf attendent autre chose que
-> du code** — une source, un document, ou une règle à trancher. Seul le **17** est codable sans rien
-> attendre, plus le **2** à finir.
+> **État des 29 points de `docs/critique_2026-08-03.md`** — **17 clos** · 1 à moitié (**2**, échec
+> d'écriture silencieux, devoir n°1) · 1 reporté (**9**) · 1 écarté (**10**) · **9 ouverts** :
+> 🔴 8, 11, 12 ter, 25, 26 et 🟡 12, 18, 19, 20. **Ces neuf attendent TOUS autre chose que du code** —
+> une source, un document, ou une règle à trancher. Côté code pur, il ne reste donc que le **2** à
+> finir : c'est la prochaine action, et la dernière avant d'être obligé de passer par un arbitrage ou
+> une recherche.
+>
+> **Chantier 8, hors critique — aucun nombre négatif en saisie manuelle** (`f94ed2c`, demande directe
+> de Benoît : « ça n'a pas de sens »). ⚠️ Ne pas le confondre avec le point **10 écarté** : celui-ci
+> porte sur la vraisemblance d'un chiffre plausible, celui-là sur une impossibilité structurelle.
+> Le piège, à connaître avant de croire un `min="0"` : **les 24 champs numériques en portent déjà un,
+> mais cet attribut n'agit QUE sur la soumission d'un `<form>`.** Les écrans qui écrivent à la frappe
+> (Frais réels, Mon profil) n'ont ni `<form>` ni bouton de soumission : leur `min` était décoratif.
+> Mesuré à l'écran : un salaire net imposable à −5 000 € affichait **« Base R = -5000.00 € »** et se
+> persistait — or Base R sert aux forfaits 14 % et 5 %. Correctif : un prédicat pur
+> (`lib/saisieNombrePositif.ts`) en garde sur les **14 champs exposés** (10 Frais réels, 4 Mon profil) ;
+> la frappe négative est ignorée et le champ contrôlé réaffiche la valeur précédente. Pas de
+> `Math.max(0, …)` — il remplacerait la saisie par une autre valeur sans le dire — et pas de bandeau de
+> plus à maintenir. ⚠️ Les valeurs négatives **déjà enregistrées** ne sont PAS corrigées (devoir n°1 :
+> on ne réécrit rien à la lecture) : fermer cette porte-là, c'est le chantier des bornes structurelles
+> à l'écriture, non demandé.
+>
+> **Chantier 7, point 17 — un contrat EEE sans jours travaillés** (`0a08c26`). `decompteHeures.ts:24-26`
+> ne lit que `nbJoursEEE` en territoire EEE : sans jours, le contrat comptait ZÉRO heure, et des cachets
+> saisis y étaient ignorés en entier. Le formulaire suffisait à produire le premier cas, contrairement à
+> ce qu'annonçait la critique (qui n'y voyait qu'un import). Arbitrages de Benoît : garde à l'ÉCRITURE
+> (`lib/contratTerritoireEEE.ts`, branché sur les trois fonctions d'écriture d'App.tsx — `refuserSiDeuxMois`
+> devient `refuserContratNonConforme`), et refus aussi du contrat EEE portant cachets ou heures.
+> **Aucun calcul touché** : additionner jours EEE (6 h) et cachets (12 h) serait inventer une règle non
+> sourcée — piste écartée, ne pas re-tenter sans une pièce du guide FT. Portée sur les données de Benoît :
+> **nulle** (ses 62 contrats sont tous en territoire `france`). ⚠️ Piège à retenir : tester
+> `!nbJoursEEE` sur l'état de saisie laisse passer un « 0 » (chaîne non vide, donc truthy) que le garde
+> d'écriture refuse ensuite — le formulaire dirait oui, l'écriture non. Le formulaire appelle le
+> prédicat de la règle lui-même.
 >
 > **Chantier 6, point 15 — `dateUtils.ts` sous tests** (`f21f872`). `src/engine/__tests__/dateUtils.test.ts`,
 > **49 tests**, **aucune ligne de `dateUtils.ts` modifiée** : comportement constant, les tests ne font
@@ -243,22 +278,23 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 >    d'URL (`/?maj=<hash>`). Avant de conclure « le correctif ne marche pas », vérifier lequel des
 >    deux est en cause.
 >
-> **▶ Prochaine action — le point 17 : un contrat EEE sans jours saisis compte zéro heure, en
-> silence.** `decompteHeures.ts:24-26` calcule `(contrat.nbJoursEEE ?? 0) × 6` pour un contrat
-> `territoire: "eee_suisse_uk"` ; rien dans le type (`types/index.ts:26-28`, tous les champs
-> optionnels) ni dans le schéma de stockage n'impose que `nbJoursEEE` soit présent quand le territoire
-> l'exige. Un contrat importé ou construit sans ce champ **disparaît du décompte sans le moindre
-> signal**. ⚠️ **À ne pas confondre avec le point 10 écarté** : ici l'app perd une donnée que
-> l'utilisateur a bien saisie ailleurs, elle ne juge pas la vraisemblance d'un chiffre. Deux voies
-> tracées par le point : rendre l'invariant explicite dans le type (union discriminée sur
-> `territoire`) ou, à défaut, signaler tout contrat qui n'apporte aucune heure. **Aucune source à
-> trouver.** ⚠️ En revanche, le choix entre les deux voies **est un arbitrage** : la première touche
-> le type donc potentiellement le schéma de LECTURE (risque de rejeter des contrats déjà enregistrés
-> — devoir n°1), la seconde ajoute un avertissement à l'écran. À poser à Benoît avant de coder.
+> **▶ Prochaine action — finir le point 2 : un stockage plein.** C'est le **dernier point codable sans
+> arbitrage ni source**, et le plus lourd des trois traités cette session. Le filet minimal est déjà
+> posé (03/08, avec le point 1) : `sauvegarderDonnees` renvoie `{ ok } | { ok: false, message }` au lieu
+> de laisser l'exception se perdre, et `App.tsx` affiche un bandeau rouge non refermable invitant à
+> exporter tout de suite. **Ce qui reste, et que la fiche énumère** : le comportement quand le stockage
+> est réellement plein (que purger, dans quel ordre), l'export de secours automatique, la détection de
+> la saturation **en amont** de l'écriture, et le sort de la copie de secours dans ce cas.
+> ⚠️ Deux consommateurs d'espace ont été ajoutés par le correctif du point 1 et font partie du
+> chantier : `cadence:v1:donnees.backup` (renouvelée à chaque écriture réelle) et
+> `cadence:v1:donnees.illisible` (écrite lors d'un « repartir de zéro » et **jamais purgée**). Chacune
+> est bornée à une copie — vérifié par test — mais l'occupation monte à trois copies au pire.
+> ⚠️ Deux pièges à ne pas rouvrir en croyant bien faire : la règle ne doit jamais entrer dans le schéma
+> de LECTURE, ni dans `donneesAppSchemaEcriture` qui valide le jeu ENTIER à chaque sauvegarde (devoir
+> n°1 dans les deux sens) ; et purger automatiquement une copie de secours, c'est détruire de la donnée
+> pour faire de la place — à faire trancher par Benoît avant d'écrire une ligne, pas après.
 >
-> Ensuite, le **2** (une écriture qui échoue ne le dit pas — le plus important des trois, et le plus
-> lourd). ⚠️ Ne **pas** attaquer 25 ni 26 sans avoir fait trancher la règle à Benoît : elles
-> ne sont pas sourcées.
+> ⚠️ Ne **pas** attaquer 25 ni 26 sans avoir fait trancher la règle à Benoît : elles ne sont pas sourcées.
 >
 > **Le point 9 n'est pas une prochaine action** — il a été posé à Benoît le 03/08/2026 et **reporté
 > sciemment** : le texte de consentement IA reste inchangé, la bascule de `MISTRAL_API_KEY` sur le plan
