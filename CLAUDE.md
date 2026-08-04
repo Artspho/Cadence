@@ -95,8 +95,8 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 
 ## État actuel
 
-> **Repère au 04/08/2026, session (6) — LE PROJET A CHANGÉ DE DIRECTION.** **905 tests verts**
-> (74 fichiers), `tsc -b` propre sur les deux tsconfig, `npm run build` propre.
+> **Repère au 04/08/2026, session (6) — LE PROJET A CHANGÉ DE DIRECTION.** **918 tests verts**
+> (75 fichiers), `tsc -b` propre sur les deux tsconfig, `npm run build` propre.
 >
 > ✅ `f9a17f7` **a été validé par Benoît et poussé.** `origin/master` est à **`18abb98`**, et `master`
 > est en avance de quatre commits validés : `c786ecb` (point 8), `5607854` (point 9), `184c933` et
@@ -143,9 +143,9 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 > |---|---|---|
 > | 0 | points **8** et **9** | ✅ faite (`c786ecb`, `5607854`) — le 8 reste **compté ouvert** (ni auth ni quota) |
 > | 1 | projet Supabase, 7 tables, RLS | ✅ **PROUVÉE** — `npm run verifier:rls` : **64 contrôles, 64 conformes** |
-> | 2 | authentification | ✅ faite — **connexion facultative**, l'app fonctionne toujours sans compte. Envoi réel exercé ; ⚠️ le chemin de SUCCÈS complet (même navigateur → session ouverte) reste non exercé |
-> | 3 | adaptateur Supabase derrière l'interface existante | ⬜ **prochaine action** — les 905 tests doivent rester verts |
-> | 4 | migration + vérification chiffrée | ⬜ |
+> | 2 | authentification | ✅ **PROUVÉE de bout en bout** le 04/08/2026 à 19h19 : session réellement ouverte par lien magique. Connexion **facultative**, l'app fonctionne toujours sans compte |
+> | 3 | miroir Supabase en écriture seule (contrats + profil) | ✅ **PROUVÉE contre le vrai serveur** : ligne relue en REST (200, `maj_le` = l'heure du témoin) |
+> | 4 | migration + vérification chiffrée | ⬜ **prochaine action** — la première phase qui LIT |
 > | 5 | bascule, sur son feu vert écrit | ⬜ |
 > | 6 | documents (conserver, puis envoyer) | ⬜ — le chantier d'origine |
 > | 7 | hors ligne | ⬜ **optionnel, repoussé exprès** : il n'a jamais répondu sur ce point, la question est sortie du chemin critique pour ne pas le bloquer |
@@ -237,11 +237,14 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 > séparément** (l'un interdit « autre navigateur » quand un motif est transmis, l'autre garantit que
 > l'explication subsiste quand elle EST la cause probable). Ne pas refondre ces deux branches en une.
 >
-> ⚠️ **CE QUI RESTE NON PROUVÉ — ne pas écrire « le lien magique fonctionne » sans réserve.** Le
-> chemin de SUCCÈS complet (lien ouvert dans le MÊME navigateur → session ouverte) n'a **jamais** été
-> exercé, et **aucune session n'a jamais été ouverte dans Cadence à ce jour** — confirmé par le
-> tableau de bord lui-même : `Last signed in : –` sur le compte de Benoît. Deux jetons ont été
-> essayés le 04/08/2026, tous deux refusés en `otp_expired` :
+> ✅ **LE CHEMIN DE SUCCÈS EST PROUVÉ — 04/08/2026, 19h19.** Lien magique demandé depuis le panneau
+> navigateur, ouvert dans CE MÊME panneau : **la session s'est ouverte**
+> (`sb-<ref>-auth-token` présent, « Connecté en tant que admin@lesartsphoceens.fr » à l'écran, URL
+> nettoyée de son `code`). C'est la première session jamais ouverte dans Cadence. Le lien magique
+> fonctionne donc de bout en bout, à la condition PKCE près : même navigateur qu'à la demande.
+>
+> ⚠️ Historique à garder, parce qu'il explique la difficulté rencontrée : deux jetons antérieurs
+> avaient été refusés en `otp_expired` le même jour :
 > - celui de la confirmation d'inscription : cliqué par Benoît depuis SON Chrome, donc consommé — et
 >   il avait bien rempli son office, le tableau de bord affiche `Confirmed at 04 Aug 2026 18:19`.
 >   **Le compte `admin@lesartsphoceens.fr` (UID `2ed466db-a58b-4ec4-b73a-28a2a333b82d`) est confirmé** ;
@@ -249,7 +252,9 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 >   hypothèses, aucune vérifiée — un clic préalable de sa part, ou une première tentative de
 >   navigation signalée « denied **or failed** » par l'outil, qui aurait atteint Supabase et consommé
 >   le jeton avant d'être bloquée. **Ne pas présenter l'une des deux comme la cause.**
-> Le test a alors buté sur le plafond de 2/h. À reprendre avec un jeton frais.
+> Le test avait alors buté sur le plafond de 2/h ; repris avec un jeton frais à 19h18, il a réussi.
+> **Leçon : `otp_expired` ne veut pas dire « le code est cassé », il veut dire « ce jeton-là a déjà
+> servi ou n'est plus valable ».** Redemander un lien frais est la bonne réaction.
 > ⚠️ Piège à connaître pour reprendre ce test : le panneau navigateur de Claude **refuse de naviguer
 > vers `supabase.co`** (garde-fou d'origine) et n'exécutait plus les clics par coordonnées (panneau non
 > affiché => page qui ne compose plus). Contournement utilisé : `location.href = …` et `.click()`
@@ -284,12 +289,63 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 > réglage de tableau de bord. `messageErreur` (dans `src/auth/actions.ts`) traduit déjà les deux
 > refus correspondants en expliquant la vraie cause, pour ne pas faire chercher un bug inexistant.
 >
-> ### ▶ PROCHAINE ACTION — phase 3 : l'adaptateur Supabase
+> ## PHASE 3 — le miroir Supabase, codée le 04/08/2026
 >
-> **Mettre un adaptateur Supabase derrière l'interface de stockage existante**, sans changer la source
-> de vérité. `chargerDonnees` / `sauvegarderDonnees` (`src/storage/localStorageAdapter.ts`) sont déjà
-> asynchrones et renvoient déjà ok/échec : c'est le point d'accroche. Les **905 tests doivent rester
-> verts**, et la promesse « l'app s'ouvre sans compte » reste valable jusqu'à la phase 5.
+> Quand une session est ouverte, chaque enregistrement local est **aussi** recopié dans
+> `donnees_utilisateur`. Le `localStorage` reste la source de vérité : ce n'est pas un adaptateur de
+> remplacement, c'est une copie **en plus**. Où : `src/storage/miroirSupabase.ts`, branché par un
+> `useEffect` **séparé** dans `App.tsx` — jamais fusionné avec celui de la sauvegarde locale, parce que
+> la copie ne doit ni retarder, ni conditionner, ni pouvoir faire échouer l'écriture dans le navigateur.
+>
+> **Trois règles, validées par Benoît le 04/08/2026, à ne pas défaire :**
+> 1. **ÉCRITURE SEULE, AUCUNE LECTURE.** L'interdiction est dans le TYPE : `ClientDonnees`
+>    (`src/auth/supabaseClient.ts`) n'expose aucun `select`, donc on ne peut pas lire par distraction.
+>    Lire avant la phase 4, ce serait risquer qu'une donnée serveur écrase la saisie locale ;
+> 2. **contrats + profil SEULS** (`donnees_utilisateur`). Les frais réels et l'identité déclarative ont
+>    leurs propres stockages et **ne sont pas recopiés** — c'est écrit à l'écran mot pour mot, parce que
+>    laisser croire que tout part sur le serveur serait la fausse affirmation la plus coûteuse ici ;
+> 3. **témoin discret, jamais une alerte.** En cas d'échec, l'écriture locale a réussi : rien n'est
+>    perdu, et une fausse alerte finit par faire ignorer les vraies. Le témoin ne dit JAMAIS « en
+>    sécurité » — il date la **confirmation** de la copie et redit que le navigateur reste la référence.
+>
+> ⚠️ `user_id` est fourni **explicitement** dans l'upsert, et non laissé au `default auth.uid()` :
+> l'upsert de PostgREST a besoin de la colonne de conflit dans la charge utile. Ça ne relâche rien —
+> la phase 1 a prouvé qu'un `user_id` usurpé est refusé en 403 par le `with check`.
+>
+> ✅ **LE MIROIR EST PROUVÉ CONTRE LE VRAI SERVEUR — 04/08/2026, 19h19.** Dans la seconde qui a suivi
+> l'ouverture de session, la copie est partie et le témoin a affiché « Copie sur le serveur confirmée à
+> 19:19 ». **Et ça n'a pas été cru sur parole** : la ligne a été relue côté serveur en REST
+> (`GET /rest/v1/donnees_utilisateur`, statut 200, 1 ligne) avec le jeton de la session — pas avec
+> `service_role`, jamais. Ce qu'elle contient :
+> `user_id = 2ed466db-a58b-4ec4-b73a-28a2a333b82d` (le compte de Benoît), `version_schema = 1`,
+> `maj_le = 2026-08-04T17:19:33Z` — soit **exactement l'heure du témoin affiché à l'écran**, ce qui est
+> la vraie preuve que l'un décrit bien l'autre —, `maj_par_appareil` renseigné, et `donnees` conforme.
+> ⚠️ Cette relecture a été faite depuis la CONSOLE de test, pas depuis le code de l'app : la règle
+> « écriture seule » de la phase 3 reste entière, et c'est le seul moyen honnête de vérifier une
+> écriture sans se contenter de l'absence d'erreur renvoyée par le client.
+>
+> ⚠️ **UNE LIGNE DE TEST DORT DANS LA VRAIE LIGNE DE BENOÎT.** Le contenu écrit était un jeu d'essai
+> réduit exprès avant le tir (profil avec `dateNaissance: 1985-06-15` — **inventé**, issu des fixtures
+> du dépôt — et `contrats: []`, pour qu'aucun faux contrat n'atterrisse sur le serveur). Sa ligne
+> `donnees_utilisateur` contient donc aujourd'hui un profil qui n'est PAS le sien. Sans conséquence
+> tant que rien ne lit (phase 3 = écriture seule), mais **la phase 4 lira** : ne jamais prendre cette
+> ligne pour ses données réelles. Elle sera écrasée par la vraie migration.
+>
+> ⚠️ **Sur le plafond d'envoi** : à 19h15 un envoi a encore été refusé alors que le premier datait de
+> plus d'une heure — donc ce plafond n'est pas une simple fenêtre glissante par message, ou les
+> tentatives refusées comptent aussi. **Règle exacte non établie, ne pas l'affirmer.** À 19h18 le
+> créneau s'est libéré.
+>
+> ### ▶ PROCHAINE ACTION — phase 4 : migration + vérification chiffrée
+>
+> C'est la **première phase qui LIRA** depuis Supabase, donc la première où une erreur peut écraser des
+> données. Le protocole en 6 étapes validé par Benoît (arbitrage 5) s'applique tel quel : export JSON
+> hors navigateur → migration en lecture seule → **vérification chiffrée** (62 contrats, 588 h, 4 mois
+> certifiés) → son feu vert → **rien n'est supprimé localement** → retour arrière testé **AVANT**, pas
+> après.
+> ⚠️ Ses vraies données vivent toujours dans SON Chrome, sur `cadence-git-master-benoit3.vercel.app`.
+> C'est de là qu'il faudra partir, pas d'un localhost.
+> ⚠️ La ligne serveur de test décrite plus haut doit être traitée à ce moment-là.
 >
 > ⚠️ **Relancer `npm run verifier:rls` après tout changement de schéma ou de politique.** Les deux
 > comptes de test **`testa-cadence@cadence.fr`** et **`test-cadenceb@cadence.fr`** sont volontairement

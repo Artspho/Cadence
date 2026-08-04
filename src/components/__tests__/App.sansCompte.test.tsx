@@ -89,6 +89,19 @@ describe("App sans compte — la promesse de la phase 2", () => {
     expect(screen.getByLabelText("Année de naissance")).toHaveValue("1985");
   });
 
+  it("aucune copie serveur n'est tentée ni annoncée sans compte (phase 3)", async () => {
+    // Sans configuration Supabase, le client de données vaut `null` et l'effet de copie sort
+    // immédiatement en état « inactif ». Rien ne doit apparaître à l'écran : parler d'une copie qui
+    // n'a pas lieu d'être laisserait croire qu'il manque quelque chose.
+    render(<App />);
+    await screen.findByRole("navigation", { name: /navigation principale/i });
+    fireEvent.click(screen.getByRole("button", { name: "Mon profil" }));
+    await screen.findByRole("heading", { name: "Compte" });
+
+    expect(screen.queryByText(/copie sur le serveur/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/copie vers le serveur/i)).not.toBeInTheDocument();
+  });
+
   it("aucune écriture parasite : le contenu du localStorage reste celui qu'on a posé", async () => {
     // Devoir n°1. La phase 2 n'écrit RIEN — ni dans Supabase, ni dans le stockage local. Si un jour
     // l'authentification se mettait à toucher aux données, ce test le dirait.

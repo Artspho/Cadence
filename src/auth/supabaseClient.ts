@@ -47,6 +47,21 @@ export interface ErreurAuth {
   status?: number;
 }
 
+/**
+ * La surface de DONNÉES dont la phase 3 a besoin : écrire une ligne, et rien de plus.
+ *
+ * Volontairement dépourvue de toute méthode de LECTURE, et ce n'est pas une économie de frappe :
+ * jusqu'à la phase 4, Cadence ne doit pas pouvoir lire Supabase, parce qu'une donnée serveur qui
+ * écraserait la saisie locale serait une perte de données (devoir n°1). L'interdiction est donc
+ * inscrite dans le type, pas seulement dans une intention — on ne peut pas appeler `select` par
+ * distraction, il n'existe pas ici.
+ */
+export interface ClientDonnees {
+  from(table: string): {
+    upsert(ligne: Record<string, unknown>): PromiseLike<{ error: ErreurAuth | null }>;
+  };
+}
+
 export interface ConfigurationSupabase {
   url?: string;
   cleAnon?: string;
@@ -64,6 +79,22 @@ export interface ConfigurationSupabase {
  * @returns le client, ou `null` si la configuration est absente/vide/invalide. Ne lève jamais.
  */
 export function construireClientAuth(configuration: ConfigurationSupabase): ClientAuth | null {
+  return construireClient(configuration)?.auth ?? null;
+}
+
+/** Les deux surfaces exposées par Cadence, issues d'UN SEUL client Supabase. */
+export interface ClientCadence {
+  auth: ClientAuth;
+  donnees: ClientDonnees;
+}
+
+/**
+ * Construit le client à partir d'une configuration explicite, et n'en expose que deux surfaces
+ * étroites : `auth` (phase 2) et `donnees` (phase 3, écriture seule).
+ *
+ * @returns les deux surfaces, ou `null` si la configuration est absente/vide/invalide. Ne lève jamais.
+ */
+export function construireClient(configuration: ConfigurationSupabase): ClientCadence | null {
   const url = configuration.url?.trim();
   const cleAnon = configuration.cleAnon?.trim();
   if (!url || !cleAnon) return null;
@@ -88,7 +119,7 @@ export function construireClientAuth(configuration: ConfigurationSupabase): Clie
         flowType: "pkce",
       },
     });
-    return client.auth;
+    return { auth: client.auth, donnees: client };
   } catch {
     // `createClient` lève sur une URL malformée. Une variable d'environnement mal recopiée ne doit
     // pas empêcher Cadence de s'ouvrir : on retombe sur « connexion non configurée ».
@@ -96,23 +127,33 @@ export function construireClientAuth(configuration: ConfigurationSupabase): Clie
   }
 }
 
-let clientMemorise: ClientAuth | null | undefined;
+let clientMemorise: ClientCadence | null | undefined;
 
 /**
  * Le client de l'application, construit une seule fois.
  *
- * Un seul client pour toute l'app, parce que chaque `createClient` installe son propre
- * rafraîchissement de jeton et son propre écouteur : deux clients sur la même clé de stockage se
- * marcheraient dessus.
+ * UN SEUL client pour toute l'app, et c'est important : chaque `createClient` installe son propre
+ * rafraîchissement de jeton et son propre écouteur, donc deux clients sur la même clé de stockage se
+ * marcheraient dessus. C'est aussi pour ça que la surface `donnees` (phase 3) sort du MÊME client que
+ * la surface `auth` — elle porte ainsi forcément le jeton de la session en cours, sans qu'aucun code
+ * n'ait à le recopier quelque part.
  */
-export function obtenirClientAuth(): ClientAuth | null {
+function obtenirClient(): ClientCadence | null {
   if (clientMemorise === undefined) {
-    clientMemorise = construireClientAuth({
+    clientMemorise = construireClient({
       url: import.meta.env.VITE_SUPABASE_URL,
       cleAnon: import.meta.env.VITE_SUPABASE_ANON_KEY,
     });
   }
   return clientMemorise;
+}
+
+export function obtenirClientAuth(): ClientAuth | null {
+  return obtenirClient()?.auth ?? null;
+}
+
+export function obtenirClientDonnees(): ClientDonnees | null {
+  return obtenirClient()?.donnees ?? null;
 }
 
 /** Réservé aux tests : oublie le client mémorisé. */

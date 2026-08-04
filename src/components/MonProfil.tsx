@@ -12,6 +12,7 @@ import { PeriodeForm } from "./PeriodeForm";
 import { PeriodeList } from "./PeriodeList";
 import { DocumentsUtiles } from "./DocumentsUtiles";
 import { Compte } from "./Compte";
+import type { EtatMiroir } from "../storage/miroirSupabase";
 import { RenouvellementAnticipe } from "./RenouvellementAnticipe";
 import { DateNaissanceInput } from "./DateNaissanceInput";
 
@@ -25,9 +26,11 @@ interface MonProfilProps {
   periodes: PeriodeAssimilee[];
   onAjouterPeriode: (periode: Omit<PeriodeAssimilee, "id">) => void;
   onSupprimerPeriode: (id: string) => void;
+  /** État de la copie vers Supabase (phase 3). Calculé dans App, affiché par la section Compte. */
+  etatMiroir?: EtatMiroir;
 }
 
-export function MonProfil({ dateDuJour, profil, onModifierProfil, contrats, periodes, onAjouterPeriode, onSupprimerPeriode }: MonProfilProps) {
+export function MonProfil({ dateDuJour, profil, onModifierProfil, contrats, periodes, onAjouterPeriode, onSupprimerPeriode, etatMiroir }: MonProfilProps) {
   const [formPeriodeOuvert, setFormPeriodeOuvert] = useState(false);
   // Compté depuis la dernière VÉRIFICATION des constantes, pas depuis l'entrée en vigueur du SMIC
   // (point 14). Purement informatif : aucun seuil ne lui est appliqué, il ne déclenche rien.
@@ -273,7 +276,7 @@ export function MonProfil({ dateDuJour, profil, onModifierProfil, contrats, peri
       {/* Phase 2 de la refonte Supabase. Volontairement posé ici, dans un onglet qu'on visite, et non
           dans la barre du haut : la connexion est facultative et ne sert encore à rien, un appel à
           l'action permanent laisserait croire qu'il faut se connecter pour utiliser Cadence. */}
-      <Compte />
+      <Compte etatMiroir={etatMiroir} />
 
       <section>
         <h2 className="font-display text-lg font-medium mb-2">Périmètre du MVP</h2>

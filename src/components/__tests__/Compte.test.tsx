@@ -50,7 +50,9 @@ describe("Compte — connecté", () => {
     const client = fauxClient({ getSession: vi.fn(async () => ({ data: { session: SESSION }, error: null })) });
     render(<Compte client={client} origine={ORIGINE} />);
     expect(await screen.findByText("benoit@example.com")).toBeInTheDocument();
-    expect(screen.getByText(/restent enregistrés dans ce navigateur/i)).toBeInTheDocument();
+    expect(screen.getByText(/ce navigateur qui reste la référence/i)).toBeInTheDocument();
+    // Et l'énumération reste exacte : les frais réels ne sont PAS recopiés en phase 3.
+    expect(screen.getByText(/frais réels, eux, ne le sont pas encore/i)).toBeInTheDocument();
   });
 
   it("se rabat sur l'identifiant quand la session n'a pas d'adresse", async () => {
@@ -204,6 +206,47 @@ describe("Compte — retour d'un lien de connexion qui n'a pas ouvert de session
     render(<Compte client={fauxClient()} origine={ORIGINE} indiceRetour={{ present: false, erreurTransmise: null }} />);
     await screen.findByLabelText(/adresse e-mail/i);
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+});
+
+describe("Compte — le témoin de la copie serveur (phase 3)", () => {
+  function connecte(etatMiroir: Parameters<typeof Compte>[0]["etatMiroir"]) {
+    const client = fauxClient({ getSession: vi.fn(async () => ({ data: { session: SESSION }, error: null })) });
+    render(<Compte client={client} origine={ORIGINE} etatMiroir={etatMiroir} />);
+  }
+
+  it("ne dit rien quand il n'y a rien à dire", async () => {
+    connecte({ statut: "inactif" });
+    await screen.findByText("benoit@example.com");
+    expect(screen.queryByText(/copie/i)).not.toBeInTheDocument();
+  });
+
+  it("date la CONFIRMATION de la copie, sans promettre la sécurité des données", async () => {
+    // Le faux message à ne jamais écrire : « tes données sont en sécurité sur le serveur ». La source
+    // de vérité reste le navigateur jusqu'à la phase 5, et le témoin doit le redire.
+    connecte({ statut: "copie", horodatage: "2026-08-04T18:55:00.000Z" });
+    expect(await screen.findByText(/Copie sur le serveur confirmée à/i)).toBeInTheDocument();
+    expect(screen.getByText(/Ce navigateur reste la référence/i)).toBeInTheDocument();
+    expect(screen.queryByText(/en sécurité/i)).not.toBeInTheDocument();
+  });
+
+  it("annonce l'échec SANS laisser croire à une perte de données", async () => {
+    // L'écriture locale a réussi : présenter l'échec de la copie comme un incident de données serait
+    // une fausse alerte, et une fausse alerte finit par faire ignorer les vraies.
+    connecte({ statut: "echec", message: "TypeError: Failed to fetch" });
+    expect(await screen.findByText(/rien n'est perdu/i)).toBeInTheDocument();
+    expect(screen.getByText(/TypeError: Failed to fetch/)).toBeInTheDocument();
+    // Et ce n'est PAS une alerte au sens accessible : le seul `role="alert"` de cette section est
+    // réservé aux échecs d'action de l'utilisateur.
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("le témoin n'apparaît jamais quand personne n'est connecté", async () => {
+    // Même si App transmettait un état par erreur, une section déconnectée ne parle pas de copie.
+    render(<Compte client={fauxClient()} origine={ORIGINE} etatMiroir={{ statut: "echec", message: "peu importe" }} />);
+    await screen.findByLabelText(/adresse e-mail/i);
+    expect(screen.queryByText(/copie/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/peu importe/)).not.toBeInTheDocument();
   });
 });
 

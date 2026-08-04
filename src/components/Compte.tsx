@@ -14,6 +14,7 @@ import { useState } from "react";
 import { obtenirClientAuth, type ClientAuth } from "../auth/supabaseClient";
 import { useSession } from "../auth/session";
 import { INDICE_RETOUR_LIEN, type IndiceRetourLien } from "../auth/retourLienMagique";
+import type { EtatMiroir } from "../storage/miroirSupabase";
 import { LONGUEUR_MINIMALE_MOT_DE_PASSE, connexionMotDePasse, creerCompte, demanderLienMagique, seDeconnecter } from "../auth/actions";
 
 interface CompteProps {
@@ -23,6 +24,46 @@ interface CompteProps {
   origine?: string;
   /** Injecté par les tests ; par défaut, l'indice capturé au chargement de la page. */
   indiceRetour?: IndiceRetourLien;
+  /** État de la copie vers Supabase (phase 3), calculé dans App. */
+  etatMiroir?: EtatMiroir;
+}
+
+/**
+ * Le témoin de la copie serveur. Discret par construction, et jamais une alerte.
+ *
+ * POURQUOI IL N'ALARME PAS, MÊME EN CAS D'ÉCHEC : l'écriture locale, elle, a réussi. Rien n'est
+ * perdu. Crier au feu ici serait une fausse alerte, et une fausse alerte finit par faire ignorer les
+ * vraies.
+ * POURQUOI IL EXISTE QUAND MÊME : sans lui, un utilisateur connecté croirait ses données « sur le
+ * serveur » alors qu'aucune copie n'a jamais abouti. C'est cette croyance-là qui coûte des données.
+ */
+function TemoinMiroir({ etat }: { etat: EtatMiroir }) {
+  if (etat.statut === "inactif") return null;
+
+  if (etat.statut === "encours") {
+    return (
+      <p className="text-xs text-faint" aria-live="polite">
+        Copie vers le serveur en cours…
+      </p>
+    );
+  }
+
+  if (etat.statut === "copie") {
+    // Formulation exacte : on date la CONFIRMATION de la copie, on ne dit pas « tes données sont en
+    // sécurité » — la source de vérité reste ce navigateur jusqu'à la phase 5.
+    return (
+      <p className="text-xs text-faint" aria-live="polite">
+        Copie sur le serveur confirmée à {new Date(etat.horodatage).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}. Ce navigateur reste la référence.
+      </p>
+    );
+  }
+
+  return (
+    <div className="text-xs leading-relaxed" aria-live="polite">
+      <p className="text-amber">La copie vers le serveur a échoué. Tes données sont enregistrées dans ce navigateur, comme d'habitude — rien n'est perdu.</p>
+      <p className="text-faint mt-0.5">Détail : {etat.message}</p>
+    </div>
+  );
 }
 
 type Mode = "lienMagique" | "motDePasse";
@@ -44,7 +85,7 @@ function Cadre({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function Compte({ client = obtenirClientAuth(), origine, indiceRetour = INDICE_RETOUR_LIEN }: CompteProps) {
+export function Compte({ client = obtenirClientAuth(), origine, indiceRetour = INDICE_RETOUR_LIEN, etatMiroir = { statut: "inactif" } }: CompteProps) {
   const etat = useSession(client);
   const [mode, setMode] = useState<Mode>("lienMagique");
   const [email, setEmail] = useState("");
@@ -114,9 +155,15 @@ export function Compte({ client = obtenirClientAuth(), origine, indiceRetour = I
         <p className="text-ink">
           Connecté en tant que <span className="text-mint">{etat.email ?? etat.utilisateurId}</span>
         </p>
+        {/* Énumération volontairement précise : le miroir de la phase 3 ne couvre QUE
+            `donnees_utilisateur` (contrats, profil, périodes). Les frais réels et l'identité
+            déclarative ont leurs propres stockages, pas encore recopiés. Laisser croire que tout part
+            sur le serveur serait une fausse affirmation, et la plus coûteuse de toutes ici. */}
         <p className="text-xs text-faint leading-relaxed">
-          Ça ne change encore rien : tes contrats, tes frais réels et ton profil restent enregistrés dans ce navigateur. Le déplacement vers le serveur viendra plus tard, et il te sera demandé explicitement.
+          Tes contrats et ton profil sont recopiés sur le serveur à chaque enregistrement. Tes frais réels, eux, ne le sont pas encore. Et dans tous les cas, c'est ce navigateur qui reste la
+          référence : le basculement viendra plus tard, et il te sera demandé explicitement.
         </p>
+        <TemoinMiroir etat={etatMiroir} />
         <button type="button" onClick={() => lancer(seDeconnecter)} disabled={enCours} className="px-4 py-2 rounded-lg border border-line text-muted disabled:opacity-40">
           {enCours ? "…" : "Se déconnecter"}
         </button>

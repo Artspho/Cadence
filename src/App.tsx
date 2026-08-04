@@ -14,6 +14,9 @@ import {
   type DonneesApp,
   type ResultatChargement,
 } from "./storage/localStorageAdapter";
+import { copierDonneesVersSupabase, type EtatMiroir } from "./storage/miroirSupabase";
+import { obtenirClientAuth, obtenirClientDonnees } from "./auth/supabaseClient";
+import { useSession } from "./auth/session";
 import { EcranDonneesIllisibles } from "./components/EcranDonneesIllisibles";
 import { calculerFenetreEnCours } from "./engine/periodeReference";
 import { calculerDecompteHeures } from "./engine/decompteHeures";
@@ -101,6 +104,51 @@ export default function App() {
     // n°2 de la critique — le sujet complet, quota plein et purge, reste ouvert).
     sauvegarderDonnees(donnees).then((resultat) => setErreurSauvegarde(resultat.ok ? null : resultat.message));
   }, [donnees, lectureSaine]);
+
+  // ── PHASE 3 : LA COPIE VERS SUPABASE ────────────────────────────────────────────────────────────
+  // Effet DÉLIBÉRÉMENT SÉPARÉ de la sauvegarde locale ci-dessus, et surtout pas fusionné avec elle :
+  // la copie serveur ne doit ni retarder, ni conditionner, ni pouvoir faire échouer l'écriture dans
+  // le navigateur. Le localStorage reste la source de vérité jusqu'à la phase 5 ; ceci est une copie
+  // EN PLUS. Aucune lecture : cf. le commentaire d'en-tête de storage/miroirSupabase.ts.
+  const clientAuth = obtenirClientAuth();
+  const clientDonnees = obtenirClientDonnees();
+  const session = useSession(clientAuth);
+  const [etatMiroir, setEtatMiroir] = useState<EtatMiroir>({ statut: "inactif" });
+  // Empreinte de la dernière copie CONFIRMÉE. Évite de réécrire la même chose à chaque changement de
+  // session (un simple rafraîchissement de jeton relance cet effet) — et n'est remise à zéro qu'à la
+  // déconnexion, pour que la reconnexion recopie bien tout.
+  const empreinteCopiee = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!lectureSaine || !donnees) return;
+
+    if (session.statut !== "connecte" || !clientDonnees) {
+      // Pas de session (ou pas de configuration) : il n'y a rien à dire, et surtout rien à afficher.
+      setEtatMiroir({ statut: "inactif" });
+      empreinteCopiee.current = null;
+      return;
+    }
+
+    const empreinte = JSON.stringify(donnees);
+    if (empreinteCopiee.current === empreinte) return;
+
+    let annule = false;
+    setEtatMiroir({ statut: "encours" });
+    copierDonneesVersSupabase(clientDonnees, session.utilisateurId, donnees).then((resultat) => {
+      if (annule) return;
+      if (resultat.ok) {
+        empreinteCopiee.current = empreinte;
+        setEtatMiroir({ statut: "copie", horodatage: resultat.horodatage });
+      } else {
+        // On ne mémorise PAS l'empreinte en cas d'échec : le prochain changement doit réessayer.
+        setEtatMiroir({ statut: "echec", message: resultat.message });
+      }
+    });
+
+    return () => {
+      annule = true;
+    };
+  }, [donnees, lectureSaine, session, clientDonnees]);
 
   const calculs = useMemo(() => {
     if (!donnees?.profil) return null;
@@ -588,6 +636,7 @@ export default function App() {
             periodes={donnees.periodes}
             onAjouterPeriode={ajouterPeriode}
             onSupprimerPeriode={supprimerPeriode}
+            etatMiroir={etatMiroir}
           />
         )}
 
