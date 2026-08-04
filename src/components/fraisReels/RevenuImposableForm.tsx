@@ -1,4 +1,5 @@
 import type { ProfilFiscalFraisReels, RevenuImposableArtistique } from "../../types/fraisReels";
+import { estSaisieNegative } from "../../lib/saisieNombrePositif";
 
 interface RevenuImposableFormProps {
   revenu: RevenuImposableArtistique;
@@ -30,7 +31,12 @@ function champNombre(valeur: number, onChange: (v: number) => void, id: string, 
         step="0.01"
         value={valeur === 0 ? "" : valeur}
         placeholder="0"
-        onChange={(e) => onChange(e.target.value === "" ? 0 : parseFloat(e.target.value))}
+        // Champ sans <form> : `min="0"` ci-dessus ne bloque rien, il faut le garde ici
+        // (cf. lib/saisieNombrePositif.ts — un salaire à −5 000 € affichait « Base R = -5000.00 € »).
+        onChange={(e) => {
+          if (estSaisieNegative(e.target.value)) return;
+          onChange(e.target.value === "" ? 0 : parseFloat(e.target.value));
+        }}
         className="w-full bg-surface-2 border border-line rounded-lg px-3 py-2 text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-mint"
       />
       {aide && <p className="text-xs text-faint mt-1">{aide}</p>}

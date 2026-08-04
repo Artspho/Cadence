@@ -5,6 +5,7 @@ import { EMAIL_FEEDBACK, construireLienFeedback } from "../config/contact";
 import { profilHorsPerimetre, regimeEffectif } from "../lib/profilHorsPerimetre";
 import { CONTRADICTION_HORS_A10 } from "../content/contradictionHorsA10";
 import { validerCoherenceProfil } from "../lib/coherenceProfil";
+import { estSaisieNegative } from "../lib/saisieNombrePositif";
 import type { ResultatEcritureProfil } from "../lib/coherenceProfil";
 import type { Contrat, PeriodeAssimilee, Profil } from "../types";
 import { PeriodeForm } from "./PeriodeForm";
@@ -366,6 +367,7 @@ function SalairesHorsAnnexe10({ profil, onModifierProfil }: { profil: Profil; on
         placeholder="0 si tu n'as eu que des contrats spectacle"
         value={saisie}
         onChange={(e) => {
+          if (estSaisieNegative(e.target.value)) return; // champ sans <form> : min={0} ne bloque rien
           setSaisie(e.target.value);
           setErreur(null);
         }}
@@ -505,7 +507,10 @@ function MonIndemnisationEnCours({
             type="number"
             min={0}
             value={franchiseSalairesTotale}
-            onChange={(e) => setFranchiseSalairesTotale(e.target.value)}
+            onChange={(e) => {
+              if (estSaisieNegative(e.target.value)) return;
+              setFranchiseSalairesTotale(e.target.value);
+            }}
             placeholder="non renseignée"
             className="w-full bg-surface-2 border border-line rounded-lg px-3 py-2 text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-mint"
           />
@@ -691,7 +696,10 @@ function GestionAjReelle({ profil, onModifierProfil }: { profil: Profil; onModif
             min={0}
             step="0.01"
             value={valeur}
-            onChange={(e) => setValeur(e.target.value)}
+            onChange={(e) => {
+              if (estSaisieNegative(e.target.value)) return;
+              setValeur(e.target.value);
+            }}
             className="w-full bg-surface-2 border border-line rounded-lg px-3 py-2 text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-mint"
           />
         </div>
@@ -801,7 +809,10 @@ function GestionTauxPAS({ profil, onModifierProfil }: { profil: Profil; onModifi
             step={0.1}
             placeholder="ex. 7,2"
             value={valeur}
-            onChange={(e) => setValeur(e.target.value)}
+            onChange={(e) => {
+              if (estSaisieNegative(e.target.value)) return;
+              setValeur(e.target.value);
+            }}
             className="w-full bg-surface-2 border border-line rounded-lg px-3 py-2 text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-mint"
           />
         </div>

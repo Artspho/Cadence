@@ -1,6 +1,7 @@
 import type { ConfigFraisReels, Depense, ModeForfait } from "../../types/fraisReels";
 import type { FranceTravailConfig } from "../../config/franceTravailConfig";
 import { calculerArbitrageForfaits } from "../../lib/arbitrageForfaits";
+import { estSaisieNegative } from "../../lib/saisieNombrePositif";
 import { DriveSettings } from "./DriveSettings";
 import { FraisKilometriques } from "./FraisKilometriques";
 
@@ -94,7 +95,10 @@ export function ForfaitsReglages({ config, depenses, ftConfig, onChangerConfig, 
                 min="0"
                 step="0.1"
                 value={config.localPro.surfaceTotalM2 === 0 ? "" : config.localPro.surfaceTotalM2}
-                onChange={(e) => onChangerConfig({ ...config, localPro: { ...config.localPro!, surfaceTotalM2: e.target.value === "" ? 0 : parseFloat(e.target.value) } })}
+                onChange={(e) => {
+                  if (estSaisieNegative(e.target.value)) return; // champ sans <form> : min="0" ne bloque rien
+                  onChangerConfig({ ...config, localPro: { ...config.localPro!, surfaceTotalM2: e.target.value === "" ? 0 : parseFloat(e.target.value) } });
+                }}
                 className="w-full bg-surface-2 border border-line rounded-lg px-3 py-2"
               />
             </div>
@@ -108,7 +112,10 @@ export function ForfaitsReglages({ config, depenses, ftConfig, onChangerConfig, 
                 min="0"
                 step="0.1"
                 value={config.localPro.surfaceProM2 === 0 ? "" : config.localPro.surfaceProM2}
-                onChange={(e) => onChangerConfig({ ...config, localPro: { ...config.localPro!, surfaceProM2: e.target.value === "" ? 0 : parseFloat(e.target.value) } })}
+                onChange={(e) => {
+                  if (estSaisieNegative(e.target.value)) return;
+                  onChangerConfig({ ...config, localPro: { ...config.localPro!, surfaceProM2: e.target.value === "" ? 0 : parseFloat(e.target.value) } });
+                }}
                 className="w-full bg-surface-2 border border-line rounded-lg px-3 py-2"
               />
             </div>
@@ -138,7 +145,10 @@ export function ForfaitsReglages({ config, depenses, ftConfig, onChangerConfig, 
               min="0"
               step="1"
               value={config.nombreRepasC3 === 0 ? "" : (config.nombreRepasC3 ?? "")}
-              onChange={(e) => onChangerConfig({ ...config, nombreRepasC3: e.target.value === "" ? 0 : parseInt(e.target.value, 10) })}
+              onChange={(e) => {
+                if (estSaisieNegative(e.target.value)) return;
+                onChangerConfig({ ...config, nombreRepasC3: e.target.value === "" ? 0 : parseInt(e.target.value, 10) });
+              }}
               className="w-full bg-surface-2 border border-line rounded-lg px-3 py-2"
             />
             <p className="text-xs text-faint">

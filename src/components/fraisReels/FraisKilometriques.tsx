@@ -6,6 +6,7 @@ import type { ConfigFraisReels } from "../../types/fraisReels";
 import type { FranceTravailConfig } from "../../config/franceTravailConfig";
 import { calculerFraisKilometriques, type ParamsFraisKilometriques, type TypeVehicule } from "../../engine/fraisReels/calculerFraisKilometriques";
 import { afficherQuestionChoixPersonnel, descriptifFraisKm, optionsPuissanceFiscale } from "../../lib/fraisKilometriquesUi";
+import { estSaisieNegative } from "../../lib/saisieNombrePositif";
 
 interface FraisKilometriquesProps {
   config: ConfigFraisReels;
@@ -118,7 +119,10 @@ function BlocC1({ params, ftConfig, onChanger }: { params: ParamsFraisKilometriq
                 min="0"
                 step="0.1"
                 value={trajet.distanceDomicileTravail === 0 ? "" : trajet.distanceDomicileTravail}
-                onChange={(e) => onChanger({ ...params, trajet: { ...trajet, distanceDomicileTravail: e.target.value === "" ? 0 : parseFloat(e.target.value) } })}
+                onChange={(e) => {
+                  if (estSaisieNegative(e.target.value)) return; // champ sans <form> : min="0" ne bloque rien
+                  onChanger({ ...params, trajet: { ...trajet, distanceDomicileTravail: e.target.value === "" ? 0 : parseFloat(e.target.value) } });
+                }}
                 className="w-full bg-surface-2 border border-line rounded-lg px-3 py-2"
               />
             </div>
@@ -132,7 +136,10 @@ function BlocC1({ params, ftConfig, onChanger }: { params: ParamsFraisKilometriq
                 min="0"
                 step="1"
                 value={trajet.nombreAR === 0 ? "" : trajet.nombreAR}
-                onChange={(e) => onChanger({ ...params, trajet: { ...trajet, nombreAR: e.target.value === "" ? 0 : parseInt(e.target.value, 10) } })}
+                onChange={(e) => {
+                  if (estSaisieNegative(e.target.value)) return;
+                  onChanger({ ...params, trajet: { ...trajet, nombreAR: e.target.value === "" ? 0 : parseInt(e.target.value, 10) } });
+                }}
                 className="w-full bg-surface-2 border border-line rounded-lg px-3 py-2"
               />
             </div>
@@ -202,7 +209,10 @@ function BlocC2({ params, ftConfig, onChanger }: { params: ParamsFraisKilometriq
               min="0"
               step="0.1"
               value={trajet.kmParcourus === 0 ? "" : trajet.kmParcourus}
-              onChange={(e) => onChanger({ ...params, trajet: { ...trajet, kmParcourus: e.target.value === "" ? 0 : parseFloat(e.target.value) } })}
+              onChange={(e) => {
+                if (estSaisieNegative(e.target.value)) return;
+                onChanger({ ...params, trajet: { ...trajet, kmParcourus: e.target.value === "" ? 0 : parseFloat(e.target.value) } });
+              }}
               className="w-full bg-surface-2 border border-line rounded-lg px-3 py-2"
             />
           </div>
