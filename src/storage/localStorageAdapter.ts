@@ -212,6 +212,40 @@ function migrer(brut: unknown) {
   return migrerTauxPASHistorique(migrerSoldeVersDateDepart(migrerAjReelleHistoriqueVersProfil(migrerContratsDateDebut(migrerAjReelleHistorique(brut)))));
 }
 
+/** Motif de refus lisible : OÙ ça coince et pourquoi, jamais un « structure invalide » opaque. */
+function decrireEchecSchema(erreur: z.ZodError): string {
+  return erreur.issues.map((i) => `${i.path.join(".") || "(racine)"} : ${i.message}`).join(" · ");
+}
+
+export type ResultatValidationLecture = { ok: true; donnees: DonneesApp } | { ok: false; detail: string };
+
+/**
+ * Valide un contenu DÉJÀ désérialisé avec le schéma de LECTURE, migrations comprises.
+ *
+ * Extraite pour que la phase 5 (lecture de Supabase) passe par le MÊME schéma que `chargerDonnees`,
+ * et surtout pas par celui d'écriture. La distinction n'est pas cosmétique : `donneesAppSchemaEcriture`
+ * applique en plus les règles de COHÉRENCE (cf. lib/coherenceProfil.ts). Un état parfaitement
+ * légitime, enregistré avant l'ajout d'une de ces règles, serait alors refusé à la simple ouverture
+ * de l'app — et un refus de lecture ressemble trait pour trait à une perte de données (devoir
+ * sacré n°1). Une nouvelle règle de cohérence doit donc rester hors de ce chemin, ici comme pour le
+ * `localStorage`.
+ *
+ * Ne lève jamais : une migration qui trébucherait sur une donnée inattendue devient un refus motivé,
+ * pas une exception qui remonterait jusqu'au rendu.
+ */
+export function validerDonneesLues(brut: unknown): ResultatValidationLecture {
+  let migre: unknown;
+  try {
+    migre = migrer(brut);
+  } catch (erreur) {
+    return { ok: false, detail: detailErreur(erreur) };
+  }
+
+  const parse = donneesAppSchemaLecture.safeParse(migre);
+  if (!parse.success) return { ok: false, detail: decrireEchecSchema(parse.error) };
+  return { ok: true, donnees: parse.data };
+}
+
 /**
  * Issue d'une tentative de lecture — TROIS cas distincts, jamais confondus (correctif du
  * 03/08/2026, point 🔴 n°1 de docs/critique_2026-08-03.md).
@@ -264,8 +298,8 @@ function lireSauvegarde(): DonneesApp | null {
   const brut = lireBrut(CLE_SAUVEGARDE);
   if (brut === null) return null;
   try {
-    const parse = donneesAppSchemaLecture.safeParse(migrer(JSON.parse(brut)));
-    return parse.success ? parse.data : null;
+    const validation = validerDonneesLues(JSON.parse(brut));
+    return validation.ok ? validation.donnees : null;
   } catch {
     return null;
   }
@@ -286,13 +320,14 @@ export async function chargerDonnees(): Promise<ResultatChargement> {
   if (brut === null) return { statut: "vide" };
 
   try {
-    const parse = donneesAppSchemaLecture.safeParse(migrer(JSON.parse(brut)));
-    if (!parse.success) {
-      return { statut: "illisible", brut, detail: parse.error.issues.map((i) => `${i.path.join(".") || "(racine)"} : ${i.message}`).join(" · "), sauvegarde: lireSauvegarde() };
+    const validation = validerDonneesLues(JSON.parse(brut));
+    if (!validation.ok) {
+      return { statut: "illisible", brut, detail: validation.detail, sauvegarde: lireSauvegarde() };
     }
-    return { statut: "ok", donnees: parse.data };
+    return { statut: "ok", donnees: validation.donnees };
   } catch (erreur) {
-    // Couvre JSON.parse ET une migration qui lèverait sur une donnée inattendue.
+    // Couvre `JSON.parse` seul désormais : une migration qui lèverait est déjà rattrapée à
+    // l'intérieur de `validerDonneesLues`, qui rend un refus motivé au lieu d'une exception.
     return { statut: "illisible", brut, detail: detailErreur(erreur), sauvegarde: lireSauvegarde() };
   }
 }

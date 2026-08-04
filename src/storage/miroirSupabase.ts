@@ -39,7 +39,7 @@ export type ResultatMiroir =
  * Utile précisément parce que la confusion entre appareils et entre URLs est ce qui a déjà coûté ses
  * contrats à Benoît une fois.
  */
-function decrireAppareil(): string | null {
+export function decrireAppareil(): string | null {
   if (typeof navigator === "undefined" || typeof navigator.userAgent !== "string") return null;
   return navigator.userAgent.slice(0, 200);
 }

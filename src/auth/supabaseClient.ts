@@ -89,6 +89,65 @@ export interface ClientLectureDonnees {
   };
 }
 
+/**
+ * Erreur telle que PostgREST la rend, avec son code SQLSTATE — distincte d'`ErreurAuth` exprès.
+ *
+ * `code` n'est pas un luxe de diagnostic : `23505` (violation d'unicité) est ce qui permet de
+ * distinguer « la ligne existait déjà, quelqu'un a écrit avant moi » d'une panne réseau. Les deux
+ * doivent conduire à des écrans différents — refus de conflit d'un côté, indisponibilité de l'autre —
+ * donc les confondre afficherait une cause fausse.
+ */
+export interface ErreurPostgrest {
+  message: string;
+  /** Code SQLSTATE quand PostgREST le fournit. `23505` = la ligne existe déjà. */
+  code?: string;
+}
+
+/**
+ * LA SURFACE DE LA PHASE 5 — lire l'état, et l'écrire SOUS CONDITION.
+ *
+ * TROISIÈME type, et non un élargissement des deux précédents. `ClientDonnees` (phase 3) doit rester
+ * incapable de lire et `ClientLectureDonnees` (phase 4) incapable d'écrire : ces interdictions
+ * protègent du code déjà écrit, qui n'a pas été relu pour la bascule. Ajouter des méthodes à l'un ou
+ * l'autre les aurait levées en silence pour lui.
+ *
+ * ⚠️ `update` expose DEUX `eq` chaînés, et c'est le cœur du verrou : le premier filtre l'utilisateur,
+ * le second exige que `maj_le` vaille encore ce qui a été lu. Une écriture qui ne peut pas nommer la
+ * version qu'elle remplace n'est pas exprimable avec ce type — c'est voulu.
+ *
+ * Pas d'`upsert` ici, alors que la phase 3 s'en sert : un upsert écrase la ligne existante sans rien
+ * demander, ce qui est exactement l'écrasement entre appareils que cette phase installe pour
+ * empêcher. La première écriture passe donc par `insert`, qui échoue si la ligne existe déjà.
+ */
+export interface ClientSourceDonnees {
+  from(table: string): {
+    select(colonnes: string): {
+      eq(
+        colonne: string,
+        valeur: string,
+      ): {
+        maybeSingle(): PromiseLike<{ data: Record<string, unknown> | null; error: ErreurPostgrest | null }>;
+      };
+    };
+    insert(ligne: Record<string, unknown>): {
+      select(colonnes: string): PromiseLike<{ data: Record<string, unknown>[] | null; error: ErreurPostgrest | null }>;
+    };
+    update(valeurs: Record<string, unknown>): {
+      eq(
+        colonne: string,
+        valeur: string,
+      ): {
+        eq(
+          colonne: string,
+          valeur: string,
+        ): {
+          select(colonnes: string): PromiseLike<{ data: Record<string, unknown>[] | null; error: ErreurPostgrest | null }>;
+        };
+      };
+    };
+  };
+}
+
 export interface ConfigurationSupabase {
   url?: string;
   cleAnon?: string;
@@ -115,6 +174,8 @@ export interface ClientCadence {
   donnees: ClientDonnees;
   /** Phase 4 : la lecture, réservée à la vérification. Cf. `ClientLectureDonnees`. */
   lecture: ClientLectureDonnees;
+  /** Phase 5 : lecture + écriture sous condition, pour la bascule. Cf. `ClientSourceDonnees`. */
+  source: ClientSourceDonnees;
 }
 
 /**
@@ -158,7 +219,12 @@ export function construireClient(configuration: ConfigurationSupabase): ClientCa
     // elle, est exactement celle-ci — c'est le chemin d'appel documenté de la bibliothèque, et
     // `verificationMigration.test.ts` vérifie qu'aucune autre méthode n'est sollicitée. `donnees`
     // (upsert) reste vérifié normalement par le compilateur.
-    return { auth: client.auth, donnees: client, lecture: client as unknown as ClientLectureDonnees };
+    // `source` (phase 5) subit la même assertion que `lecture`, et pour la même raison mécanique :
+    // les chaînes `select().eq().maybeSingle()` et `update().eq().eq().select()` de
+    // @supabase/supabase-js portent un typage générique trop profond pour être rapproché de nos
+    // interfaces étroites (TS2589). La forme réelle est exactement celle décrite ; ce que l'assertion
+    // ne peut pas garantir, `sourceSupabase.test.ts` le vérifie en exerçant chaque chaîne d'appel.
+    return { auth: client.auth, donnees: client, lecture: client as unknown as ClientLectureDonnees, source: client as unknown as ClientSourceDonnees };
   } catch {
     // `createClient` lève sur une URL malformée. Une variable d'environnement mal recopiée ne doit
     // pas empêcher Cadence de s'ouvrir : on retombe sur « connexion non configurée ».
@@ -197,6 +263,10 @@ export function obtenirClientDonnees(): ClientDonnees | null {
 
 export function obtenirClientLectureDonnees(): ClientLectureDonnees | null {
   return obtenirClient()?.lecture ?? null;
+}
+
+export function obtenirClientSourceDonnees(): ClientSourceDonnees | null {
+  return obtenirClient()?.source ?? null;
 }
 
 /** Réservé aux tests : oublie le client mémorisé. */
