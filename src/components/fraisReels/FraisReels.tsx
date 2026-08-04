@@ -137,6 +137,13 @@ export function FraisReels({ profil, soldeIndemnisationDepart, contrats, config,
     setDonnees((d) => (d ? { ...d, config: fraisReelsConfig, depenses: d.depenses.map((dep) => (dep.id === depense.id ? depense : dep)) } : d));
   }
 
+  // Remplace la liste entière : l'envoi des justificatifs vers Drive met à jour plusieurs dépenses en
+  // une passe (cf. lib/envoiJustificatifsEnAttente.ts), et les écrire une par une multiplierait les
+  // sauvegardes — donc les occasions d'échouer à mi-chemin sur un stockage déjà plein.
+  function remplacerDepenses(depensesMaj: Depense[]) {
+    setDonnees((d) => (d ? { ...d, config: fraisReelsConfig, depenses: depensesMaj } : d));
+  }
+
   function supprimerDepense(id: string) {
     setDonnees((d) => (d ? { ...d, config: fraisReelsConfig, depenses: d.depenses.filter((dep) => dep.id !== id) } : d));
   }
@@ -242,7 +249,7 @@ export function FraisReels({ profil, soldeIndemnisationDepart, contrats, config,
         onSupprimer={supprimerDepense}
       />
 
-      <ForfaitsReglages config={fraisReelsConfig} depenses={depenses} ftConfig={config} onChangerConfig={ecrireConfig}>
+      <ForfaitsReglages config={fraisReelsConfig} depenses={depenses} ftConfig={config} onChangerConfig={ecrireConfig} onRemplacerDepenses={remplacerDepenses}>
         <AmortissementBiens anneeImposition={anneeFiscale} biens={biens} ftConfig={config} onAjouter={ajouterBienAmorti} onSupprimer={supprimerBienAmorti} />
       </ForfaitsReglages>
 

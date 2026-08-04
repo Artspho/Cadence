@@ -3,6 +3,7 @@ import type { FranceTravailConfig } from "../../config/franceTravailConfig";
 import { calculerArbitrageForfaits } from "../../lib/arbitrageForfaits";
 import { estSaisieNegative } from "../../lib/saisieNombrePositif";
 import { DriveSettings } from "./DriveSettings";
+import { JustificatifsEnAttente } from "./JustificatifsEnAttente";
 import { FraisKilometriques } from "./FraisKilometriques";
 
 interface ForfaitsReglagesProps {
@@ -10,6 +11,8 @@ interface ForfaitsReglagesProps {
   depenses: Depense[];
   ftConfig: FranceTravailConfig;
   onChangerConfig: (config: ConfigFraisReels) => void;
+  /** Remplace la liste entière de dépenses — l'envoi vers Drive en met plusieurs à jour d'un coup. */
+  onRemplacerDepenses: (depenses: Depense[]) => void;
   // Blocs supplémentaires de la carte « réglages » dont l'état ne vit pas dans ConfigFraisReels
   // (biens amortis : liste durable, hors année fiscale) — passés en children plutôt qu'en props
   // pour éviter de faire transiter leur état par ce composant, qui n'en a pas besoin.
@@ -41,7 +44,7 @@ function RubriqueForfait({ label, mode, montantForfait, montantReel, onChanger }
   );
 }
 
-export function ForfaitsReglages({ config, depenses, ftConfig, onChangerConfig, children }: ForfaitsReglagesProps) {
+export function ForfaitsReglages({ config, depenses, ftConfig, onChangerConfig, onRemplacerDepenses, children }: ForfaitsReglagesProps) {
   const forfaitsDesactives = config.profilFiscal === "enseignant_pur";
 
   // Même source que la carte de comparaison (FraisReelsGraphiques) : un seul endroit rejoue
@@ -161,6 +164,12 @@ export function ForfaitsReglages({ config, depenses, ftConfig, onChangerConfig, 
       <FraisKilometriques config={config} ftConfig={ftConfig} onChangerConfig={onChangerConfig} />
 
       {children}
+
+      {/* Placé AVANT le bloc de connexion Drive : quand il y a des justificatifs à faire sortir, c'est
+          l'information la plus utile de cette carte — et elle explique pourquoi connecter Drive. */}
+      <div className="border-t border-line pt-5 space-y-3">
+        <JustificatifsEnAttente depenses={depenses} driveConnecte={Boolean(config.driveConnecte)} onRemplacerDepenses={onRemplacerDepenses} />
+      </div>
 
       <DriveSettings config={config} onChangerConfig={onChangerConfig} />
     </section>

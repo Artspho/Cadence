@@ -74,9 +74,14 @@ export function DepenseForm({ anneeFiscale, valeurInitiale, ratioLocalPro, nombr
           setEnvoiEnCours(false);
           return;
         } catch {
-          setErreur("Échec de l'envoi vers Google Drive — fichier stocké localement à la place.");
+          // Décision de Benoît du 04/08/2026 : le justificatif est gardé localement mais l'utilisateur
+          // doit SAVOIR qu'il n'est pas parti, et savoir qu'il pourra réessayer. L'ancien message
+          // (« fichier stocké localement à la place ») sonnait comme un rangement définitif : c'est ce
+          // repli d'apparence anodine qui remplissait le stockage à l'insu de l'utilisateur, exactement
+          // le problème que ce chantier ferme. Le compteur de « Réglages » liste ensuite ce qui attend.
+          setErreur("Envoi vers Google Drive impossible pour l'instant — le justificatif est conservé dans ce navigateur et reste à envoyer. Tu le retrouveras dans « Réglages forfaits » pour réessayer.");
           setEnvoiEnCours(false);
-          // tombe dans le fallback localStorage ci-dessous
+          // tombe dans le stockage local ci-dessous : rien n'est perdu, et l'envoi restera à faire
         }
       }
     }
