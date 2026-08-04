@@ -95,16 +95,97 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 
 ## État actuel
 
-> **Repère au 04/08/2026, fin de session (5)** — **830 tests verts** (68 fichiers), `tsc -b` propre
-> sur les deux tsconfig, `npm run build` propre. Working tree **propre**.
+> **Repère au 04/08/2026, session (6) — LE PROJET A CHANGÉ DE DIRECTION.** **847 tests verts**
+> (69 fichiers), `tsc -b` propre sur les deux tsconfig, `npm run build` propre.
 >
-> ⚠️ **UN COMMIT EN ATTENTE DE VALIDATION, NON POUSSÉ : `f9a17f7`** (envoi des justificatifs vers
-> Drive, étape 1). Il a été fait **sans feu vert explicite de Benoît** : il a demandé un passage de
-> relais avant de répondre, et son mode opératoire interdit de quitter sur un arbre de travail sale
-> (du non committé ne survit pas à un changement de session). **Première chose à faire au prochain
-> fil : lui demander s'il le valide.** S'il refuse : `git reset --soft HEAD~1` ramène tout dans
-> l'arbre sans rien perdre. S'il valide : `git push origin master`.
-> `origin/master` est à **`4f86203`** — tout le reste est poussé.
+> ✅ `f9a17f7` **a été validé par Benoît et poussé.** `origin/master` est à **`18abb98`**, et `master`
+> est en avance de trois commits validés : `c786ecb` (point 8), `5607854` (point 9), `184c933`
+> (phase 1). Rien n'attend de validation.
+>
+> ## 🔴 REFONTE SUPABASE — décidée le 04/08/2026, elle recadre tout le reste
+>
+> **Supabase devient la source de vérité ; le `localStorage` cesse de l'être.** Benoît a choisi ce
+> « niveau 3 » **contre ma recommandation** (je proposais le niveau 2 : local source de vérité +
+> Supabase en sauvegarde) et l'a réaffirmé. **C'est acté — ne pas rouvrir le débat.** Il a accepté en
+> connaissance de cause les deux conséquences : **plus d'ouverture hors ligne, plus d'usage sans
+> compte**. Son argument décisif, que je n'ai pas contesté : il a **déjà perdu ses contrats une fois**
+> (point 22) et un `localStorage` n'a aucune sauvegarde.
+>
+> **Ce qui a rendu la refonte défendable, mesuré et non supposé** : `chargerDonnees` /
+> `sauvegarderDonnees` sont **déjà asynchrones et renvoient déjà ok/échec** (acquis du point 2), et
+> seuls **9 fichiers sur 184** touchent le stockage. L'obstacle habituel — passer une app d'un
+> stockage instantané à un stockage lent et faillible — était déjà franchi.
+>
+> **Ses 7 arbitrages, validés par écrit. Ne pas les re-litiger :**
+> 1. **JSONB, une ligne par utilisateur** (option B), pas 7 tables relationnelles : la forme des
+>    données ne change pas, donc le schéma Zod reste le validateur et la migration est réversible ;
+> 2. auth = **lien magique + mot de passe de secours** (supprime le point de panne unique sur l'accès
+>    à ses propres données) ;
+> 3. région **Paris `eu-west-3`** — ⚠️ **pas** « Europe », qui inclut Londres et Zurich, hors UE ;
+> 4. **palier gratuit d'abord**, payant quand les limites arrivent. ⚠️ **Le point de décision tombe à
+>    la phase 5** : un projet gratuit est mis en pause après **7 jours d'inactivité**, et une pause =
+>    app qui ne s'ouvre plus dès que Supabase est la source de vérité. **Le lui rappeler là**, pas avant ;
+> 5. **protocole de migration en 6 étapes**, validé tel quel : export JSON hors navigateur → migration
+>    en lecture seule → **vérification chiffrée** (62 contrats, 588 h, 4 mois certifiés) → son feu vert
+>    → **rien n'est supprimé localement** → retour arrière testé **avant**, pas après ;
+> 6. consentement testeurs : **son texte mot pour mot** — « Mes documents sont stockés sur un serveur.
+>    Ils servent uniquement à calculer mon statut. » Case à cocher **horodatée et journalisée** (pas une
+>    case UI volatile), affichée une fois à l'inscription. ⚠️ **Réserve à lui reposer en phase 6** :
+>    « uniquement à calculer mon statut » ne couvre pas les justificatifs de frais réels (qui servent une
+>    déclaration fiscale), et le texte ne dit pas qu'il peut **techniquement** lire les documents des
+>    testeurs (`service_role` contourne RLS) ;
+> 7. **mentions légales + politique de confidentialité minimales AVANT la phase 6** — sa demande, motif :
+>    des documents portant potentiellement le NIR de tiers vont vivre sur un serveur qu'il gère.
+>    « Pas besoin d'un luxe juridique, juste l'essentiel. »
+>
+> **Séquence en 9 phases, validée :**
+> | Phase | Contenu | État |
+> |---|---|---|
+> | 0 | points **8** et **9** | ✅ faite (`c786ecb`, `5607854`) — le 8 reste **compté ouvert** (ni auth ni quota) |
+> | 1 | projet Supabase, 7 tables, RLS | ✅ **PROUVÉE** — `npm run verifier:rls` : **64 contrôles, 64 conformes** |
+> | 2 | authentification | ⬜ **prochaine action** |
+> | 3 | adaptateur Supabase derrière l'interface existante | ⬜ — les 830→847 tests doivent rester verts |
+> | 4 | migration + vérification chiffrée | ⬜ |
+> | 5 | bascule, sur son feu vert écrit | ⬜ |
+> | 6 | documents (conserver, puis envoyer) | ⬜ — le chantier d'origine |
+> | 7 | hors ligne | ⬜ **optionnel, repoussé exprès** : il n'a jamais répondu sur ce point, la question est sortie du chemin critique pour ne pas le bloquer |
+> | 8 | les 7 points réglementaires restants | ⬜ quand une source tombe |
+>
+> **Isolation prouvée le 04/08/2026**, et c'est le livrable de la phase 1 : `scripts/verifier-rls.mjs`
+> exerce les 7 tables + le stockage de fichiers. Un utilisateur ne peut ni voir, ni modifier, ni
+> supprimer, ni **écrire au nom d'un autre** (usurpation d'`user_id` refusée en 403 par le `with
+> check` — chemin d'attaque oublié de la première version du script, trouvé en relisant la grille et
+> non parce qu'un test rougissait). Le SQL, jamais exécuté ni analysé avant application (ni Docker ni
+> `psql` sur la machine), est passé du premier coup.
+>
+> ⚠️ **Ce que la phase 1 ne prouve PAS** : la clé `service_role` contourne tout par conception. RLS
+> protège les testeurs **les uns des autres**, pas de Benoît. C'est exactement ce que son texte de
+> consentement ne dit pas encore (cf. arbitrage 6).
+>
+> **Drive est supplanté** : les documents iront dans Supabase Storage (phase 6). L'ancienne prochaine
+> action — créer l'ID client OAuth Google — est **annulée**, ne pas la relancer. Le code Drive
+> (3 fichiers + tests) **dort** ; aucune décision de le supprimer n'a été prise. Ne jamais dire
+> « Drive fonctionne » : l'aller-retour réel n'a **jamais** été exercé.
+>
+> ### ▶ PROCHAINE ACTION — phase 2 : l'authentification
+>
+> **Une seule chose : brancher l'authentification Supabase, en lien magique + mot de passe de
+> secours.** Rien ne bloque, aucun arbitrage n'est en attente, le projet Supabase existe et son
+> isolation est prouvée. C'est du code, et c'est à moi de le faire.
+>
+> Le point de conception à ne pas rater, parce qu'il porte une promesse faite à Benoît :
+> **l'authentification ne doit pas transformer Cadence en « connectez-vous pour continuer »
+> aujourd'hui.** Jusqu'à la bascule de la phase 5, l'app doit continuer de s'ouvrir et de fonctionner
+> exactement comme maintenant, sur le `localStorage`, **sans compte**. La connexion s'ajoute à côté ;
+> elle ne devient obligatoire qu'à la phase 5, et c'est à ce moment-là que Benoît doit être prévenu
+> (cf. arbitrage 4 : le palier gratuit met le projet en pause après 7 jours d'inactivité).
+>
+> ⚠️ **À vérifier avant de s'engager sur le lien magique** : les limites d'envoi d'e-mails du SMTP par
+> défaut de Supabase. Je ne les ai **pas** vérifiées (annoncé comme tel à Benoît le 04/08/2026). Si
+> elles sont trop basses pour une bêta, il faudra un SMTP à lui — c'est une décision qui lui revient.
+>
+> ⚠️ **Relancer `npm run verifier:rls` après tout changement de schéma ou de politique.** Les deux
+> comptes de test (`test-a@example.com`, `test-b@example.com`) sont volontairement conservés pour ça.
 >
 > ✅ **DÉPLOIEMENT VÉRIFIÉ le 04/08/2026, pour la première fois depuis `f8f52cf`.** Bundle déployé sur
 > `https://cadence-git-master-benoit3.vercel.app/` : **`index-DRnZrHLg.js`**, hash **identique** à celui
@@ -331,19 +412,18 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 > autorise deux dossiers homonymes, donc du parallèle éparpillerait les fichiers dans des
 > `Frais_<année>` jumeaux.
 >
-> **▶ Prochaine action — l'ID client OAuth Google, et c'est BENOÎT qui débloque.** Rien d'autre ne
-> manque pour finir ce chantier : `VITE_GOOGLE_DRIVE_CLIENT_ID` n'existe que dans `.env.example`, son
-> `.env` réel ne contient que `MISTRAL_API_KEY`. Tant qu'il manque, cliquer « Connecter Google Drive »
-> affiche « Google Drive non configuré » — vérifié à l'écran le 04/08/2026, et l'envoi réel n'a donc
-> **jamais** été exercé autrement que par les tests (uploader injecté).
-> Ce qu'il doit faire : console Google Cloud → API Drive activée → identifiants → **ID client OAuth,
-> type « Application Web »**, avec `http://localhost:<port>` et
-> `https://cadence-git-master-benoit3.vercel.app` dans les origines JavaScript autorisées. ⚠️ À poser
-> dans `.env` **ET** dans les variables d'environnement du projet Vercel : une variable `VITE_*` est
-> **figée au build**, sans elle côté Vercel ça ne marchera qu'en local.
-> Dès qu'il l'a : vérifier l'aller-retour réel (déposer un justificatif, le voir dans
-> `Cadence/Frais_2026/` sur son Drive, vérifier que le base64 a bien disparu du localStorage), puis
-> décider si Drive devient le mode par défaut.
+> **🔴 CE CHANTIER EST SUSPENDU DEPUIS LE 04/08/2026 — NE PAS LE REPRENDRE EN L'ÉTAT.**
+> L'ancienne prochaine action (« créer l'ID client OAuth Google ») est **ANNULÉE** : la refonte
+> Supabase, décidée le même jour, envoie les documents dans **Supabase Storage** (phase 6), pas sur
+> Drive. Cf. la section « État actuel » en tête de ce fichier — c'est elle qui porte la prochaine
+> action réelle.
+> Ce qui reste vrai et utile à savoir : `VITE_GOOGLE_DRIVE_CLIENT_ID` n'existe que dans
+> `.env.example`, donc **l'aller-retour Drive réel n'a JAMAIS été exercé** (uniquement par tests, avec
+> un uploader injecté). **Ne jamais écrire ni dire que « Drive fonctionne ».**
+> Le travail de `f9a17f7` n'est pas perdu pour autant : `envoyerJustificatifsLocaux` reçoit
+> l'**uploader en paramètre**, donc changer de destination revient à injecter un autre uploader —
+> exactement ce que cette conception permettait. Le code Drive (3 fichiers + tests) **dort** ; aucune
+> décision de le supprimer n'a été prise, ne pas le supprimer sans demander à Benoît.
 >
 > ⚠️ Ne **pas** attaquer 25 ni 26 sans avoir fait trancher la règle à Benoît : elles ne sont pas sourcées.
 >

@@ -224,6 +224,24 @@ async function main() {
     noter("négatif", `B ne peut pas supprimer dans ${table}`, ok, ok ? "" : `⚠️ ${json.length} ligne(s) SUPPRIMÉES`);
   }
 
+  // B tente d'écrire une ligne en REVENDIQUANT l'identifiant de A.
+  //
+  // Chemin d'attaque distinct de tous les précédents, et le plus tentant : les colonnes `user_id`
+  // ont `default auth.uid()`, donc l'app n'envoie jamais ce champ — mais rien n'empêche un appelant
+  // de l'envoyer QUAND MÊME. Si seul le `default` protégeait, B pourrait déposer des lignes dans
+  // l'espace de A (pollution, faux justificatifs, saturation de son quota). C'est le `with check`
+  // des politiques d'insertion qui doit refuser, et c'est ici qu'on le vérifie plutôt que de le
+  // supposer. Oubli de la première version de ce script, trouvé en relisant la grille le 04/08/2026.
+  for (const table of TABLES) {
+    const { statut } = await rest("POST", table, b.jeton, {
+      ...ligneDEssai(table, `${marqueur}-usurpation`),
+      ...(table === "documents" ? { chemin_stockage: `essai-rls/${marqueur}-usurpation.pdf` } : {}),
+      user_id: a.id,
+    });
+    const ok = statut >= 400;
+    noter("usurpation", `B ne peut pas écrire une ligne au nom de A dans ${table}`, ok, `statut ${statut}`);
+  }
+
   // La preuve que les tentatives de B ont réellement échoué : les lignes de A sont TOUJOURS là.
   // Un DELETE « réussi mais sans effet » et un DELETE effectif se distinguent seulement ici.
   for (const table of TABLES) {
