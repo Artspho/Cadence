@@ -95,10 +95,16 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 
 ## État actuel
 
-> **Repère au 04/08/2026, session (5)** — **807 tests verts** (66 fichiers), `tsc -b` propre
-> sur les deux tsconfig, `npm run build` propre. Working tree propre.
-> **`master` poussé sur `origin/master`** — vérifié : `HEAD` et `origin/master` sur `36469dc`
-> (le point 2 `b223ad3` et sa documentation sont donc bien partis).
+> **Repère au 04/08/2026, fin de session (5)** — **830 tests verts** (68 fichiers), `tsc -b` propre
+> sur les deux tsconfig, `npm run build` propre. Working tree **propre**.
+>
+> ⚠️ **UN COMMIT EN ATTENTE DE VALIDATION, NON POUSSÉ : `f9a17f7`** (envoi des justificatifs vers
+> Drive, étape 1). Il a été fait **sans feu vert explicite de Benoît** : il a demandé un passage de
+> relais avant de répondre, et son mode opératoire interdit de quitter sur un arbre de travail sale
+> (du non committé ne survit pas à un changement de session). **Première chose à faire au prochain
+> fil : lui demander s'il le valide.** S'il refuse : `git reset --soft HEAD~1` ramène tout dans
+> l'arbre sans rien perdre. S'il valide : `git push origin master`.
+> `origin/master` est à **`4f86203`** — tout le reste est poussé.
 >
 > ✅ **DÉPLOIEMENT VÉRIFIÉ le 04/08/2026, pour la première fois depuis `f8f52cf`.** Bundle déployé sur
 > `https://cadence-git-master-benoit3.vercel.app/` : **`index-DRnZrHLg.js`**, hash **identique** à celui
@@ -305,18 +311,35 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 >    d'URL (`/?maj=<hash>`). Avant de conclure « le correctif ne marche pas », vérifier lequel des
 >    deux est en cause.
 >
-> **▶ Prochaine action — sortir les justificatifs du localStorage.** C'est la cause profonde mise au
-> jour en finissant le point 2, et le seul chantier qui ne dépende d'aucune source réglementaire.
-> Aujourd'hui un justificatif est stocké **en base64** dans `justificatifData`
-> (`types/fraisReels.ts`), limite 5 Mo par fichier : c'est le seul vrai carburant de la saturation.
-> **Décision de Benoît le 04/08/2026** : sortie vers **Google Workspace ou une base de données en plan
-> payant**. ⚠️ **IndexedDB a été proposé et REFUSÉ** — ne pas le reproposer.
-> ⚠️ Ce chantier recoupe l'**étape 3 « Google Drive »** du module Frais réels, déjà tracée et jamais
-> commencée, que Benoît veut **cadrer ensemble avant tout développement**. Donc : ne pas coder d'abord.
-> Les questions à trancher avec lui, dans l'ordre : quel service exactement ; quelle authentification ;
-> ce que deviennent les justificatifs **déjà** en base64 (migration — devoir n°1, on ne perd rien) ; et
-> ce que l'app fait quand le service est indisponible ou hors ligne (aujourd'hui tout fonctionne sans
-> réseau, cf. la PWA).
+> **Chantier 10, étape 1 — sortie des justificatifs vers Google Drive** (`f9a17f7`, **à valider**).
+> La cause de la saturation, là où le point 2 n'en posait que le filet. Le chemin Drive était **déjà
+> écrit** (`googleDriveAuth.ts`, `googleDriveStorage.ts`, `DriveSettings.tsx`) : ce chantier n'a rien
+> réécrit, il l'a branché.
+> **Trois décisions de Benoît, à ne pas re-litiger** : (1) destination **Google Drive** — ⚠️ IndexedDB
+> proposé et **REFUSÉ** ; (2) si l'envoi échoue, le justificatif reste local mais l'utilisateur **sait**
+> qu'il est à envoyer, compteur visible et nouvelle tentative ; (3) migration de l'existant sur **bouton
+> explicite** avec compte-rendu.
+> **La simplification qui en découle** : « migrer l'existant » et « réessayer ce qui n'est pas parti »
+> sont la **même opération** — envoyer tout ce qui est encore local. Un seul mécanisme
+> (`lib/envoiJustificatifsEnAttente.ts`), un seul bouton. Ne pas les dédoubler.
+> ⚠️ **Règle absolue du module** : le base64 n'est effacé QUE quand l'envoi de CE fichier est confirmé.
+> Contrôle négatif exécuté (l'effacer avant → 3 tests rouges). Et envois **séquentiels** : Drive
+> autorise deux dossiers homonymes, donc du parallèle éparpillerait les fichiers dans des
+> `Frais_<année>` jumeaux.
+>
+> **▶ Prochaine action — l'ID client OAuth Google, et c'est BENOÎT qui débloque.** Rien d'autre ne
+> manque pour finir ce chantier : `VITE_GOOGLE_DRIVE_CLIENT_ID` n'existe que dans `.env.example`, son
+> `.env` réel ne contient que `MISTRAL_API_KEY`. Tant qu'il manque, cliquer « Connecter Google Drive »
+> affiche « Google Drive non configuré » — vérifié à l'écran le 04/08/2026, et l'envoi réel n'a donc
+> **jamais** été exercé autrement que par les tests (uploader injecté).
+> Ce qu'il doit faire : console Google Cloud → API Drive activée → identifiants → **ID client OAuth,
+> type « Application Web »**, avec `http://localhost:<port>` et
+> `https://cadence-git-master-benoit3.vercel.app` dans les origines JavaScript autorisées. ⚠️ À poser
+> dans `.env` **ET** dans les variables d'environnement du projet Vercel : une variable `VITE_*` est
+> **figée au build**, sans elle côté Vercel ça ne marchera qu'en local.
+> Dès qu'il l'a : vérifier l'aller-retour réel (déposer un justificatif, le voir dans
+> `Cadence/Frais_2026/` sur son Drive, vérifier que le base64 a bien disparu du localStorage), puis
+> décider si Drive devient le mode par défaut.
 >
 > ⚠️ Ne **pas** attaquer 25 ni 26 sans avoir fait trancher la règle à Benoît : elles ne sont pas sourcées.
 >
