@@ -9,24 +9,28 @@
 //
 // ⚠️ NE PAS REFORMULER sans décision explicite.
 //
-// 🔶 ÉTAT AU 31/07/2026 (voir CLAUDE.md pour le détail) : ce texte annonce l'absence d'entraînement
-// car nous PRÉVOYONS de passer sur une clé API Mistral payante (plan Scale, qui exclut l'entraînement
-// par défaut) — mais MISTRAL_API_KEY n'est PAS ENCORE basculée sur ce plan au moment où ce texte est
-// écrit. Le texte annonce donc un fait pas encore vrai en pratique. Ne pas oublier de vérifier que la
-// clé est bien passée sur le plan Scale ; si le projet revient sur cette décision (reste sur le tier
-// gratuit), c'est CE fichier qu'il faut corriger en premier : annoncer une absence d'entraînement qui
-// n'est pas garantie serait aussi faux que taire un entraînement qui a lieu (devoir n°2).
+// ✅ ÉTAT AU 04/08/2026 — la phrase sur l'entraînement est désormais VRAIE. Le point 9 est CLOS.
+// Benoît a désactivé l'utilisation de ses données pour l'entraînement dans la console Mistral (menu
+// Privacy : l'option a été décochée). Le plan gratuit autorise cet opt-out, et une fois confirmé
+// Mistral n'utilise plus les entrées/sorties pour entraîner ses modèles — vérifié à la source le
+// 04/08/2026 (help.mistral.ai/en/articles/455207). La bascule de MISTRAL_API_KEY sur le plan Scale
+// n'a donc PAS été nécessaire : les deux chemins rendent la même phrase vraie, et le gratuit était
+// immédiat. L'ancien report du 03/08/2026 est éteint — il n'y a plus d'écart à reporter.
 //
-// 🔴 DÉCISION DU 03/08/2026 — l'écart ci-dessus est REPORTÉ SCIEMMENT, ce n'est plus un oubli.
-// Benoît a tranché : on ne touche pas au texte, et la bascule sur le plan payant se fera à la toute
-// fin du projet. Le motif est recevable en l'état — il est le seul utilisateur, les documents envoyés
-// sont les siens, et il sait exactement ce qu'il envoie : l'affirmation inexacte n'est faite qu'à
-// lui-même, en connaissance de cause. Donc : ne PAS « corriger » ce texte en croyant réparer un
-// oubli, et ne pas rouvrir le débat à chaque session (cf. point 9 de docs/critique_2026-08-03.md).
-// ⚠️ MAIS la décision cesse de tenir dès qu'un autre utilisateur peut envoyer un document : ce
-// canal est monté sans interrupteur (App.tsx), donc à la première ouverture à des tiers, ce fichier
-// redevient le premier à corriger — envers quelqu'un qui n'a pas choisi, la phrase est simplement
-// fausse.
+// ⚠️ FAIT DÉCLARÉ PAR BENOÎT, QUE CADENCE NE PEUT PAS VÉRIFIER — même statut que
+// `meta.dateDerniereVerification` : personne ici ne peut lire son compte Mistral. Si l'opt-out était
+// annulé (changement de clé, de compte ou d'organisation Mistral), cette phrase redeviendrait fausse
+// SANS que rien dans le code ne s'en aperçoive. À re-contrôler dans la console à chaque changement
+// de clé, et c'est CE fichier qu'il faudrait corriger en premier — annoncer une absence
+// d'entraînement qui n'est plus garantie serait aussi faux que taire un entraînement qui a lieu
+// (devoir n°2, dans les deux sens).
+//
+// ⚠️ CE QUI N'EST TOUJOURS PAS VRAI, ET QUE LE TEXTE NE DIT DONC PAS : les documents restent
+// CONSERVÉS jusqu'à 30 jours côté Mistral. Le Zero Data Retention n'existe que sur le plan Scale,
+// qui n'a pas été pris. Ne JAMAIS ajouter au texte une phrase sur la non-conservation : elle serait
+// fausse. Le texte ne promet que l'absence d'entraînement — exactement ce qui est acquis, ni plus.
+//
+// Le texte lui-même n'a pas changé depuis le 31/07/2026 : seule sa véracité a été acquise.
 //
 // Texte BRUT volontairement (même principe que content/contradictionHorsA10.ts) : ni balisage à
 // parser, ni fragments à recoller. L'emphase reste l'affaire du composant.

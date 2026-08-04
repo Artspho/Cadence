@@ -49,14 +49,19 @@ export const config = { runtime: "edge" };
 
 const MISTRAL_MODEL = "mistral-ocr-latest";
 
-// ⚠️ Pendant les tests (phase actuelle) : clé du tier gratuit "Experiment" de
-// La Plateforme (console.mistral.ai), aucune carte bancaire nécessaire.
-// AVANT tout document réel d'un vrai utilisateur (même Benoît en test réel) :
-// vérifier dans la console si le tier gratuit garantit bien l'absence
-// d'entraînement sur les données envoyées (l'engagement contractuel trouvé
-// dans nos recherches est explicitement rattaché aux abonnements payants,
-// pas confirmé pour le tier gratuit) — cf. brief_claude_code_documents_premium.md.
-// Si ce n'est pas garanti, passer sur une clé payante (~1 centime/document).
+// Clé du tier gratuit de La Plateforme (console.mistral.ai), aucune carte bancaire.
+// ✅ 04/08/2026 — la question de l'entraînement est RÉGLÉE sur ce tier : Benoît a décoché
+// l'utilisation de ses données pour l'entraînement dans le menu Privacy de la console.
+// Le plan gratuit autorise cet opt-out (help.mistral.ai/en/articles/455207, vérifié à la
+// source), donc il n'a PAS fallu passer sur le plan Scale. L'ancienne note de ce bloc
+// disait l'inverse — que l'engagement était réservé aux abonnements payants : c'était
+// exact pour l'engagement PAR DÉFAUT, mais elle ignorait l'opt-out du tier gratuit.
+// ⚠️ Fait déclaré par Benoît, non vérifiable depuis le code : si la clé change de compte
+// ou d'organisation Mistral, l'opt-out ne suit pas et le texte de consentement affiché à
+// l'utilisateur redevient faux (cf. src/content/mentionEnvoiIA.ts, qui porte le détail).
+// ⚠️ Ce qui n'est PAS acquis : la rétention. Les documents restent conservés jusqu'à
+// 30 jours côté Mistral — le Zero Data Retention est réservé au plan Scale. Le texte
+// affiché ne promet donc rien sur la conservation, et ne doit jamais le faire.
 
 const INSTRUCTIONS = `Tu es un extracteur de documents pour Cadence, une app d'aide à la gestion des droits des
 artistes-interprètes intermittents du spectacle (régime Annexe 10, France). Documents reçus :

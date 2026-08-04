@@ -138,13 +138,17 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 > **Six points clos dans la session (4)**, dans l'ordre : **5** et **6** (`f2ec278`, chantier 3),
 > puis **7** (`501ca53`) et **23** (`a12ae14`, chantier 4), puis **13** et **14** ensemble
 > (chantier 5, `21bbb17`). Deux points ont été **instruits puis fermés sans code**, chacun sur une
-> décision de Benoît : le **9** est **reporté sciemment** (`4a33baa` — la bascule Mistral se fera à la
-> toute fin) et le **10** est **écarté** (`54caeff` — la vraisemblance d'un chiffre saisi est la
+> décision de Benoît : le **9** avait été **reporté sciemment** (`4a33baa`) — **il est depuis CLOS,
+> le 04/08/2026, sans dépense** (opt-out d'entraînement décoché dans la console Mistral, cf. plus
+> bas) — et le **10** est **écarté** (`54caeff` — la vraisemblance d'un chiffre saisi est la
 > responsabilité de l'utilisateur, pas de l'app ; ne pas le reproposer). Détail plus bas.
 >
-> **État des 29 points de `docs/critique_2026-08-03.md`** — **18 clos** (plus aucun « à moitié ») ·
-> 1 reporté (**9**) · 1 écarté (**10**) · **9 ouverts** : 🔴 8, 11, 12 ter, 25, 26 et 🟡 12, 18, 19, 20.
-> **Ces neuf attendent TOUS autre chose que du code** — une source, un document, ou une règle à
+> **État des 29 points de `docs/critique_2026-08-03.md`** (mis à jour le 04/08/2026) — **19 clos** ·
+> 1 écarté (**10**) · **9 ouverts** : 🔴 8, 11, 12 ter, 25, 26 et 🟡 12, 18, 19, 20.
+> ⚠️ Le **8** est **partiellement traité** (`c786ecb` : contrôle de taille serveur + contrôle
+> d'origine) mais **compte encore comme ouvert** — il lui manque l'authentification et le quota, tous
+> deux en phase 2 de la refonte Supabase. Ne pas le passer en clos avant.
+> **Les huit autres attendent TOUS autre chose que du code** — une source, un document, ou une règle à
 > trancher. ⚠️ **Il n'y a donc PLUS RIEN à coder sur la critique sans passer par un arbitrage ou une
 > recherche.** Le prochain chantier n'en vient pas : c'est la sortie des justificatifs du localStorage
 > (cf. plus bas).
@@ -343,11 +347,14 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 >
 > ⚠️ Ne **pas** attaquer 25 ni 26 sans avoir fait trancher la règle à Benoît : elles ne sont pas sourcées.
 >
-> **Le point 9 n'est pas une prochaine action** — il a été posé à Benoît le 03/08/2026 et **reporté
-> sciemment** : le texte de consentement IA reste inchangé, la bascule de `MISTRAL_API_KEY` sur le plan
-> payant se fera à la toute fin du projet et clôra le point. Ne pas le rouvrir, ne pas « corriger » le
-> texte (détail et limite de validité de la décision : entrée 🔶 sur la mention d'entraînement, et
-> point 9 de `docs/critique_2026-08-03.md`).
+> **Le point 9 est CLOS depuis le 04/08/2026** — et il n'a rien coûté. Benoît a **décoché
+> l'utilisation de ses données pour l'entraînement** dans le menu Privacy de la console Mistral : le
+> plan gratuit autorise cet opt-out (help.mistral.ai/en/articles/455207, vérifié à la source), donc la
+> bascule sur le plan Scale **n'a pas été nécessaire**. Le texte de consentement n'a pas changé, seule
+> sa véracité a été acquise. ⚠️ Fait **déclaré par Benoît**, non vérifiable depuis le code : à
+> re-contrôler à chaque changement de clé Mistral. ⚠️ La **rétention** (jusqu'à 30 jours) n'est PAS
+> couverte — le Zero Data Retention est réservé au plan Scale, donc ne jamais ajouter au texte une
+> phrase sur la non-conservation (détail : `src/content/mentionEnvoiIA.ts`).
 >
 > ### ⚠️ Chantier tracé, non fait : brancher l'onboarding sur `validerProfilPourEcriture`
 >
@@ -1721,14 +1728,17 @@ synchronisée à chaque commit. 5 commits locaux cette session, rien poussé sur
      PAS par l'interface. Le segment **navigateur → `/api/extract-document` reste non exercé** :
      vérifié le 29/07, `npm run dev` (Vite) ne sert pas les Vercel Functions et répond **404** sur
      cette route. Ce segment ne sera validé qu'avec `vercel dev` ou un déploiement.
-- 🔶 **Mention d'entraînement retirée du texte de consentement (31/07/2026) — clé pas encore
-  basculée.** Le texte n'annonce plus que Mistral « peut utiliser ce document pour entraîner ses
-  modèles » : nous prévoyons de passer sur une clé API Mistral payante (plan Scale), qui exclut
-  l'entraînement par défaut selon le centre d'aide officiel Mistral
-  (help.mistral.ai/articles/347617). **Mais `MISTRAL_API_KEY` n'est PAS ENCORE basculée sur ce plan
-  au moment de ce commit** — le texte annonce donc un fait qui n'est pas encore vrai en pratique. Ne
-  PAS repasser cette entrée en ✅ tant que la clé réellement utilisée n'a pas été confirmée comme
-  étant sur le plan Scale (cf. le ⬜ correspondant en toute fin de la liste priorité normale).
+- ✅ **Mention d'entraînement : le texte est VRAI depuis le 04/08/2026 (point 9 clos).** Le texte
+  n'annonce plus que Mistral « peut utiliser ce document pour entraîner ses modèles », et cette
+  affirmation est désormais exacte : **Benoît a décoché l'utilisation de ses données pour
+  l'entraînement dans le menu Privacy de la console Mistral.** Le tier gratuit autorise cet opt-out
+  (help.mistral.ai/en/articles/455207, vérifié à la source le 04/08/2026), donc **la bascule sur le
+  plan Scale n'a jamais été nécessaire** — l'ancienne rédaction de cette entrée supposait le
+  contraire parce qu'elle ne connaissait que l'engagement PAR DÉFAUT du plan payant
+  (help.mistral.ai/articles/347617), et ignorait l'opt-out gratuit. ⚠️ **Fait déclaré par Benoît,
+  non vérifiable depuis le code** : si la clé change de compte ou d'organisation Mistral, l'opt-out
+  ne suit pas et le texte redevient faux **sans que rien ne s'en aperçoive**. À re-contrôler dans la
+  console à chaque changement de clé.
   **La contrepartie de la décision reste non négociable : la mention doit être dite à l'utilisateur
   en clair, dans l'UI, AVANT tout envoi — jamais dans des CGU cachées ni en petits caractères après
   coup.** Texte exact retenu, à ne pas reformuler sans décision explicite :
@@ -1747,15 +1757,15 @@ synchronisée à chaque commit. 5 commits locaux cette session, rien poussé sur
   d'entraînement qui n'est plus garantie serait aussi faux que taire un entraînement qui a lieu
   (devoir n°2, dans les deux sens).
 
-  **🔴 Décision du 03/08/2026 — l'écart est REPORTÉ SCIEMMENT, ce n'est plus un oubli.** Le point 9
-  de `docs/critique_2026-08-03.md` a été posé à Benoît, qui a tranché : **le texte reste inchangé** et
-  la bascule sur le plan payant se fera **à la toute fin du projet**. Motif recevable en l'état : il
-  est le seul utilisateur, les documents envoyés sont les siens, il sait ce qu'il envoie — la phrase
-  inexacte n'est dite qu'à lui-même, en connaissance de cause. **Ne pas rouvrir ce débat à chaque
-  session, et ne pas « corriger » le texte en croyant réparer un oubli.** ⚠️ En revanche la décision
-  cesse de tenir **dès qu'un tiers peut envoyer un document** : le canal IA est monté sans
-  interrupteur (`App.tsx:501`), donc toute ouverture à d'autres utilisateurs (déjà interdite en l'état
-  par le point 8 de la critique) rend la phrase fausse envers quelqu'un qui n'a pas choisi.
+  **Historique de la décision, conservé parce qu'il explique pourquoi le point a bougé.** Le
+  03/08/2026, l'écart avait été **reporté sciemment** : Benoît étant seul utilisateur, la phrase
+  inexacte n'était dite qu'à lui-même, en connaissance de cause. Ce report portait une limite
+  explicite — **il cessait de tenir dès qu'un tiers pouvait envoyer un document**, le canal IA étant
+  monté sans interrupteur (`App.tsx:501`). C'est exactement ce que la **refonte Supabase** a déclenché
+  le 04/08/2026 en ouvrant l'app à des bêta-testeurs : le report est donc tombé, et le point a été
+  réglé le jour même par l'opt-out gratuit plutôt que par la dépense prévue. À retenir comme méthode :
+  la limite de validité écrite au moment du report est ce qui a permis de voir que l'échéance
+  arrivait, au lieu de la découvrir après coup.
 - ✅ **Consentement avant tout envoi + point d'entrée réel de l'import IA (29/07/2026, commits
   `ecca2c8` puis `d4906d5`)** — le chemin est désormais complet et en ligne droite :
   **dépôt → contrôles locaux → CONSENTEMENT → envoi → revue**. Pièces : `content/mentionEnvoiIA.ts`
@@ -2122,15 +2132,23 @@ de situation ✅ — l'échec semble propre à ce format de bulletin, pas au can
   et à chaque nouvelle convention d'assurance chômage). Objectif : garantir que
   `franceTravailConfig.ts` reste à jour et que le bandeau « règles vérifiées au JJ/MM/AAAA » ne
   vieillit pas silencieusement.
-- ⬜ **Basculer MISTRAL_API_KEY sur le plan payant Mistral (Scale) — À LA TOUTE FIN, décidé le
-  03/08/2026 par Benoît.** C'est LE geste qui clôt le point 9 de la critique : tant qu'il n'est pas
-  fait, le texte de consentement annonce une absence d'entraînement qui n'est pas garantie, et c'est
-  assumé (Benoît seul utilisateur, ses propres documents). À faire avant toute ouverture à un autre
-  utilisateur, jamais après. Une fois fait : vérifier le plan réellement appliqué à la clé, repasser
-  l'entrée 🔶 ci-dessus en ✅, et clore le point 9. ⚠️ Vérifier aussi à ce moment-là, depuis la source
-  officielle, que le plan souscrit exclut bien l'entraînement (source citée le 31/07 :
-  help.mistral.ai/articles/347617 — **non revérifiée depuis**). Coût estimé : ~260-350 $/an pour
-  100 utilisateurs à 100-200 documents/an chacun (voir calcul de session).
+- ✅ **Point 9 clos le 04/08/2026 — SANS basculer sur le plan payant, et sans rien dépenser.** Cet
+  item demandait de passer `MISTRAL_API_KEY` sur le plan Scale « à la toute fin ». L'échéance est
+  arrivée plus tôt que prévu (ouverture à des bêta-testeurs, cf. refonte Supabase), et la
+  vérification à la source a montré que **la dépense était évitable** : le tier gratuit permet de
+  **refuser l'entraînement** depuis le menu Privacy de la console
+  (help.mistral.ai/en/articles/455207, vérifié le 04/08/2026). Benoît a décoché l'option ; le texte
+  de consentement est devenu vrai sans changer d'un mot.
+  **La leçon de méthode, à ne pas perdre** : la source de 2026-07-31 (help.mistral.ai/articles/347617)
+  était exacte mais *incomplète* — elle décrivait l'engagement PAR DÉFAUT des plans payants, et le
+  projet en a déduit pendant quatre jours qu'il fallait payer. Revérifier une source, ce n'est pas
+  seulement contrôler qu'elle dit toujours la même chose : c'est chercher ce qu'elle ne disait pas.
+  ⚠️ **Ce qui reste ouvert et n'est PAS couvert par l'opt-out** : la **rétention** (jusqu'à 30 jours).
+  Le Zero Data Retention est réservé au plan Scale. Le texte affiché ne promet rien sur la
+  conservation et ne doit jamais le faire. Si un jour la non-conservation devient nécessaire (exigence
+  d'un tiers, ou choix produit), c'est **là** que la dépense redevient obligatoire — pas pour
+  l'entraînement. Estimation conservée pour ce cas : ~260-350 $/an pour 100 utilisateurs à
+  100-200 documents/an chacun.
 
 ### Post-bêta
 - ⬜ Refonte design (couleurs, placement onglets — à préciser)
