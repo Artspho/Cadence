@@ -12,7 +12,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "generate-pwa-icons": "node scripts/generate-pwa-icons.mjs",
-    "verifier:rls": "node --env-file=.env scripts/verifier-rls.mjs"
+    "verifier:rls": "node --env-file=.env scripts/verifier-rls.mjs",
+    "verifier:verrou": "node --env-file=.env scripts/verifier-verrou.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.112.0",
