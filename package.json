@@ -15,6 +15,7 @@
     "verifier:rls": "node --env-file=.env scripts/verifier-rls.mjs"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.112.0",
     "date-fns": "^3.6.0",
     "jspdf": "^4.2.1",
     "pdfjs-dist": "^4.4.168",

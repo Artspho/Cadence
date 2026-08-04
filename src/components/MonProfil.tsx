@@ -11,6 +11,7 @@ import type { Contrat, PeriodeAssimilee, Profil } from "../types";
 import { PeriodeForm } from "./PeriodeForm";
 import { PeriodeList } from "./PeriodeList";
 import { DocumentsUtiles } from "./DocumentsUtiles";
+import { Compte } from "./Compte";
 import { RenouvellementAnticipe } from "./RenouvellementAnticipe";
 import { DateNaissanceInput } from "./DateNaissanceInput";
 
@@ -268,6 +269,11 @@ export function MonProfil({ dateDuJour, profil, onModifierProfil, contrats, peri
       </div>
 
       <DocumentsUtiles />
+
+      {/* Phase 2 de la refonte Supabase. Volontairement posé ici, dans un onglet qu'on visite, et non
+          dans la barre du haut : la connexion est facultative et ne sert encore à rien, un appel à
+          l'action permanent laisserait croire qu'il faut se connecter pour utiliser Cadence. */}
+      <Compte />
 
       <section>
         <h2 className="font-display text-lg font-medium mb-2">Périmètre du MVP</h2>

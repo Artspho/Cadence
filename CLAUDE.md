@@ -95,12 +95,12 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 
 ## État actuel
 
-> **Repère au 04/08/2026, session (6) — LE PROJET A CHANGÉ DE DIRECTION.** **847 tests verts**
-> (69 fichiers), `tsc -b` propre sur les deux tsconfig, `npm run build` propre.
+> **Repère au 04/08/2026, session (6) — LE PROJET A CHANGÉ DE DIRECTION.** **905 tests verts**
+> (74 fichiers), `tsc -b` propre sur les deux tsconfig, `npm run build` propre.
 >
 > ✅ `f9a17f7` **a été validé par Benoît et poussé.** `origin/master` est à **`18abb98`**, et `master`
-> est en avance de trois commits validés : `c786ecb` (point 8), `5607854` (point 9), `184c933`
-> (phase 1). Rien n'attend de validation.
+> est en avance de quatre commits validés : `c786ecb` (point 8), `5607854` (point 9), `184c933` et
+> `5868eb8` (phase 1). Rien n'attend de validation.
 >
 > ## 🔴 REFONTE SUPABASE — décidée le 04/08/2026, elle recadre tout le reste
 >
@@ -143,8 +143,8 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 > |---|---|---|
 > | 0 | points **8** et **9** | ✅ faite (`c786ecb`, `5607854`) — le 8 reste **compté ouvert** (ni auth ni quota) |
 > | 1 | projet Supabase, 7 tables, RLS | ✅ **PROUVÉE** — `npm run verifier:rls` : **64 contrôles, 64 conformes** |
-> | 2 | authentification | ⬜ **prochaine action** |
-> | 3 | adaptateur Supabase derrière l'interface existante | ⬜ — les 830→847 tests doivent rester verts |
+> | 2 | authentification | ✅ faite — **connexion facultative**, l'app fonctionne toujours sans compte. Envoi réel exercé ; ⚠️ le chemin de SUCCÈS complet (même navigateur → session ouverte) reste non exercé |
+> | 3 | adaptateur Supabase derrière l'interface existante | ⬜ **prochaine action** — les 905 tests doivent rester verts |
 > | 4 | migration + vérification chiffrée | ⬜ |
 > | 5 | bascule, sur son feu vert écrit | ⬜ |
 > | 6 | documents (conserver, puis envoyer) | ⬜ — le chantier d'origine |
@@ -167,30 +167,151 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 > (3 fichiers + tests) **dort** ; aucune décision de le supprimer n'a été prise. Ne jamais dire
 > « Drive fonctionne » : l'aller-retour réel n'a **jamais** été exercé.
 >
-> ### ▶ PROCHAINE ACTION — phase 2 : l'authentification
+> ## PHASE 2 — l'authentification, faite le 04/08/2026
 >
-> **Une seule chose : brancher l'authentification Supabase, en lien magique + mot de passe de
-> secours.** Rien ne bloque, aucun arbitrage n'est en attente, le projet Supabase existe et son
-> isolation est prouvée. C'est du code, et c'est à moi de le faire.
+> **Où c'est** : `src/auth/supabaseClient.ts` (construction du client), `src/auth/session.ts` (état de
+> la connexion), `src/auth/actions.ts` (les quatre gestes + traduction des erreurs),
+> `src/components/Compte.tsx` (la section « Compte » de l'onglet **Mon profil**). Dépendance ajoutée :
+> `@supabase/supabase-js@2.112.0` — **+59 ko gzip** sur le bundle (381 → 440 ko, mesuré contre le
+> bundle déployé, pas estimé). Aucune vulnérabilité apportée.
 >
-> Le point de conception à ne pas rater, parce qu'il porte une promesse faite à Benoît :
-> **l'authentification ne doit pas transformer Cadence en « connectez-vous pour continuer »
-> aujourd'hui.** Jusqu'à la bascule de la phase 5, l'app doit continuer de s'ouvrir et de fonctionner
-> exactement comme maintenant, sur le `localStorage`, **sans compte**. La connexion s'ajoute à côté ;
-> elle ne devient obligatoire qu'à la phase 5, et c'est à ce moment-là que Benoît doit être prévenu
-> (cf. arbitrage 4 : le palier gratuit met le projet en pause après 7 jours d'inactivité).
+> **LA PROMESSE EST TENUE, ET UN TEST LA GARDE.** `src/components/__tests__/App.sansCompte.test.tsx`
+> rend le vrai `App` sans configuration Supabase et parcourt les 8 onglets : aucun mur de connexion,
+> les données locales s'affichent, et le contenu du `localStorage` est relu inchangé à la fin. Ce test
+> doit rougir le jour où quelqu'un ajouterait un « connectez-vous pour continuer ».
 >
-> ⚠️ **À vérifier avant de s'engager sur le lien magique** : les limites d'envoi d'e-mails du SMTP par
-> défaut de Supabase. Je ne les ai **pas** vérifiées (annoncé comme tel à Benoît le 04/08/2026). Si
-> elles sont trop basses pour une bêta, il faudra un SMTP à lui — c'est une décision qui lui revient.
+> **Trois conceptions à ne pas défaire :**
+> 1. **configuration absente => `null`, jamais d'exception.** `construireClientAuth` rend `null` sur
+>    une variable manquante, vide ou une URL malformée. Un `throw` ici remonterait au rendu et
+>    changerait « connexion non configurée » en « l'app ne démarre plus » ;
+> 2. **le client est INJECTÉ** dans `Compte` et `useSession` (même patron que l'uploader
+>    d'`envoyerJustificatifsLocaux`) : les tests fournissent un faux de quelques lignes, aucun test
+>    n'ouvre de vraie session ni ne touche au réseau ;
+> 3. **l'état `indetermine` existe exprès.** Quand la lecture de session échoue, l'interface dit
+>    « impossible de savoir si tu es connecté » et **pas** « non connecté » — on ne sait pas, donc on
+>    ne l'affirme pas (devoir n°2 appliqué à un état).
+>
+> ⚠️ **`.env.test` est un fichier de PRODUCTION DE PREUVE, ne pas le supprimer.** Vite charge le `.env`
+> réel même pendant les tests : sans lui, la suite se comporterait différemment selon la machine
+> (configuration Supabase absente en intégration continue, présente sur celle de Benoît). Un test dont
+> le résultat dépend de la machine ne prouve rien.
+> `src/auth/__tests__/supabaseClient.test.ts` contient le test qui garde ce fichier.
+>
+> **ENVOI RÉEL EXERCÉ le 04/08/2026, sur demande explicite de Benoît.** Acquis, et donc à ne plus
+> remettre en doute :
+> - l'adresse **`admin@lesartsphoceens.fr`** est bien membre de l'organisation Supabase : le service
+>   d'envoi par défaut l'a acceptée (aucune erreur renvoyée) et **l'e-mail est arrivé** ;
+> - **les Redirect URLs acceptent `http://localhost:5183`** — le lien l'y a ramené, confirmé par lui.
+>   L'action « déclarer l'origine de retour » qui était annoncée comme à faire ne l'est donc pas pour
+>   localhost. Reste à vérifier pour l'URL de branche, jamais exercée ;
+> - ✅ `signInWithOtp` **crée bien l'utilisateur** : le premier envoi a produit un e-mail « Confirm your
+>   email address » (`type=signup`), et non un lien de connexion. **Un compte existe donc pour
+>   `admin@lesartsphoceens.fr`**, et il est vraisemblablement **NON CONFIRMÉ** (les deux jetons de
+>   confirmation sont morts, cf. ci-dessous). Conséquence à ne pas oublier : tant qu'il n'est pas
+>   confirmé, une connexion par mot de passe échouera en « Email not confirmed ». Il est confirmable à
+>   la main dans le tableau de bord, sans e-mail ;
+> - ✅ **PLAFOND DE 2 MESSAGES PAR HEURE MESURÉ**, plus seulement lu : le troisième envoi de l'heure a
+>   été refusé avec `email rate limit exceeded`, et l'app l'a bien traduit en citant le plafond.
+>
+> 🔴 **LE DÉFAUT QUE CET ESSAI A RÉVÉLÉ, ET QU'AUCUN TEST N'AURAIT TROUVÉ.** Benoît a ouvert le lien
+> depuis SON Chrome alors que la clé PKCE était dans le navigateur demandeur. L'échange a échoué —
+> comportement normal de PKCE — mais **l'écran ne disait rien** : il revoyait le formulaire, sans
+> savoir que quelque chose venait d'échouer ni pourquoi. L'avertissement existait, mais **avant** le
+> clic, donc illisible pour qui est dans l'autre navigateur. Un état muet, pas un chiffre faux, et
+> tout aussi interdit.
+> Corrigé par `src/auth/retourLienMagique.ts` : l'indice de retour (`code`, `token_hash`, `error*`)
+> est capturé **à l'import du module**, car `detectSessionInUrl` NETTOIE l'URL — un composant qui
+> lirait `location` au premier rendu arriverait trop tard. Si la session reste fermée alors qu'un
+> indice était présent, la section explique l'échec et désigne la cause probable.
+> Vérifié à l'écran dans les deux sens le 04/08/2026 : `/?code=<bidon>` affiche le message, `/`
+> n'affiche rien (pas de fausse alerte).
+> ⚠️ Ce message ne peut apparaître à tort que si `getSession()` cessait d'attendre la fin de
+> l'initialisation de la bibliothèque (échange de l'URL compris). C'est le seul faux message possible
+> ici — raisonné, non mesuré.
+>
+> 🔴 **DEUXIÈME DÉFAUT, INTRODUIT EN CORRIGEANT LE PREMIER** — et trouvé lui aussi par l'usage, une
+> demi-heure plus tard. Sous une erreur transmise par Supabase (« Email link is invalid or has
+> expired »), le message ajoutait « la cause la plus probable : demandé depuis un autre navigateur ».
+> Une **cause fausse sous une erreur exacte** : pire que le silence qu'on venait de supprimer.
+> Corrigé : deux branches distinctes dans `Compte.tsx`, et **deux tests qui les verrouillent
+> séparément** (l'un interdit « autre navigateur » quand un motif est transmis, l'autre garantit que
+> l'explication subsiste quand elle EST la cause probable). Ne pas refondre ces deux branches en une.
+>
+> ⚠️ **CE QUI RESTE NON PROUVÉ — ne pas écrire « le lien magique fonctionne » sans réserve.** Le
+> chemin de SUCCÈS complet (lien ouvert dans le MÊME navigateur → session ouverte) n'a **jamais** été
+> exercé, et **aucune session n'a jamais été ouverte dans Cadence à ce jour** — confirmé par le
+> tableau de bord lui-même : `Last signed in : –` sur le compte de Benoît. Deux jetons ont été
+> essayés le 04/08/2026, tous deux refusés en `otp_expired` :
+> - celui de la confirmation d'inscription : cliqué par Benoît depuis SON Chrome, donc consommé — et
+>   il avait bien rempli son office, le tableau de bord affiche `Confirmed at 04 Aug 2026 18:19`.
+>   **Le compte `admin@lesartsphoceens.fr` (UID `2ed466db-a58b-4ec4-b73a-28a2a333b82d`) est confirmé** ;
+> - celui du lien de connexion : refusé **deux minutes après son émission**, sans cause établie. Deux
+>   hypothèses, aucune vérifiée — un clic préalable de sa part, ou une première tentative de
+>   navigation signalée « denied **or failed** » par l'outil, qui aurait atteint Supabase et consommé
+>   le jeton avant d'être bloquée. **Ne pas présenter l'une des deux comme la cause.**
+> Le test a alors buté sur le plafond de 2/h. À reprendre avec un jeton frais.
+> ⚠️ Piège à connaître pour reprendre ce test : le panneau navigateur de Claude **refuse de naviguer
+> vers `supabase.co`** (garde-fou d'origine) et n'exécutait plus les clics par coordonnées (panneau non
+> affiché => page qui ne compose plus). Contournement utilisé : `location.href = …` et `.click()`
+> depuis la page, ce qui traverse le vrai gestionnaire et le vrai appel réseau.
+>
+> Ce qui EST prouvé : l'e-mail part et arrive, le compte est créé, le retour atterrit sur la bonne
+> origine, le plafond horaire est réel, et **les deux chemins d'ÉCHEC sont propres et exacts**. Même
+> prudence que pour Drive.
+>
+> ⚠️ **PKCE, et sa contrepartie assumée** : le lien magique doit être ouvert **dans le navigateur qui
+> l'a demandé** (le vérificateur y est stocké). C'est maintenant dit à l'écran avant ET après le clic.
+> Le mode implicite aurait marché depuis n'importe où, mais en laissant le jeton dans l'URL.
+> ⚠️ **Conséquence pour les testeurs, à ne pas découvrir en bêta** : ils liront leurs e-mails sur leur
+> téléphone et cliqueront donc souvent depuis un autre navigateur que celui de l'app. Ils tomberont
+> sur le message d'échec — correct, mais frustrant. À rouvrir avant la phase 5.
+>
+> ### 🔴 DETTE ÉTABLIE — un SMTP à Benoît, AVANT le premier testeur externe
+>
+> **Ce n'est plus une réserve « non vérifiée » : c'est une contrainte mesurée** (doc officielle
+> Supabase, lue le 04/08/2026). Le service d'envoi par défaut :
+> - est plafonné à **2 messages par heure** ;
+> - **n'envoie QU'AUX adresses membres de l'organisation du projet** — toute autre échoue avec
+>   « Email address not authorized » ;
+> - n'offre **aucune garantie** de livraison (« best-effort »).
+>
+> Conséquence exacte, à ne pas arrondir : ce n'est pas « trop lent pour une bêta », c'est
+> **impossible** d'envoyer un lien magique, un e-mail de confirmation ou une réinitialisation de mot de
+> passe à un testeur. Le mot de passe de secours ne contourne rien.
+> **Position de Benoît, le 04/08/2026 : « à traiter avant le premier vrai testeur externe, pas urgent
+> avant. »** Donc : rien à faire tant qu'il est seul utilisateur ; le choix du fournisseur SMTP est
+> **sa décision**, elle a un coût, ne pas la prendre à sa place. Le code n'en dépend pas — c'est un
+> réglage de tableau de bord. `messageErreur` (dans `src/auth/actions.ts`) traduit déjà les deux
+> refus correspondants en expliquant la vraie cause, pour ne pas faire chercher un bug inexistant.
+>
+> ### ▶ PROCHAINE ACTION — phase 3 : l'adaptateur Supabase
+>
+> **Mettre un adaptateur Supabase derrière l'interface de stockage existante**, sans changer la source
+> de vérité. `chargerDonnees` / `sauvegarderDonnees` (`src/storage/localStorageAdapter.ts`) sont déjà
+> asynchrones et renvoient déjà ok/échec : c'est le point d'accroche. Les **905 tests doivent rester
+> verts**, et la promesse « l'app s'ouvre sans compte » reste valable jusqu'à la phase 5.
 >
 > ⚠️ **Relancer `npm run verifier:rls` après tout changement de schéma ou de politique.** Les deux
-> comptes de test (`test-a@example.com`, `test-b@example.com`) sont volontairement conservés pour ça.
+> comptes de test **`testa-cadence@cadence.fr`** et **`test-cadenceb@cadence.fr`** sont volontairement
+> conservés pour ça (⚠️ et NON `test-a@example.com` / `test-b@example.com`, qui n'étaient que des noms
+> d'exemple écrits par erreur ici jusqu'au 04/08/2026 — une session future aurait cherché des comptes
+> inexistants). Leurs mots de passe sont dans le `.env`. **NE JAMAIS LES SUPPRIMER** : ce sont des
+> adresses `@cadence.fr` qui ne reçoivent rien, créées avec « Auto Confirm User » exprès pour ne
+> dépendre d'aucun e-mail, et `verifier:rls` s'y connecte pour produire ses 64 contrôles. Les
+> supprimer, c'est perdre la preuve d'isolation. Question posée par Benoît le 04/08/2026 (« ce sont de
+> faux mails, je peux supprimer ? ») : la réponse est non.
 >
 > ✅ **DÉPLOIEMENT VÉRIFIÉ le 04/08/2026, pour la première fois depuis `f8f52cf`.** Bundle déployé sur
 > `https://cadence-git-master-benoit3.vercel.app/` : **`index-DRnZrHLg.js`**, hash **identique** à celui
 > du `npm run build` local — donc le code servi est bien celui de `master`. Confirmé en plus par le
 > CONTENU du bundle téléchargé (pas seulement par le hash), chaîne par chaîne :
+> ⚠️ **CE NOM DE BUNDLE EST PÉRIMÉ** (constaté le 04/08/2026, plus tard dans la journée) : l'URL de
+> branche sert désormais **`index-BOHKJEhc.js`**. `origin/master` n'a pas bougé (`18abb98`) — Vercel a
+> donc reconstruit le même commit, et une dépendance en `^` a été résolue autrement. **Leçon pour la
+> méthode du piège n°2 : un hash qui change ne signifie pas qu'un autre code est déployé.** Un hash
+> identique reste une preuve ; un hash différent n'est qu'une invitation à chercher des chaînes
+> littérales dans le bundle. La vérification ci-dessous, elle, était exacte au moment où elle a été
+> faite.
 > - point **17** : « ne compterait aucune heure », « ne comptent pas en territoire EEE » → présentes ;
 > - point **2** : « Télécharger ma sauvegarde maintenant », « Plus de place dans le stockage »,
 >   « Cadence ne la supprime jamais d'elle-même », « justificatifs de dépenses qui pèsent le plus
