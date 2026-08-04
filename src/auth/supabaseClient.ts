@@ -62,6 +62,33 @@ export interface ClientDonnees {
   };
 }
 
+/**
+ * La surface de LECTURE, introduite par la PHASE 4 — et volontairement SÉPARÉE de `ClientDonnees`.
+ *
+ * POURQUOI UN SECOND TYPE PLUTÔT QU'UN `select` AJOUTÉ AU PREMIER. Le miroir de la phase 3 ne doit
+ * toujours pas pouvoir lire : sa règle n°1 (« écriture seule ») reste vraie après la phase 4, parce
+ * qu'une donnée serveur qui écraserait la saisie locale resterait une perte de données. Ajouter
+ * `select` à `ClientDonnees` aurait discrètement levé cette interdiction pour du code déjà écrit.
+ * Ici, seul ce qui demande explicitement `ClientLectureDonnees` peut lire — c'est-à-dire, à ce jour,
+ * le seul module de vérification.
+ *
+ * ⚠️ CE QUE LA PHASE 4 N'AUTORISE PAS, ET QUI N'EST DONC NULLE PART DANS CE FICHIER : écrire le
+ * résultat d'une lecture dans le `localStorage`. Lire sert à COMPARER, et à rien d'autre, jusqu'à la
+ * bascule de la phase 5 — qui sera demandée explicitement à l'utilisateur.
+ */
+export interface ClientLectureDonnees {
+  from(table: string): {
+    select(colonnes: string): {
+      eq(
+        colonne: string,
+        valeur: string,
+      ): {
+        maybeSingle(): PromiseLike<{ data: Record<string, unknown> | null; error: ErreurAuth | null }>;
+      };
+    };
+  };
+}
+
 export interface ConfigurationSupabase {
   url?: string;
   cleAnon?: string;
@@ -86,6 +113,8 @@ export function construireClientAuth(configuration: ConfigurationSupabase): Clie
 export interface ClientCadence {
   auth: ClientAuth;
   donnees: ClientDonnees;
+  /** Phase 4 : la lecture, réservée à la vérification. Cf. `ClientLectureDonnees`. */
+  lecture: ClientLectureDonnees;
 }
 
 /**
@@ -119,7 +148,17 @@ export function construireClient(configuration: ConfigurationSupabase): ClientCa
         flowType: "pkce",
       },
     });
-    return { auth: client.auth, donnees: client };
+    // `donnees` et `lecture` sont le MÊME objet, vu à travers deux types différents. Ce n'est pas
+    // une astuce : la séparation qui compte est celle des types, puisque c'est elle qui décide ce que
+    // chaque module a le droit d'appeler. Un second `createClient` n'aurait rien protégé de plus et
+    // aurait installé un deuxième rafraîchissement de jeton (cf. `obtenirClient`).
+    // ⚠️ L'assertion ne porte QUE sur `lecture`, et pour une raison mécanique, pas par confort :
+    // le typage générique de `select().eq().maybeSingle()` dans @supabase/supabase-js est trop
+    // profond pour que TypeScript le rapproche de notre interface étroite (TS2589). La forme réelle,
+    // elle, est exactement celle-ci — c'est le chemin d'appel documenté de la bibliothèque, et
+    // `verificationMigration.test.ts` vérifie qu'aucune autre méthode n'est sollicitée. `donnees`
+    // (upsert) reste vérifié normalement par le compilateur.
+    return { auth: client.auth, donnees: client, lecture: client as unknown as ClientLectureDonnees };
   } catch {
     // `createClient` lève sur une URL malformée. Une variable d'environnement mal recopiée ne doit
     // pas empêcher Cadence de s'ouvrir : on retombe sur « connexion non configurée ».
@@ -154,6 +193,10 @@ export function obtenirClientAuth(): ClientAuth | null {
 
 export function obtenirClientDonnees(): ClientDonnees | null {
   return obtenirClient()?.donnees ?? null;
+}
+
+export function obtenirClientLectureDonnees(): ClientLectureDonnees | null {
+  return obtenirClient()?.lecture ?? null;
 }
 
 /** Réservé aux tests : oublie le client mémorisé. */

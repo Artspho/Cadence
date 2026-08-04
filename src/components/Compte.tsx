@@ -11,10 +11,12 @@
  */
 
 import { useState } from "react";
-import { obtenirClientAuth, type ClientAuth } from "../auth/supabaseClient";
+import { obtenirClientAuth, obtenirClientLectureDonnees, type ClientAuth, type ClientLectureDonnees } from "../auth/supabaseClient";
 import { useSession } from "../auth/session";
 import { INDICE_RETOUR_LIEN, type IndiceRetourLien } from "../auth/retourLienMagique";
 import type { EtatMiroir } from "../storage/miroirSupabase";
+import type { DonneesApp } from "../storage/localStorageAdapter";
+import { VerificationServeur } from "./VerificationServeur";
 import { LONGUEUR_MINIMALE_MOT_DE_PASSE, connexionMotDePasse, creerCompte, demanderLienMagique, seDeconnecter } from "../auth/actions";
 
 interface CompteProps {
@@ -26,6 +28,10 @@ interface CompteProps {
   indiceRetour?: IndiceRetourLien;
   /** État de la copie vers Supabase (phase 3), calculé dans App. */
   etatMiroir?: EtatMiroir;
+  /** Phase 4 : les données de CE navigateur, pour les comparer à la copie serveur. Jamais écrites. */
+  donnees?: DonneesApp | null;
+  /** Phase 4 : la surface de lecture. Injectée par les tests ; par défaut celle de l'app. */
+  clientLecture?: ClientLectureDonnees | null;
 }
 
 /**
@@ -85,7 +91,14 @@ function Cadre({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function Compte({ client = obtenirClientAuth(), origine, indiceRetour = INDICE_RETOUR_LIEN, etatMiroir = { statut: "inactif" } }: CompteProps) {
+export function Compte({
+  client = obtenirClientAuth(),
+  origine,
+  indiceRetour = INDICE_RETOUR_LIEN,
+  etatMiroir = { statut: "inactif" },
+  donnees = null,
+  clientLecture = obtenirClientLectureDonnees(),
+}: CompteProps) {
   const etat = useSession(client);
   const [mode, setMode] = useState<Mode>("lienMagique");
   const [email, setEmail] = useState("");
@@ -164,6 +177,7 @@ export function Compte({ client = obtenirClientAuth(), origine, indiceRetour = I
           référence : le basculement viendra plus tard, et il te sera demandé explicitement.
         </p>
         <TemoinMiroir etat={etatMiroir} />
+        <VerificationServeur client={clientLecture} utilisateurId={etat.utilisateurId} donnees={donnees} />
         <button type="button" onClick={() => lancer(seDeconnecter)} disabled={enCours} className="px-4 py-2 rounded-lg border border-line text-muted disabled:opacity-40">
           {enCours ? "…" : "Se déconnecter"}
         </button>

@@ -637,6 +637,7 @@ export default function App() {
             onAjouterPeriode={ajouterPeriode}
             onSupprimerPeriode={supprimerPeriode}
             etatMiroir={etatMiroir}
+            donnees={donnees}
           />
         )}
 
