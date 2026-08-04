@@ -29,6 +29,9 @@ import { zodToJsonSchema } from "zod-to-json-schema";
 // Schéma partagé avec le front (écran de revue) — source unique, cf. l'en-tête du fichier.
 import { extractionResultSchema, type ExtractionResult } from "../src/types/extraction";
 import { texteOcrIllisible } from "../src/lib/ocrIllisible";
+// Garde du point 8 — même convention que `ocrIllisible` ci-dessus : la logique vit dans `src/lib/`
+// pour être couverte par les tests, `api/` ne fait que la brancher.
+import { lireOriginesAutorisees, verifierRequeteExtraction } from "../src/lib/gardeEndpointExtraction";
 
 /**
  * Runtime Edge (et non Node). Choix cohérent avec le code : le handler ci-dessous
@@ -726,14 +729,37 @@ export default async function handler(req: Request): Promise<Response> {
     return new Response("Method not allowed", { status: 405 });
   }
 
-  // TODO (Phase 4) : vérifier ici que la requête vient d'un utilisateur
-  // premium valide (cf. verify-subscription.ts) avant d'appeler extractDocument.
+  // Garde du point 8 (phase 0 de la refonte Supabase) : contrôle d'origine + contrôle de taille
+  // CÔTÉ SERVEUR. Avant, la limite de 3 Mo n'existait que dans le navigateur, donc un appelant
+  // direct l'ignorait entièrement et faisait tourner la facture Mistral. La logique et son
+  // raisonnement vivent dans src/lib/gardeEndpointExtraction.ts (testée — `include` de
+  // vite.config.ts ne couvre pas `api/`).
+  //
+  // ⚠️ Le point 8 n'est PAS clos ici : il reste sans authentification et sans quota, tous deux
+  // reportés en phase 2 pour une raison technique explicite (pas d'endroit où compter avant la base
+  // Supabase). Ne pas écrire ailleurs que ce point est fermé. Cette garde vient AVANT toute lecture
+  // du corps utile et avant tout appel réseau : un refus ne coûte rien et n'envoie rien.
+  let corps: unknown;
+  try {
+    corps = await req.json();
+  } catch {
+    corps = null;
+  }
+
+  const verdict = verifierRequeteExtraction({
+    origine: req.headers.get("origin"),
+    pdfBase64: (corps as { pdfBase64?: unknown } | null)?.pdfBase64,
+    originesAutorisees: lireOriginesAutorisees(process.env.ORIGINES_AUTORISEES),
+  });
+  if (!verdict.ok) {
+    return new Response(JSON.stringify({ error: verdict.erreur }), {
+      status: verdict.statut,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
 
   try {
-    const { pdfBase64 } = (await req.json()) as { pdfBase64: string };
-    if (!pdfBase64) {
-      return new Response(JSON.stringify({ error: "pdfBase64 manquant" }), { status: 400 });
-    }
+    const pdfBase64 = (corps as { pdfBase64: string }).pdfBase64;
 
     const result = await extractDocument(pdfBase64);
     return new Response(JSON.stringify(result), {
