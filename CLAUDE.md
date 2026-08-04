@@ -97,31 +97,37 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 
 > **Repère au 04/08/2026, session (5)** — **807 tests verts** (66 fichiers), `tsc -b` propre
 > sur les deux tsconfig, `npm run build` propre. Working tree propre.
-> ⚠️ **`b223ad3` (point 2) et ce commit de documentation ne sont PAS poussés** — Benoît n'a pas demandé
-> le push. Dernier commit sur `origin/master` : `b732dcd`.
+> **`master` poussé sur `origin/master`** — vérifié : `HEAD` et `origin/master` sur `36469dc`
+> (le point 2 `b223ad3` et sa documentation sont donc bien partis).
 >
-> ⚠️ **DÉPLOIEMENT NON VÉRIFIÉ pour tout ce qui suit `f8f52cf`** : le bundle déployé n'a pas été sondé.
-> Dernier déploiement réellement vérifié : `f8f52cf` (bundle `index-Dg3R5vLT.js`, contenant le chemin
-> de récupération du point 23 — « Restaurer une sauvegarde », « rien ne sera écrasé »).
-> Mais l'écart est plus étroit qu'il n'y paraît, et il faut le dire précisément :
-> - **vérifié à l'écran en local** (`npm run dev`, port 5182) : le point **17** (`0a08c26`) et le garde
->   des **nombres négatifs** (`f94ed2c`) — les deux ont été exercés champ par champ dans le vrai
->   navigateur, cf. leurs messages de commit. Ce qui reste inconnu pour eux, c'est le DÉPLOIEMENT, pas
->   le comportement ;
-> - **ne peuvent rien changer à l'écran** : `54caeff`, `ffb0ad3`, `2ebd349` et ce commit (documentation),
->   `f21f872` (fichier de tests, jamais dans le bundle) ;
-> - **jamais contrôlé, ni en local ni déployé** : `21bbb17` (bandeau des règles) — c'est le seul vrai
->   angle mort de comportement. Ses garanties reposent sur `components/__tests__/bandeauRegles.test.tsx`.
-> À noter pour la prochaine fois : juste après un push, l'URL sert encore l'ancien bundle — le
-> déploiement Vercel prend un moment (constaté : trois sondages à 25 s au commit `501ca53`). Sonder en
-> boucle plutôt que conclure « pas déployé » au premier essai. Et si le hash du bundle déployé est
-> identique à celui du `npm run build` local, c'est une preuve valable que le code servi est bien
-> celui-là ; un hash différent, en revanche, ne prouve rien (chercher alors une chaîne de caractères
-> introduite par le correctif).
+> ✅ **DÉPLOIEMENT VÉRIFIÉ le 04/08/2026, pour la première fois depuis `f8f52cf`.** Bundle déployé sur
+> `https://cadence-git-master-benoit3.vercel.app/` : **`index-DRnZrHLg.js`**, hash **identique** à celui
+> du `npm run build` local — donc le code servi est bien celui de `master`. Confirmé en plus par le
+> CONTENU du bundle téléchargé (pas seulement par le hash), chaîne par chaîne :
+> - point **17** : « ne compterait aucune heure », « ne comptent pas en territoire EEE » → présentes ;
+> - point **2** : « Télécharger ma sauvegarde maintenant », « Plus de place dans le stockage »,
+>   « Cadence ne la supprime jamais d'elle-même », « justificatifs de dépenses qui pèsent le plus
+>   lourd » → présentes ;
+> - **`21bbb17`** (bandeau des règles), qui était le seul commit jamais contrôlé nulle part : « Règles
+>   vérifiées **le** » et « juillet 2026 » présentes, et « **Règles à vérifier** » **ABSENTE** — la
+>   bannière qui ne pouvait jamais s'allumer a donc bien disparu du code servi.
+> ⚠️ Ce qui est prouvé, c'est que le BON CODE est déployé. Rien n'a été cliqué dans le Chrome de Benoît
+> sur ses vraies données — et son service worker peut encore lui servir l'ancien bundle (voir le piège
+> n°2 plus bas : recharger avec `/?maj=DRnZrHLg`).
+> Méthode réutilisable, elle a marché du premier coup : `curl` l'URL de branche, extraire le nom du
+> bundle, le comparer au `dist/assets/index-*.js` local, puis télécharger le bundle et y chercher des
+> chaînes littérales introduites par les correctifs. ⚠️ Une chaîne construite par interpolation JSX
+> (`{n} autre{s} entrée{s}…`) n'existe PAS d'un seul morceau dans le bundle : son absence ne prouve
+> rien, choisir des chaînes littérales pour ce contrôle.
+> ⚠️ Juste après un push, l'URL peut encore servir l'ancien bundle (constaté : trois sondages à 25 s au
+> commit `501ca53`) : sonder en boucle plutôt que conclure « pas déployé » au premier essai. Un hash
+> identique au build local est une preuve valable ; un hash différent, en revanche, ne prouve rien
+> (chercher alors une chaîne de caractères introduite par le correctif).
 >
-> **Session (5) : deux points clos, 15 (`f21f872`) et 17 (`0a08c26`)**, plus un chantier demandé
-> directement par Benoît, hors critique — l'**interdiction des nombres négatifs en saisie manuelle**
-> (`f94ed2c`). Détail des trois plus bas.
+> **Session (5) : trois points clos — 15 (`f21f872`), 17 (`0a08c26`) et 2 (`b223ad3`)** — plus un
+> chantier demandé directement par Benoît, hors critique : l'**interdiction des nombres négatifs en
+> saisie manuelle** (`f94ed2c`). Détail des quatre plus bas. C'est la session où le déploiement a
+> **enfin** été vérifié, et où la critique a cessé d'avoir des points codables sans arbitrage.
 >
 > **Six points clos dans la session (4)**, dans l'ordre : **5** et **6** (`f2ec278`, chantier 3),
 > puis **7** (`501ca53`) et **23** (`a12ae14`, chantier 4), puis **13** et **14** ensemble
