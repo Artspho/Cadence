@@ -18,6 +18,7 @@ import { RecapitulatifCategories } from "./RecapitulatifCategories";
 import { explicationsFraisReels } from "../../content/explicationsFraisReels";
 import { FraisReelsGraphiques } from "./FraisReelsGraphiques";
 import { DeclarationTexte } from "./DeclarationTexte";
+import { BandeauStockagePlein } from "../BandeauStockagePlein";
 
 interface FraisReelsProps {
   profil: Profil;
@@ -25,6 +26,8 @@ interface FraisReelsProps {
   contrats: Contrat[];
   config: FranceTravailConfig;
   dateDuJour: string;
+  /** Export JSON complet, fourni par App.tsx — affiché dans le bandeau si une écriture échoue (point 2). */
+  onExporterSauvegarde: () => void;
 }
 
 function configParDefaut(anneeFiscale: number, totalAreCalcule: number | null): ConfigFraisReels {
@@ -46,7 +49,7 @@ function anneesSelectionnables(anneeCourante: number): number[] {
   return Array.from({ length: PROFONDEUR_ANNEES }, (_, i) => anneeCourante - i);
 }
 
-export function FraisReels({ profil, soldeIndemnisationDepart, contrats, config, dateDuJour }: FraisReelsProps) {
+export function FraisReels({ profil, soldeIndemnisationDepart, contrats, config, dateDuJour, onExporterSauvegarde }: FraisReelsProps) {
   const anneeCourante = Number(dateDuJour.slice(0, 4));
   // Année d'exercice affichée — état, plus une valeur dérivée de `dateDuJour` : chaque exercice a sa
   // propre clé localStorage (`cadence_frais_reels_<annee>`), des données 2025 étaient donc
@@ -61,6 +64,8 @@ export function FraisReels({ profil, soldeIndemnisationDepart, contrats, config,
   // d'année fiscale. Cf. `CLE_BIENS_AMORTIS`, storage/fraisReelsStorage.ts.
   const [biensAmortis, setBiensAmortis] = useState<BienAmorti[] | null>(null);
   const chargementBiensTermine = useRef(false);
+  /** Message brut du navigateur si la dernière écriture des frais réels a échoué (point 2). */
+  const [erreurSauvegarde, setErreurSauvegarde] = useState<string | null>(null);
 
   useEffect(() => {
     chargementTermine.current = false;
@@ -77,15 +82,19 @@ export function FraisReels({ profil, soldeIndemnisationDepart, contrats, config,
     });
   }, []);
 
+  // Point 2 : une écriture qui échoue doit le DIRE. Ces deux effets ignoraient le résultat de la
+  // sauvegarde — un stockage plein partait en rejet de promesse non traité, et la dépense disparaissait
+  // sans un mot (cf. storage/fraisReelsStorage.ts). Le verdict est désormais lu, et remonté au même
+  // bandeau rouge que le reste de l'app.
   useEffect(() => {
     if (donnees && chargementTermine.current) {
-      sauvegarderFraisReels(anneeFiscale, donnees);
+      sauvegarderFraisReels(anneeFiscale, donnees).then((r) => setErreurSauvegarde(r.ok ? null : r.message));
     }
   }, [donnees, anneeFiscale]);
 
   useEffect(() => {
     if (biensAmortis && chargementBiensTermine.current) {
-      sauvegarderBiensAmortis(biensAmortis);
+      sauvegarderBiensAmortis(biensAmortis).then((r) => setErreurSauvegarde(r.ok ? null : r.message));
     }
   }, [biensAmortis]);
 
@@ -181,6 +190,11 @@ export function FraisReels({ profil, soldeIndemnisationDepart, contrats, config,
 
   return (
     <div className="space-y-6 max-w-[900px]">
+      {/* Même bandeau que le reste de l'app : un échec d'écriture se dit toujours de la même façon,
+          quelle que soit la porte par laquelle il arrive. `onExporter` vient d'App.tsx, seul endroit
+          qui sait produire l'export JSON complet — un export partiel des seuls frais réels donnerait
+          une fausse impression de sauvegarde. */}
+      {erreurSauvegarde !== null && <BandeauStockagePlein erreur={erreurSauvegarde} onExporter={onExporterSauvegarde} />}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <p className="text-xs text-faint bg-surface-2 border border-line rounded-lg px-4 py-2.5 flex-1 min-w-[280px]">
           Indicatif — les règles fiscales peuvent évoluer. Source : SNAM-CGT mars 2026.

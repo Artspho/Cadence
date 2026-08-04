@@ -52,6 +52,7 @@ import { centreAlertesPourEcran } from "./lib/alertesAffichage";
 import { validerProfilPourEcriture } from "./lib/coherenceProfil";
 import { validerContratsPourEcriture } from "./lib/contratUnSeulMois";
 import { validerContratsEEEPourEcriture } from "./lib/contratTerritoireEEE";
+import { BandeauStockagePlein } from "./components/BandeauStockagePlein";
 
 const dateDuJour = new Date().toISOString().slice(0, 10);
 
@@ -374,16 +375,12 @@ export default function App() {
 
   return (
     <div className="min-h-screen">
-      {/* Filet minimal du point n°2 de la critique : une écriture qui échoue (stockage plein,
-          navigation privée) ne disparaît plus dans la console. Bandeau non refermable — tant qu'il
-          est là, ce que l'utilisateur saisit n'est PAS enregistré, et il doit pouvoir l'exporter.
-          Le sujet complet (purge, export de secours automatique) reste ouvert. */}
-      {erreurSauvegarde !== null && (
-        <div role="alert" className="bg-red/15 text-red px-6 py-3 text-sm">
-          <strong className="font-medium">Tes dernières modifications n'ont PAS été enregistrées.</strong> Le stockage de ce navigateur a refusé l'écriture ({erreurSauvegarde}). Utilise « Exporter
-          mes données » sans tarder pour ne rien perdre, puis libère de l'espace ou change de navigateur.
-        </div>
-      )}
+      {/* Point n°2 de la critique : une écriture qui échoue (stockage plein, navigation privée) ne
+          disparaît plus dans la console — et depuis le 04/08/2026 le bandeau permet d'AGIR sans quitter
+          l'écran : export immédiat, occupation réelle mesurée clé par clé, suppression de la copie de
+          quarantaine sur clic explicite. Non refermable : tant qu'il est là, ce que l'utilisateur
+          saisit n'est PAS enregistré. Détail des choix dans components/BandeauStockagePlein.tsx. */}
+      {erreurSauvegarde !== null && <BandeauStockagePlein erreur={erreurSauvegarde} onExporter={exporter} />}
       {/* Contrat refusé parce qu'il couvre deux mois civils (cf. lib/contratUnSeulMois.ts). Même motif
           que le bandeau de sauvegarde ci-dessus, mais surtout PAS le même texte : ce sont deux échecs
           de nature différente, et les confondre dirait à l'utilisateur une raison fausse (le devoir
@@ -595,7 +592,14 @@ export default function App() {
         )}
 
         {onglet === "fraisPro" && (
-          <FraisReels profil={profil} soldeIndemnisationDepart={donnees.soldeIndemnisationDepart} contrats={donnees.contrats} config={franceTravailConfig} dateDuJour={dateDuJour} />
+          <FraisReels
+            profil={profil}
+            soldeIndemnisationDepart={donnees.soldeIndemnisationDepart}
+            contrats={donnees.contrats}
+            config={franceTravailConfig}
+            dateDuJour={dateDuJour}
+            onExporterSauvegarde={exporter}
+          />
         )}
       </main>
     </div>

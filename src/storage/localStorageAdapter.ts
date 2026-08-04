@@ -355,6 +355,24 @@ export async function reinitialiserDonnees(): Promise<DonneesApp> {
   return vides;
 }
 
+/**
+ * Supprime la copie de quarantaine (`CLE_QUARANTAINE`), écrite lors d'un « repartir de zéro » et
+ * jamais purgée jusqu'ici — elle peut donc occuper la place d'un jeu de données entier indéfiniment.
+ *
+ * ⚠️ Appelée UNIQUEMENT sur un geste explicite de l'utilisateur, depuis le bandeau de stockage plein.
+ * Cadence ne purge jamais cette clé d'elle-même, même pour se débloquer : ce serait détruire une
+ * copie de secours au moment précis où les données sont le plus fragiles (devoir sacré n°1). Le choix
+ * appartient à celui qui sait si le contenu a déjà été récupéré, et ce n'est pas l'app.
+ */
+export function supprimerQuarantaine(): void {
+  try {
+    window.localStorage.removeItem(CLE_QUARANTAINE);
+  } catch {
+    // Stockage inaccessible : rien à supprimer de toute façon, et surtout pas de quoi faire tomber
+    // l'écran depuis lequel l'utilisateur essaie de se sortir d'affaire.
+  }
+}
+
 /** Réinstalle la copie de secours comme donnée courante (bouton « restaurer la version précédente »). */
 export async function restaurerSauvegarde(donnees: DonneesApp): Promise<void> {
   window.localStorage.setItem(CLE_STOCKAGE, JSON.stringify(donnees));

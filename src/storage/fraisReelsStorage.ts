@@ -86,6 +86,9 @@ export interface DonneesFraisReels {
 
 const donneesVides: DonneesFraisReels = { config: null, depenses: [] };
 
+/** Verdict d'écriture — `message` porte l'erreur brute du navigateur, jamais reformulée. */
+export type ResultatSauvegardeFraisReels = { ok: true } | { ok: false; message: string };
+
 function cleStockage(anneeFiscale: number): string {
   return `cadence_frais_reels_${anneeFiscale}`;
 }
@@ -106,8 +109,23 @@ export async function chargerFraisReels(anneeFiscale: number): Promise<DonneesFr
   }
 }
 
-export async function sauvegarderFraisReels(anneeFiscale: number, donnees: DonneesFraisReels): Promise<void> {
-  window.localStorage.setItem(cleStockage(anneeFiscale), JSON.stringify(donnees));
+/**
+ * Même forme de verdict que `sauvegarderDonnees` (storage/localStorageAdapter.ts), et pour la même
+ * raison — point 2 de docs/critique_2026-08-03.md, devoir sacré n°1.
+ *
+ * ⚠️ Trouvé le 04/08/2026 en finissant le point 2 : ces deux fonctions faisaient un `setItem` NU, et
+ * leurs appelants (`FraisReels.tsx`, deux `useEffect`) n'attendaient pas la promesse. Un stockage plein
+ * partait donc en rejet de promesse **non traité** : la dépense disparaissait sans un mot, écran
+ * inchangé. La fiche du point 2 ne visait que `localStorageAdapter.ts` et `App.tsx` — cette porte-là
+ * n'y était pas, alors que c'est justement celle où les justificatifs (base64, gros) saturent.
+ */
+export async function sauvegarderFraisReels(anneeFiscale: number, donnees: DonneesFraisReels): Promise<ResultatSauvegardeFraisReels> {
+  try {
+    window.localStorage.setItem(cleStockage(anneeFiscale), JSON.stringify(donnees));
+    return { ok: true };
+  } catch (erreur) {
+    return { ok: false, message: erreur instanceof Error ? `${erreur.name} : ${erreur.message}` : String(erreur) };
+  }
 }
 
 export function creerDepense(partiel: Omit<Depense, "id">): Depense {
@@ -154,8 +172,13 @@ export async function chargerBiensAmortis(): Promise<BienAmorti[]> {
   }
 }
 
-export async function sauvegarderBiensAmortis(biens: BienAmorti[]): Promise<void> {
-  window.localStorage.setItem(CLE_BIENS_AMORTIS, JSON.stringify(biens));
+export async function sauvegarderBiensAmortis(biens: BienAmorti[]): Promise<ResultatSauvegardeFraisReels> {
+  try {
+    window.localStorage.setItem(CLE_BIENS_AMORTIS, JSON.stringify(biens));
+    return { ok: true };
+  } catch (erreur) {
+    return { ok: false, message: erreur instanceof Error ? `${erreur.name} : ${erreur.message}` : String(erreur) };
+  }
 }
 
 export function creerBienAmorti(partiel: Omit<BienAmorti, "id">): BienAmorti {

@@ -4,6 +4,7 @@ import { CATEGORIES_ORDONNEES, LIBELLES_CATEGORIE_COMPLETS } from "./categorieLa
 import { calculerStatutJustificatif } from "../../lib/statutJustificatif";
 import { getToken } from "../../lib/googleDriveAuth";
 import { uploaderJustificatif } from "../../lib/googleDriveStorage";
+import { chargeAdditionnelleTiendrait, formaterTaille, mesurerOccupation } from "../../lib/capaciteStockage";
 
 interface DepenseFormProps {
   anneeFiscale: number;
@@ -82,6 +83,19 @@ export function DepenseForm({ anneeFiscale, valeurInitiale, ratioLocalPro, nombr
 
     try {
       const base64 = await lireFichierEnBase64(fichier);
+      // Point 2 : détection EN AMONT, par un essai réel (cf. lib/capaciteStockage.ts). Un justificatif
+      // en base64 est de loin le plus gros consommateur du stockage — c'est ici, et pas au moment de
+      // sauvegarder tout le jeu de données, qu'il faut savoir si ça tient. Sans cet essai, le fichier
+      // était accepté à l'écran, puis TOUTE la sauvegarde échouait ensuite : l'utilisateur voyait un
+      // bandeau « non enregistré » sans jamais savoir que son justificatif en était la cause.
+      if (!chargeAdditionnelleTiendrait(base64, window.localStorage)) {
+        const occupation = mesurerOccupation(window.localStorage);
+        setErreur(
+          `Plus de place dans le stockage de ce navigateur pour ce justificatif (${formaterTaille(base64.length)} une fois encodé). ` +
+            `Cadence occupe déjà ${formaterTaille(occupation.totalOctets)}. Exporte tes données, puis supprime des justificatifs de dépenses anciennes — ce sont eux qui prennent la place.`,
+        );
+        return;
+      }
       setJustificatifData(base64);
       setJustificatifNom(fichier.name);
       setDriveFileId(undefined);
