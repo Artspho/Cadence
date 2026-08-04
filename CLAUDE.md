@@ -95,12 +95,19 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 
 ## État actuel
 
-> **Repère au 04/08/2026, session (6) — LE PROJET A CHANGÉ DE DIRECTION.** **918 tests verts**
-> (75 fichiers), `tsc -b` propre sur les deux tsconfig, `npm run build` propre.
+> **Repère au 05/08/2026, session (7) — LA MIGRATION EST FAITE ET PROUVÉE.** **947 tests verts**
+> (77 fichiers), `tsc -b` propre sur les deux tsconfig, `npm run build` propre.
 >
-> ✅ `f9a17f7` **a été validé par Benoît et poussé.** `origin/master` est à **`18abb98`**, et `master`
-> est en avance de quatre commits validés : `c786ecb` (point 8), `5607854` (point 9), `184c933` et
-> `5868eb8` (phase 1). Rien n'attend de validation.
+> ✅ **Tout est poussé.** `origin/master` = `master` = **`8f6089c`** (phase 4). Les sept commits en
+> attente de la session (6) sont partis d'un coup, avec l'accord écrit de Benoît. Arbre propre, rien
+> n'attend de validation.
+>
+> ✅ **Le déploiement est configuré pour de bon** : `VITE_SUPABASE_URL` et `VITE_SUPABASE_ANON_KEY`
+> existent enfin dans Vercel (Production + Preview). ⚠️ **Vite fige les `VITE_*` à la CONSTRUCTION** :
+> ajouter une variable ne suffit pas, il faut REDÉPLOYER. C'est ce qui a fait échouer le premier
+> essai — le build automatique déclenché par le push était antérieur aux variables. Le contrôle qui
+> tranche : chercher `rajybcuzsflrxphppsfx.supabase.co` **dans le bundle servi**. Absente = les
+> variables ne sont pas dans le build, inutile d'ouvrir l'app.
 >
 > ## 🔴 REFONTE SUPABASE — décidée le 04/08/2026, elle recadre tout le reste
 >
@@ -145,8 +152,8 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 > | 1 | projet Supabase, 7 tables, RLS | ✅ **PROUVÉE** — `npm run verifier:rls` : **64 contrôles, 64 conformes** |
 > | 2 | authentification | ✅ **PROUVÉE de bout en bout** le 04/08/2026 à 19h19 : session réellement ouverte par lien magique. Connexion **facultative**, l'app fonctionne toujours sans compte |
 > | 3 | miroir Supabase en écriture seule (contrats + profil) | ✅ **PROUVÉE contre le vrai serveur** : ligne relue en REST (200, `maj_le` = l'heure du témoin) |
-> | 4 | migration + vérification chiffrée | ⬜ **prochaine action** — la première phase qui LIT |
-> | 5 | bascule, sur son feu vert écrit | ⬜ |
+> | 4 | migration + vérification chiffrée | ✅ **PROUVÉE le 05/08/2026 à 01:05** — verdict `identique`, SHA-256 concordant sur **trois** sources |
+> | 5 | bascule, sur son feu vert écrit | ⬜ **prochaine action** |
 > | 6 | documents (conserver, puis envoyer) | ⬜ — le chantier d'origine |
 > | 7 | hors ligne | ⬜ **optionnel, repoussé exprès** : il n'a jamais répondu sur ce point, la question est sortie du chemin critique pour ne pas le bloquer |
 > | 8 | les 7 points réglementaires restants | ⬜ quand une source tombe |
@@ -324,28 +331,66 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 > « écriture seule » de la phase 3 reste entière, et c'est le seul moyen honnête de vérifier une
 > écriture sans se contenter de l'absence d'erreur renvoyée par le client.
 >
-> ⚠️ **UNE LIGNE DE TEST DORT DANS LA VRAIE LIGNE DE BENOÎT.** Le contenu écrit était un jeu d'essai
-> réduit exprès avant le tir (profil avec `dateNaissance: 1985-06-15` — **inventé**, issu des fixtures
-> du dépôt — et `contrats: []`, pour qu'aucun faux contrat n'atterrisse sur le serveur). Sa ligne
-> `donnees_utilisateur` contient donc aujourd'hui un profil qui n'est PAS le sien. Sans conséquence
-> tant que rien ne lit (phase 3 = écriture seule), mais **la phase 4 lira** : ne jamais prendre cette
-> ligne pour ses données réelles. Elle sera écrasée par la vraie migration.
+> ✅ **RÉSERVE LEVÉE — la ligne de test n'existe plus.** Elle avait été écrite avec un jeu d'essai
+> (profil `dateNaissance: 1985-06-15`, **inventé**, issu des fixtures du dépôt, et `contrats: []`) et
+> la consigne était de ne jamais la prendre pour les données réelles de Benoît. La migration du
+> 05/08/2026 à 01:05:26 l'a **écrasée** par ses 62 vrais contrats. Plus rien de fictif sur le serveur.
 >
 > ⚠️ **Sur le plafond d'envoi** : à 19h15 un envoi a encore été refusé alors que le premier datait de
 > plus d'une heure — donc ce plafond n'est pas une simple fenêtre glissante par message, ou les
 > tentatives refusées comptent aussi. **Règle exacte non établie, ne pas l'affirmer.** À 19h18 le
 > créneau s'est libéré.
 >
-> ### ▶ PROCHAINE ACTION — phase 4 : migration + vérification chiffrée
+> ### ✅ PHASE 4 — FAITE ET PROUVÉE le 05/08/2026 (commit `8f6089c`)
 >
-> C'est la **première phase qui LIRA** depuis Supabase, donc la première où une erreur peut écraser des
-> données. Le protocole en 6 étapes validé par Benoît (arbitrage 5) s'applique tel quel : export JSON
-> hors navigateur → migration en lecture seule → **vérification chiffrée** (62 contrats, 588 h, 4 mois
-> certifiés) → son feu vert → **rien n'est supprimé localement** → retour arrière testé **AVANT**, pas
-> après.
-> ⚠️ Ses vraies données vivent toujours dans SON Chrome, sur `cadence-git-master-benoit3.vercel.app`.
-> C'est de là qu'il faudra partir, pas d'un localhost.
-> ⚠️ La ligne serveur de test décrite plus haut doit être traitée à ce moment-là.
+> Le protocole en 6 étapes (arbitrage 5) a été suivi **dans l'ordre**, et c'est l'ordre qui a fait la
+> preuve. Les six étapes, avec ce qui les atteste :
+> 1. **export JSON hors navigateur** — `Téléchargements\cadence-export-2026-08-04.json` (nom en UTC,
+>    contenu du 05/08 à 00:21), 62 contrats, SHA-256 du FICHIER `E57C15CB…` ;
+> 2. **retour arrière testé AVANT** — le fichier repassé par le VRAI `importerJSON` (pas par une
+>    lecture JSON complaisante) rend **62 contrats** et, au moteur réel, **588 h** ;
+> 3. **migration** — par le miroir de la phase 3, déjà éprouvé, à l'ouverture de session, 01:05:26 ;
+> 4. **vérification chiffrée** — verdict `identique` à l'écran, 62 contrats / 0 périodes / 2 exercices
+>    figés des deux côtés, empreinte commune `8b92cb3741af209023cc0756c7ee8e0f…` ;
+> 5. **feu vert écrit de Benoît** — donné le 05/08/2026 ;
+> 6. **rien supprimé localement** — son `localStorage` est intact, le fichier de secours aussi.
+>
+> **LA PREUVE LA PLUS FORTE, et elle n'était pas au programme** : l'empreinte canonique recalculée sur
+> le FICHIER (mêmes règles que `verificationMigration.ts`, en retirant `schemaVersion`/`exporteLe`)
+> vaut `8b92cb3741af209023cc0756c7ee8e0fd2925a0d06ffca5ddc557f7782df7422` — **exactement** celle
+> affichée par l'app. Donc **fichier de secours = navigateur = serveur**, au bit près. Les 588 h
+> mesurées à l'étape 2 valent par conséquent aussi pour la copie serveur.
+> ⚠️ Les **4 mois certifiés** n'ont PAS été re-mesurés ce jour-là : ils restent couverts par la suite
+> de tests, comme avant. Ne pas les compter comme une preuve du 05/08.
+>
+> **CE QUE L'USAGE RÉEL A APPRIS, et qu'aucun test n'aurait dit** (troisième fois de suite) :
+> - la section « Compte » est **introuvable** : elle est tout en bas de « Mon profil », sous les
+>   périodes assimilées, juste avant « Périmètre du MVP ». Benoît a conclu « ça ne marche pas » alors
+>   que tout fonctionnait. C'était un choix délibéré de la phase 2 (ne pas pousser à se connecter tant
+>   que ça ne sert à rien) ; il devient **nuisible en phase 5**, quand la connexion sera nécessaire.
+>   **À corriger là.**
+> - `?maj=<hash>` **ne contourne pas** le service worker pour la page elle-même. Ce qui marche, avec
+>   `registerType: "autoUpdate"` + `skipWaiting`, c'est de **recharger une seconde fois** : le premier
+>   chargement sert l'ancien bundle et installe le nouveau. Corriger le piège n°2 en conséquence.
+>
+> **DETTE OUVERTE** : `exporterJSON` **ne contient PAS les frais réels** (clés `cadence_frais_reels_*`,
+> stockage séparé) ni l'identité déclarative (exclusion délibérée et testée). Le filet de sécurité
+> couvre donc exactement ce que la phase 4 migrait, mais **plus quand les documents entreront en jeu
+> (phase 6)**. À traiter avant.
+>
+> ### ▶ PROCHAINE ACTION — phase 5 : la bascule
+>
+> Supabase devient la source de vérité, le `localStorage` cesse de l'être. Ce qu'elle exige de Benoît,
+> et qui n'est pas du code :
+> - **son feu vert écrit**, comme pour la phase 4 ;
+> - **la décision palier gratuit / payant** (arbitrage 4) : un projet gratuit est mis en pause après
+>   **7 jours d'inactivité**, et une pause = app qui ne s'ouvre plus une fois Supabase devenu la
+>   référence. **C'est ici qu'il faut le lui rappeler**, pas avant ;
+> - il accepte deux conséquences déjà actées : **plus d'ouverture hors ligne, plus d'usage sans compte**.
+>
+> ⚠️ À traiter dans la même phase : rendre la section « Compte » trouvable (voir ci-dessus), et la
+> réserve **PKCE** — ses testeurs liront leurs liens sur leur téléphone, or le lien doit être ouvert
+> dans le navigateur qui l'a demandé.
 >
 > ⚠️ **Relancer `npm run verifier:rls` après tout changement de schéma ou de politique.** Les deux
 > comptes de test **`testa-cadence@cadence.fr`** et **`test-cadenceb@cadence.fr`** sont volontairement
