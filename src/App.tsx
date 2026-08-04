@@ -51,6 +51,7 @@ import { AvertissementContradictionHorsA10 } from "./components/AvertissementCon
 import { centreAlertesPourEcran } from "./lib/alertesAffichage";
 import { validerProfilPourEcriture } from "./lib/coherenceProfil";
 import { validerContratsPourEcriture } from "./lib/contratUnSeulMois";
+import { validerContratsEEEPourEcriture } from "./lib/contratTerritoireEEE";
 
 const dateDuJour = new Date().toISOString().slice(0, 10);
 
@@ -230,22 +231,28 @@ export default function App() {
   const profil = donnees.profil;
 
   /**
-   * Refuse un contrat couvrant deux mois civils (cf. lib/contratUnSeulMois.ts pour la règle et son
-   * pourquoi). Placé ici, sur les fonctions d'écriture, et NON dans un schéma Zod : celui de lecture
+   * Refuse un contrat qui viole une règle d'intégrité d'écriture. Deux règles à ce jour, chacune dans
+   * son module avec son pourquoi :
+   *   - couvrir deux mois civils (lib/contratUnSeulMois.ts, point 7) ;
+   *   - être en territoire EEE sans jours travaillés, ou avec des cachets/heures que le décompte
+   *     ignore (lib/contratTerritoireEEE.ts, point 17).
+   * Placé ici, sur les fonctions d'écriture, et NON dans un schéma Zod : celui de lecture
    * rendrait illisible un fichier légitime, celui d'écriture valide le jeu de données entier et
    * bloquerait toute sauvegarde à cause d'un seul contrat hérité (devoir sacré n°1 dans les deux cas).
    * Ces trois fonctions sont le seul point de passage commun à toutes les portes d'écriture :
    * ContractForm, ContractList (édition), ImportBulletins, RevueExtraction (IA).
    * Retourne `false` et affiche le bandeau quand le contrat est refusé — jamais un rejet silencieux.
+   * Les règles sont évaluées dans l'ordre et le premier refus gagne : chaque message nomme UNE action
+   * à faire, en enchaîner deux dans le même bandeau les rendrait illisibles.
    */
-  function refuserSiDeuxMois(contrats: Omit<Contrat, "id">[]): boolean {
-    const verdict = validerContratsPourEcriture(contrats);
-    setRefusEcriture(verdict.ok ? null : verdict.message);
-    return !verdict.ok;
+  function refuserContratNonConforme(contrats: Omit<Contrat, "id">[]): boolean {
+    const verdict = [validerContratsPourEcriture(contrats), validerContratsEEEPourEcriture(contrats)].find((v) => !v.ok);
+    setRefusEcriture(verdict === undefined || verdict.ok ? null : verdict.message);
+    return verdict !== undefined && !verdict.ok;
   }
 
   function ajouterContrat(partiel: Omit<Contrat, "id">) {
-    if (refuserSiDeuxMois([partiel])) return;
+    if (refuserContratNonConforme([partiel])) return;
     setDonnees((d) => (d ? { ...d, contrats: [...d.contrats, creerContrat(partiel)] } : d));
   }
 
@@ -262,7 +269,7 @@ export default function App() {
    * fonction ne fait que remplacer, aucune règle métier ici (même esprit que ajouterContrat).
    */
   function modifierContrat(id: string, nouveauContrat: Omit<Contrat, "id">) {
-    if (refuserSiDeuxMois([nouveauContrat])) return;
+    if (refuserContratNonConforme([nouveauContrat])) return;
     setDonnees((d) => (d ? { ...d, contrats: d.contrats.map((c) => (c.id === id ? { ...nouveauContrat, id } : c)) } : d));
   }
 
@@ -291,7 +298,7 @@ export default function App() {
   function ajouterContratsRecurrents(contrats: Contrat[]) {
     // Le générateur (lib/contratRecurrent.ts) cale déjà chaque contrat sur un mois civil ; ce garde
     // est là pour que la règle ne dépende pas de cette promesse, et tienne si le générateur change.
-    if (refuserSiDeuxMois(contrats)) return;
+    if (refuserContratNonConforme(contrats)) return;
     setDonnees((d) => (d ? { ...d, contrats: [...d.contrats, ...contrats] } : d));
   }
 

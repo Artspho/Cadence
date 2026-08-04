@@ -4,6 +4,7 @@ import type { FranceTravailConfig } from "../config/franceTravailConfig";
 import { heuresBrutesContrat } from "../engine/decompteHeures";
 import { champAEffacerEnModeExclusif, detecterActiviteMixteInitiale } from "../lib/activiteMixteFormulaire";
 import { MESSAGE_CONTRAT_DEUX_MOIS, contratSurPlusieursMois } from "../lib/contratUnSeulMois";
+import { MESSAGE_EEE_SANS_JOURS, contratEEESansJours } from "../lib/contratTerritoireEEE";
 import { ContractFormRecurrent } from "./ContractFormRecurrent";
 
 interface ContractFormProps {
@@ -77,6 +78,13 @@ export function ContractForm({ profil, config, decompteActuel, valeurInitiale, o
     if (champAEffacerEnModeExclusif("nbHeures", valeur, activiteMixte) === "nbCachets") setNbCachets("");
   }
 
+  // Un contrat ne porte que les champs de SON territoire (cf. lib/contratTerritoireEEE.ts, point 17) :
+  // en EEE le décompte ne lit que `nbJoursEEE` et ignore cachets et heures, en France c'est l'inverse.
+  // Les états de saisie, eux, sont conservés intacts : basculer le territoire par erreur puis revenir
+  // ne perd rien de ce qui a été tapé — c'est le contrat ENREGISTRÉ qui est nettoyé, pas le formulaire.
+  // Quand des valeurs sont ainsi écartées, `avertissementEEE` ci-dessous le dit avant l'enregistrement :
+  // jamais une donnée abandonnée en silence (devoir n°1).
+  const estEEE = territoire === "eee_suisse_uk";
   const brouillon: Contrat = {
     id: "brouillon",
     dateDebut: dateDebut || dateFinEffective,
@@ -84,9 +92,9 @@ export function ContractForm({ profil, config, decompteActuel, valeurInitiale, o
     type,
     typeRemuneration,
     territoire,
-    nbCachets: nbCachets ? parseFloat(nbCachets) : undefined,
-    nbHeures: nbHeures ? parseFloat(nbHeures) : undefined,
-    nbJoursEEE: nbJoursEEE ? parseFloat(nbJoursEEE) : undefined,
+    nbCachets: !estEEE && nbCachets ? parseFloat(nbCachets) : undefined,
+    nbHeures: !estEEE && nbHeures ? parseFloat(nbHeures) : undefined,
+    nbJoursEEE: estEEE && nbJoursEEE ? parseFloat(nbJoursEEE) : undefined,
     salaireBrut: parseFloat(salaireBrut) || 0,
     employeur,
     etablissementAgree,
@@ -120,6 +128,22 @@ export function ContractForm({ profil, config, decompteActuel, valeurInitiale, o
     return null;
   }, [type, apercu, decompteActuel, config]);
 
+  // Point 17 : un contrat EEE sans jours travaillés ne compterait AUCUNE heure. On bloque à la saisie
+  // pour expliquer avant de refuser — le vrai rempart reste le garde d'App.tsx, qui couvre aussi
+  // l'import de bulletin et la revue IA (cf. lib/contratTerritoireEEE.ts).
+  // Le prédicat de la règle est appelé tel quel, sur le brouillon : le formulaire ne réimplémente pas
+  // la condition, sinon les deux divergent. ⚠️ Piège vérifié le 04/08/2026 : tester `!nbJoursEEE` sur
+  // l'état de saisie laisserait passer un « 0 » — c'est une chaîne non vide, donc truthy — que le garde
+  // d'App.tsx refuserait ensuite. Le formulaire dirait oui, l'écriture dirait non.
+  const eeeSansJours = contratEEESansJours(brouillon);
+  // Cas de l'ÉDITION d'un contrat EEE hérité qui porte des cachets ou des heures : les champs
+  // correspondants ne sont pas affichés en territoire EEE, donc sans ce message l'utilisateur ne
+  // saurait pas que des valeurs enregistrées vont disparaître de son contrat. Comparé à zéro APRÈS
+  // conversion, pour ne pas avertir à propos de « 0 cachet » — un avertissement sans objet est un
+  // faux avertissement (devoir n°2).
+  const remunerationEcarteeParEEE = estEEE && ((parseFloat(nbCachets) || 0) > 0 || (parseFloat(nbHeures) || 0) > 0);
+  const avertissementEEE = remunerationEcarteeParEEE ? "Les cachets et heures saisis ne comptent pas en territoire EEE : ils ne seront pas enregistrés sur ce contrat." : null;
+
   const alerteCachets = useMemo(() => {
     // nbCachets renseigné, pas typeRemuneration === "cachet" : un contrat mixte (heures ET cachets)
     // doit aussi être compté pour ce plafond, même si son mode principal affiché est "heures".
@@ -135,7 +159,7 @@ export function ContractForm({ profil, config, decompteActuel, valeurInitiale, o
 
   function soumettre(e: React.FormEvent) {
     e.preventDefault();
-    if (dateDebutInvalide || contratADeuxMois) return;
+    if (dateDebutInvalide || contratADeuxMois || eeeSansJours) return;
     onValider({
       dateDebut: dateDebut || brouillon.date,
       date: brouillon.date,
@@ -248,6 +272,8 @@ export function ContractForm({ profil, config, decompteActuel, valeurInitiale, o
           </label>
           <input id="jours-eee" type="number" min="0" step="0.5" value={nbJoursEEE} onChange={(e) => setNbJoursEEE(e.target.value)} className="w-full bg-surface-2 border border-line rounded-lg px-3 py-2" />
           <p className="text-xs text-faint mt-1">{config.heuresParJourEEE} h retenues par jour.</p>
+          {eeeSansJours && <p className="text-xs rounded-lg px-3 py-2 mt-2 bg-amber/10 text-amber">{MESSAGE_EEE_SANS_JOURS}</p>}
+          {avertissementEEE && <p className="text-xs rounded-lg px-3 py-2 mt-2 bg-amber/10 text-amber">{avertissementEEE}</p>}
         </div>
       ) : (
         <div>
@@ -322,7 +348,7 @@ export function ContractForm({ profil, config, decompteActuel, valeurInitiale, o
       {alerteCachets && <p className="text-xs rounded-lg px-3 py-2 bg-amber/10 text-amber">{alerteCachets}</p>}
 
       <div className="flex gap-2 pt-2">
-        <button type="submit" disabled={dateDebutInvalide || contratADeuxMois} className="flex-1 bg-mint text-bg font-medium rounded-lg py-2.5 disabled:opacity-40 disabled:cursor-not-allowed">
+        <button type="submit" disabled={dateDebutInvalide || contratADeuxMois || eeeSansJours} className="flex-1 bg-mint text-bg font-medium rounded-lg py-2.5 disabled:opacity-40 disabled:cursor-not-allowed">
           Enregistrer le contrat
         </button>
         {onAnnuler && (
