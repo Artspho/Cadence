@@ -95,15 +95,18 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 
 ## État actuel
 
-> **Repère au 03/08/2026, fin de session (4)** — **693 tests verts** (57 fichiers), `tsc -b` propre
+> **Repère au 04/08/2026, session (5)** — **742 tests verts** (58 fichiers), `tsc -b` propre
 > sur les deux tsconfig, `npm run build` propre. Working tree propre. **`master` poussé sur
-> `origin/master`** (`54caeff`, vérifié : `HEAD` et `origin/master` sur le même hash).
+> `origin/master`** (`f21f872` + ce commit de documentation).
 >
-> ⚠️ **DÉPLOIEMENT NON VÉRIFIÉ** pour `54caeff` (ni pour `21bbb17`) : le push vient d'être fait, le
-> bundle déployé n'a pas été sondé, et rien n'a été contrôlé à l'écran. **Première chose à faire au
-> prochain fil** si l'écran doit être cru. Le dernier déploiement réellement vérifié reste `f8f52cf`
-> (bundle `index-Dg3R5vLT.js`, contenant le chemin de récupération du point 23 — « Restaurer une
-> sauvegarde », « rien ne sera écrasé »).
+> ⚠️ **DÉPLOIEMENT NON VÉRIFIÉ pour tout ce qui suit `f8f52cf`** — soit `21bbb17`, `54caeff`,
+> `ffb0ad3`, `f21f872` et ce commit : le bundle déployé n'a pas été sondé, et rien n'a été contrôlé à
+> l'écran. **Première chose à faire au prochain fil** si l'écran doit être cru. Le dernier déploiement
+> réellement vérifié reste `f8f52cf` (bundle `index-Dg3R5vLT.js`, contenant le chemin de récupération
+> du point 23 — « Restaurer une sauvegarde », « rien ne sera écrasé »).
+> À noter : sur les cinq commits en écart, **trois ne peuvent rien changer à l'écran** (`ffb0ad3` et
+> celui-ci sont de la documentation, `f21f872` un fichier de tests qui ne part pas dans le bundle).
+> L'écart réel porte donc sur `21bbb17` (bandeau des règles) et `54caeff` (documentation également).
 > À noter pour la prochaine fois : juste après un push, l'URL sert encore l'ancien bundle — le
 > déploiement Vercel prend un moment (constaté : trois sondages à 25 s au commit `501ca53`). Sonder en
 > boucle plutôt que conclure « pas déployé » au premier essai. Et si le hash du bundle déployé est
@@ -111,18 +114,39 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 > celui-là ; un hash différent, en revanche, ne prouve rien (chercher alors une chaîne de caractères
 > introduite par le correctif).
 >
-> **Six points clos dans cette session**, dans l'ordre : **5** et **6** (`f2ec278`, chantier 3),
+> **Session (5), un seul point clos : le 15** (chantier 6, `f21f872` — détail plus bas).
+>
+> **Six points clos dans la session (4)**, dans l'ordre : **5** et **6** (`f2ec278`, chantier 3),
 > puis **7** (`501ca53`) et **23** (`a12ae14`, chantier 4), puis **13** et **14** ensemble
 > (chantier 5, `21bbb17`). Deux points ont été **instruits puis fermés sans code**, chacun sur une
 > décision de Benoît : le **9** est **reporté sciemment** (`4a33baa` — la bascule Mistral se fera à la
 > toute fin) et le **10** est **écarté** (`54caeff` — la vraisemblance d'un chiffre saisi est la
 > responsabilité de l'utilisateur, pas de l'app ; ne pas le reproposer). Détail plus bas.
 >
-> **État des 29 points de `docs/critique_2026-08-03.md`** — 15 clos · 1 à moitié (**2**, échec
-> d'écriture silencieux, devoir n°1) · 1 reporté (**9**) · 1 écarté (**10**) · **11 ouverts** :
-> 🔴 8, 11, 12 ter, 25, 26 et 🟡 12, 15, 17, 18, 19, 20. **Sur ces 11, neuf attendent autre chose que
-> du code** — une source, un document, ou une règle à trancher. Seuls **15** et **17** sont codables
-> sans rien attendre, plus le **2** à finir.
+> **État des 29 points de `docs/critique_2026-08-03.md`** — **16 clos** · 1 à moitié (**2**, échec
+> d'écriture silencieux, devoir n°1) · 1 reporté (**9**) · 1 écarté (**10**) · **10 ouverts** :
+> 🔴 8, 11, 12 ter, 25, 26 et 🟡 12, 17, 18, 19, 20. **Sur ces 10, neuf attendent autre chose que
+> du code** — une source, un document, ou une règle à trancher. Seul le **17** est codable sans rien
+> attendre, plus le **2** à finir.
+>
+> **Chantier 6, point 15 — `dateUtils.ts` sous tests** (`f21f872`). `src/engine/__tests__/dateUtils.test.ts`,
+> **49 tests**, **aucune ligne de `dateUtils.ts` modifiée** : comportement constant, les tests ne font
+> que le fixer. Les fonctions sont **treize**, pas dix comme l'annonçait le point. Quatre propriétés
+> étaient les vraies cibles : l'aller-retour `toDate`/`toISO` **sans dérive de fuseau** (le piège qui
+> décalerait toutes les dates de l'app d'un jour d'un coup) ; **les deux changements d'heure** — sans le
+> `Math.round` de `joursChevauchement`, la division par 86 400 000 renverrait 2,958 (mars) et 3,041
+> (octobre) jours au lieu de 3, donc un prorata de contrat et des heures assimilées faux deux fois par
+> an ; le **seuil des 50 ans** d'`ageAuJour`, qui bascule le jour de l'anniversaire et non la veille
+> (il choisit le plafond enseignement, donc les heures retenues, donc le droit) ; et l'**invariant du
+> prorata mensuel** sur six formes de contrat (un seul mois, fin d'année, 29 février, chacun des deux
+> changements d'heure, 12 mois glissants) — la somme des jours attribués mois par mois égale
+> exactement la durée du contrat, ni jour perdu ni jour inventé.
+> **Aucun bug révélé.** Deux comportements consignés dans les tests **sans être corrigés**, parce
+> qu'ils ne sont pas atteignables par l'écran : `moisEntre()` sur des dates inversées renvoie les mois
+> **à l'envers** plutôt qu'une liste vide (garde-fou en amont : `ContractForm.tsx:58` refuse déjà une
+> date de début postérieure à la fin), et `ageAuJour()` renvoie un **âge négatif** si la référence
+> précède la naissance (garde-fou dans `lib/coherenceProfil.ts`). ⚠️ Ne pas « corriger » ces deux
+> comportements sans avoir d'abord montré un appelant réel qui les atteint.
 >
 > **Chantier 5, points 13 et 14 — le bandeau des règles.** Traités ensemble : ils touchaient les
 > mêmes deux lignes de `TopBar.tsx` et `MonProfil.tsx`.
@@ -219,18 +243,21 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 >    d'URL (`/?maj=<hash>`). Avant de conclure « le correctif ne marche pas », vérifier lequel des
 >    deux est en cause.
 >
-> **▶ Prochaine action — le point 15 : donner des tests dédiés à `src/engine/dateUtils.ts`.** C'est le
-> seul fichier de `src/engine/` sans `__tests__/<nom>.test.ts`, alors que ses dix fonctions portent
-> toute l'arithmétique de calendrier du projet (fenêtres de 12 mois, chevauchements, découpage
-> mensuel, âge). Elles ne sont aujourd'hui exercées qu'indirectement. **Aucun arbitrage à demander à
-> Benoît, aucune source à trouver, aucun comportement à modifier** : on ajoute un filet là où il n'y
-> en a pas — donc à faire à comportement constant, et si un test révèle un bug, le signaler avant de
-> corriger quoi que ce soit.
+> **▶ Prochaine action — le point 17 : un contrat EEE sans jours saisis compte zéro heure, en
+> silence.** `decompteHeures.ts:24-26` calcule `(contrat.nbJoursEEE ?? 0) × 6` pour un contrat
+> `territoire: "eee_suisse_uk"` ; rien dans le type (`types/index.ts:26-28`, tous les champs
+> optionnels) ni dans le schéma de stockage n'impose que `nbJoursEEE` soit présent quand le territoire
+> l'exige. Un contrat importé ou construit sans ce champ **disparaît du décompte sans le moindre
+> signal**. ⚠️ **À ne pas confondre avec le point 10 écarté** : ici l'app perd une donnée que
+> l'utilisateur a bien saisie ailleurs, elle ne juge pas la vraisemblance d'un chiffre. Deux voies
+> tracées par le point : rendre l'invariant explicite dans le type (union discriminée sur
+> `territoire`) ou, à défaut, signaler tout contrat qui n'apporte aucune heure. **Aucune source à
+> trouver.** ⚠️ En revanche, le choix entre les deux voies **est un arbitrage** : la première touche
+> le type donc potentiellement le schéma de LECTURE (risque de rejeter des contrats déjà enregistrés
+> — devoir n°1), la seconde ajoute un avertissement à l'écran. À poser à Benoît avant de coder.
 >
-> Ensuite, par ordre d'intérêt : le **17** (un contrat EEE sans jours saisis compte zéro heure, en
-> silence — l'app perd une donnée, elle ne conteste pas un chiffre : à ne pas confondre avec le point
-> 10 écarté), puis le **2** (une écriture qui échoue ne le dit pas — le plus important des trois, et
-> le plus lourd). ⚠️ Ne **pas** attaquer 25 ni 26 sans avoir fait trancher la règle à Benoît : elles
+> Ensuite, le **2** (une écriture qui échoue ne le dit pas — le plus important des trois, et le plus
+> lourd). ⚠️ Ne **pas** attaquer 25 ni 26 sans avoir fait trancher la règle à Benoît : elles
 > ne sont pas sourcées.
 >
 > **Le point 9 n'est pas une prochaine action** — il a été posé à Benoît le 03/08/2026 et **reporté
