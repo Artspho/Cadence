@@ -383,9 +383,18 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 > Supabase devient la source de vérité, le `localStorage` cesse de l'être. Ce qu'elle exige de Benoît,
 > et qui n'est pas du code :
 > - **son feu vert écrit**, comme pour la phase 4 ;
-> - **la décision palier gratuit / payant** (arbitrage 4) : un projet gratuit est mis en pause après
->   **7 jours d'inactivité**, et une pause = app qui ne s'ouvre plus une fois Supabase devenu la
->   référence. **C'est ici qu'il faut le lui rappeler**, pas avant ;
+> - **la décision palier gratuit / payant** (arbitrage 4). ✅ **VÉRIFIÉ À LA SOURCE le 05/08/2026**,
+>   la note antérieure n'était qu'une affirmation :
+>   · doc Supabase (« Going into prod ») — « We may pause applications on the Free Plan that exhibit
+>     low activity in a 7-day period to save on server resources », et un projet en pause **se
+>     restaure depuis le tableau de bord** (ce n'est donc pas une perte de données, mais une
+>     indisponibilité, le temps de s'en apercevoir et d'agir) ;
+>   · page Pricing — Free : « Free projects are paused after 1 week of inactivity », 500 Mo de base,
+>     1 Go de fichiers, **2 projets actifs maximum** ; Pro : **25 $/mois** (+ facturation du calcul),
+>     « Pausing: Never », 8 Go de base.
+>   **La conséquence à lui exposer telle quelle** : tant que le `localStorage` est la référence, une
+>   pause est sans effet. **Dès la bascule, une pause = Cadence ne s'ouvre plus du tout.** Et Cadence
+>   est une app qu'il peut très bien ne pas ouvrir pendant 7 jours. C'est SA décision, pas la mienne ;
 > - il accepte deux conséquences déjà actées : **plus d'ouverture hors ligne, plus d'usage sans compte**.
 >
 > ⚠️ À traiter dans la même phase : rendre la section « Compte » trouvable (voir ci-dessus), et la
