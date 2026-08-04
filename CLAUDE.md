@@ -95,9 +95,10 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 
 ## État actuel
 
-> **Repère au 04/08/2026, session (5)** — **778 tests verts** (62 fichiers), `tsc -b` propre
-> sur les deux tsconfig, `npm run build` propre. Working tree propre. **`master` poussé sur
-> `origin/master`** (`f94ed2c` + ce commit de documentation).
+> **Repère au 04/08/2026, session (5)** — **807 tests verts** (66 fichiers), `tsc -b` propre
+> sur les deux tsconfig, `npm run build` propre. Working tree propre.
+> ⚠️ **`b223ad3` (point 2) et ce commit de documentation ne sont PAS poussés** — Benoît n'a pas demandé
+> le push. Dernier commit sur `origin/master` : `b732dcd`.
 >
 > ⚠️ **DÉPLOIEMENT NON VÉRIFIÉ pour tout ce qui suit `f8f52cf`** : le bundle déployé n'a pas été sondé.
 > Dernier déploiement réellement vérifié : `f8f52cf` (bundle `index-Dg3R5vLT.js`, contenant le chemin
@@ -129,12 +130,32 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 > toute fin) et le **10** est **écarté** (`54caeff` — la vraisemblance d'un chiffre saisi est la
 > responsabilité de l'utilisateur, pas de l'app ; ne pas le reproposer). Détail plus bas.
 >
-> **État des 29 points de `docs/critique_2026-08-03.md`** — **17 clos** · 1 à moitié (**2**, échec
-> d'écriture silencieux, devoir n°1) · 1 reporté (**9**) · 1 écarté (**10**) · **9 ouverts** :
-> 🔴 8, 11, 12 ter, 25, 26 et 🟡 12, 18, 19, 20. **Ces neuf attendent TOUS autre chose que du code** —
-> une source, un document, ou une règle à trancher. Côté code pur, il ne reste donc que le **2** à
-> finir : c'est la prochaine action, et la dernière avant d'être obligé de passer par un arbitrage ou
-> une recherche.
+> **État des 29 points de `docs/critique_2026-08-03.md`** — **18 clos** (plus aucun « à moitié ») ·
+> 1 reporté (**9**) · 1 écarté (**10**) · **9 ouverts** : 🔴 8, 11, 12 ter, 25, 26 et 🟡 12, 18, 19, 20.
+> **Ces neuf attendent TOUS autre chose que du code** — une source, un document, ou une règle à
+> trancher. ⚠️ **Il n'y a donc PLUS RIEN à coder sur la critique sans passer par un arbitrage ou une
+> recherche.** Le prochain chantier n'en vient pas : c'est la sortie des justificatifs du localStorage
+> (cf. plus bas).
+>
+> **Chantier 9, point 2 — le stockage plein** (`b223ad3`). Le défaut d'origine (une écriture qui échoue
+> sans le dire) est fermé sur toutes les portes ; **la cause profonde est un chantier distinct**, voir
+> ci-dessous. Ce qui a été fait : détection **en amont par un essai réel** avant d'accepter un
+> justificatif (`lib/capaciteStockage.ts`) — **aucun seuil deviné**, un avertissement sans mesure serait
+> un faux avertissement ; bandeau **actionnable** (`components/BandeauStockagePlein.tsx`) avec export
+> immédiat, occupation mesurée clé par clé, et suppression de la quarantaine **sur clic seulement** ;
+> et une porte que la fiche n'avait pas vue — `sauvegarderFraisReels` / `sauvegarderBiensAmortis`
+> faisaient un `setItem` nu, dont l'échec partait en **rejet de promesse non traité** (dépense ou bien
+> amorti perdu sans un mot).
+> ⚠️ **Deux choix par défaut, réversibles, faute de réponse de Benoît** : export **manuel** (aucun
+> téléchargement automatique) et quarantaine **proposée** (jamais purgée d'office).
+> ⚠️ **Ne pas utiliser l'essai de capacité avant la sauvegarde générale** : il réclame la place totale
+> là où une réécriture ne coûte que la différence, et refuserait des écritures qui passent — refuser à
+> tort est aussi un mensonge. Le fichier le dit, ne pas « améliorer » ça sans le relire.
+>
+> **▶ Mesures de stockage à connaître avant de raisonner sur la saturation** (04/08/2026, à l'écran) :
+> plafond réel **~50 Mo** sur l'origine testée — pas 5 Mo ; les **62 contrats pèsent 23 Ko** ; un scan
+> de facture de 3 Mo occupe **4,0 Mo** encodé en base64. La saturation ne viendra jamais des contrats.
+> ⚠️ Le plafond a été mesuré sur `localhost`, pas sur l'origine Vercel réelle.
 >
 > **Chantier 8, hors critique — aucun nombre négatif en saisie manuelle** (`f94ed2c`, demande directe
 > de Benoît : « ça n'a pas de sens »). ⚠️ Ne pas le confondre avec le point **10 écarté** : celui-ci
@@ -278,21 +299,18 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 >    d'URL (`/?maj=<hash>`). Avant de conclure « le correctif ne marche pas », vérifier lequel des
 >    deux est en cause.
 >
-> **▶ Prochaine action — finir le point 2 : un stockage plein.** C'est le **dernier point codable sans
-> arbitrage ni source**, et le plus lourd des trois traités cette session. Le filet minimal est déjà
-> posé (03/08, avec le point 1) : `sauvegarderDonnees` renvoie `{ ok } | { ok: false, message }` au lieu
-> de laisser l'exception se perdre, et `App.tsx` affiche un bandeau rouge non refermable invitant à
-> exporter tout de suite. **Ce qui reste, et que la fiche énumère** : le comportement quand le stockage
-> est réellement plein (que purger, dans quel ordre), l'export de secours automatique, la détection de
-> la saturation **en amont** de l'écriture, et le sort de la copie de secours dans ce cas.
-> ⚠️ Deux consommateurs d'espace ont été ajoutés par le correctif du point 1 et font partie du
-> chantier : `cadence:v1:donnees.backup` (renouvelée à chaque écriture réelle) et
-> `cadence:v1:donnees.illisible` (écrite lors d'un « repartir de zéro » et **jamais purgée**). Chacune
-> est bornée à une copie — vérifié par test — mais l'occupation monte à trois copies au pire.
-> ⚠️ Deux pièges à ne pas rouvrir en croyant bien faire : la règle ne doit jamais entrer dans le schéma
-> de LECTURE, ni dans `donneesAppSchemaEcriture` qui valide le jeu ENTIER à chaque sauvegarde (devoir
-> n°1 dans les deux sens) ; et purger automatiquement une copie de secours, c'est détruire de la donnée
-> pour faire de la place — à faire trancher par Benoît avant d'écrire une ligne, pas après.
+> **▶ Prochaine action — sortir les justificatifs du localStorage.** C'est la cause profonde mise au
+> jour en finissant le point 2, et le seul chantier qui ne dépende d'aucune source réglementaire.
+> Aujourd'hui un justificatif est stocké **en base64** dans `justificatifData`
+> (`types/fraisReels.ts`), limite 5 Mo par fichier : c'est le seul vrai carburant de la saturation.
+> **Décision de Benoît le 04/08/2026** : sortie vers **Google Workspace ou une base de données en plan
+> payant**. ⚠️ **IndexedDB a été proposé et REFUSÉ** — ne pas le reproposer.
+> ⚠️ Ce chantier recoupe l'**étape 3 « Google Drive »** du module Frais réels, déjà tracée et jamais
+> commencée, que Benoît veut **cadrer ensemble avant tout développement**. Donc : ne pas coder d'abord.
+> Les questions à trancher avec lui, dans l'ordre : quel service exactement ; quelle authentification ;
+> ce que deviennent les justificatifs **déjà** en base64 (migration — devoir n°1, on ne perd rien) ; et
+> ce que l'app fait quand le service est indisponible ou hors ligne (aujourd'hui tout fonctionne sans
+> réseau, cf. la PWA).
 >
 > ⚠️ Ne **pas** attaquer 25 ni 26 sans avoir fait trancher la règle à Benoît : elles ne sont pas sourcées.
 >
