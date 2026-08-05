@@ -95,12 +95,16 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 
 ## État actuel
 
-> **Repère au 05/08/2026, session (7) — LA MIGRATION EST FAITE ET PROUVÉE.** **947 tests verts**
-> (77 fichiers), `tsc -b` propre sur les deux tsconfig, `npm run build` propre.
+> **Repère au 05/08/2026, session (8) — LA BASCULE (PHASE 5) EST CODÉE ET VÉRIFIÉE EN CONDITIONS
+> RÉELLES.** **987 tests verts** (79 fichiers), `tsc -b` propre, `npm run build` propre.
 >
-> ✅ **Tout est poussé.** `origin/master` = `master` = **`8f6089c`** (phase 4). Les sept commits en
-> attente de la session (6) sont partis d'un coup, avec l'accord écrit de Benoît. Arbre propre, rien
-> n'attend de validation.
+> ⚠️ **PAS ENCORE POUSSÉ.** `master` est en avance de **6 commits** sur `origin/master` (qui reste à
+> `8f6089c`, fin de la phase 4) : `57c3e22` (outillage non branché) · `de188e8` (verrou prouvé contre
+> le vrai serveur) · `57c576a` (LA BASCULE — le serveur devient la source de vérité) · `4249391`
+> (trois phrases fausses trouvées en vérifiant à l'écran, corrigées) — plus les deux commits de doc
+> `96dd787`/`40fddfa` déjà présents en session 7. **Tous validés par Benoît, un par un, avec diff et
+> sortie de tests montrés avant chaque commit.** Ne pas pousser sans qu'il le redemande explicitement
+> dans le fil — c'est sa règle, cf. `cadence_push_credentials` en mémoire.
 >
 > ✅ **Le déploiement est configuré pour de bon** : `VITE_SUPABASE_URL` et `VITE_SUPABASE_ANON_KEY`
 > existent enfin dans Vercel (Production + Preview). ⚠️ **Vite fige les `VITE_*` à la CONSTRUCTION** :
@@ -153,7 +157,7 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 > | 2 | authentification | ✅ **PROUVÉE de bout en bout** le 04/08/2026 à 19h19 : session réellement ouverte par lien magique. Connexion **facultative**, l'app fonctionne toujours sans compte |
 > | 3 | miroir Supabase en écriture seule (contrats + profil) | ✅ **PROUVÉE contre le vrai serveur** : ligne relue en REST (200, `maj_le` = l'heure du témoin) |
 > | 4 | migration + vérification chiffrée | ✅ **PROUVÉE le 05/08/2026 à 01:05** — verdict `identique`, SHA-256 concordant sur **trois** sources |
-> | 5 | bascule, sur son feu vert écrit | ⬜ **prochaine action** |
+> | 5 | bascule, sur son feu vert écrit | 🟡 **EN COURS** — le serveur fait référence, VÉRIFIÉ EN VRAI (588 h, 62 contrats) ; reste le commit D (section « Compte » trouvable + mot de passe + PKCE) puis E (doc) |
 > | 6 | documents (conserver, puis envoyer) | ⬜ — le chantier d'origine |
 > | 7 | hors ligne | ⬜ **optionnel, repoussé exprès** : il n'a jamais répondu sur ce point, la question est sortie du chemin critique pour ne pas le bloquer |
 > | 8 | les 7 points réglementaires restants | ⬜ quand une source tombe |
@@ -298,7 +302,13 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 >
 > ## PHASE 3 — le miroir Supabase, codée le 04/08/2026
 >
-> Quand une session est ouverte, chaque enregistrement local est **aussi** recopié dans
+> ⚠️ **CE MIROIR A ÉTÉ SUPPRIMÉ le 05/08/2026 (commit `57c576a`, phase 5)** : `miroirSupabase.ts`,
+> `ClientDonnees` et leurs tests n'existent plus. Il écrivait par `upsert`, donc SANS CONDITION, et
+> aurait contourné le verrou entre appareils installé par la bascule. Section gardée pour l'historique
+> et pour comprendre pourquoi certains choix de la phase 5 sont ce qu'ils sont — ne pas chercher ces
+> fichiers dans le dépôt actuel, ni recréer un `upsert` sans condition.
+>
+> Quand une session est ouverte, chaque enregistrement local était **aussi** recopié dans
 > `donnees_utilisateur`. Le `localStorage` reste la source de vérité : ce n'est pas un adaptateur de
 > remplacement, c'est une copie **en plus**. Où : `src/storage/miroirSupabase.ts`, branché par un
 > `useEffect` **séparé** dans `App.tsx` — jamais fusionné avec celui de la sauvegarde locale, parce que
@@ -378,28 +388,77 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 > couvre donc exactement ce que la phase 4 migrait, mais **plus quand les documents entreront en jeu
 > (phase 6)**. À traiter avant.
 >
-> ### ▶ PROCHAINE ACTION — phase 5 : la bascule
+> ### ✅ PHASE 5 — LA BASCULE, EN COURS (session 8, 05/08/2026)
 >
-> Supabase devient la source de vérité, le `localStorage` cesse de l'être. Ce qu'elle exige de Benoît,
-> et qui n'est pas du code :
-> - **son feu vert écrit**, comme pour la phase 4 ;
-> - **la décision palier gratuit / payant** (arbitrage 4). ✅ **VÉRIFIÉ À LA SOURCE le 05/08/2026**,
->   la note antérieure n'était qu'une affirmation :
->   · doc Supabase (« Going into prod ») — « We may pause applications on the Free Plan that exhibit
->     low activity in a 7-day period to save on server resources », et un projet en pause **se
->     restaure depuis le tableau de bord** (ce n'est donc pas une perte de données, mais une
->     indisponibilité, le temps de s'en apercevoir et d'agir) ;
->   · page Pricing — Free : « Free projects are paused after 1 week of inactivity », 500 Mo de base,
->     1 Go de fichiers, **2 projets actifs maximum** ; Pro : **25 $/mois** (+ facturation du calcul),
->     « Pausing: Never », 8 Go de base.
->   **La conséquence à lui exposer telle quelle** : tant que le `localStorage` est la référence, une
->   pause est sans effet. **Dès la bascule, une pause = Cadence ne s'ouvre plus du tout.** Et Cadence
->   est une app qu'il peut très bien ne pas ouvrir pendant 7 jours. C'est SA décision, pas la mienne ;
-> - il accepte deux conséquences déjà actées : **plus d'ouverture hors ligne, plus d'usage sans compte**.
+> **Ses trois décisions, prises ce jour-là — ne pas les rouvrir :**
+> 1. **Palier GRATUIT** (arbitrage 4 enfin tranché, chiffres vérifiés à la source la veille) : pause
+>    après 7 jours d'inactivité, restaurable depuis le tableau de bord (indisponibilité, **pas** une
+>    perte) ; Pro = 25 $/mois si besoin plus tard ;
+> 2. ⚠️ **L'arbitrage « plus d'ouverture hors ligne » est ASSOUPLI** : serveur muet (pause, réseau,
+>    jeton expiré) ⇒ Cadence **s'ouvre en LECTURE SEULE** depuis la dernière copie locale, bandeau
+>    impossible à rater, aucune écriture possible. Décision plus récente que celle du 04/08, elle la
+>    remplace — ne pas dire « l'app refuse de démarrer » ;
+> 3. **Verrou entre appareils INCLUS** dans cette phase (pas repoussé) : toute écriture nomme la
+>    version qu'elle remplace (`maj_le`, tenu par le trigger serveur, jamais par l'horloge du
+>    navigateur) ; version différente ⇒ refus + écran de décision, jamais d'écrasement ni de fusion.
 >
-> ⚠️ À traiter dans la même phase : rendre la section « Compte » trouvable (voir ci-dessus), et la
-> réserve **PKCE** — ses testeurs liront leurs liens sur leur téléphone, or le lien doit être ouvert
-> dans le navigateur qui l'a demandé.
+> **Découpage en 5 commits, validés un par un avec Benoît (diff + tests montrés avant chaque
+> commit) :**
+> - **A — `57c3e22`** : l'outillage (`storage/sourceSupabase.ts`, type `ClientSourceDonnees`),
+>   DÉLIBÉRÉMENT NON BRANCHÉ — `App.tsx` intact, donc incapable de casser quoi que ce soit.
+> - **B — `de188e8`** : `npm run verifier:verrou` — **7 contrôles sur 7 contre le VRAI serveur**
+>   (comptes de test uniquement, refuse de tourner sur une ligne non vide). Preuve mesurée, pas
+>   supposée : l'écart de version se détecte à la microseconde, le code `23505` est bien celui rendu
+>   par Postgres, et une écriture refusée laisse le contenu existant intact.
+> - **C1 — `57c576a`** : LE BRANCHEMENT. `storage/bascule.ts` (fonction pure, testée situation par
+>   situation) décide entre 8 issues (`serveurEnPhase`, `adopterServeur`, `divergence`, `aTeleverser`,
+>   `premierLancement`, `serveurIllisible`, `versionInattendue`, `serveurMuet`) — **deux seuls
+>   automatismes autorisés** (navigateur vide ⇒ adopte le serveur ; les deux côtés identiques ⇒ rien à
+>   faire), tout le reste dresse `DecisionServeur.tsx`, écran bloquant sur le patron
+>   d'`EcranDonneesIllisibles`. Le miroir de la phase 3 (`ClientDonnees`, `upsert` sans condition) a
+>   été **supprimé**, pas laissé dormant : il aurait contourné le verrou.
+>   ⚠️ **Défaut réel trouvé par le test d'intégration**, corrigé avant le commit : l'état initial
+>   laissait l'écriture ouverte le temps d'interroger le serveur, donc l'app écrivait localement AVANT
+>   de savoir quoi que ce soit — creusant elle-même une divergence. Correct : `interrogation` (fermée)
+>   dès que Supabase est configuré.
+> - **fix — `4249391`**, après vérification EN VRAI dans le Chrome de Benoît (port 5183, son compte
+>   `admin@lesartsphoceens.fr`) : un navigateur n'ayant jamais vu ses données s'est connecté, a lu le
+>   serveur, détecté la divergence avec un profil de test local, affiché l'écran, puis — après
+>   « Prendre le serveur » — affiché **588 h**, exactement son chiffre vérifié le 05/08. Ses 62
+>   contrats et 2 exercices figés sont arrivés intacts. **La preuve que cette phase attendait.**
+>   🔴 **CE QU'ELLE A RÉVÉLÉ, ET QU'AUCUN TEST N'AVAIT TROUVÉ (quatrième fois de suite)** : trois
+>   phrases affichaient encore « ce navigateur reste la référence » (`Compte.tsx`,
+>   `VerificationServeur.tsx`, `Onboarding.tsx`) — vrai en phase 3/4, faux depuis le branchement. **987
+>   tests étaient verts avec cette phrase fausse, parce qu'un des tests la VERROUILLAIT comme
+>   attendue.** Un test ne compare un composant qu'à lui-même, jamais à ce que dit le reste du code.
+>   Les deux tests concernés ont été réécrits en sens inverse (vérifié qu'ils échouaient sans le
+>   correctif). Leçon générale, cf. `cadence_preuve_vs_affirmation` en mémoire : pour toute phrase
+>   affichée qui affirme QUI fait référence entre deux systèmes, relire l'écran après tout changement
+>   d'architecture — l'existence d'un test qui la mentionne ne suffit pas.
+>   Piège annexe rencontré (pas une perte) : le tableau de bord a montré « 0 contrat » pendant que le
+>   `localStorage` en contenait 62 — artefact du serveur de dev (HMR) resté ouvert pendant que le code
+>   était modifié en direct. Résolu par un rechargement complet ; confirmé en relisant le
+>   `localStorage` brut avant/après qu'il n'avait jamais bougé.
+>
+> ### ▶ PROCHAINE ACTION — commit D, puis E
+>
+> **D — rendre la section « Compte » trouvable** (elle est tout en bas de « Mon profil », piège déjà
+> connu depuis la phase 4) ; **ajouter un moyen de définir un mot de passe** depuis l'écran (Benoît l'a
+> demandé le 05/08/2026 : « pour l'instant pas de compte avec mdp, mais je veux qu'à terme on ait ça »
+> — le mode mot de passe existe déjà côté auth, il manque le bouton qui le règle) ; et la **réserve
+> PKCE** — ses testeurs liront leurs liens sur leur téléphone, or le lien magique doit être ouvert dans
+> le navigateur qui l'a demandé, à expliciter à l'écran.
+> Puis **E — la doc** : CLAUDE.md à jour de la bascule (ce que cette entrée fait déjà en partie),
+> arbitrage hors-ligne assoupli daté, dettes ouvertes listées.
+>
+> ⚠️ **DETTE OUVERTE, à trancher — PAS avant le commit D, elle a été délibérément reportée APRÈS lui**
+> (décision du 05/08/2026, session 8) : la table serveur `donnees_sauvegarde` (l'équivalent du filet
+> local `cadence:v1:donnees.backup`) n'est PAS alimentée. **Ce n'est pas une régression** : le filet
+> local continue de fonctionner à l'identique après la bascule (la copie locale suit toujours chaque
+> écriture serveur réussie). `donnees_sauvegarde` serait un filet **supplémentaire**, qui n'a jamais
+> existé, protégeant contre la perte du navigateur lui-même. Sa colonne `cree_le` n'a pas de trigger :
+> la réécrire laisserait une date périmée en base — donc ça implique une migration `0002` et de
+> relancer `npm run verifier:rls`. Ne pas la faire en même temps qu'un autre changement de schéma.
 >
 > ⚠️ **Relancer `npm run verifier:rls` après tout changement de schéma ou de politique.** Les deux
 > comptes de test **`testa-cadence@cadence.fr`** et **`test-cadenceb@cadence.fr`** sont volontairement
