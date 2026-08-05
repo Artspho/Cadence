@@ -133,12 +133,14 @@ export function ChecklistDocuments({ profil, contrats }: ChecklistDocumentsProps
     <section className="bg-surface border border-line rounded-card overflow-hidden">
       <div className="px-4 pt-4 pb-3">
         <h4 className="font-display text-sm font-medium tracking-tight">Ce qu'il te reste à fournir</h4>
-        {/* Dire d'où vient le statut évite le contresens le plus probable : croire que Cadence a gardé
-            une trace des fichiers déposés. Elle ne garde que les chiffres — c'est pourquoi une saisie
-            manuelle compte autant qu'un import, et pourquoi le mot « fourni » n'est jamais employé. */}
+        {/* Dire d'où vient le statut évite le contresens le plus probable : croire que ce badge reflète
+            les fichiers eux-mêmes. Depuis le commit 4 (phase 6), Cadence PEUT conserver un document
+            (connecté, sur ton choix — cf. « Mon dossier ») ; ce statut-ci continue pourtant de ne
+            regarder QUE les données déjà enregistrées, jamais la présence d'un fichier stocké — sinon
+            il dépendrait d'une connexion et d'un choix distincts de ce qu'il mesure vraiment. */}
         <p className="text-xs text-faint leading-relaxed mt-1">
-          Calculé d'après les informations déjà enregistrées, pas d'après les fichiers déposés — remplir un champ à la main compte donc autant qu'un import. Cadence ne conserve
-          aucun document.
+          Calculé d'après les informations déjà enregistrées, pas d'après les fichiers déposés — remplir un champ à la main compte donc autant qu'un import. Si tu conserves un
+          document sur le serveur (une fois connecté), tu le retrouveras dans « Mon dossier » — ce statut-ci ne s'appuie jamais sur ça.
         </p>
       </div>
       <div className="border-t border-line">

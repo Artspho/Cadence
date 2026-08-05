@@ -6,17 +6,23 @@
  * `lib/routageExtraction.ts` — un badge affiché à l'écran est une affirmation sur les droits de
  * quelqu'un, elle se teste.
  *
- * ════════ LA CONTRAINTE FONDATRICE ════════
+ * ════════ LA CONTRAINTE FONDATRICE (revue au commit 4 de la phase 6, 05/08/2026) ════════
  *
- * L'app ne garde AUCUNE trace des fichiers déposés. Ce qui est stocké, c'est
- * `{ profil, contrats, periodes, soldeIndemnisationDepart }` — les chiffres, jamais les documents
- * (cf. storage/localStorageAdapter.ts). Aucun champ n'existe pour « une notification a été déposée ».
+ * ⚠️ CECI A CHANGÉ : jusqu'au commit 4, l'app ne gardait AUCUNE trace des fichiers déposés. Ce
+ * n'est plus vrai — un utilisateur connecté peut désormais choisir de conserver le fichier lui-même
+ * sur le serveur (bucket `justificatifs`, visible dans « Mon dossier »). Ce qui reste vrai, et c'est
+ * la raison pour laquelle CETTE checklist-ci ne change pas de logique : `{ profil, contrats,
+ * periodes, soldeIndemnisationDepart }` (cf. storage/localStorageAdapter.ts) demeure la SEULE chose
+ * que ce module regarde. Aucun champ « une notification a été déposée » n'existe ici, et ce n'est
+ * plus une limite technique mais un choix délibéré — voir pourquoi juste en dessous.
  *
- * Conséquence, et c'est le devoir sacré n°2 au mot près : un statut adossé à « tu as déposé un
- * fichier » MENTIRAIT dès qu'une extraction est refusée par le routage ou abandonnée à l'écran de
- * revue — document passé, donnée absente, feu vert affiché. Tout ici se calcule donc depuis les
- * DONNÉES PRÉSENTES. Bénéfice gratuit : une saisie manuelle éteint le statut exactement comme un
- * import, ce qui est le comportement juste.
+ * Conséquence, et c'est le devoir sacré n°2 au mot près : un statut adossé à « un fichier existe
+ * dans Mon dossier » MENTIRAIT dans plusieurs cas qui coexistent maintenant avec le stockage réel —
+ * une extraction refusée par le routage, un import abandonné à l'écran de revue, un dépôt SANS
+ * conservation choisie (elle est optionnelle), ou tout simplement l'absence de session (le stockage
+ * exige d'être connecté, cette checklist non). Tout ici continue donc de se calculer depuis les
+ * DONNÉES PRÉSENTES, jamais depuis la présence d'un fichier stocké. Bénéfice gratuit, inchangé :
+ * une saisie manuelle éteint le statut exactement comme un import, ce qui est le comportement juste.
  *
  * C'est aussi pourquoi le vocabulaire ne dit jamais « fournie » (l'app ne peut pas l'observer) mais
  * « complète » / « incomplète » / « rien de renseigné » — décision de Benoît du 29/07/2026.
