@@ -2,7 +2,7 @@ import { franceTravailConfig } from "../config/franceTravailConfig";
 import { EMAIL_FEEDBACK, construireLienFeedback } from "../config/contact";
 import { formaterDateLisible } from "../lib/dateLisible";
 
-export type Onglet = "dashboard" | "profil" | "contrats" | "import" | "historique" | "simulateur" | "revenus" | "fraisPro";
+export type Onglet = "dashboard" | "profil" | "contrats" | "import" | "historique" | "simulateur" | "revenus" | "fraisPro" | "dossier";
 
 // `dateDuJour` a été retirée des props le 03/08/2026 : elle ne servait qu'à `estPerime`, supprimé
 // avec la bannière de péremption (point 13). Le bandeau n'énonce plus qu'un fait déclaré en config,
@@ -22,6 +22,7 @@ const ONGLETS: { id: Onglet; label: string }[] = [
   { id: "simulateur", label: "Simulateur" },
   { id: "revenus", label: "Revenus mensuels" },
   { id: "fraisPro", label: "Frais pro" },
+  { id: "dossier", label: "Mon dossier" },
 ];
 
 export function TopBar({ ongletActif, onChangerOnglet, periodeLabel }: TopBarProps) {

@@ -21,3 +21,22 @@ export function telechargerTexte(nomFichier: string, contenu: string): void {
   lien.click();
   URL.revokeObjectURL(url);
 }
+
+/**
+ * Télécharge un fichier BINAIRE depuis une URL déjà obtenue (phase 6 — URL signée du bucket
+ * `justificatifs`). Le fichier est d'abord récupéré en `Blob` plutôt que déposé tel quel dans
+ * `<a href>` : une URL signée sert typiquement le fichier en `Content-Disposition: inline`, donc un
+ * lien direct l'ouvrirait dans l'onglet au lieu de le télécharger, et n'imposerait pas `nomFichier`
+ * comme nom local. Passer par un `Blob` garantit le même comportement qu'un vrai téléchargement,
+ * quel que soit l'en-tête renvoyé par le serveur.
+ */
+export async function telechargerDepuisUrl(nomFichier: string, url: string): Promise<void> {
+  const reponse = await fetch(url);
+  const blob = await reponse.blob();
+  const urlObjet = URL.createObjectURL(blob);
+  const lien = document.createElement("a");
+  lien.href = urlObjet;
+  lien.download = nomFichier;
+  lien.click();
+  URL.revokeObjectURL(urlObjet);
+}

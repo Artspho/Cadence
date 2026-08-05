@@ -62,6 +62,7 @@ import { validerProfilPourEcriture } from "./lib/coherenceProfil";
 import { validerContratsPourEcriture } from "./lib/contratUnSeulMois";
 import { validerContratsEEEPourEcriture } from "./lib/contratTerritoireEEE";
 import { BandeauStockagePlein } from "./components/BandeauStockagePlein";
+import { MonDossier } from "./components/MonDossier";
 
 const dateDuJour = new Date().toISOString().slice(0, 10);
 
@@ -940,6 +941,8 @@ export default function App() {
             onExporterSauvegarde={exporter}
           />
         )}
+
+        {onglet === "dossier" && <MonDossier />}
       </main>
     </div>
   );
