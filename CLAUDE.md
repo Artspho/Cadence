@@ -95,16 +95,19 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 
 ## État actuel
 
-> **Repère au 05/08/2026, session (8) — LA BASCULE (PHASE 5) EST CODÉE ET VÉRIFIÉE EN CONDITIONS
-> RÉELLES.** **987 tests verts** (79 fichiers), `tsc -b` propre, `npm run build` propre.
+> **Repère au 05/08/2026, session (8) — PHASE 5 TERMINÉE : LA BASCULE EST CODÉE ET VÉRIFIÉE EN
+> CONDITIONS RÉELLES, ET LES TROIS MANQUES DU COMMIT D SONT TRAITÉS.** **994 tests verts**
+> (79 fichiers), `tsc -b` propre, `npm run build` propre.
 >
-> ⚠️ **PAS ENCORE POUSSÉ.** `master` est en avance de **6 commits** sur `origin/master` (qui reste à
+> ⚠️ **PAS ENCORE POUSSÉ.** `master` est en avance de **8 commits** sur `origin/master` (qui reste à
 > `8f6089c`, fin de la phase 4) : `57c3e22` (outillage non branché) · `de188e8` (verrou prouvé contre
 > le vrai serveur) · `57c576a` (LA BASCULE — le serveur devient la source de vérité) · `4249391`
-> (trois phrases fausses trouvées en vérifiant à l'écran, corrigées) — plus les deux commits de doc
-> `96dd787`/`40fddfa` déjà présents en session 7. **Tous validés par Benoît, un par un, avec diff et
-> sortie de tests montrés avant chaque commit.** Ne pas pousser sans qu'il le redemande explicitement
-> dans le fil — c'est sa règle, cf. `cadence_push_credentials` en mémoire.
+> (trois phrases fausses trouvées en vérifiant à l'écran, corrigées) · `1e96429` (doc) · `17fb941`
+> (**commit D** — section « Compte » trouvable, mot de passe ajoutable à une session, réserve PKCE
+> explicite à l'écran) — plus les deux commits de doc `96dd787`/`40fddfa` déjà présents en session 7.
+> **Tous validés par Benoît, un par un, avec diff et sortie de tests montrés avant chaque commit.**
+> Ne pas pousser sans qu'il le redemande explicitement dans le fil — c'est sa règle, cf.
+> `cadence_push_credentials` en mémoire.
 >
 > ✅ **Le déploiement est configuré pour de bon** : `VITE_SUPABASE_URL` et `VITE_SUPABASE_ANON_KEY`
 > existent enfin dans Vercel (Production + Preview). ⚠️ **Vite fige les `VITE_*` à la CONSTRUCTION** :
@@ -157,7 +160,7 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 > | 2 | authentification | ✅ **PROUVÉE de bout en bout** le 04/08/2026 à 19h19 : session réellement ouverte par lien magique. Connexion **facultative**, l'app fonctionne toujours sans compte |
 > | 3 | miroir Supabase en écriture seule (contrats + profil) | ✅ **PROUVÉE contre le vrai serveur** : ligne relue en REST (200, `maj_le` = l'heure du témoin) |
 > | 4 | migration + vérification chiffrée | ✅ **PROUVÉE le 05/08/2026 à 01:05** — verdict `identique`, SHA-256 concordant sur **trois** sources |
-> | 5 | bascule, sur son feu vert écrit | 🟡 **EN COURS** — le serveur fait référence, VÉRIFIÉ EN VRAI (588 h, 62 contrats) ; reste le commit D (section « Compte » trouvable + mot de passe + PKCE) puis E (doc) |
+> | 5 | bascule, sur son feu vert écrit | ✅ **FAITE** — le serveur fait référence, VÉRIFIÉ EN VRAI (588 h, 62 contrats) ; commit D (section « Compte » trouvable, mot de passe, réserve PKCE) et E (cette doc) faits |
 > | 6 | documents (conserver, puis envoyer) | ⬜ — le chantier d'origine |
 > | 7 | hors ligne | ⬜ **optionnel, repoussé exprès** : il n'a jamais répondu sur ce point, la question est sortie du chemin critique pour ne pas le bloquer |
 > | 8 | les 7 points réglementaires restants | ⬜ quand une source tombe |
@@ -388,7 +391,7 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 > couvre donc exactement ce que la phase 4 migrait, mais **plus quand les documents entreront en jeu
 > (phase 6)**. À traiter avant.
 >
-> ### ✅ PHASE 5 — LA BASCULE, EN COURS (session 8, 05/08/2026)
+> ### ✅ PHASE 5 — LA BASCULE, TERMINÉE (session 8, 05/08/2026)
 >
 > **Ses trois décisions, prises ce jour-là — ne pas les rouvrir :**
 > 1. **Palier GRATUIT** (arbitrage 4 enfin tranché, chiffres vérifiés à la source la veille) : pause
@@ -440,25 +443,45 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 >   était modifié en direct. Résolu par un rechargement complet ; confirmé en relisant le
 >   `localStorage` brut avant/après qu'il n'avait jamais bougé.
 >
-> ### ▶ PROCHAINE ACTION — commit D, puis E
+> ### ✅ COMMIT D — FAIT (`17fb941`), les trois manques trouvés en usage réel le 05/08/2026, traités
 >
-> **D — rendre la section « Compte » trouvable** (elle est tout en bas de « Mon profil », piège déjà
-> connu depuis la phase 4) ; **ajouter un moyen de définir un mot de passe** depuis l'écran (Benoît l'a
-> demandé le 05/08/2026 : « pour l'instant pas de compte avec mdp, mais je veux qu'à terme on ait ça »
-> — le mode mot de passe existe déjà côté auth, il manque le bouton qui le règle) ; et la **réserve
-> PKCE** — ses testeurs liront leurs liens sur leur téléphone, or le lien magique doit être ouvert dans
-> le navigateur qui l'a demandé, à expliciter à l'écran.
-> Puis **E — la doc** : CLAUDE.md à jour de la bascule (ce que cette entrée fait déjà en partie),
-> arbitrage hors-ligne assoupli daté, dettes ouvertes listées.
+> - **La section « Compte » est remontée** : elle était tout en bas de « Mon profil », sous les
+>   périodes assimilées — choix délibéré de la phase 2 (la connexion ne servait alors à rien), devenu
+>   un piège en phase 5 (Benoît l'avait déjà prise pour une panne). Elle est maintenant juste après
+>   l'identité, en haut de l'onglet.
+> - **Un mot de passe peut s'ajouter à une session déjà ouverte** : Benoît l'a demandé le 05/08/2026
+>   (« pour l'instant pas de compte avec mdp, mais je veux qu'à terme on ait ça »). `definirMotDePasse`
+>   (`src/auth/actions.ts`) appelle `updateUser({ password })` sur la session en cours — pas de champ
+>   « mot de passe actuel », parce qu'il n'y en a pas forcément un quand la session vient d'un lien
+>   magique.
+> - **La réserve PKCE est explicite à l'écran**, en ambre : ses testeurs liront leurs liens de
+>   connexion sur leur téléphone, pas forcément l'appareil qui les a demandés — le lien échoue alors
+>   toujours, silencieusement sans ce texte.
 >
-> ⚠️ **DETTE OUVERTE, à trancher — PAS avant le commit D, elle a été délibérément reportée APRÈS lui**
-> (décision du 05/08/2026, session 8) : la table serveur `donnees_sauvegarde` (l'équivalent du filet
-> local `cadence:v1:donnees.backup`) n'est PAS alimentée. **Ce n'est pas une régression** : le filet
-> local continue de fonctionner à l'identique après la bascule (la copie locale suit toujours chaque
-> écriture serveur réussie). `donnees_sauvegarde` serait un filet **supplémentaire**, qui n'a jamais
-> existé, protégeant contre la perte du navigateur lui-même. Sa colonne `cree_le` n'a pas de trigger :
-> la réécrire laisserait une date périmée en base — donc ça implique une migration `0002` et de
-> relancer `npm run verifier:rls`. Ne pas la faire en même temps qu'un autre changement de schéma.
+> ⚠️ **DÉCISION PRISE AVEC BENOÎT LE 05/08/2026, À NE PAS ROUVRIR SANS RAISON NOUVELLE** : la
+> contrainte PKCE elle-même (lien verrouillé au navigateur demandeur) reste telle quelle. Deux
+> alternatives ont été présentées et écartées — repasser en mode implicite (le jeton de session
+> voyagerait alors dans l'URL de l'e-mail, exposé à l'historique du navigateur et aux journaux
+> d'intermédiaires) ou ajouter un code à 6 chiffres à recopier à la main (règle le problème sans
+> exposer de jeton, mais demande un nouvel écran) — au motif que **la future création de compte avec
+> mot de passe réglera le multi-appareil autrement** ; pas la peine de rouvrir un arbitrage de
+> sécurité pour un problème qu'une fonctionnalité déjà prévue va résoudre différemment. Détail :
+> `cadence_pkce_reserve_lien_magique` en mémoire.
+>
+> ### ▶ PROCHAINE ACTION — à décider avec Benoît
+>
+> **Phase 5 terminée.** Rien n'est engagé pour la suite : reste à choisir avec lui entre reprendre la
+> **phase 6** (documents — conserver, puis envoyer, cf. tableau des 9 phases plus haut) ou traiter
+> d'abord la dette ouverte ci-dessous. Ne pas décider seul, les deux options changent le périmètre.
+>
+> ⚠️ **DETTE OUVERTE, non bloquante, toujours à trancher** (constatée le 05/08/2026, session 8) : la
+> table serveur `donnees_sauvegarde` (l'équivalent du filet local `cadence:v1:donnees.backup`) n'est
+> PAS alimentée. **Ce n'est pas une régression** : le filet local continue de fonctionner à l'identique
+> après la bascule (la copie locale suit toujours chaque écriture serveur réussie). `donnees_sauvegarde`
+> serait un filet **supplémentaire**, qui n'a jamais existé, protégeant contre la perte du navigateur
+> lui-même. Sa colonne `cree_le` n'a pas de trigger : la réécrire laisserait une date périmée en base —
+> donc ça implique une migration `0002` et de relancer `npm run verifier:rls`. Ne pas la faire en même
+> temps qu'un autre changement de schéma.
 >
 > ⚠️ **Relancer `npm run verifier:rls` après tout changement de schéma ou de politique.** Les deux
 > comptes de test **`testa-cadence@cadence.fr`** et **`test-cadenceb@cadence.fr`** sont volontairement
