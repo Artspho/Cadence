@@ -493,11 +493,40 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 > `npm run verifier:sauvegarde` → **7 contrôles, 7 conformes**. `npm run verifier:rls` relancé par
 > prudence → **64 contrôles, 64 conformes** — le trigger n'a rien changé à l'isolation.
 >
-> ### ▶ PROCHAINE ACTION — à décider avec Benoît
+> ### ✅ PRÉREQUIS LÉGAL DE L'ARBITRAGE 7 — FAIT (05/08/2026, avant tout code de la phase 6)
 >
-> **Phase 5 terminée, dette soldée.** Rien n'est engagé pour la suite : reste à choisir avec Benoît
-> quoi reprendre — la **phase 6** (documents — conserver, puis envoyer, cf. tableau des 9 phases plus
-> haut) est le chantier d'origine, mais ne pas décider seul.
+> Benoît avait posé le 04/08/2026 : « mentions légales + politique de confidentialité minimales
+> AVANT la phase 6 » — motif : des documents potentiellement porteurs du NIR allaient vivre sur un
+> serveur qu'il gère. Fait : `src/content/mentionsLegales.ts` (texte, source unique) +
+> `src/components/MentionsLegales.tsx` (modale) + un lien discret « Mentions légales &
+> confidentialité » en bas de l'onglet « Mon profil ». Responsable désigné : l'**association Les
+> Arts Phocéens**, contact **`cadence@lesartsphoceens.fr`** (distinct de `benoit.zahra@orange.fr`,
+> réservé au bouton feedback). Couvre aussi la réserve de l'arbitrage 6 : le texte dit maintenant que
+> le titulaire du compte Supabase peut techniquement lire les données de tous les testeurs.
+>
+> 🔴 **DÉCISION DE BENOÎT, DONT J'AI DÉSACCORD DOCUMENTÉ — À NE PAS DÉFAIRE SANS LUI REDEMANDER.**
+> Le texte a d'abord été écrit AVEC la phrase disant que Mistral conserve les documents envoyés
+> jusqu'à 30 jours (fait vrai, déjà établi dans `content/mentionEnvoiIA.ts`). Benoît a demandé son
+> retrait (« NON NÉGOCIABLE ») après avoir été prévenu que ça affaiblit le caractère *informé* du
+> consentement décrit juste au-dessus dans le même texte. Retirée. **Le fait reste vrai** et continue
+> d'être dit ailleurs (`mentionEnvoiIA.ts`, montré avant chaque envoi IA) — seule LA POLITIQUE DE
+> CONFIDENTIALITÉ ne le répète plus. Ne jamais, à l'inverse, y écrire que Mistral ne conserve rien :
+> ce serait alors une contre-vérité, pas seulement une omission. Détail de l'échange :
+> `src/content/mentionsLegales.ts` (avertissement en tête de fichier).
+>
+> 1000 tests verts (81 fichiers), `tsc -b` propre, `npm run build` propre. Texte relu à l'écran par
+> Benoît avant validation (modale ouverte en conditions réelles, localhost:5185).
+>
+> ### ▶ PROCHAINE ACTION — la vraie fonctionnalité de la phase 6
+>
+> Prérequis levé. Reste à construire ce que Benoît a défini le 05/08/2026 : au moment de l'import
+> d'un document, dire qu'il est stocké (RGPD) et que le « dossier intermittent » se complète ;
+> permettre de télécharger à tout moment le dossier complet (AEM, notifications, relevés, bulletins,
+> frais réels…) au même endroit. Le schéma serveur existe déjà (table `documents` + bucket
+> `justificatifs`, migration 0001) — reste l'écran et le branchement. ⚠️ **Ceci inverse une décision
+> fondatrice documentée dans `lib/documentsRequis.ts`** (« l'app ne garde AUCUNE trace des fichiers
+> déposés ») : le fichier a changé de politique par décision de Benoît, à ne pas confondre avec une
+> régression accidentelle si ce commentaire n'a pas encore été mis à jour.
 >
 > ⚠️ **Relancer `npm run verifier:rls` après tout changement de schéma ou de politique.** Les deux
 > comptes de test **`testa-cadence@cadence.fr`** et **`test-cadenceb@cadence.fr`** sont volontairement

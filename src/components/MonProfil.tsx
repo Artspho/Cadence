@@ -16,6 +16,7 @@ import type { EtatEnregistrement } from "../storage/sourceSupabase";
 import type { DonneesApp } from "../storage/localStorageAdapter";
 import { RenouvellementAnticipe } from "./RenouvellementAnticipe";
 import { DateNaissanceInput } from "./DateNaissanceInput";
+import { MentionsLegales } from "./MentionsLegales";
 
 type OnModifierProfil = (profil: Profil) => ResultatEcritureProfil;
 
@@ -40,6 +41,7 @@ interface MonProfilProps {
 
 export function MonProfil({ dateDuJour, profil, onModifierProfil, contrats, periodes, onAjouterPeriode, onSupprimerPeriode, etatEnregistrement, donnees }: MonProfilProps) {
   const [formPeriodeOuvert, setFormPeriodeOuvert] = useState(false);
+  const [mentionsLegalesOuvertes, setMentionsLegalesOuvertes] = useState(false);
   // Compté depuis la dernière VÉRIFICATION des constantes, pas depuis l'entrée en vigueur du SMIC
   // (point 14). Purement informatif : aucun seuil ne lui est appliqué, il ne déclenche rien.
   const jours = joursDepuisDerniereVerification(new Date(dateDuJour));
@@ -325,6 +327,14 @@ export function MonProfil({ dateDuJour, profil, onModifierProfil, contrats, peri
           <p className="text-xs text-faint mt-1">ou écris-moi directement à {EMAIL_FEEDBACK}</p>
         </div>
       )}
+
+      <div>
+        <button type="button" onClick={() => setMentionsLegalesOuvertes(true)} className="text-xs text-faint hover:text-muted transition-colors underline">
+          Mentions légales &amp; confidentialité
+        </button>
+      </div>
+
+      {mentionsLegalesOuvertes && <MentionsLegales onFermer={() => setMentionsLegalesOuvertes(false)} />}
     </div>
   );
 }
