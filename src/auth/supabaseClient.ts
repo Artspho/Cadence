@@ -141,6 +141,61 @@ export interface ClientSourceDonnees {
   };
 }
 
+/**
+ * LA SURFACE DE LA PHASE 6 — la table `documents` (une ligne par fichier, pas une ligne par
+ * utilisateur comme `donnees_utilisateur`).
+ *
+ * Distincte de `ClientSourceDonnees` à dessein : celle-ci porte le verrou `maj_le` propre à une
+ * ligne UNIQUE par utilisateur, un concept qui ne s'applique pas ici — chaque document est créé une
+ * fois (l'unicité vient de `chemin_stockage_unique`, pas d'un jeton de version), et une correction
+ * de métadonnées (ex. « corriger le type ») cible sa propre ligne par `id`, protégée par RLS. Pas de
+ * verrou de concurrence à exprimer, donc pas de deuxième `eq` chaîné sur `update`.
+ *
+ * `order` sur `select` sert à lister « Mon dossier » du plus récent au plus ancien sans le refaire
+ * à la main côté client à chaque appelant.
+ */
+export interface ClientDocuments {
+  from(table: string): {
+    select(colonnes: string): {
+      eq(
+        colonne: string,
+        valeur: string,
+      ): {
+        order(colonne: string, options: { ascending: boolean }): PromiseLike<{ data: Record<string, unknown>[] | null; error: ErreurPostgrest | null }>;
+      };
+    };
+    insert(ligne: Record<string, unknown>): {
+      select(colonnes: string): PromiseLike<{ data: Record<string, unknown>[] | null; error: ErreurPostgrest | null }>;
+    };
+    update(valeurs: Record<string, unknown>): {
+      eq(
+        colonne: string,
+        valeur: string,
+      ): PromiseLike<{ data: Record<string, unknown>[] | null; error: ErreurPostgrest | null }>;
+    };
+  };
+}
+
+/** Erreur telle que le SDK Storage de Supabase la rend — distincte d'`ErreurPostgrest` (REST). */
+export interface ErreurStorage {
+  message: string;
+}
+
+/**
+ * LA SURFACE DE STOCKAGE DE FICHIERS — le bucket privé `justificatifs` (migration 0001), et rien
+ * d'autre du SDK Storage complet (pas de gestion de buckets, pas de listing par dossier : Cadence
+ * connaît déjà chaque chemin par la ligne `documents` correspondante, lister le bucket lui-même
+ * serait une deuxième source de vérité).
+ *
+ * ⚠️ `createSignedUrl` ne doit JAMAIS être appelée par avance ni mise en cache : une URL signée
+ * expire, et il n'y a aucune raison de la redemander avant l'instant du téléchargement.
+ */
+export interface ClientFichiers {
+  upload(chemin: string, fichier: File): Promise<{ data: { path: string } | null; error: ErreurStorage | null }>;
+  remove(chemins: string[]): Promise<{ data: unknown; error: ErreurStorage | null }>;
+  createSignedUrl(chemin: string, expirationSecondes: number): Promise<{ data: { signedUrl: string } | null; error: ErreurStorage | null }>;
+}
+
 export interface ConfigurationSupabase {
   url?: string;
   cleAnon?: string;
@@ -161,20 +216,28 @@ export function construireClientAuth(configuration: ConfigurationSupabase): Clie
   return construireClient(configuration)?.auth ?? null;
 }
 
-/** Les trois surfaces exposées par Cadence, issues d'UN SEUL client Supabase. */
+/** Le nom du bucket est fixé ici, une seule fois — jamais recopié en chaîne ailleurs. */
+export const BUCKET_JUSTIFICATIFS = "justificatifs";
+
+/** Les cinq surfaces exposées par Cadence, issues d'UN SEUL client Supabase. */
 export interface ClientCadence {
   auth: ClientAuth;
   /** Phase 4 : la lecture, réservée à la vérification. Cf. `ClientLectureDonnees`. */
   lecture: ClientLectureDonnees;
   /** Phase 5 : lecture + écriture sous condition. La SEULE surface d'écriture. Cf. `ClientSourceDonnees`. */
   source: ClientSourceDonnees;
+  /** Phase 6 : la table `documents`. Cf. `ClientDocuments`. */
+  documents: ClientDocuments;
+  /** Phase 6 : le bucket `justificatifs`, déjà lié — l'appelant ne choisit jamais le bucket. */
+  fichiers: ClientFichiers;
 }
 
 /**
  * Construit le client à partir d'une configuration explicite, et n'en expose que des surfaces
- * étroites : `auth` (phase 2), `lecture` (phase 4) et `source` (phase 5).
+ * étroites : `auth` (phase 2), `lecture` (phase 4), `source` (phase 5), `documents`/`fichiers`
+ * (phase 6).
  *
- * @returns les trois surfaces, ou `null` si la configuration est absente/vide/invalide. Ne lève jamais.
+ * @returns les cinq surfaces, ou `null` si la configuration est absente/vide/invalide. Ne lève jamais.
  */
 export function construireClient(configuration: ConfigurationSupabase): ClientCadence | null {
   const url = configuration.url?.trim();
@@ -211,7 +274,15 @@ export function construireClient(configuration: ConfigurationSupabase): ClientCa
     // forme réelle est exactement celle décrite ; ce que le compilateur ne peut pas garantir ici,
     // `verificationMigration.test.ts` et `sourceSupabase.test.ts` le vérifient en exerçant chaque
     // chaîne d'appel et en refusant qu'une autre méthode soit sollicitée.
-    return { auth: client.auth, lecture: client as unknown as ClientLectureDonnees, source: client as unknown as ClientSourceDonnees };
+    return {
+      auth: client.auth,
+      lecture: client as unknown as ClientLectureDonnees,
+      source: client as unknown as ClientSourceDonnees,
+      documents: client as unknown as ClientDocuments,
+      // Lié au bucket UNE FOIS ici : aucun appelant ne passe `BUCKET_JUSTIFICATIFS` lui-même, donc
+      // aucun risque d'un jour l'écrire à la main dans le mauvais bucket.
+      fichiers: client.storage.from(BUCKET_JUSTIFICATIFS) as unknown as ClientFichiers,
+    };
   } catch {
     // `createClient` lève sur une URL malformée. Une variable d'environnement mal recopiée ne doit
     // pas empêcher Cadence de s'ouvrir : on retombe sur « connexion non configurée ».
@@ -250,6 +321,14 @@ export function obtenirClientLectureDonnees(): ClientLectureDonnees | null {
 
 export function obtenirClientSourceDonnees(): ClientSourceDonnees | null {
   return obtenirClient()?.source ?? null;
+}
+
+export function obtenirClientDocuments(): ClientDocuments | null {
+  return obtenirClient()?.documents ?? null;
+}
+
+export function obtenirClientFichiers(): ClientFichiers | null {
+  return obtenirClient()?.fichiers ?? null;
 }
 
 /** Réservé aux tests : oublie le client mémorisé. */

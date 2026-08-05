@@ -14,7 +14,8 @@
     "generate-pwa-icons": "node scripts/generate-pwa-icons.mjs",
     "verifier:rls": "node --env-file=.env scripts/verifier-rls.mjs",
     "verifier:verrou": "node --env-file=.env scripts/verifier-verrou.mjs",
-    "verifier:sauvegarde": "node --env-file=.env scripts/verifier-sauvegarde-serveur.mjs"
+    "verifier:sauvegarde": "node --env-file=.env scripts/verifier-sauvegarde-serveur.mjs",
+    "verifier:documents": "node --env-file=.env scripts/verifier-documents.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.112.0",
