@@ -66,7 +66,12 @@ describe("VerificationServeur — les verdicts", () => {
     expect(screen.getByText(/^a{32}…$/)).toBeInTheDocument();
   });
 
-  it("« différent » : nomme l'écart ET rassure explicitement sur le local", async () => {
+  // ⚠️ CE TEST VERROUILLAIT « tes données locales sont intactes, ce navigateur reste la référence »
+  // JUSQU'AU 05/08/2026 — vrai en phase 4, faux depuis la bascule (phase 5), et invisible aux 986
+  // tests alors verts : un test ne compare un composant qu'à lui-même, jamais à ce que dit le reste
+  // de l'app. Trouvé en vérifiant à l'écran une session réelle. La phrase ne doit plus jamais
+  // affirmer LEQUEL des deux côtés fait référence — ce panneau ne le sait pas.
+  it("« différent » : nomme l'écart, rassure SANS trancher qui fait référence", async () => {
     await cliquerPuisAttendre(
       {
         statut: "different",
@@ -80,8 +85,10 @@ describe("VerificationServeur — les verdicts", () => {
       /différent/i,
     );
     expect(screen.getByText(/écart sur : les contrats/i)).toBeInTheDocument();
-    // Un cadre orange fait spontanément craindre une perte : le démentir est obligatoire ici.
-    expect(screen.getByText(/tes données locales sont intactes/i)).toBeInTheDocument();
+    // Un cadre orange fait spontanément craindre une perte : le démentir reste obligatoire — mais
+    // sans dire lequel des deux côtés fait référence, ce que ce panneau ne peut pas savoir.
+    expect(screen.getByText(/ce bouton n'a rien modifié/i)).toBeInTheDocument();
+    expect(screen.queryByText(/reste la référence/i)).not.toBeInTheDocument();
   });
 
   it("« absente » : ne parle PAS d'écart", async () => {

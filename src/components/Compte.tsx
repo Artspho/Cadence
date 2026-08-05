@@ -189,13 +189,24 @@ export function Compte({
         <p className="text-ink">
           Connecté en tant que <span className="text-mint">{etat.email ?? etat.utilisateurId}</span>
         </p>
-        {/* Énumération volontairement précise : le miroir de la phase 3 ne couvre QUE
-            `donnees_utilisateur` (contrats, profil, périodes). Les frais réels et l'identité
-            déclarative ont leurs propres stockages, pas encore recopiés. Laisser croire que tout part
-            sur le serveur serait une fausse affirmation, et la plus coûteuse de toutes ici. */}
+        {/*
+         * ⚠️ CETTE PHRASE A ÉTÉ CORRIGÉE LE 05/08/2026, APRÈS VÉRIFICATION À L'ÉCRAN — elle disait
+         * encore, mot pour mot, « c'est ce navigateur qui reste la référence : le basculement viendra
+         * plus tard ». C'était vrai en phase 3, faux depuis le commit de la bascule (phase 5), et
+         * aucun test ne l'avait détecté : la suite automatisée ne compare jamais ce paragraphe au
+         * reste du code, seulement à lui-même. Devoir n°2 : ce paragraphe DOIT rester cohérent avec
+         * `App.tsx` (`ecritureAutorisee`) à chaque nouvelle phrase touchant au serveur — le relire
+         * entièrement, pas seulement la partie qu'on modifie.
+         *
+         * Énumération volontairement précise pour le reste : le serveur ne couvre QUE
+         * `donnees_utilisateur` (contrats, profil, périodes, exercices figés). Les frais réels et
+         * l'identité déclarative ont leurs propres stockages, jamais recopiés — dette ouverte,
+         * cf. cadence_refonte_supabase.md. Laisser croire que tout part sur le serveur serait la
+         * fausse affirmation la plus coûteuse possible ici.
+         */}
         <p className="text-xs text-faint leading-relaxed">
-          Tes contrats et ton profil sont recopiés sur le serveur à chaque enregistrement. Tes frais réels, eux, ne le sont pas encore. Et dans tous les cas, c'est ce navigateur qui reste la
-          référence : le basculement viendra plus tard, et il te sera demandé explicitement.
+          Tes contrats et ton profil sont enregistrés sur le serveur : c'est lui qui fait référence, et il est relu à chaque ouverture de Cadence. Tes frais réels, eux, restent uniquement
+          dans ce navigateur.
         </p>
         <TemoinEnregistrement etat={etatEnregistrement} />
         <VerificationServeur client={clientLecture} utilisateurId={etat.utilisateurId} donnees={donnees} />

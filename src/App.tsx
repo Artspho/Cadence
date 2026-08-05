@@ -555,7 +555,12 @@ export default function App() {
   if (!donnees.profil) {
     return (
       <>
-        <Onboarding onTerminer={(profil: Profil) => setDonnees({ ...donnees, profil })} onRestaurerSauvegarde={() => inputImportRef.current?.click()} erreurImport={erreurImport} />
+        <Onboarding
+          onTerminer={(profil: Profil) => setDonnees({ ...donnees, profil })}
+          onRestaurerSauvegarde={() => inputImportRef.current?.click()}
+          erreurImport={erreurImport}
+          serveurFaitReference={etatBascule.statut === "active"}
+        />
         {machinerieImport}
       </>
     );

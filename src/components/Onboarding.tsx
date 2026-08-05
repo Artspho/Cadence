@@ -13,13 +13,25 @@ interface OnboardingProps {
   onRestaurerSauvegarde?: () => void;
   /** Erreur du dernier import tenté depuis cet écran — sinon un fichier invalide échouerait en silence. */
   erreurImport?: string | null;
+  /**
+   * `true` quand une session est ouverte et que le serveur fait référence (phase 5).
+   *
+   * Existe pour une raison précise, trouvée en vérifiant à l'écran le 05/08/2026 : la phrase de bas de
+   * page affirmait « tes données restent uniquement sur cet appareil ». C'était vrai avant la bascule,
+   * et ça reste vrai sans compte — mais un testeur qui se connecte PUIS remplit ce formulaire lisait
+   * une phrase fausse au moment précis où il confie ses données. Défaut invisible aux tests, puisque
+   * la phrase était juste dans le seul cas qu'ils exerçaient.
+   *
+   * Défaut `false` : sans information, on affirme le moins, et les appels existants ne changent pas.
+   */
+  serveurFaitReference?: boolean;
 }
 
 // Premier écran vu par un compte vierge (§11.A). Gère explicitement le cas
 // "je ne sais pas" pour la date anniversaire : une première admission n'a
 // par construction pas encore de cycle ouvert, et le moteur (periodeReference.ts)
 // sait fonctionner avec une date anniversaire vide.
-export function Onboarding({ onTerminer, onRestaurerSauvegarde, erreurImport }: OnboardingProps) {
+export function Onboarding({ onTerminer, onRestaurerSauvegarde, erreurImport, serveurFaitReference = false }: OnboardingProps) {
   const [dateNaissance, setDateNaissance] = useState("");
   const [situation, setSituation] = useState<Profil["situation"]>("premiere_admission");
   const [dateAnniversaireConnue, setDateAnniversaireConnue] = useState(true);
@@ -186,7 +198,11 @@ export function Onboarding({ onTerminer, onRestaurerSauvegarde, erreurImport }: 
         </button>
       </div>
 
-      <p className="text-xs text-faint text-center mt-6">Tes données restent uniquement sur cet appareil (localStorage). Pense à utiliser l'export JSON régulièrement pour ne rien perdre.</p>
+      <p className="text-xs text-faint text-center mt-6">
+        {serveurFaitReference
+          ? "Tu es connecté : ce que tu saisis ici sera enregistré sur le serveur, et relu depuis n'importe quel appareil. L'export JSON reste utile comme copie de secours à toi."
+          : "Tes données restent uniquement sur cet appareil (localStorage). Pense à utiliser l'export JSON régulièrement pour ne rien perdre."}
+      </p>
     </div>
   );
 }

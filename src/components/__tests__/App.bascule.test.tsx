@@ -255,6 +255,21 @@ describe("App — le serveur n'a encore rien pour ce compte", () => {
   });
 });
 
+describe("App — premier lancement d'un compte connecté", () => {
+  it("l'onboarding annonce l'enregistrement SUR LE SERVEUR, et non « uniquement sur cet appareil »", async () => {
+    // Défaut trouvé en vérifiant à l'écran le 05/08/2026, invisible aux tests jusque-là : la phrase de
+    // bas de page de l'onboarding affirmait « tes données restent uniquement sur cet appareil ». Vrai
+    // sans compte, faux dès qu'une session est ouverte — et affiché au moment précis où quelqu'un
+    // confie ses données.
+    window.localStorage.clear();
+    faux.lecture = { data: null, error: null };
+
+    render(<App />);
+    expect(await screen.findByText(/sera enregistré sur le serveur/i)).toBeInTheDocument();
+    expect(screen.queryByText(/restent uniquement sur cet appareil/i)).not.toBeInTheDocument();
+  });
+});
+
 describe("App — nouvel appareil : le navigateur est vide", () => {
   it("adopte le serveur SANS rien demander — il n'y a rien à perdre", async () => {
     window.localStorage.clear();

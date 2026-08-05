@@ -43,16 +43,24 @@ describe("Compte — configuration absente", () => {
 });
 
 describe("Compte — connecté", () => {
-  it("affiche l'adresse ET dit explicitement que rien n'a bougé côté données", async () => {
-    // Le piège que ce test verrouille : une section « Compte » laisse croire que les données sont
-    // « en sécurité sur le serveur ». Elles ne le sont pas avant la phase 5. Le taire serait une
-    // fausse affirmation, et la plus dangereuse de toutes ici (devoir n°1).
+  // ⚠️ CE TEST VERROUILLAIT L'ANCIENNE PHRASE FAUSSE JUSQU'AU 05/08/2026, ET C'EST EXACTEMENT COMME
+  // ÇA QU'ELLE A SURVÉCU AU COMMIT DE LA BASCULE SANS QU'AUCUN DES 986 TESTS ALORS VERTS NE LA
+  // DÉTECTE. La suite automatisée ne compare un composant qu'à lui-même — si le test attend « ce
+  // navigateur reste la référence » et que le composant l'affiche encore, tout est vert, y compris
+  // le jour où c'est devenu faux. Seule la vérification à l'écran (05/08/2026, session réelle,
+  // localhost:5183) l'a trouvée. Leçon : quand une phrase affirme QUI fait référence, la revérifier
+  // en conditions réelles ne peut pas être sauté au motif que « les tests passent ».
+  it("affiche l'adresse ET dit explicitement que c'est le SERVEUR qui fait référence (phase 5)", async () => {
+    // Devoir n°1 : une section « Compte » qui laisserait croire au contraire de la réalité — que ce
+    // navigateur fait encore référence, ou que les frais réels sont sur le serveur — serait la fausse
+    // affirmation la plus dangereuse possible ici.
     const client = fauxClient({ getSession: vi.fn(async () => ({ data: { session: SESSION }, error: null })) });
     render(<Compte client={client} origine={ORIGINE} />);
     expect(await screen.findByText("benoit@example.com")).toBeInTheDocument();
-    expect(screen.getByText(/ce navigateur qui reste la référence/i)).toBeInTheDocument();
-    // Et l'énumération reste exacte : les frais réels ne sont PAS recopiés en phase 3.
-    expect(screen.getByText(/frais réels, eux, ne le sont pas encore/i)).toBeInTheDocument();
+    expect(screen.getByText(/c'est lui qui fait référence/i)).toBeInTheDocument();
+    expect(screen.queryByText(/ce navigateur qui reste la référence/i)).not.toBeInTheDocument();
+    // Et l'énumération reste exacte : les frais réels ne sont TOUJOURS PAS recopiés, même en phase 5.
+    expect(screen.getByText(/frais réels, eux, restent uniquement dans ce navigateur/i)).toBeInTheDocument();
   });
 
   it("se rabat sur l'identifiant quand la session n'a pas d'adresse", async () => {

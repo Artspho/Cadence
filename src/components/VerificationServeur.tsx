@@ -1,14 +1,21 @@
 /**
- * Phase 4 de la refonte Supabase — le panneau de vérification chiffrée.
+ * Panneau de vérification chiffrée, construit en phase 4 — ⚠️ REPRIS APRÈS LA BASCULE (phase 5,
+ * 05/08/2026) : son texte affirmait encore « ce navigateur reste la référence », trouvé faux en
+ * vérifiant à l'écran une session réelle. Aucun des tests alors verts ne l'avait détecté — un test
+ * ne compare un composant qu'à lui-même, jamais à ce que dit le reste de l'app.
  *
- * CE QU'IL NE FAIT PAS, ET C'EST TOUT L'INTÉRÊT : il n'a aucun bouton qui télécharge, restaure,
- * remplace ou efface quoi que ce soit. Il lit le serveur, il compare, il affiche un verdict. Ce
- * navigateur reste la référence jusqu'à la bascule de la phase 5, qui sera demandée explicitement.
+ * CE QU'IL NE FAIT PAS, ET C'EST TOUJOURS TOUT L'INTÉRÊT : il n'a aucun bouton qui télécharge,
+ * restaure, remplace ou efface quoi que ce soit. Il lit le serveur, il compare, il affiche un
+ * verdict — un second regard, sur demande, en plus de la comparaison automatique que `App.tsx` fait
+ * déjà à chaque ouverture (`storage/bascule.ts`).
  *
- * POURQUOI LA LECTURE EST DÉCLENCHÉE PAR UN BOUTON ET NON AU CHARGEMENT : la phase 4 est la première
- * qui lit des données métier sur le serveur. Faire de cette lecture un acte délibéré, daté, décidé
- * par l'utilisateur, c'est ce qui permet de dire exactement quand elle a eu lieu — et de ne pas la
- * déclencher dans le dos de quelqu'un qui ouvrait simplement l'onglet.
+ * ⚠️ CE QU'IL NE FAUT PLUS LUI FAIRE DIRE : quel des deux côtés fait référence. Avant la bascule, la
+ * réponse était fixe (le navigateur, toujours). Depuis, ça dépend de l'état de l'app au moment du
+ * clic — ce panneau ne le connaît pas, donc il ne doit plus trancher.
+ *
+ * POURQUOI LA LECTURE EST DÉCLENCHÉE PAR UN BOUTON ET NON AU CHARGEMENT : rester un acte délibéré,
+ * daté, décidé par l'utilisateur — pas déclenché dans le dos de quelqu'un qui ouvrait simplement
+ * l'onglet.
  */
 
 import { useState } from "react";
@@ -71,8 +78,10 @@ function Resultat({ verdict }: { verdict: Verdict }) {
           Empreinte serveur : <Empreinte valeur={verdict.empreinteServeur} />
         </p>
         {verdict.majLe !== null && <p className="text-xs text-faint">Copie serveur datée du {new Date(verdict.majLe).toLocaleString("fr-FR")}.</p>}
-        {/* Dit explicitement, parce qu'un cadre orange fait spontanément craindre une perte. */}
-        <p className="text-xs text-faint">Rien n'a été modifié : ce navigateur reste la référence, et tes données locales sont intactes.</p>
+        {/* Dit explicitement, parce qu'un cadre orange fait spontanément craindre une perte — mais
+            SANS trancher lequel des deux côtés fait référence : ce panneau ne le sait pas, et
+            l'affirmer à sa place serait exactement la fausse réassurance trouvée le 05/08/2026. */}
+        <p className="text-xs text-faint">Ce bouton n'a rien modifié, ni ici ni sur le serveur. Recharge Cadence pour revoir la comparaison automatique et, si l'écart est réel, la question qu'elle pose.</p>
       </div>
     );
   }
