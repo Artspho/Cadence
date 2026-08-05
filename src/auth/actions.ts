@@ -135,6 +135,23 @@ export async function creerCompte(client: ClientAuth, email: string, motDePasse:
   };
 }
 
+/**
+ * Définit un mot de passe sur une session déjà ouverte (typiquement arrivée par lien magique).
+ *
+ * Ne demande pas le mot de passe actuel : `updateUser` agit sur la session en cours, pas sur les
+ * identifiants — c'est ce qui permet à quelqu'un connecté par lien magique de s'équiper d'un mot de
+ * passe sans jamais en avoir eu un.
+ */
+export async function definirMotDePasse(client: ClientAuth, motDePasse: string): Promise<ResultatAuth> {
+  if (motDePasse.length < LONGUEUR_MINIMALE_MOT_DE_PASSE) {
+    return { ok: false, message: `Mot de passe trop court : ${LONGUEUR_MINIMALE_MOT_DE_PASSE} caractères au minimum.` };
+  }
+
+  const { error } = await client.updateUser({ password: motDePasse });
+  if (error) return { ok: false, message: messageErreur(error) };
+  return { ok: true, message: "Mot de passe enregistré. Tu peux désormais te connecter avec, en plus du lien magique." };
+}
+
 export async function seDeconnecter(client: ClientAuth): Promise<ResultatAuth> {
   const { error } = await client.signOut();
   if (error) return { ok: false, message: messageErreur(error) };

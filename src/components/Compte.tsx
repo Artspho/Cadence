@@ -19,7 +19,7 @@ import { INDICE_RETOUR_LIEN, type IndiceRetourLien } from "../auth/retourLienMag
 import type { EtatEnregistrement } from "../storage/sourceSupabase";
 import type { DonneesApp } from "../storage/localStorageAdapter";
 import { VerificationServeur } from "./VerificationServeur";
-import { LONGUEUR_MINIMALE_MOT_DE_PASSE, connexionMotDePasse, creerCompte, demanderLienMagique, seDeconnecter } from "../auth/actions";
+import { LONGUEUR_MINIMALE_MOT_DE_PASSE, connexionMotDePasse, creerCompte, definirMotDePasse, demanderLienMagique, seDeconnecter } from "../auth/actions";
 
 interface CompteProps {
   /** Injecté par les tests ; par défaut, le client de l'app (`null` si non configuré). */
@@ -124,6 +124,7 @@ export function Compte({
   const [mode, setMode] = useState<Mode>("lienMagique");
   const [email, setEmail] = useState("");
   const [motDePasse, setMotDePasse] = useState("");
+  const [nouveauMotDePasse, setNouveauMotDePasse] = useState("");
   const [enCours, setEnCours] = useState(false);
   const [information, setInformation] = useState<string | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
@@ -210,9 +211,48 @@ export function Compte({
         </p>
         <TemoinEnregistrement etat={etatEnregistrement} />
         <VerificationServeur client={clientLecture} utilisateurId={etat.utilisateurId} donnees={donnees} />
+
+        {/* Demandé le 05/08/2026 : « pour l'instant pas de compte avec mdp, mais je veux qu'à terme
+            on ait ça ». Le mode mot de passe existait déjà côté connexion (`connexionMotDePasse`) ;
+            ce qui manquait, c'est le geste qui EN CRÉE un depuis une session déjà ouverte (typiquement
+            arrivée par lien magique). Pas de champ « mot de passe actuel » : `updateUser` agit sur la
+            session en cours, pas sur des identifiants à reconfirmer. */}
+        <div className="border-t border-line pt-3">
+          <label className={CLASSE_ETIQUETTE} htmlFor="compte-nouveau-mot-de-passe">
+            Définir un mot de passe
+          </label>
+          <p className="text-xs text-faint leading-relaxed mb-2">
+            Pour te connecter aussi sans lien magique, par exemple depuis un autre appareil.
+          </p>
+          <div className="flex gap-2">
+            <input
+              id="compte-nouveau-mot-de-passe"
+              type="password"
+              autoComplete="new-password"
+              value={nouveauMotDePasse}
+              onChange={(e) => setNouveauMotDePasse(e.target.value)}
+              className={`flex-1 ${CLASSE_CHAMP}`}
+            />
+            <button
+              type="button"
+              onClick={() => lancer((c) => definirMotDePasse(c, nouveauMotDePasse))}
+              disabled={enCours}
+              className="px-4 rounded-lg border border-line text-muted disabled:opacity-40"
+            >
+              {enCours ? "…" : "Enregistrer"}
+            </button>
+          </div>
+          <p className="text-xs text-faint leading-relaxed mt-1">{LONGUEUR_MINIMALE_MOT_DE_PASSE} caractères au minimum.</p>
+        </div>
+
         <button type="button" onClick={() => lancer(seDeconnecter)} disabled={enCours} className="px-4 py-2 rounded-lg border border-line text-muted disabled:opacity-40">
           {enCours ? "…" : "Se déconnecter"}
         </button>
+        {information !== null && (
+          <p className="text-muted leading-relaxed" aria-live="polite">
+            {information}
+          </p>
+        )}
         {erreur !== null && (
           <p className="text-red leading-relaxed" role="alert">
             {erreur}
@@ -302,8 +342,14 @@ export function Compte({
           >
             {enCours ? "Envoi…" : "Recevoir un lien de connexion"}
           </button>
-          <p className="text-xs text-faint leading-relaxed">
-            Le lien doit être ouvert depuis ce navigateur : c'est lui qui détient la clé de la session, elle ne voyage pas dans l'e-mail.
+          {/* Réserve PKCE (commit D, 05/08/2026) : ses testeurs liront l'e-mail sur leur téléphone,
+              pas nécessairement l'appareil depuis lequel ils viennent de demander le lien. La clé de
+              session vit dans CE navigateur-ci ; ouvrir le lien ailleurs échoue toujours, quel que soit
+              l'appareil visé — ce n'est pas propre au téléphone, mais c'est le cas le plus probable en
+              pratique (demande sur ordinateur, lien lu et ouvert depuis le téléphone). */}
+          <p className="text-xs text-amber leading-relaxed">
+            Le lien doit être ouvert depuis ce navigateur-ci : c'est lui qui détient la clé de la session, elle ne voyage pas dans l'e-mail. Si tu lis tes e-mails sur ton téléphone mais que tu as
+            demandé le lien depuis un ordinateur (ou l'inverse), ouvre-le quand même depuis l'appareil qui a fait la demande — sinon la connexion échouera.
           </p>
         </>
       ) : (

@@ -242,6 +242,14 @@ export function MonProfil({ dateDuJour, profil, onModifierProfil, contrats, peri
         </div>
       </section>
 
+      {/* Commit D (phase 5, 05/08/2026) : remontée depuis le bas de l'onglet, où elle était devenue
+          introuvable (constat en conditions réelles le 05/08/2026 — Benoît a conclu « ça ne marche
+          pas » alors que tout fonctionnait). Placée volontairement ici, juste après l'identité, plutôt
+          que tout en bas : la raison de la phase 2 pour la reléguer — « la connexion est facultative
+          et ne sert encore à rien » — s'est inversée depuis la bascule (phase 5), où c'est le serveur
+          qui fait référence dès qu'on est connecté. */}
+      <Compte etatEnregistrement={etatEnregistrement} donnees={donnees} />
+
       <MonIndemnisationEnCours profil={profil} onModifierProfil={onModifierProfil} onSuggestionDateAnniversaire={suggererDateAnniversaire} />
 
       <RenouvellementAnticipe profil={profil} contrats={contrats} periodes={periodes} config={franceTravailConfig} />
@@ -280,11 +288,6 @@ export function MonProfil({ dateDuJour, profil, onModifierProfil, contrats, peri
       </div>
 
       <DocumentsUtiles />
-
-      {/* Phase 2 de la refonte Supabase. Volontairement posé ici, dans un onglet qu'on visite, et non
-          dans la barre du haut : la connexion est facultative et ne sert encore à rien, un appel à
-          l'action permanent laisserait croire qu'il faut se connecter pour utiliser Cadence. */}
-      <Compte etatEnregistrement={etatEnregistrement} donnees={donnees} />
 
       <section>
         <h2 className="font-display text-lg font-medium mb-2">Périmètre du MVP</h2>

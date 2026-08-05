@@ -4,7 +4,7 @@
 // confirmé, et ne jamais remplacer une erreur par un message vague qui ferait chercher un bug là où
 // il n'y en a pas.
 import { describe, expect, it, vi } from "vitest";
-import { connexionMotDePasse, creerCompte, demanderLienMagique, messageErreur, seDeconnecter } from "../actions";
+import { connexionMotDePasse, creerCompte, definirMotDePasse, demanderLienMagique, messageErreur, seDeconnecter } from "../actions";
 import type { ClientAuth, ErreurAuth, SessionMinimale } from "../supabaseClient";
 
 const SESSION: SessionMinimale = { user: { id: "u-1", email: "benoit@example.com" } };
@@ -19,6 +19,7 @@ function fauxClient(reponses: Partial<ClientAuth> = {}): ClientAuth {
     signInWithPassword: vi.fn(async () => ({ data: { session: SESSION }, error: null })),
     signUp: vi.fn(async () => ({ data: { session: null }, error: null })),
     signOut: vi.fn(async () => ({ error: null })),
+    updateUser: vi.fn(async () => ({ error: null })),
     ...reponses,
   };
 }
@@ -133,6 +134,33 @@ describe("creerCompte", () => {
   it("ne dit rien de plus quand la session est immédiate (confirmation désactivée)", async () => {
     const client = fauxClient({ signUp: vi.fn(async () => ({ data: { session: SESSION }, error: null })) });
     expect(await creerCompte(client, "benoit@example.com", "motdepasse-solide", ORIGINE)).toEqual({ ok: true, message: null });
+  });
+});
+
+describe("definirMotDePasse", () => {
+  it("exige 8 caractères avant d'appeler Supabase", async () => {
+    const client = fauxClient();
+    const resultat = await definirMotDePasse(client, "court12");
+    expect(resultat).toEqual({ ok: false, message: "Mot de passe trop court : 8 caractères au minimum." });
+    expect(client.updateUser).not.toHaveBeenCalled();
+  });
+
+  it("agit sur la session en cours, sans redemander le mot de passe actuel", async () => {
+    const client = fauxClient();
+    await definirMotDePasse(client, "motdepasse-solide");
+    expect(client.updateUser).toHaveBeenCalledWith({ password: "motdepasse-solide" });
+  });
+
+  it("confirme l'enregistrement sans jamais dire « connecté » (ce n'est pas ce que ça fait)", async () => {
+    const resultat = await definirMotDePasse(fauxClient(), "motdepasse-solide");
+    expect(resultat).toEqual({ ok: true, message: expect.stringMatching(/enregistré/i) });
+  });
+
+  it("remonte l'erreur de Supabase telle qu'elle est traduite", async () => {
+    const client = fauxClient({ updateUser: vi.fn(async () => ({ error: erreur("password should be at least 6 characters") })) });
+    const resultat = await definirMotDePasse(client, "motdepasse-solide");
+    expect(resultat.ok).toBe(false);
+    expect(resultat.message).toMatch(/8 caractères au minimum/);
   });
 });
 

@@ -21,6 +21,7 @@ function fauxClient(reponses: Partial<ClientAuth> = {}): ClientAuth {
     signInWithPassword: vi.fn(async () => ({ data: { session: SESSION }, error: null })),
     signUp: vi.fn(async () => ({ data: { session: null }, error: null })),
     signOut: vi.fn(async () => ({ error: null })),
+    updateUser: vi.fn(async () => ({ error: null })),
     ...reponses,
   };
 }
@@ -89,6 +90,29 @@ describe("Compte — connecté", () => {
   });
 });
 
+describe("Compte — connecté : définir un mot de passe", () => {
+  // Demandé le 05/08/2026 : « pour l'instant pas de compte avec mdp, mais je veux qu'à terme on ait
+  // ça ». Le geste manquant, ici : créer un mot de passe SANS redemander l'ancien, puisqu'il n'y en a
+  // pas forcément un (arrivée par lien magique).
+  it("appelle updateUser avec le mot de passe saisi, sans rien redemander d'autre", async () => {
+    const client = fauxClient({ getSession: vi.fn(async () => ({ data: { session: SESSION }, error: null })) });
+    render(<Compte client={client} origine={ORIGINE} />);
+    fireEvent.change(await screen.findByLabelText(/définir un mot de passe/i), { target: { value: "motdepasse-solide" } });
+    fireEvent.click(screen.getByRole("button", { name: /enregistrer/i }));
+    await waitFor(() => expect(client.updateUser).toHaveBeenCalledWith({ password: "motdepasse-solide" }));
+    expect(await screen.findByText(/Mot de passe enregistré\./i)).toBeInTheDocument();
+  });
+
+  it("refuse un mot de passe trop court sans appeler Supabase", async () => {
+    const client = fauxClient({ getSession: vi.fn(async () => ({ data: { session: SESSION }, error: null })) });
+    render(<Compte client={client} origine={ORIGINE} />);
+    fireEvent.change(await screen.findByLabelText(/définir un mot de passe/i), { target: { value: "court12" } });
+    fireEvent.click(screen.getByRole("button", { name: /enregistrer/i }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(/8 caractères au minimum/);
+    expect(client.updateUser).not.toHaveBeenCalled();
+  });
+});
+
 describe("Compte — état de connexion illisible", () => {
   it("dit qu'il ne SAIT pas, et ne prétend pas « non connecté »", async () => {
     const client = fauxClient({ getSession: vi.fn(async () => ({ data: { session: null }, error: { message: "Failed to fetch" } })) });
@@ -135,6 +159,14 @@ describe("Compte — déconnecté : lien magique", () => {
     fireEvent.click(screen.getByRole("button", { name: /recevoir un lien de connexion/i }));
     expect(await screen.findByRole("alert")).toHaveTextContent(/incomplète/i);
     expect(client.signInWithOtp).not.toHaveBeenCalled();
+  });
+
+  it("explicite le cas du téléphone (réserve PKCE, commit D)", async () => {
+    // Ses testeurs liront le lien sur leur téléphone, pas forcément l'appareil qui l'a demandé — cf.
+    // CLAUDE.md, phase 5, commit D. Le taire produirait un échec incompréhensible pour eux.
+    render(<Compte client={fauxClient()} origine={ORIGINE} />);
+    await screen.findByLabelText(/adresse e-mail/i);
+    expect(screen.getByText(/téléphone/i)).toBeInTheDocument();
   });
 });
 

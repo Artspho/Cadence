@@ -35,6 +35,8 @@ export interface ClientAuth {
   signInWithPassword(parametres: { email: string; password: string }): Promise<{ data: { session: SessionMinimale | null }; error: ErreurAuth | null }>;
   signUp(parametres: { email: string; password: string; options?: { emailRedirectTo?: string } }): Promise<{ data: { session: SessionMinimale | null }; error: ErreurAuth | null }>;
   signOut(): Promise<{ error: ErreurAuth | null }>;
+  /** Définit ou change le mot de passe d'une session déjà ouverte (lien magique ou mot de passe). */
+  updateUser(attributs: { password: string }): Promise<{ error: ErreurAuth | null }>;
 }
 
 export interface SessionMinimale {
