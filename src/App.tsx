@@ -63,6 +63,7 @@ import { validerContratsPourEcriture } from "./lib/contratUnSeulMois";
 import { validerContratsEEEPourEcriture } from "./lib/contratTerritoireEEE";
 import { BandeauStockagePlein } from "./components/BandeauStockagePlein";
 import { MonDossier } from "./components/MonDossier";
+import { EcranConnexionObligatoire } from "./components/EcranConnexionObligatoire";
 
 const dateDuJour = new Date().toISOString().slice(0, 10);
 
@@ -75,9 +76,12 @@ const dateDuJour = new Date().toISOString().slice(0, 10);
  */
 type EtatBascule =
   /**
-   * Supabase n'est pas configuré, ou aucune session n'est ouverte : Cadence fonctionne sur ce seul
-   * navigateur, exactement comme avant la refonte. C'est ce qui laisse l'app utilisable en
-   * développement sans `.env`, et sans compte tant que la connexion obligatoire n'est pas installée.
+   * Supabase n'est pas configuré, ou aucune session n'est ouverte. ⚠️ DEVENU UN FILET, PAS UN MODE
+   * NORMAL depuis la connexion obligatoire (05/08/2026, cf. `EcranConnexionObligatoire.tsx`) : le mur
+   * posé plus bas dans le rendu de `App` empêche désormais d'atteindre ce code sans session — ce cas
+   * ne devrait donc plus jamais se produire en pratique. Conservé tel quel (pas supprimé) parce que
+   * retirer ce filet reviendrait à supposer, sans le prouver, qu'aucun chemin ne peut plus jamais
+   * l'atteindre — hors périmètre de ce chantier, cf. plan `fluttering-beaming-summit.md`.
    */
   | { statut: "localSeul" }
   /** Lecture du serveur en cours. Écriture suspendue le temps de savoir à quoi s'en tenir. */
@@ -165,17 +169,21 @@ export default function App() {
   const interrogationFaite = useRef<string | null>(null);
 
   /**
-   * LE VERROU D'ÉCRITURE. Trois situations le ferment, et chacune pour une raison distincte :
+   * LE VERROU D'ÉCRITURE. Quatre situations le ferment, et chacune pour une raison distincte :
    *  - `interrogation` : on ne sait pas encore ce que porte le serveur, donc rien ne doit bouger ;
    *  - `decision` : une question est posée, et y répondre déterminera quelle version survit ;
    *  - `lectureSeule` : le serveur se tait. Écrire dans le navigateur creuserait un écart que
-   *    personne n'a demandé, et dont personne ne saurait qu'il existe.
-   *
-   * ⚠️ `localSeul` l'OUVRE — c'est le comportement d'avant la refonte, celui qui permet d'ouvrir
-   * Cadence sans configuration Supabase. Le retirer d'ici rendrait l'app inutilisable en
-   * développement, et sans compte.
+   *    personne n'a demandé, et dont personne ne saurait qu'il existe ;
+   *  - `localSeul` : DEPUIS LA CONNEXION OBLIGATOIRE (05/08/2026), ce n'est plus « le mode local
+   *    légitime » — c'est ce que porte l'app PENDANT que le mur (`EcranConnexionObligatoire.tsx`) est
+   *    affiché. ⚠️ Les effets de ce fichier (dont celui qui écrit, juste en dessous) sont déclarés
+   *    AVANT le `return` du mur dans le rendu : React les exécute quand même, quel que soit ce que le
+   *    rendu affiche ensuite. Sans ce garde-fou, écrire ici derrière un écran qui prétend bloquer
+   *    « toute utilisation » aurait été un mensonge silencieux (constaté par
+   *    `App.connexionNonConfiguree.test.tsx`, « n'écrit rien dans le localStorage », avant ce correctif).
+   *    Seul `active` ouvre donc l'écriture désormais.
    */
-  const ecritureAutorisee = etatBascule.statut === "localSeul" || etatBascule.statut === "active";
+  const ecritureAutorisee = etatBascule.statut === "active";
 
   useEffect(() => {
     if (!lectureSaine || !donnees) return;
@@ -459,6 +467,15 @@ export default function App() {
       return { ...d, exercicesGeles: nouveauxGeles };
     });
   }, [calculs?.aGeler, ecritureAutorisee]);
+
+  // LE MUR (05/08/2026) : décision de Benoît, prise en dehors du plan de la phase 6 — Cadence exige
+  // désormais un compte pour être utilisée, sans exception. Placé AVANT tout le reste du rendu (avant
+  // même l'écran de récupération de données illisibles ci-dessous) : c'est la lecture la plus stricte
+  // de « sans compte, pas d'utilisation ». Ne bloque rien d'autre : le mécanisme de bascule (phase 5,
+  // juste en dessous) suppose déjà une session pour s'activer et n'a besoin d'aucun changement.
+  if (session.statut !== "connecte") {
+    return <EcranConnexionObligatoire session={session} client={clientAuth} />;
+  }
 
   // Écran bloquant : ni navigation, ni onboarding, ni tableau de bord à vide — l'utilisateur ne doit
   // jamais voir une app « neuve » alors que ses données sont peut-être intactes et récupérables.
@@ -926,6 +943,7 @@ export default function App() {
             periodes={donnees.periodes}
             onAjouterPeriode={ajouterPeriode}
             onSupprimerPeriode={supprimerPeriode}
+            session={session}
             etatEnregistrement={etatEnregistrement}
             donnees={donnees}
           />

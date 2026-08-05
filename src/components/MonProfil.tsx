@@ -14,6 +14,7 @@ import { DocumentsUtiles } from "./DocumentsUtiles";
 import { Compte } from "./Compte";
 import type { EtatEnregistrement } from "../storage/sourceSupabase";
 import type { DonneesApp } from "../storage/localStorageAdapter";
+import type { SessionConnectee } from "../auth/session";
 import { RenouvellementAnticipe } from "./RenouvellementAnticipe";
 import { DateNaissanceInput } from "./DateNaissanceInput";
 import { MentionsLegales } from "./MentionsLegales";
@@ -28,6 +29,8 @@ interface MonProfilProps {
   periodes: PeriodeAssimilee[];
   onAjouterPeriode: (periode: Omit<PeriodeAssimilee, "id">) => void;
   onSupprimerPeriode: (id: string) => void;
+  /** Résolue par le mur (connexion obligatoire, 05/08/2026) — App.tsx ne rend `MonProfil` qu'une fois connecté. */
+  session: SessionConnectee;
   /** État de la copie vers Supabase (phase 3). Calculé dans App, affiché par la section Compte. */
   etatEnregistrement?: EtatEnregistrement;
   /**
@@ -39,7 +42,7 @@ interface MonProfilProps {
   donnees?: DonneesApp | null;
 }
 
-export function MonProfil({ dateDuJour, profil, onModifierProfil, contrats, periodes, onAjouterPeriode, onSupprimerPeriode, etatEnregistrement, donnees }: MonProfilProps) {
+export function MonProfil({ dateDuJour, profil, onModifierProfil, contrats, periodes, onAjouterPeriode, onSupprimerPeriode, session, etatEnregistrement, donnees }: MonProfilProps) {
   const [formPeriodeOuvert, setFormPeriodeOuvert] = useState(false);
   const [mentionsLegalesOuvertes, setMentionsLegalesOuvertes] = useState(false);
   // Compté depuis la dernière VÉRIFICATION des constantes, pas depuis l'entrée en vigueur du SMIC
@@ -250,7 +253,7 @@ export function MonProfil({ dateDuJour, profil, onModifierProfil, contrats, peri
           que tout en bas : la raison de la phase 2 pour la reléguer — « la connexion est facultative
           et ne sert encore à rien » — s'est inversée depuis la bascule (phase 5), où c'est le serveur
           qui fait référence dès qu'on est connecté. */}
-      <Compte etatEnregistrement={etatEnregistrement} donnees={donnees} />
+      <Compte session={session} etatEnregistrement={etatEnregistrement} donnees={donnees} />
 
       <MonIndemnisationEnCours profil={profil} onModifierProfil={onModifierProfil} onSuggestionDateAnniversaire={suggererDateAnniversaire} />
 

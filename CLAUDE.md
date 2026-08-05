@@ -96,9 +96,36 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 ## État actuel
 
 > **Repère au 05/08/2026, session (8, toujours en cours) — PHASE 5 TERMINÉE ET SOLDÉE, PHASE 6 EN
-> COURS (commits 1 à 4 faits, commit 5 codé et testé mais PAS ENCORE VALIDÉ PAR BENOÎT).**
-> **1037 tests verts** (85 fichiers), `tsc -b` propre, `npm run build` propre — y compris les
-> changements non commités du commit 5 (voir juste en dessous).
+> COURS (commits 1 à 5 faits et commités). Un chantier hors plan s'est intercalé et vient d'être codé :
+> LE COMPTE EST DÉSORMAIS OBLIGATOIRE — PAS ENCORE COMMITÉ, en revue avec Benoît.**
+> **1046 tests verts** (91 fichiers), `tsc -b` propre, `npm run build` propre — y compris ce
+> chantier non commité (voir juste en dessous). Vérifié en conditions réelles (`npm run dev`,
+> localhost:5173, vrai projet Supabase) : le mur s'affiche, formulaire lien magique/mot de passe
+> fonctionnels à l'écran. ⚠️ Le login/inscription bout en bout (avec un vrai compte) reste à faire par
+> Benoît — je n'ai pas accès à sa boîte mail pour confirmer un lien magique ou une confirmation
+> d'inscription.
+>
+> 🟡 **COMPTE OBLIGATOIRE (05/08/2026) — CODÉ, TESTÉ, PAS ENCORE COMMITÉ.** Décidé par Benoît en
+> pleine revue du commit 6, en dehors du plan de la phase 6 : plus AUCUN usage de Cadence sans compte,
+> dès le premier lancement. Plan complet : `C:\Users\benoi\.claude\plans\fluttering-beaming-summit.md`.
+> Ce que ça fait : nouveau `components/EcranConnexionObligatoire.tsx` (mur plein écran, réutilise
+> `auth/actions.ts` — aucune logique dupliquée), branché dans `App.tsx` tout en amont du rendu (avant
+> même l'écran de récupération de données illisibles) ; `Compte.tsx` simplifié (ne gère plus que la
+> session déjà connectée, reçue en prop — les autres branches ont migré vers le mur) ; `useSession`
+> n'est plus appelé qu'à un seul endroit (`App.tsx`). ⚠️ **Fragilité nouvelle et assumée** : si
+> `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY` venaient à manquer en production, PERSONNE ne pourrait
+> plus ouvrir Cadence (avant, ce cas retombait sur le localStorage). Le mur le dit comme une panne, pas
+> comme un mode dégradé. ⚠️ **Bug trouvé et corrigé en cours de route** : `ecritureAutorisee` (App.tsx)
+> incluait encore `localSeul`, qui écrivait dans le navigateur MÊME QUAND le mur était affiché (les
+> `useEffect` de chargement/sauvegarde sont déclarés avant le `return` du mur — React les exécute quand
+> même). Rétréci à `statut === "active"` seul, prouvé par
+> `App.connexionNonConfiguree.test.tsx`. **Hors périmètre, signalé mais pas construit** : consentement
+> horodaté aux mentions légales à l'inscription (déjà repéré comme « arbitrage 6 » en phase 6) ;
+> intégration calendrier (mentionnée en passant par Benoît, notée pour plus tard, sans rapport).
+>
+> **Une fois ce commit validé et committé : reprendre le commit 6 de la phase 6** (frais réels —
+> bascule sur le canal unique Supabase Storage + retrait complet de Google Drive), inchangé dans son
+> contenu, cf. `C:\Users\benoi\.claude\plans\humming-wandering-kite.md`.
 >
 > ✅ **POUSSÉ jusqu'à `6bdf58f`** (dette `donnees_sauvegarde` soldée), sur demande explicite de
 > Benoît dans le fil. ⚠️ **`origin/master` est en retard de 5 commits, tous LOCAUX et NON POUSSÉS** —

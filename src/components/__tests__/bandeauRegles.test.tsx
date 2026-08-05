@@ -40,6 +40,7 @@ function rendreMonProfil(dateDuJour: string): string {
       periodes={[]}
       onAjouterPeriode={vi.fn()}
       onSupprimerPeriode={vi.fn()}
+      session={{ statut: "connecte", utilisateurId: "u-test", email: "test@example.com" }}
     />,
   );
   return container.textContent ?? "";

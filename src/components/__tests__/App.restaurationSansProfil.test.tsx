@@ -9,11 +9,38 @@
 //
 // Ce test déroule le parcours ENTIER sur le vrai App : écran vierge → restaurer → confirmer →
 // données présentes. Il ne teste pas une doublure, c'est le chemin de production.
+//
+// ⚠️ SESSION MOCKÉE CONNECTÉE DEPUIS LA CONNEXION OBLIGATOIRE (05/08/2026) : sans ce mock, le mur
+// (`EcranConnexionObligatoire.tsx`) s'afficherait à la place de l'écran d'accueil (comportement par
+// défaut des tests). Le parcours protégé ici ne change pas, seul l'accès préalable change.
 import "@testing-library/jest-dom/vitest";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import App from "../../App";
 import { CLE_STOCKAGE } from "../../storage/localStorageAdapter";
+
+vi.mock("../../auth/supabaseClient", async (importOriginal) => {
+  const vrai = await importOriginal<typeof import("../../auth/supabaseClient")>();
+  const auth = {
+    getSession: async () => ({ data: { session: { user: { id: "u-42", email: "benoit@example.com" } } }, error: null }),
+    onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
+    signInWithOtp: async () => ({ error: null }),
+    signInWithPassword: async () => ({ data: { session: null }, error: null }),
+    signUp: async () => ({ data: { session: null }, error: null }),
+    signOut: async () => ({ error: null }),
+    updateUser: async () => ({ error: null }),
+  };
+  const source = {
+    from: () => ({
+      select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: null, error: null }) }) }),
+      insert: () => ({ select: async () => ({ data: [{ maj_le: "2026-08-05T09:14:02.987654+00:00" }], error: null }) }),
+      update: () => ({ eq: () => ({ eq: () => ({ select: async () => ({ data: [{ maj_le: "" }], error: null }) }) }) }),
+    }),
+  };
+  return { ...vrai, obtenirClientAuth: () => auth, obtenirClientSourceDonnees: () => source, obtenirClientLectureDonnees: () => null };
+});
+
+// Importé APRÈS le mock, sinon il capturerait les vraies fonctions.
+const { default: App } = await import("../../App");
 
 // Sauvegarde réaliste : un profil complet + un contrat, exactement ce qu'un utilisateur récupère.
 const SAUVEGARDE = JSON.stringify({
