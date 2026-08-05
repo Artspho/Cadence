@@ -14,10 +14,16 @@ import {
   type DonneesApp,
   type ResultatChargement,
 } from "./storage/localStorageAdapter";
-import { copierDonneesVersSupabase, type EtatMiroir } from "./storage/miroirSupabase";
-import { obtenirClientAuth, obtenirClientDonnees } from "./auth/supabaseClient";
+import { ecrireEtatServeur, lireEtatServeur, type EtatEnregistrement, type Jeton } from "./storage/sourceSupabase";
+import { analyserBascule, type Bascule } from "./storage/bascule";
+import { texteCanonique } from "./storage/verificationMigration";
+import { obtenirClientAuth, obtenirClientSourceDonnees } from "./auth/supabaseClient";
 import { useSession } from "./auth/session";
 import { EcranDonneesIllisibles } from "./components/EcranDonneesIllisibles";
+import { DecisionServeur, type BasculeADecider } from "./components/DecisionServeur";
+import { BandeauLectureSeule } from "./components/BandeauLectureSeule";
+import { BandeauEchecEnregistrement } from "./components/BandeauEchecEnregistrement";
+import { telechargerTexte } from "./lib/telechargement";
 import { calculerFenetreEnCours } from "./engine/periodeReference";
 import { calculerDecompteHeures } from "./engine/decompteHeures";
 import { calculerSalaireReference } from "./engine/salaireReference";
@@ -59,8 +65,35 @@ import { BandeauStockagePlein } from "./components/BandeauStockagePlein";
 
 const dateDuJour = new Date().toISOString().slice(0, 10);
 
+/**
+ * PHASE 5 — OÙ EN EST LA RELATION AVEC LE SERVEUR, ET DONC QUI A LE DROIT D'ÉCRIRE.
+ *
+ * C'est cet état, et lui seul, qui autorise ou interdit les écritures (cf. `ecritureAutorisee`).
+ * Même rôle que `chargement` pour le `localStorage` depuis le correctif du 03/08/2026 : une
+ * situation qu'on ne sait pas trancher ne doit JAMAIS pouvoir déclencher une écriture.
+ */
+type EtatBascule =
+  /**
+   * Supabase n'est pas configuré, ou aucune session n'est ouverte : Cadence fonctionne sur ce seul
+   * navigateur, exactement comme avant la refonte. C'est ce qui laisse l'app utilisable en
+   * développement sans `.env`, et sans compte tant que la connexion obligatoire n'est pas installée.
+   */
+  | { statut: "localSeul" }
+  /** Lecture du serveur en cours. Écriture suspendue le temps de savoir à quoi s'en tenir. */
+  | { statut: "interrogation" }
+  /** Le serveur fait référence. `jeton` est `null` avant la toute première écriture (insertion). */
+  | { statut: "active"; jeton: Jeton | null }
+  /** Une question est en suspens : écran bloquant, aucune écriture nulle part. */
+  | { statut: "decision"; bascule: BasculeADecider }
+  /** Serveur muet : consultation autorisée, écriture interdite. */
+  | { statut: "lectureSeule"; message: string };
+
 export default function App() {
-  const [donnees, setDonnees] = useState<DonneesApp | null>(null);
+  // ⚠️ `setDonneesBrut` CONTOURNE LE VERROU D'ÉCRITURE — réservé aux trois cas où c'est légitime :
+  // la lecture initiale, une restauration décidée par l'utilisateur, et l'adoption de la version
+  // serveur. Partout ailleurs, on passe par `setDonnees` (défini plus bas), qui refuse quand le
+  // serveur ne permet pas d'enregistrer.
+  const [donnees, setDonneesBrut] = useState<DonneesApp | null>(null);
   const [onglet, setOnglet] = useState<Onglet>("dashboard");
   const [erreurImport, setErreurImport] = useState<string | null>(null);
   const [fichierEnAttenteImport, setFichierEnAttenteImport] = useState<File | null>(null);
@@ -86,8 +119,8 @@ export default function App() {
   useEffect(() => {
     chargerDonnees().then((resultat) => {
       setChargement(resultat);
-      if (resultat.statut === "ok") setDonnees(resultat.donnees);
-      else if (resultat.statut === "vide") setDonnees(creerDonneesVides());
+      if (resultat.statut === "ok") setDonneesBrut(resultat.donnees);
+      else if (resultat.statut === "vide") setDonneesBrut(creerDonneesVides());
       // "illisible" : `donnees` reste `null`, donc l'app ne rend jamais son interface normale et
       // l'effet de sauvegarde ci-dessous ne peut structurellement pas s'exécuter.
     });
@@ -98,57 +131,273 @@ export default function App() {
   // JAMAIS déclencher d'écriture — c'est la règle que ce correctif installe.
   const lectureSaine = chargement !== null && chargement.statut !== "illisible";
 
+  // ── PHASE 5 : LA BASCULE ────────────────────────────────────────────────────────────────────────
+  // Remplace le miroir en écriture seule de la phase 3, qui a été SUPPRIMÉ — il écrivait par `upsert`,
+  // donc sans condition, et aurait contourné le verrou installé ici (cf. auth/supabaseClient.ts).
+  const clientAuth = obtenirClientAuth();
+  const clientSource = obtenirClientSourceDonnees();
+  const session = useSession(clientAuth);
+  /**
+   * ⚠️ L'ÉTAT INITIAL DÉPEND DE LA CONFIGURATION, ET CE N'EST PAS UN DÉTAIL. Une première version
+   * démarrait toujours sur `localSeul`, donc écriture OUVERTE — et un test d'intégration a montré que
+   * l'app enregistrait alors dans le navigateur pendant la fraction de seconde qui précède la réponse
+   * du serveur. Écrire avant de savoir ce que le serveur porte, c'est précisément ce que cette phase
+   * interdit : la divergence aurait été créée par l'app elle-même.
+   *
+   * Sans configuration Supabase, en revanche, il n'y a rien à attendre : `localSeul` immédiatement,
+   * sinon Cadence deviendrait inutilisable en développement sans `.env`.
+   */
+  const [etatBascule, setEtatBascule] = useState<EtatBascule>(clientSource ? { statut: "interrogation" } : { statut: "localSeul" });
+  const [echecEnregistrement, setEchecEnregistrement] = useState<string | null>(null);
+  const [horodatageEnregistrement, setHorodatageEnregistrement] = useState<string | null>(null);
+  const [decisionEnCours, setDecisionEnCours] = useState(false);
+  /** Incrémenté pour redemander une lecture du serveur (bouton « réessayer », reprise après conflit). */
+  const [relanceLecture, setRelanceLecture] = useState(0);
+  /**
+   * Empreinte de ce qui est CONFIRMÉ sur le serveur. Empêche de réécrire ce qu'on vient d'y lire ou
+   * d'y écrire — sans quoi le moindre rafraîchissement de jeton relancerait une écriture inutile.
+   * Canonique (clés triées), pour la même raison que dans `analyserBascule` : Postgres ne conserve pas
+   * l'ordre des clés d'un JSONB.
+   */
+  const empreinteServeur = useRef<string | null>(null);
+  /** Ce qui a déjà été interrogé, pour ne lire le serveur qu'une fois par session (et par relance). */
+  const interrogationFaite = useRef<string | null>(null);
+
+  /**
+   * LE VERROU D'ÉCRITURE. Trois situations le ferment, et chacune pour une raison distincte :
+   *  - `interrogation` : on ne sait pas encore ce que porte le serveur, donc rien ne doit bouger ;
+   *  - `decision` : une question est posée, et y répondre déterminera quelle version survit ;
+   *  - `lectureSeule` : le serveur se tait. Écrire dans le navigateur creuserait un écart que
+   *    personne n'a demandé, et dont personne ne saurait qu'il existe.
+   *
+   * ⚠️ `localSeul` l'OUVRE — c'est le comportement d'avant la refonte, celui qui permet d'ouvrir
+   * Cadence sans configuration Supabase. Le retirer d'ici rendrait l'app inutilisable en
+   * développement, et sans compte.
+   */
+  const ecritureAutorisee = etatBascule.statut === "localSeul" || etatBascule.statut === "active";
+
   useEffect(() => {
     if (!lectureSaine || !donnees) return;
+    // Le verrou vaut AUSSI pour l'écriture locale, et c'est le point délicat de toute la bascule :
+    // sans ça, un serveur muet laisserait le navigateur continuer d'enregistrer, et la divergence
+    // serait créée par l'app elle-même, en silence, sans le moindre geste de l'utilisateur.
+    if (!ecritureAutorisee) return;
     // L'échec d'écriture remonte désormais à l'écran au lieu d'être avalé (filet minimal du point
     // n°2 de la critique — le sujet complet, quota plein et purge, reste ouvert).
     sauvegarderDonnees(donnees).then((resultat) => setErreurSauvegarde(resultat.ok ? null : resultat.message));
-  }, [donnees, lectureSaine]);
+  }, [donnees, lectureSaine, ecritureAutorisee]);
 
-  // ── PHASE 3 : LA COPIE VERS SUPABASE ────────────────────────────────────────────────────────────
-  // Effet DÉLIBÉRÉMENT SÉPARÉ de la sauvegarde locale ci-dessus, et surtout pas fusionné avec elle :
-  // la copie serveur ne doit ni retarder, ni conditionner, ni pouvoir faire échouer l'écriture dans
-  // le navigateur. Le localStorage reste la source de vérité jusqu'à la phase 5 ; ceci est une copie
-  // EN PLUS. Aucune lecture : cf. le commentaire d'en-tête de storage/miroirSupabase.ts.
-  const clientAuth = obtenirClientAuth();
-  const clientDonnees = obtenirClientDonnees();
-  const session = useSession(clientAuth);
-  const [etatMiroir, setEtatMiroir] = useState<EtatMiroir>({ statut: "inactif" });
-  // Empreinte de la dernière copie CONFIRMÉE. Évite de réécrire la même chose à chaque changement de
-  // session (un simple rafraîchissement de jeton relance cet effet) — et n'est remise à zéro qu'à la
-  // déconnexion, pour que la reconnexion recopie bien tout.
-  const empreinteCopiee = useRef<string | null>(null);
-
+  // ── Ce que porte le serveur, et ce qu'on en conclut ─────────────────────────────────────────────
   useEffect(() => {
     if (!lectureSaine || !donnees) return;
 
-    if (session.statut !== "connecte" || !clientDonnees) {
-      // Pas de session (ou pas de configuration) : il n'y a rien à dire, et surtout rien à afficher.
-      setEtatMiroir({ statut: "inactif" });
-      empreinteCopiee.current = null;
+    // La session n'est pas encore tranchée : on ATTEND, écriture fermée. Basculer en `localSeul` ici
+    // rouvrirait la fenêtre d'écriture prématurée décrite plus haut.
+    if (clientSource && session.statut === "chargement") return;
+
+    // On ne SAIT PAS si une session existe (`getSession` a échoué). Le traiter comme « déconnecté »
+    // autoriserait l'écriture alors que le serveur porte peut-être des données pour cet utilisateur :
+    // on préfère dire l'ignorance et ne rien écrire (même principe que le statut « illisible » du
+    // `localStorage`). En pratique ce cas est rare — hors ligne sans session, la bibliothèque rend
+    // « déconnecté », pas une erreur.
+    if (clientSource && session.statut === "indetermine") {
+      setEtatBascule({ statut: "lectureSeule", message: session.detail });
       return;
     }
 
-    const empreinte = JSON.stringify(donnees);
-    if (empreinteCopiee.current === empreinte) return;
+    if (session.statut !== "connecte" || !clientSource) {
+      // Pas de session (ou pas de configuration) : ce navigateur suffit, et il n'y a rien à afficher.
+      setEtatBascule({ statut: "localSeul" });
+      empreinteServeur.current = null;
+      interrogationFaite.current = null;
+      return;
+    }
+
+    const cle = `${session.utilisateurId}#${relanceLecture}`;
+    if (interrogationFaite.current === cle) return;
+    interrogationFaite.current = cle;
 
     let annule = false;
-    setEtatMiroir({ statut: "encours" });
-    copierDonneesVersSupabase(clientDonnees, session.utilisateurId, donnees).then((resultat) => {
+    setEtatBascule({ statut: "interrogation" });
+    lireEtatServeur(clientSource, session.utilisateurId).then((etat) => {
       if (annule) return;
-      if (resultat.ok) {
-        empreinteCopiee.current = empreinte;
-        setEtatMiroir({ statut: "copie", horodatage: resultat.horodatage });
-      } else {
-        // On ne mémorise PAS l'empreinte en cas d'échec : le prochain changement doit réessayer.
-        setEtatMiroir({ statut: "echec", message: resultat.message });
+      appliquerBascule(analyserBascule(donnees, etat));
+    });
+
+    return () => {
+      annule = true;
+    };
+    // `donnees` est lu ici mais volontairement absent des dépendances : cet effet ne doit PAS se
+    // relancer à chaque saisie, seulement quand la session ou une relance l'exige. Le garde
+    // `interrogationFaite` suffirait, mais l'omission rend l'intention explicite — et l'écriture est
+    // de toute façon fermée pendant l'interrogation, donc `donnees` ne peut pas changer entre-temps.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lectureSaine, session, clientSource, relanceLecture]);
+
+  /**
+   * Traduit un verdict d'ouverture en état d'application.
+   *
+   * Les deux seules branches qui touchent aux données sont celles que `analyserBascule` a déjà
+   * jugées incapables de détruire quoi que ce soit (cf. son en-tête) : adopter le serveur quand le
+   * navigateur est vide, et ne rien faire quand les deux côtés concordent.
+   */
+  function appliquerBascule(bascule: Bascule) {
+    switch (bascule.genre) {
+      case "serveurEnPhase":
+        empreinteServeur.current = texteCanonique(donnees);
+        setEtatBascule({ statut: "active", jeton: bascule.jeton });
+        return;
+
+      case "premierLancement":
+        // Rien de part ni d'autre : la première écriture sera une insertion, d'où le jeton `null`.
+        empreinteServeur.current = null;
+        setEtatBascule({ statut: "active", jeton: null });
+        return;
+
+      case "adopterServeur":
+        // Le navigateur est vide : on prend le serveur sans rien détruire. L'empreinte est posée
+        // AVANT, pour que l'effet d'écriture ne renvoie pas aussitôt au serveur ce qu'il vient d'en
+        // lire. La copie locale, elle, sera rafraîchie par l'effet de sauvegarde.
+        empreinteServeur.current = texteCanonique(bascule.donnees);
+        setDonneesBrut(bascule.donnees);
+        setEtatBascule({ statut: "active", jeton: bascule.jeton });
+        return;
+
+      case "serveurMuet":
+        setEtatBascule({ statut: "lectureSeule", message: bascule.message });
+        return;
+
+      default:
+        setEtatBascule({ statut: "decision", bascule });
+    }
+  }
+
+  // ── L'enregistrement sur le serveur, sous condition ─────────────────────────────────────────────
+  useEffect(() => {
+    if (!lectureSaine || !donnees) return;
+    if (etatBascule.statut !== "active" || !clientSource || session.statut !== "connecte") return;
+
+    const empreinte = texteCanonique(donnees);
+    if (empreinteServeur.current === empreinte) return;
+
+    let annule = false;
+    ecrireEtatServeur(clientSource, session.utilisateurId, donnees, etatBascule.jeton).then((resultat) => {
+      if (annule) return;
+      switch (resultat.statut) {
+        case "ecrit":
+          empreinteServeur.current = empreinte;
+          setEchecEnregistrement(null);
+          setHorodatageEnregistrement(resultat.jeton);
+          setEtatBascule({ statut: "active", jeton: resultat.jeton });
+          return;
+
+        case "ecritJetonPerdu":
+          // L'écriture A eu lieu : ne jamais l'annoncer comme un échec. Il manque seulement la
+          // nouvelle version, donc on relit pour la retrouver avant d'écrire à nouveau.
+          empreinteServeur.current = empreinte;
+          setEchecEnregistrement(null);
+          setRelanceLecture((v) => v + 1);
+          return;
+
+        case "conflit":
+          // Quelqu'un d'autre a écrit entre-temps. On ne force RIEN : on relit, et la comparaison
+          // conduira à l'écran de décision si les deux versions diffèrent réellement.
+          setRelanceLecture((v) => v + 1);
+          return;
+
+        default:
+          // On ne mémorise pas l'empreinte : la prochaine modification réessaiera. Et surtout, on ne
+          // prétend pas avoir enregistré — c'est ce que dit le témoin de la section « Compte ».
+          setEchecEnregistrement(resultat.message);
       }
     });
 
     return () => {
       annule = true;
     };
-  }, [donnees, lectureSaine, session, clientDonnees]);
+  }, [donnees, etatBascule, clientSource, session, lectureSaine]);
+
+  /**
+   * Le seul chemin d'écriture pour tout le reste de l'app.
+   *
+   * Porte le nom qu'avait le `setState` d'origine, donc les seize appels existants n'ont pas bougé :
+   * le verrou s'installe en UN endroit, et aucun appelant ne peut l'oublier. Un refus ne se contente
+   * pas de ne rien faire — il le DIT, via le bandeau déjà en place. Un formulaire qui n'a aucun effet
+   * et ne s'explique pas serait pris pour une panne, et surtout : quelqu'un croirait avoir enregistré.
+   */
+  function setDonnees(maj: DonneesApp | null | ((precedent: DonneesApp | null) => DonneesApp | null)) {
+    if (!ecritureAutorisee) {
+      setRefusEcriture(
+        etatBascule.statut === "lectureSeule"
+          ? "Cadence est en lecture seule : le serveur ne répond pas. Ta modification n'a PAS été enregistrée — reprends-la quand la connexion sera rétablie."
+          : "Cadence attend ta réponse sur la version à conserver. Rien n'est enregistré tant que la question n'est pas tranchée.",
+      );
+      return;
+    }
+    setDonneesBrut(maj as Parameters<typeof setDonneesBrut>[0]);
+  }
+
+  /**
+   * « Garder ce navigateur » : envoie l'état local sur le serveur, en remplaçant ce qu'il portait.
+   *
+   * Le jeton distingue les deux situations, et cette distinction EST la protection : pour
+   * `aTeleverser` aucune ligne n'existait, donc insertion — qui échouera si une ligne est apparue
+   * entre-temps ; ailleurs, on remplace précisément la version qu'on a lue, et pas une autre.
+   */
+  async function televerserNavigateur(bascule: BasculeADecider, local: DonneesApp) {
+    if (!clientSource || session.statut !== "connecte") return;
+    setDecisionEnCours(true);
+    const resultat = await ecrireEtatServeur(clientSource, session.utilisateurId, local, bascule.genre === "aTeleverser" ? null : bascule.jeton);
+    setDecisionEnCours(false);
+
+    switch (resultat.statut) {
+      case "ecrit":
+        empreinteServeur.current = texteCanonique(local);
+        setEchecEnregistrement(null);
+        setHorodatageEnregistrement(resultat.jeton);
+        setEtatBascule({ statut: "active", jeton: resultat.jeton });
+        return;
+
+      case "ecritJetonPerdu":
+        empreinteServeur.current = texteCanonique(local);
+        setEchecEnregistrement(null);
+        setRelanceLecture((v) => v + 1);
+        return;
+
+      case "conflit":
+        // Un troisième écrivain est passé pendant que l'écran était affiché. On relit plutôt que
+        // d'insister : la question doit être reposée sur la version réellement en place.
+        setRelanceLecture((v) => v + 1);
+        return;
+
+      default:
+        setEchecEnregistrement(resultat.message);
+    }
+  }
+
+  /**
+   * « Prendre le serveur » : la version serveur devient celle de ce navigateur.
+   *
+   * Aucune écriture serveur ici — il porte déjà cette version. L'empreinte est posée AVANT le
+   * changement d'état pour que l'effet d'enregistrement ne renvoie pas au serveur ce qu'il vient d'en
+   * lire ; la copie locale, elle, est rafraîchie par l'effet de sauvegarde.
+   */
+  function adopterVersionServeur(donneesServeur: DonneesApp, jeton: Jeton) {
+    empreinteServeur.current = texteCanonique(donneesServeur);
+    setDonneesBrut(donneesServeur);
+    setEchecEnregistrement(null);
+    setEtatBascule({ statut: "active", jeton });
+  }
+
+  /** L'état de l'enregistrement, tel que la section « Compte » a le droit de l'affirmer. */
+  const etatEnregistrement: EtatEnregistrement = (() => {
+    if (etatBascule.statut === "localSeul") return { statut: "inactif" };
+    if (etatBascule.statut === "lectureSeule") return { statut: "lectureSeule", message: etatBascule.message };
+    if (echecEnregistrement !== null) return { statut: "echec", message: echecEnregistrement };
+    if (etatBascule.statut === "interrogation") return { statut: "encours" };
+    if (horodatageEnregistrement !== null) return { statut: "enregistre", horodatage: horodatageEnregistrement };
+    return { statut: "inactif" };
+  })();
 
   const calculs = useMemo(() => {
     if (!donnees?.profil) return null;
@@ -196,13 +445,19 @@ export default function App() {
   // touche jamais `donnees` (pas de boucle, pas d'écriture superflue).
   useEffect(() => {
     if (!calculs || calculs.aGeler.length === 0) return;
+    // ⚠️ TESTÉ AVANT `setDonnees`, ET NON DÉLÉGUÉ À LUI : c'est la seule écriture que l'app déclenche
+    // toute seule. Passer par le verrou afficherait le bandeau « ta modification n'a pas été
+    // enregistrée » sans que personne n'ait rien saisi — une alerte incompréhensible, donc une
+    // fausse alerte. Ici, ne rien faire est le bon comportement : au prochain rendu, `aGeler`
+    // reproposera ces exercices, et ils seront figés dès que le serveur répondra.
+    if (!ecritureAutorisee) return;
     setDonnees((d) => {
       if (!d) return d;
       const nouveauxGeles = { ...d.exercicesGeles };
       for (const exercice of calculs.aGeler) nouveauxGeles[exercice.id] = exercice;
       return { ...d, exercicesGeles: nouveauxGeles };
     });
-  }, [calculs?.aGeler]);
+  }, [calculs?.aGeler, ecritureAutorisee]);
 
   // Écran bloquant : ni navigation, ni onboarding, ni tableau de bord à vide — l'utilisateur ne doit
   // jamais voir une app « neuve » alors que ses données sont peut-être intactes et récupérables.
@@ -212,17 +467,21 @@ export default function App() {
         brut={chargement.brut}
         detail={chargement.detail}
         sauvegarde={chargement.sauvegarde}
+        // `setDonneesBrut` et non `setDonnees` : ces deux gestes ont DÉJÀ écrit dans le navigateur
+        // (`restaurerSauvegarde`, `reinitialiserDonnees`) et sont explicitement décidés par
+        // l'utilisateur. Les faire passer par le verrou refuserait de mettre à jour l'affichage après
+        // une écriture pourtant réussie — l'écran resterait bloqué sans raison compréhensible.
         onRestaurer={() => {
           const restaurees = chargement.sauvegarde;
           if (!restaurees) return;
           restaurerSauvegarde(restaurees).then(() => {
-            setDonnees(restaurees);
+            setDonneesBrut(restaurees);
             setChargement({ statut: "ok", donnees: restaurees });
           });
         }}
         onRepartirDeZero={() => {
           reinitialiserDonnees().then((vides) => {
-            setDonnees(vides);
+            setDonneesBrut(vides);
             setChargement({ statut: "ok", donnees: vides });
           });
         }}
@@ -232,6 +491,31 @@ export default function App() {
 
   if (!donnees) {
     return <div className="min-h-screen flex items-center justify-center text-muted">Chargement…</div>;
+  }
+
+  // Second écran bloquant, pour la même raison que le premier : personne ne doit pouvoir saisir un
+  // contrat pendant qu'une question sur la version à conserver est en suspens — la réponse déterminera
+  // quelle version survit. Placé APRÈS le test `!donnees` : sans état local lu, il n'y aurait rien à
+  // comparer ni à proposer.
+  if (etatBascule.statut === "decision") {
+    const bascule = etatBascule.bascule;
+    return (
+      <DecisionServeur
+        bascule={bascule}
+        local={donnees}
+        enCours={decisionEnCours}
+        erreur={echecEnregistrement}
+        onReessayer={() => setRelanceLecture((v) => v + 1)}
+        onGarderNavigateur={() => televerserNavigateur(bascule, donnees)}
+        // Le bouton « prendre le serveur » n'existe que pour une divergence — les autres genres n'ont
+        // pas de version serveur lisible à adopter. Le garde n'est donc pas défensif pour rien : il
+        // est ce qui rend le type exact, puisque `aTeleverser` ne porte aucun jeton.
+        onPrendreServeur={(donneesServeur) => {
+          if (bascule.genre !== "divergence") return;
+          adopterVersionServeur(donneesServeur, bascule.jeton);
+        }}
+      />
+    );
   }
 
   // Machinerie d'import, définie UNE fois et rendue dans les deux branches (onboarding et app
@@ -371,18 +655,8 @@ export default function App() {
     return resultat;
   }
 
-  function declencherTelechargement(nomFichier: string, contenu: string) {
-    const blob = new Blob([contenu], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = nomFichier;
-    a.click();
-    URL.revokeObjectURL(url);
-  }
-
   function exporter() {
-    declencherTelechargement(`cadence-export-${dateDuJour}.json`, exporterJSON(donnees!));
+    telechargerTexte(`cadence-export-${dateDuJour}.json`, exporterJSON(donnees!));
   }
 
   /**
@@ -397,7 +671,7 @@ export default function App() {
     if (!fichierEnAttenteImport || !donnees) return;
     setImportEnCours(true);
     try {
-      declencherTelechargement(`cadence-sauvegarde-avant-import-${dateDuJour}.json`, exporterJSON(donnees)); // (1)
+      telechargerTexte(`cadence-sauvegarde-avant-import-${dateDuJour}.json`, exporterJSON(donnees)); // (1)
       const texte = await fichierEnAttenteImport.text();
       const importees = importerJSON(texte); // (2) — lève si invalide, rien n'est écrit
       setDonnees(importees); // (3)
@@ -429,6 +703,16 @@ export default function App() {
           quarantaine sur clic explicite. Non refermable : tant qu'il est là, ce que l'utilisateur
           saisit n'est PAS enregistré. Détail des choix dans components/BandeauStockagePlein.tsx. */}
       {erreurSauvegarde !== null && <BandeauStockagePlein erreur={erreurSauvegarde} onExporter={exporter} />}
+      {/* Phase 5 : le serveur ne répond pas (pause du palier gratuit, réseau, jeton expiré). En
+          PREMIER, avant tout le reste : c'est le bandeau qui conditionne la lecture de tous les
+          chiffres affichés en dessous — ils viennent de la copie locale et peuvent être en retard. */}
+      {etatBascule.statut === "lectureSeule" && (
+        <BandeauLectureSeule message={etatBascule.message} onExporter={exporter} onReessayer={() => setRelanceLecture((v) => v + 1)} />
+      )}
+      {/* L'écriture serveur a échoué alors que l'app fonctionne : la saisie est dans ce navigateur mais
+          pas à l'endroit qui fait référence. Visible partout, et pas seulement dans l'onglet « Mon
+          profil » — la section « Compte » est trop peu trouvable pour porter seule cette information. */}
+      {echecEnregistrement !== null && etatBascule.statut === "active" && <BandeauEchecEnregistrement message={echecEnregistrement} onExporter={exporter} />}
       {/* Contrat refusé parce qu'il couvre deux mois civils (cf. lib/contratUnSeulMois.ts). Même motif
           que le bandeau de sauvegarde ci-dessus, mais surtout PAS le même texte : ce sont deux échecs
           de nature différente, et les confondre dirait à l'utilisateur une raison fausse (le devoir
@@ -636,7 +920,7 @@ export default function App() {
             periodes={donnees.periodes}
             onAjouterPeriode={ajouterPeriode}
             onSupprimerPeriode={supprimerPeriode}
-            etatMiroir={etatMiroir}
+            etatEnregistrement={etatEnregistrement}
             donnees={donnees}
           />
         )}

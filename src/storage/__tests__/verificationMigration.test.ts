@@ -6,7 +6,7 @@
 //  3. que ce module ne fasse RIEN d'autre que lire — pas d'écriture, ni serveur ni locale.
 import { describe, expect, it, vi } from "vitest";
 import { SCHEMA_VERSION_DONNEES, creerDonneesVides, type DonneesApp } from "../localStorageAdapter";
-import { TABLE_DONNEES } from "../miroirSupabase";
+import { TABLE_DONNEES } from "../sourceSupabase";
 import { canoniser, decompter, lireLigneServeur, listerDifferences, texteCanonique, verifierMigration } from "../verificationMigration";
 import type { ClientLectureDonnees } from "../../auth/supabaseClient";
 

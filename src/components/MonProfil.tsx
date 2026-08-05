@@ -12,7 +12,7 @@ import { PeriodeForm } from "./PeriodeForm";
 import { PeriodeList } from "./PeriodeList";
 import { DocumentsUtiles } from "./DocumentsUtiles";
 import { Compte } from "./Compte";
-import type { EtatMiroir } from "../storage/miroirSupabase";
+import type { EtatEnregistrement } from "../storage/sourceSupabase";
 import type { DonneesApp } from "../storage/localStorageAdapter";
 import { RenouvellementAnticipe } from "./RenouvellementAnticipe";
 import { DateNaissanceInput } from "./DateNaissanceInput";
@@ -28,7 +28,7 @@ interface MonProfilProps {
   onAjouterPeriode: (periode: Omit<PeriodeAssimilee, "id">) => void;
   onSupprimerPeriode: (id: string) => void;
   /** État de la copie vers Supabase (phase 3). Calculé dans App, affiché par la section Compte. */
-  etatMiroir?: EtatMiroir;
+  etatEnregistrement?: EtatEnregistrement;
   /**
    * Phase 4 : l'état local COMPLET, pour la vérification chiffrée de la section Compte.
    * Transmis en entier (et non reconstruit ici à partir de `profil`/`contrats`/`periodes`) parce que
@@ -38,7 +38,7 @@ interface MonProfilProps {
   donnees?: DonneesApp | null;
 }
 
-export function MonProfil({ dateDuJour, profil, onModifierProfil, contrats, periodes, onAjouterPeriode, onSupprimerPeriode, etatMiroir, donnees }: MonProfilProps) {
+export function MonProfil({ dateDuJour, profil, onModifierProfil, contrats, periodes, onAjouterPeriode, onSupprimerPeriode, etatEnregistrement, donnees }: MonProfilProps) {
   const [formPeriodeOuvert, setFormPeriodeOuvert] = useState(false);
   // Compté depuis la dernière VÉRIFICATION des constantes, pas depuis l'entrée en vigueur du SMIC
   // (point 14). Purement informatif : aucun seuil ne lui est appliqué, il ne déclenche rien.
@@ -284,7 +284,7 @@ export function MonProfil({ dateDuJour, profil, onModifierProfil, contrats, peri
       {/* Phase 2 de la refonte Supabase. Volontairement posé ici, dans un onglet qu'on visite, et non
           dans la barre du haut : la connexion est facultative et ne sert encore à rien, un appel à
           l'action permanent laisserait croire qu'il faut se connecter pour utiliser Cadence. */}
-      <Compte etatMiroir={etatMiroir} donnees={donnees} />
+      <Compte etatEnregistrement={etatEnregistrement} donnees={donnees} />
 
       <section>
         <h2 className="font-display text-lg font-medium mb-2">Périmètre du MVP</h2>

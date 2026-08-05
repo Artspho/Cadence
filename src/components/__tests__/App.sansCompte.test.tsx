@@ -72,8 +72,11 @@ describe("App sans compte — la promesse de la phase 2", () => {
 
     expect(await screen.findByRole("heading", { name: "Compte" })).toBeInTheDocument();
     expect(screen.getByText(/n'est pas configurée/i)).toBeInTheDocument();
-    // Elle dit aussi qu'elle est facultative : c'est ce qui empêche de croire qu'il faut un compte.
-    expect(screen.getByText(/Cadence fonctionne sans compte/i)).toBeInTheDocument();
+    // Elle dit aussi que le compte est facultatif : c'est ce qui empêche de croire qu'il en faut un.
+    // Formulation reprise à la bascule du 05/08/2026 (« se connecter ne déplace aucune donnée » était
+    // devenu faux), mais la promesse vérifiée ici est la même — et elle reste vraie tant que la
+    // connexion obligatoire n'est pas installée.
+    expect(screen.getByText(/Sans compte, Cadence fonctionne/i)).toBeInTheDocument();
   });
 
   it("le reste de l'onglet Mon profil fonctionne toujours (la section s'ajoute, elle ne remplace rien)", async () => {

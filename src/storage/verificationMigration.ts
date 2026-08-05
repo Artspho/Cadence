@@ -1,6 +1,6 @@
 import type { ClientLectureDonnees } from "../auth/supabaseClient";
 import { SCHEMA_VERSION_DONNEES, type DonneesApp } from "./localStorageAdapter";
-import { TABLE_DONNEES } from "./miroirSupabase";
+import { TABLE_DONNEES } from "./sourceSupabase";
 
 /**
  * PHASE 4 DE LA REFONTE SUPABASE — LIRE POUR COMPARER, ET POUR RIEN D'AUTRE.

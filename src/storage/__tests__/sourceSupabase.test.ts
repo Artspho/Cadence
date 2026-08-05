@@ -14,8 +14,7 @@
 //     fabriquer une protection qui n'en est pas une.
 import { describe, expect, it, vi } from "vitest";
 import { SCHEMA_VERSION_DONNEES, creerDonneesVides, exporterJSON, importerJSON, type DonneesApp } from "../localStorageAdapter";
-import { TABLE_DONNEES } from "../miroirSupabase";
-import { ecrireEtatServeur, lireEtatServeur } from "../sourceSupabase";
+import { TABLE_DONNEES, ecrireEtatServeur, lireEtatServeur } from "../sourceSupabase";
 import type { ClientSourceDonnees, ErreurPostgrest } from "../../auth/supabaseClient";
 import { contrat, profil } from "../../engine/__tests__/testUtils";
 
@@ -146,7 +145,15 @@ describe("lireEtatServeur — ce que le serveur a le droit de dire", () => {
     // n'y a qu'un changement de format.
     const faux = fauxClient({ lecture: { data: { donnees: CONTENU_REFUSE_PAR_LE_SCHEMA, version_schema: 999, maj_le: JETON }, error: null } });
 
-    expect(await lireEtatServeur(faux.client, UTILISATEUR)).toEqual({ statut: "versionInattendue", attendue: SCHEMA_VERSION_DONNEES, recue: 999, jeton: JETON });
+    // `brut` est rapporté même ici : sans lui, l'écran ne pourrait proposer d'écraser ce contenu
+    // qu'à l'aveugle, sans permettre de le sauvegarder d'abord (devoir n°1).
+    expect(await lireEtatServeur(faux.client, UTILISATEUR)).toEqual({
+      statut: "versionInattendue",
+      attendue: SCHEMA_VERSION_DONNEES,
+      recue: 999,
+      jeton: JETON,
+      brut: CONTENU_REFUSE_PAR_LE_SCHEMA,
+    });
   });
 
   it("un profil bien formé mais INCOHÉRENT est accepté à la lecture — le schéma d'écriture, lui, le refuse", async () => {

@@ -1,6 +1,5 @@
 import type { ClientSourceDonnees, ErreurPostgrest } from "../auth/supabaseClient";
 import { SCHEMA_VERSION_DONNEES, validerDonneesLues, type DonneesApp } from "./localStorageAdapter";
-import { decrireAppareil, TABLE_DONNEES } from "./miroirSupabase";
 
 /**
  * PHASE 5 DE LA REFONTE SUPABASE — LE SERVEUR DEVIENT LA SOURCE DE VÉRITÉ.
@@ -36,6 +35,21 @@ import { decrireAppareil, TABLE_DONNEES } from "./miroirSupabase";
  *    statut `ecritJetonPerdu`, qui dit les deux choses à la fois.
  */
 
+export const TABLE_DONNEES = "donnees_utilisateur";
+
+/**
+ * Description courte de l'appareil, pour la colonne `maj_par_appareil`.
+ *
+ * ⚠️ Purement informatif, comme le dit le schéma SQL : « quel appareil a écrit en dernier », jamais
+ * une clé de décision — ce serait sinon un second endroit où la vérité pourrait mentir. Le verrou,
+ * lui, repose sur `maj_le`, tenu par le serveur. Utile précisément parce que la confusion entre
+ * appareils et entre URLs est ce qui a déjà coûté ses contrats à Benoît une fois.
+ */
+export function decrireAppareil(): string | null {
+  if (typeof navigator === "undefined" || typeof navigator.userAgent !== "string") return null;
+  return navigator.userAgent.slice(0, 200);
+}
+
 /**
  * La version de la ligne serveur, telle que le serveur l'a rendue — jamais fabriquée ici.
  *
@@ -51,8 +65,12 @@ export type EtatServeur =
   | { statut: "lu"; donnees: DonneesApp; jeton: Jeton; brut: unknown }
   /** Ligne présente, contenu refusé par le schéma. **Écriture interdite** (règle n°2). */
   | { statut: "illisible"; detail: string; brut: unknown; jeton: Jeton }
-  /** Ligne écrite sous une autre version de schéma : ni lisible, ni écrasable sans décision. */
-  | { statut: "versionInattendue"; attendue: number; recue: unknown; jeton: Jeton }
+  /**
+   * Ligne écrite sous une autre version de schéma : ni lisible, ni écrasable sans décision.
+   * `brut` est rapporté ici AUSSI, et ce n'est pas du zèle : sans lui, l'écran ne pourrait proposer
+   * d'écraser ce contenu qu'à l'aveugle, sans permettre de le sauvegarder d'abord (devoir n°1).
+   */
+  | { statut: "versionInattendue"; attendue: number; recue: unknown; jeton: Jeton; brut: unknown }
   /** Aucune ligne : rien n'a encore été téléversé. Cas normal, pas une erreur. */
   | { statut: "absente" }
   /** Serveur injoignable, en pause, jeton expiré, ou `maj_le` inexploitable. Rien n'est su. */
@@ -116,12 +134,13 @@ export async function lireEtatServeur(client: ClientSourceDonnees, utilisateurId
     const jeton = extraireJeton(data);
     if (jeton === null) return { statut: "echec", message: MESSAGE_JETON_ABSENT };
 
+    const brut = data.donnees;
+
     const versionSchema = data.version_schema;
     if (versionSchema !== SCHEMA_VERSION_DONNEES) {
-      return { statut: "versionInattendue", attendue: SCHEMA_VERSION_DONNEES, recue: versionSchema, jeton };
+      return { statut: "versionInattendue", attendue: SCHEMA_VERSION_DONNEES, recue: versionSchema, jeton, brut };
     }
 
-    const brut = data.donnees;
     const validation = validerDonneesLues(brut);
     if (!validation.ok) return { statut: "illisible", detail: validation.detail, brut, jeton };
 
@@ -185,6 +204,27 @@ export async function ecrireEtatServeur(
     return { statut: "echec", message: messageDe(incident) };
   }
 }
+
+/**
+ * L'état du dernier enregistrement, tel que l'interface a le DROIT de l'affirmer.
+ *
+ * Remplace `EtatMiroir` (phase 3), et ce n'est pas qu'un renommage : les textes que ce type gouverne
+ * étaient devenus faux. Tant que le `localStorage` était la référence, un échec de copie serveur
+ * était bénin — « tes données sont enregistrées dans ce navigateur, comme d'habitude » était vrai, et
+ * ne pas alarmer était la bonne conduite. Depuis la bascule, un échec signifie que la saisie N'EST
+ * PAS à l'endroit qui fait référence. Le même écran doit donc dire l'inverse de ce qu'il disait, et
+ * un type distinct force à reprendre chaque formulation au lieu d'en hériter.
+ */
+export type EtatEnregistrement =
+  /** Pas de configuration, ou pas de compte : rien à dire, et rien à afficher. */
+  | { statut: "inactif" }
+  | { statut: "encours" }
+  /** Confirmé par le serveur, à cet horodatage-là — jamais une date d'écriture supposée. */
+  | { statut: "enregistre"; horodatage: string }
+  /** L'écriture serveur a échoué : la saisie n'est PAS à l'endroit qui fait référence. */
+  | { statut: "echec"; message: string }
+  /** Serveur muet : consultation possible, aucune écriture. */
+  | { statut: "lectureSeule"; message: string };
 
 /** Le type est réexporté pour que les appelants n'aient pas à connaître `auth/supabaseClient`. */
 export type { ClientSourceDonnees, ErreurPostgrest };

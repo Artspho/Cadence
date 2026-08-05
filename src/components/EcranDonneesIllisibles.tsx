@@ -12,6 +12,7 @@
 //   3. repartir de zéro (irréversible) — gaté par une case à cocher décochée par défaut.
 import { useState } from "react";
 import type { DonneesApp } from "../storage/localStorageAdapter";
+import { horodatagePourNomFichier, telechargerTexte } from "../lib/telechargement";
 
 interface EcranDonneesIllisiblesProps {
   brut: string | null;
@@ -22,14 +23,7 @@ interface EcranDonneesIllisiblesProps {
 }
 
 function telechargerBrut(brut: string) {
-  // Nom horodaté : deux tentatives de sauvegarde ne s'écrasent pas dans le dossier de téléchargement.
-  const horodatage = new Date().toISOString().replace(/[:.]/g, "-");
-  const url = URL.createObjectURL(new Blob([brut], { type: "application/json" }));
-  const lien = document.createElement("a");
-  lien.href = url;
-  lien.download = `cadence-donnees-illisibles-${horodatage}.json`;
-  lien.click();
-  URL.revokeObjectURL(url);
+  telechargerTexte(`cadence-donnees-illisibles-${horodatagePourNomFichier()}.json`, brut);
 }
 
 export function EcranDonneesIllisibles({ brut, detail, sauvegarde, onRestaurer, onRepartirDeZero }: EcranDonneesIllisiblesProps) {

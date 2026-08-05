@@ -209,43 +209,68 @@ describe("Compte — retour d'un lien de connexion qui n'a pas ouvert de session
   });
 });
 
-describe("Compte — le témoin de la copie serveur (phase 3)", () => {
-  function connecte(etatMiroir: Parameters<typeof Compte>[0]["etatMiroir"]) {
+// ⚠️ CE BLOC A ÉTÉ RÉÉCRIT À LA BASCULE (05/08/2026), ET SES ATTENTES SONT VOLONTAIREMENT INVERSÉES.
+//
+// En phase 3, ces tests exigeaient qu'un échec de copie serveur NE PARAISSE PAS grave : l'écriture
+// locale — la seule qui faisait référence — avait réussi, donc « rien n'est perdu » était vrai, et
+// alarmer aurait été une fausse alerte. Ils vérifiaient même l'absence de `role="alert"`.
+//
+// Depuis la bascule, la même situation signifie que la saisie n'est PAS à l'endroit qui fait
+// référence. Les anciennes attentes sont devenues l'exact contraire de ce qu'il faut protéger : elles
+// verrouillaient un message rassurant devenu faux. D'où l'inversion — ce n'est pas un test « corrigé
+// pour passer », c'est la règle qui a changé, et c'est le devoir n°2 qui l'impose.
+describe("Compte — le témoin de l'enregistrement serveur (phase 5)", () => {
+  function connecte(etatEnregistrement: Parameters<typeof Compte>[0]["etatEnregistrement"]) {
     const client = fauxClient({ getSession: vi.fn(async () => ({ data: { session: SESSION }, error: null })) });
-    render(<Compte client={client} origine={ORIGINE} etatMiroir={etatMiroir} />);
+    render(<Compte client={client} origine={ORIGINE} etatEnregistrement={etatEnregistrement} />);
   }
+
+  // ⚠️ Les motifs ci-dessous visent les phrases PROPRES au témoin, et non un mot isolé comme
+  // « enregistr… » : le texte d'introduction de la section parle lui aussi d'enregistrement depuis la
+  // bascule, et un motif trop large y répondrait — le test passerait ou échouerait pour une raison
+  // qui n'a rien à voir avec ce qu'il prétend vérifier.
+  const PHRASES_DU_TEMOIN = /Enregistré sur le serveur à|Enregistrement sur le serveur…|a échoué|Lecture seule/i;
 
   it("ne dit rien quand il n'y a rien à dire", async () => {
     connecte({ statut: "inactif" });
     await screen.findByText("benoit@example.com");
-    expect(screen.queryByText(/copie/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(PHRASES_DU_TEMOIN)).not.toBeInTheDocument();
   });
 
-  it("date la CONFIRMATION de la copie, sans promettre la sécurité des données", async () => {
-    // Le faux message à ne jamais écrire : « tes données sont en sécurité sur le serveur ». La source
-    // de vérité reste le navigateur jusqu'à la phase 5, et le témoin doit le redire.
-    connecte({ statut: "copie", horodatage: "2026-08-04T18:55:00.000Z" });
-    expect(await screen.findByText(/Copie sur le serveur confirmée à/i)).toBeInTheDocument();
-    expect(screen.getByText(/Ce navigateur reste la référence/i)).toBeInTheDocument();
+  it("date la CONFIRMATION rendue par le serveur, sans promettre la sécurité des données", async () => {
+    // Le faux message à ne jamais écrire, avant comme après la bascule : « tes données sont en
+    // sécurité sur le serveur ». Un enregistrement confirmé n'est pas une garantie de sécurité.
+    connecte({ statut: "enregistre", horodatage: "2026-08-04T18:55:00.000Z" });
+    expect(await screen.findByText(/Enregistré sur le serveur à/i)).toBeInTheDocument();
     expect(screen.queryByText(/en sécurité/i)).not.toBeInTheDocument();
+    // Et surtout plus « Ce navigateur reste la référence » : c'est le serveur, désormais.
+    expect(screen.queryByText(/ce navigateur reste la référence/i)).not.toBeInTheDocument();
   });
 
-  it("annonce l'échec SANS laisser croire à une perte de données", async () => {
-    // L'écriture locale a réussi : présenter l'échec de la copie comme un incident de données serait
-    // une fausse alerte, et une fausse alerte finit par faire ignorer les vraies.
+  it("un échec dit que la saisie n'est PAS sur le serveur — et ne rassure plus", async () => {
     connecte({ statut: "echec", message: "TypeError: Failed to fetch" });
-    expect(await screen.findByText(/rien n'est perdu/i)).toBeInTheDocument();
+    // Motif sans le mot « pas » : il est dans un <strong>, donc découpé sur plusieurs nœuds de texte —
+    // un motif qui l'enjambe ne trouverait rien, quel que soit l'affichage réel.
+    expect(await screen.findByText(/L'enregistrement sur le serveur a échoué/i)).toBeInTheDocument();
     expect(screen.getByText(/TypeError: Failed to fetch/)).toBeInTheDocument();
-    // Et ce n'est PAS une alerte au sens accessible : le seul `role="alert"` de cette section est
-    // réservé aux échecs d'action de l'utilisateur.
-    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    // Et le fond du message : c'est le serveur qui fait référence, donc ne pas s'y fier ailleurs.
+    expect(screen.getByText(/Ne compte pas dessus depuis un autre appareil/i)).toBeInTheDocument();
+    // L'ancienne formule est désormais interdite ici : elle laisserait croire que la situation est
+    // sans conséquence alors que la référence, elle, ignore cette saisie.
+    expect(screen.queryByText(/rien n'est perdu/i)).not.toBeInTheDocument();
+  });
+
+  it("serveur muet : annonce la lecture seule et qu'une saisie ne serait pas conservée", async () => {
+    connecte({ statut: "lectureSeule", message: "paused" });
+    expect(await screen.findByText(/lecture seule/i)).toBeInTheDocument();
+    expect(screen.getByText(/ne serait conservé/i)).toBeInTheDocument();
   });
 
   it("le témoin n'apparaît jamais quand personne n'est connecté", async () => {
-    // Même si App transmettait un état par erreur, une section déconnectée ne parle pas de copie.
-    render(<Compte client={fauxClient()} origine={ORIGINE} etatMiroir={{ statut: "echec", message: "peu importe" }} />);
+    // Même si App transmettait un état par erreur, une section déconnectée n'en parle pas.
+    render(<Compte client={fauxClient()} origine={ORIGINE} etatEnregistrement={{ statut: "echec", message: "peu importe" }} />);
     await screen.findByLabelText(/adresse e-mail/i);
-    expect(screen.queryByText(/copie/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(PHRASES_DU_TEMOIN)).not.toBeInTheDocument();
     expect(screen.queryByText(/peu importe/)).not.toBeInTheDocument();
   });
 });

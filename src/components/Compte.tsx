@@ -1,20 +1,22 @@
 /**
- * Section « Compte » de l'onglet Mon profil — phase 2 de la refonte Supabase.
+ * Section « Compte » de l'onglet Mon profil — phase 2, reprise à la BASCULE de la phase 5.
  *
- * CE QUE CETTE SECTION NE FAIT PAS, ET C'EST VOLONTAIRE : elle ne conditionne RIEN. Aucun onglet,
- * aucun bouton, aucun écran de Cadence ne dépend de l'état affiché ici. Se connecter ne déplace
- * aucune donnée : les contrats, les frais réels et le profil restent dans ce navigateur jusqu'à la
- * bascule de la phase 5. C'est écrit à l'écran, parce qu'une section « Compte » laisse
- * spontanément croire le contraire — et laisser croire que les données sont « en sécurité sur le
- * serveur » alors qu'elles n'y sont pas serait exactement le genre de fausse affirmation que ce
- * projet s'interdit.
+ * ⚠️ CE QUE CETTE SECTION DISAIT JUSQU'AU 05/08/2026, ET QUI EST DEVENU FAUX : « se connecter ne
+ * déplace aucune donnée ». C'était exact tant que Supabase ne recevait qu'une copie. Depuis la
+ * bascule, se connecter change la source de vérité — le serveur est lu à l'ouverture et écrit à
+ * chaque enregistrement. Laisser l'ancienne phrase aurait été plus grave qu'une imprécision : elle
+ * invitait à se connecter en croyant que c'était sans conséquence.
+ *
+ * Ce qui reste vrai, et qui est dit tel quel : **sans compte, Cadence fonctionne toujours sur ce seul
+ * navigateur.** Les frais réels et l'identité déclarative, eux, ne partent toujours PAS sur le serveur
+ * (stockages séparés) — dette ouverte, à traiter avant la phase 6.
  */
 
 import { useState } from "react";
 import { obtenirClientAuth, obtenirClientLectureDonnees, type ClientAuth, type ClientLectureDonnees } from "../auth/supabaseClient";
 import { useSession } from "../auth/session";
 import { INDICE_RETOUR_LIEN, type IndiceRetourLien } from "../auth/retourLienMagique";
-import type { EtatMiroir } from "../storage/miroirSupabase";
+import type { EtatEnregistrement } from "../storage/sourceSupabase";
 import type { DonneesApp } from "../storage/localStorageAdapter";
 import { VerificationServeur } from "./VerificationServeur";
 import { LONGUEUR_MINIMALE_MOT_DE_PASSE, connexionMotDePasse, creerCompte, demanderLienMagique, seDeconnecter } from "../auth/actions";
@@ -26,8 +28,8 @@ interface CompteProps {
   origine?: string;
   /** Injecté par les tests ; par défaut, l'indice capturé au chargement de la page. */
   indiceRetour?: IndiceRetourLien;
-  /** État de la copie vers Supabase (phase 3), calculé dans App. */
-  etatMiroir?: EtatMiroir;
+  /** État du dernier enregistrement sur le serveur (phase 5), calculé dans App. */
+  etatEnregistrement?: EtatEnregistrement;
   /** Phase 4 : les données de CE navigateur, pour les comparer à la copie serveur. Jamais écrites. */
   donnees?: DonneesApp | null;
   /** Phase 4 : la surface de lecture. Injectée par les tests ; par défaut celle de l'app. */
@@ -35,38 +37,56 @@ interface CompteProps {
 }
 
 /**
- * Le témoin de la copie serveur. Discret par construction, et jamais une alerte.
+ * Le témoin de l'enregistrement serveur.
  *
- * POURQUOI IL N'ALARME PAS, MÊME EN CAS D'ÉCHEC : l'écriture locale, elle, a réussi. Rien n'est
- * perdu. Crier au feu ici serait une fausse alerte, et une fausse alerte finit par faire ignorer les
- * vraies.
- * POURQUOI IL EXISTE QUAND MÊME : sans lui, un utilisateur connecté croirait ses données « sur le
- * serveur » alors qu'aucune copie n'a jamais abouti. C'est cette croyance-là qui coûte des données.
+ * ⚠️ SES FORMULATIONS ONT ÉTÉ REPRISES À LA BASCULE (05/08/2026), ET IL FAUT COMPRENDRE POURQUOI
+ * AVANT D'Y RETOUCHER. En phase 3, ce témoin était volontairement discret et ne s'alarmait jamais :
+ * un échec de copie était bénin, puisque l'écriture locale — la seule qui faisait référence — avait
+ * réussi. Il disait donc « tes données sont enregistrées dans ce navigateur, comme d'habitude », et
+ * c'était vrai.
+ *
+ * Depuis la bascule, la même situation a changé de sens : un échec signifie que la saisie n'est PAS
+ * à l'endroit qui fait référence. Continuer à rassurer serait un faux feu vert (devoir n°2), et
+ * précisément le genre de croyance qui coûte des données. D'où un ton différent selon les cas : muet
+ * quand tout va bien, explicite quand ça ne va pas.
  */
-function TemoinMiroir({ etat }: { etat: EtatMiroir }) {
+function TemoinEnregistrement({ etat }: { etat: EtatEnregistrement }) {
   if (etat.statut === "inactif") return null;
 
   if (etat.statut === "encours") {
     return (
       <p className="text-xs text-faint" aria-live="polite">
-        Copie vers le serveur en cours…
+        Enregistrement sur le serveur…
       </p>
     );
   }
 
-  if (etat.statut === "copie") {
-    // Formulation exacte : on date la CONFIRMATION de la copie, on ne dit pas « tes données sont en
-    // sécurité » — la source de vérité reste ce navigateur jusqu'à la phase 5.
+  if (etat.statut === "enregistre") {
+    // On date la CONFIRMATION rendue par le serveur, jamais une heure d'écriture supposée.
     return (
       <p className="text-xs text-faint" aria-live="polite">
-        Copie sur le serveur confirmée à {new Date(etat.horodatage).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}. Ce navigateur reste la référence.
+        Enregistré sur le serveur à {new Date(etat.horodatage).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}.
       </p>
+    );
+  }
+
+  if (etat.statut === "lectureSeule") {
+    return (
+      <div className="text-xs leading-relaxed" aria-live="polite">
+        <p className="text-amber">Lecture seule : le serveur ne répond pas. Rien de ce que tu saisirais ne serait conservé.</p>
+        <p className="text-faint mt-0.5">Détail : {etat.message}</p>
+      </div>
     );
   }
 
   return (
     <div className="text-xs leading-relaxed" aria-live="polite">
-      <p className="text-amber">La copie vers le serveur a échoué. Tes données sont enregistrées dans ce navigateur, comme d'habitude — rien n'est perdu.</p>
+      {/* Formulation retournée par rapport à la phase 3, et c'est le cœur du changement : ce n'est
+          plus « rien n'est perdu », c'est « ce n'est pas au bon endroit ». */}
+      <p className="text-red">
+        L'enregistrement sur le serveur a échoué. Ta dernière saisie est dans ce navigateur, mais elle n'est <strong className="font-medium">pas</strong> sur le serveur — et c'est le
+        serveur qui fait référence. Ne compte pas dessus depuis un autre appareil.
+      </p>
       <p className="text-faint mt-0.5">Détail : {etat.message}</p>
     </div>
   );
@@ -83,7 +103,8 @@ function Cadre({ children }: { children: React.ReactNode }) {
       <div className="px-4 pt-4 pb-3">
         <h4 className="font-display text-sm font-medium tracking-tight">Compte</h4>
         <p className="text-xs text-faint leading-relaxed mt-1">
-          Nouveau, et facultatif. Cadence fonctionne sans compte : se connecter ne déplace aucune donnée pour le moment.
+          Une fois connecté, c'est le serveur qui fait référence : tes contrats y sont enregistrés, et relus à chaque ouverture. Sans compte, Cadence fonctionne sur ce seul navigateur.
+          Tes justificatifs de frais réels, eux, restent dans ce navigateur dans les deux cas.
         </p>
       </div>
       <div className="border-t border-line px-4 py-4 space-y-3 text-sm">{children}</div>
@@ -95,7 +116,7 @@ export function Compte({
   client = obtenirClientAuth(),
   origine,
   indiceRetour = INDICE_RETOUR_LIEN,
-  etatMiroir = { statut: "inactif" },
+  etatEnregistrement = { statut: "inactif" },
   donnees = null,
   clientLecture = obtenirClientLectureDonnees(),
 }: CompteProps) {
@@ -176,7 +197,7 @@ export function Compte({
           Tes contrats et ton profil sont recopiés sur le serveur à chaque enregistrement. Tes frais réels, eux, ne le sont pas encore. Et dans tous les cas, c'est ce navigateur qui reste la
           référence : le basculement viendra plus tard, et il te sera demandé explicitement.
         </p>
-        <TemoinMiroir etat={etatMiroir} />
+        <TemoinEnregistrement etat={etatEnregistrement} />
         <VerificationServeur client={clientLecture} utilisateurId={etat.utilisateurId} donnees={donnees} />
         <button type="button" onClick={() => lancer(seDeconnecter)} disabled={enCours} className="px-4 py-2 rounded-lg border border-line text-muted disabled:opacity-40">
           {enCours ? "…" : "Se déconnecter"}

@@ -48,33 +48,25 @@ export interface ErreurAuth {
 }
 
 /**
- * La surface de DONNÉES dont la phase 3 a besoin : écrire une ligne, et rien de plus.
+ * ⚠️ `ClientDonnees` (phase 3) A ÉTÉ SUPPRIMÉ À LA PHASE 5, LE 05/08/2026 — ne pas le rétablir.
  *
- * Volontairement dépourvue de toute méthode de LECTURE, et ce n'est pas une économie de frappe :
- * jusqu'à la phase 4, Cadence ne doit pas pouvoir lire Supabase, parce qu'une donnée serveur qui
- * écraserait la saisie locale serait une perte de données (devoir n°1). L'interdiction est donc
- * inscrite dans le type, pas seulement dans une intention — on ne peut pas appeler `select` par
- * distraction, il n'existe pas ici.
+ * Il n'exposait qu'un `upsert`, ce qui était exactement ce qu'il fallait quand Supabase ne recevait
+ * qu'une copie : écrire sans condition, sans jamais pouvoir lire. Depuis la bascule, c'est devenu la
+ * pire surface possible. Un `upsert` REMPLACE la ligne sans regarder ce qu'elle contient — il aurait
+ * donc contourné le verrou de `ClientSourceDonnees` et rendu possible l'écrasement entre appareils
+ * que toute la phase 5 installe pour empêcher.
+ *
+ * Le supprimer plutôt que le laisser dormant est délibéré : un module capable d'écrire sans condition,
+ * même inutilisé, finit par être rappelé — y compris par une session future de bon aloi qui le
+ * croirait toujours d'actualité. Toute écriture passe désormais par `ecrireEtatServeur`.
  */
-export interface ClientDonnees {
-  from(table: string): {
-    upsert(ligne: Record<string, unknown>): PromiseLike<{ error: ErreurAuth | null }>;
-  };
-}
 
 /**
- * La surface de LECTURE, introduite par la PHASE 4 — et volontairement SÉPARÉE de `ClientDonnees`.
+ * La surface de LECTURE SEULE, introduite par la PHASE 4 pour le panneau de vérification chiffrée.
  *
- * POURQUOI UN SECOND TYPE PLUTÔT QU'UN `select` AJOUTÉ AU PREMIER. Le miroir de la phase 3 ne doit
- * toujours pas pouvoir lire : sa règle n°1 (« écriture seule ») reste vraie après la phase 4, parce
- * qu'une donnée serveur qui écraserait la saisie locale resterait une perte de données. Ajouter
- * `select` à `ClientDonnees` aurait discrètement levé cette interdiction pour du code déjà écrit.
- * Ici, seul ce qui demande explicitement `ClientLectureDonnees` peut lire — c'est-à-dire, à ce jour,
- * le seul module de vérification.
- *
- * ⚠️ CE QUE LA PHASE 4 N'AUTORISE PAS, ET QUI N'EST DONC NULLE PART DANS CE FICHIER : écrire le
- * résultat d'une lecture dans le `localStorage`. Lire sert à COMPARER, et à rien d'autre, jusqu'à la
- * bascule de la phase 5 — qui sera demandée explicitement à l'utilisateur.
+ * Conservée après la bascule, et distincte de `ClientSourceDonnees` : `VerificationServeur` compare
+ * et rend un verdict, il n'a aucune raison de pouvoir écrire. Lui donner la surface complète
+ * n'apporterait rien et ouvrirait une porte inutile.
  */
 export interface ClientLectureDonnees {
   from(table: string): {
@@ -106,10 +98,9 @@ export interface ErreurPostgrest {
 /**
  * LA SURFACE DE LA PHASE 5 — lire l'état, et l'écrire SOUS CONDITION.
  *
- * TROISIÈME type, et non un élargissement des deux précédents. `ClientDonnees` (phase 3) doit rester
- * incapable de lire et `ClientLectureDonnees` (phase 4) incapable d'écrire : ces interdictions
- * protègent du code déjà écrit, qui n'a pas été relu pour la bascule. Ajouter des méthodes à l'un ou
- * l'autre les aurait levées en silence pour lui.
+ * Type distinct, et non un élargissement de `ClientLectureDonnees` (phase 4), qui doit rester
+ * incapable d'écrire : lui ajouter des méthodes aurait levé cette interdiction en silence pour du
+ * code déjà écrit qui n'a pas été relu pour la bascule.
  *
  * ⚠️ `update` expose DEUX `eq` chaînés, et c'est le cœur du verrou : le premier filtre l'utilisateur,
  * le second exige que `maj_le` vaille encore ce qui a été lu. Une écriture qui ne peut pas nommer la
@@ -168,21 +159,20 @@ export function construireClientAuth(configuration: ConfigurationSupabase): Clie
   return construireClient(configuration)?.auth ?? null;
 }
 
-/** Les deux surfaces exposées par Cadence, issues d'UN SEUL client Supabase. */
+/** Les trois surfaces exposées par Cadence, issues d'UN SEUL client Supabase. */
 export interface ClientCadence {
   auth: ClientAuth;
-  donnees: ClientDonnees;
   /** Phase 4 : la lecture, réservée à la vérification. Cf. `ClientLectureDonnees`. */
   lecture: ClientLectureDonnees;
-  /** Phase 5 : lecture + écriture sous condition, pour la bascule. Cf. `ClientSourceDonnees`. */
+  /** Phase 5 : lecture + écriture sous condition. La SEULE surface d'écriture. Cf. `ClientSourceDonnees`. */
   source: ClientSourceDonnees;
 }
 
 /**
- * Construit le client à partir d'une configuration explicite, et n'en expose que deux surfaces
- * étroites : `auth` (phase 2) et `donnees` (phase 3, écriture seule).
+ * Construit le client à partir d'une configuration explicite, et n'en expose que des surfaces
+ * étroites : `auth` (phase 2), `lecture` (phase 4) et `source` (phase 5).
  *
- * @returns les deux surfaces, ou `null` si la configuration est absente/vide/invalide. Ne lève jamais.
+ * @returns les trois surfaces, ou `null` si la configuration est absente/vide/invalide. Ne lève jamais.
  */
 export function construireClient(configuration: ConfigurationSupabase): ClientCadence | null {
   const url = configuration.url?.trim();
@@ -209,22 +199,17 @@ export function construireClient(configuration: ConfigurationSupabase): ClientCa
         flowType: "pkce",
       },
     });
-    // `donnees` et `lecture` sont le MÊME objet, vu à travers deux types différents. Ce n'est pas
-    // une astuce : la séparation qui compte est celle des types, puisque c'est elle qui décide ce que
+    // `lecture` et `source` sont le MÊME objet, vu à travers deux types différents. Ce n'est pas une
+    // astuce : la séparation qui compte est celle des types, puisque c'est elle qui décide ce que
     // chaque module a le droit d'appeler. Un second `createClient` n'aurait rien protégé de plus et
     // aurait installé un deuxième rafraîchissement de jeton (cf. `obtenirClient`).
-    // ⚠️ L'assertion ne porte QUE sur `lecture`, et pour une raison mécanique, pas par confort :
-    // le typage générique de `select().eq().maybeSingle()` dans @supabase/supabase-js est trop
-    // profond pour que TypeScript le rapproche de notre interface étroite (TS2589). La forme réelle,
-    // elle, est exactement celle-ci — c'est le chemin d'appel documenté de la bibliothèque, et
-    // `verificationMigration.test.ts` vérifie qu'aucune autre méthode n'est sollicitée. `donnees`
-    // (upsert) reste vérifié normalement par le compilateur.
-    // `source` (phase 5) subit la même assertion que `lecture`, et pour la même raison mécanique :
-    // les chaînes `select().eq().maybeSingle()` et `update().eq().eq().select()` de
-    // @supabase/supabase-js portent un typage générique trop profond pour être rapproché de nos
-    // interfaces étroites (TS2589). La forme réelle est exactement celle décrite ; ce que l'assertion
-    // ne peut pas garantir, `sourceSupabase.test.ts` le vérifie en exerçant chaque chaîne d'appel.
-    return { auth: client.auth, donnees: client, lecture: client as unknown as ClientLectureDonnees, source: client as unknown as ClientSourceDonnees };
+    // ⚠️ LES ASSERTIONS SONT MÉCANIQUES, PAS DU CONFORT : les chaînes
+    // `select().eq().maybeSingle()` et `update().eq().eq().select()` de @supabase/supabase-js portent
+    // un typage générique trop profond pour être rapproché de nos interfaces étroites (TS2589). La
+    // forme réelle est exactement celle décrite ; ce que le compilateur ne peut pas garantir ici,
+    // `verificationMigration.test.ts` et `sourceSupabase.test.ts` le vérifient en exerçant chaque
+    // chaîne d'appel et en refusant qu'une autre méthode soit sollicitée.
+    return { auth: client.auth, lecture: client as unknown as ClientLectureDonnees, source: client as unknown as ClientSourceDonnees };
   } catch {
     // `createClient` lève sur une URL malformée. Une variable d'environnement mal recopiée ne doit
     // pas empêcher Cadence de s'ouvrir : on retombe sur « connexion non configurée ».
@@ -255,10 +240,6 @@ function obtenirClient(): ClientCadence | null {
 
 export function obtenirClientAuth(): ClientAuth | null {
   return obtenirClient()?.auth ?? null;
-}
-
-export function obtenirClientDonnees(): ClientDonnees | null {
-  return obtenirClient()?.donnees ?? null;
 }
 
 export function obtenirClientLectureDonnees(): ClientLectureDonnees | null {
