@@ -28,6 +28,14 @@ describe("mention d'envoi IA — le texte validé ne peut pas dériver", () => {
     expect(MENTION_ENVOI_IA_PHRASES[2]).toContain("la saisie manuelle reste gratuite");
     expect(MENTION_ENVOI_IA_PHRASES[2]).toContain("ne quitte jamais ton appareil");
   });
+
+  // Phase 6, commit 5 : comble une OMISSION (le document est aussi conservé sur le serveur), sans
+  // jamais prétendre que ce serait vrai sans compte — d'où le conditionnel.
+  it("dit que le document est aussi conservé sur le serveur, SOUS CONDITION d'être connecté", () => {
+    expect(MENTION_ENVOI_IA_PHRASES[3]).toContain("Si tu es connecté");
+    expect(MENTION_ENVOI_IA_PHRASES[3]).toContain("conservé sur le serveur");
+    expect(MENTION_ENVOI_IA_PHRASES[3]).toContain("Mon dossier");
+  });
 });
 
 describe("annonce du canal — ce que fait le bouton, avant même de choisir un fichier", () => {

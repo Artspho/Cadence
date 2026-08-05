@@ -55,6 +55,7 @@ export function ConsentementEnvoiIA({ nomFichier, enCours, onAnnuler, onConfirme
           <p className="text-sm text-muted leading-relaxed">{MENTION_ENVOI_IA_PHRASES[0]}</p>
           <p className="text-sm text-muted leading-relaxed">{MENTION_ENVOI_IA_PHRASES[1]}</p>
           <p className="text-sm text-muted leading-relaxed">{MENTION_ENVOI_IA_PHRASES[2]}</p>
+          <p className="text-sm text-muted leading-relaxed">{MENTION_ENVOI_IA_PHRASES[3]}</p>
         </div>
 
         <div className="flex gap-2 pt-2">

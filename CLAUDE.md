@@ -95,21 +95,34 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 
 ## État actuel
 
-> **Repère au 05/08/2026, session (8) — PHASE 5 TERMINÉE ET SA DETTE SOLDÉE.** La bascule est codée
-> et vérifiée en conditions réelles, les trois manques du commit D sont traités, et
-> `donnees_sauvegarde` est désormais alimentée (trigger + preuve, cf. plus bas). **994 tests verts**
-> (79 fichiers), `tsc -b` propre, `npm run build` propre — inchangés depuis E, cette dette ne touche
-> que du SQL et des scripts, aucun fichier `src/`.
+> **Repère au 05/08/2026, session (8, toujours en cours) — PHASE 5 TERMINÉE ET SOLDÉE, PHASE 6 EN
+> COURS (commits 1 à 4 faits, commit 5 codé et testé mais PAS ENCORE VALIDÉ PAR BENOÎT).**
+> **1037 tests verts** (85 fichiers), `tsc -b` propre, `npm run build` propre — y compris les
+> changements non commités du commit 5 (voir juste en dessous).
 >
-> ✅ **POUSSÉ jusqu'à `b44e1eb` (commit E) le 05/08/2026, sur demande explicite de Benoît dans le
-> fil.** `origin/master` a rattrapé tout le travail de la phase 5 : `57c3e22` (outillage non
-> branché) · `de188e8` (verrou prouvé contre le vrai serveur) · `57c576a` (LA BASCULE) · `4249391`
-> (trois phrases fausses corrigées) · `1e96429` (doc) · `17fb941` (commit D — Compte trouvable, mot
-> de passe, réserve PKCE) · `b44e1eb` (commit E — doc de fin de phase). ⚠️ **Le commit qui règle la
-> dette `donnees_sauvegarde` (migration 0002 + script de preuve) n'est ni commité ni poussé** — diff
-> et sortie de `verifier:sauvegarde`/`verifier:rls` en cours de revue par Benoît au moment d'écrire
-> cette ligne. Ne pas pousser sans qu'il le redemande explicitement dans le fil — c'est sa règle, cf.
-> `cadence_push_credentials` en mémoire.
+> ✅ **POUSSÉ jusqu'à `6bdf58f`** (dette `donnees_sauvegarde` soldée), sur demande explicite de
+> Benoît dans le fil. ⚠️ **`origin/master` est en retard de 5 commits, tous LOCAUX et NON POUSSÉS** —
+> `34c0ea3` (prérequis légal : mentions légales/confidentialité) · `88354b3` (commit 1 — migration
+> 0003, `type_document` étendu à 10 valeurs) · `6161af5` (commit 2 — fondation stockage, non
+> branchée, prouvée par `npm run verifier:documents` : 15/15) · `a61551e` (commit 3 — écran « Mon
+> dossier », lecture seule) · `e674266` (commit 4 — canal local `ImportBulletins.tsx` branché).
+> Ne pas pousser sans que Benoît le redemande explicitement — cf. `cadence_push_credentials`.
+>
+> 🟡 **COMMIT 5 (canal IA, `ImportDocumentIA.tsx`) : CODÉ, TESTÉ, PAS ENCORE COMMITÉ.** Benoît a
+> explicitement choisi (05/08/2026) de le revoir/commiter depuis un **autre fil** plutôt qu'ici — ne
+> pas prétendre qu'il est commité tant que `git log` ne le montre pas. Diff en attente dans l'arbre
+> de travail au moment d'écrire cette ligne : `src/components/ImportDocumentIA.tsx`,
+> `src/components/ConsentementEnvoiIA.tsx`, `src/content/mentionEnvoiIA.ts` (+ son test), nouveau
+> `src/components/__tests__/ImportDocumentIA.test.tsx`. Ce que ce commit fait : après extraction
+> réussie, si connecté, dépose le document (type traduit automatiquement pour 8 cas ; un sélecteur
+> bloquant demande le type si l'IA rend `non_reconnu`, jamais deviné) ; la modale de consentement dit
+> désormais aussi que le document est conservé (conditionnel à la session, PHRASES[3] de
+> `mentionEnvoiIA.ts`) ; un échec de conservation n'empêche jamais d'afficher les propositions
+> extraites (devoir n°1).
+>
+> **Plan complet de la phase 6, avec le détail des 8 commits (dont les 3 restants) :**
+> `C:\Users\benoi\.claude\plans\humming-wandering-kite.md` — le relire avant de continuer, il porte
+> aussi les décisions déjà tranchées avec Benoît à ne pas rouvrir (cf. section suivante).
 >
 > ✅ **Le déploiement est configuré pour de bon** : `VITE_SUPABASE_URL` et `VITE_SUPABASE_ANON_KEY`
 > existent enfin dans Vercel (Production + Preview). ⚠️ **Vite fige les `VITE_*` à la CONSTRUCTION** :
@@ -517,16 +530,37 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 > 1000 tests verts (81 fichiers), `tsc -b` propre, `npm run build` propre. Texte relu à l'écran par
 > Benoît avant validation (modale ouverte en conditions réelles, localhost:5185).
 >
-> ### ▶ PROCHAINE ACTION — la vraie fonctionnalité de la phase 6
+> ### ▶ PROCHAINE ACTION — valider le commit 5, puis enchaîner les commits 6 à 8
 >
-> Prérequis levé. Reste à construire ce que Benoît a défini le 05/08/2026 : au moment de l'import
-> d'un document, dire qu'il est stocké (RGPD) et que le « dossier intermittent » se complète ;
-> permettre de télécharger à tout moment le dossier complet (AEM, notifications, relevés, bulletins,
-> frais réels…) au même endroit. Le schéma serveur existe déjà (table `documents` + bucket
-> `justificatifs`, migration 0001) — reste l'écran et le branchement. ⚠️ **Ceci inverse une décision
-> fondatrice documentée dans `lib/documentsRequis.ts`** (« l'app ne garde AUCUNE trace des fichiers
-> déposés ») : le fichier a changé de politique par décision de Benoît, à ne pas confondre avec une
-> régression accidentelle si ce commentaire n'a pas encore été mis à jour.
+> **D'abord : montrer le diff du commit 5 à Benoît (dans le nouveau fil), attendre son « oui »,
+> committer, confirmer le hash.** Ne rien committer d'autre avant ça — c'est sa règle (revue avant
+> commit, cf. mémoire `cadence_revue_avant_commit`).
+>
+> **Ensuite, dans l'ordre du plan** (`C:\Users\benoi\.claude\plans\humming-wandering-kite.md`) :
+> - **Commit 6 — frais réels : bascule sur le canal unique + retrait complet de Drive.** Précédé
+>   d'un audit déjà fait avec Benoît (05/08/2026) : **aucune dépense réelle n'a de justificatif
+>   SEULEMENT sur Drive** (jamais exercé en vrai) — le retrait est donc sûr, sans migration de
+>   données à faire. `Depense.documentId` remplace `justificatifData`/`driveFileId`/
+>   `driveWebViewLink` en écriture (schéma de LECTURE élargi, jamais durci). Suppression complète de
+>   `lib/googleDriveAuth.ts`, `lib/googleDriveStorage.ts`, `components/fraisReels/DriveSettings.tsx`
+>   + leurs tests. Ne PAS scinder ce commit (retrait Drive / bascule) — le plan explique pourquoi.
+> - **Commit 7 — biens amortis : upload réel.** `BienAmorti.justificatifId` → `documentId`.
+>   Décision déjà validée avec Benoît (05/08/2026, avec la vraie justification cette fois — pas une
+>   supposition) : **`categorie_frais` toujours `'C7'`**, parce que « Biens amortis » dans Cadence
+>   ne sert QUE quand un bien quitte le forfait A (14 %) pour le réel — la catégorie A elle-même
+>   couvre déjà l'achat d'un instrument au forfait, sans passer par cet écran. Source :
+>   `engine/fraisReels/calculerAmortissement.ts:1` et `content/explicationsFraisReels.ts` (règle des
+>   500 € HT). `annee_fiscale` = année de `dateAchat`.
+> - **Commit 8 — documentation de fin de phase 6** (tableau des 9 phases, retirer les mentions
+>   « Drive dort », vérifier que `mentionsLegales.ts` peut enfin être poussé).
+>
+> ⚠️ **Ceci inverse une décision fondatrice documentée dans `lib/documentsRequis.ts`** (« l'app ne
+> garde AUCUNE trace des fichiers déposés ») : déjà mise à jour au commit 4, avec la même logique de
+> checklist conservée (calcul sur les DONNÉES présentes, jamais sur la présence d'un fichier stocké).
+>
+> **Signalé mais explicitement HORS PÉRIMÈTRE de cette phase 6** (à ne pas ajouter sans que Benoît
+> le redemande) : l'arbitrage 6 (case de consentement à l'inscription, horodatée et journalisée)
+> n'a jamais été construit — trouvé en creusant pour le commit 2, pas demandé cette fois.
 >
 > ⚠️ **Relancer `npm run verifier:rls` après tout changement de schéma ou de politique.** Les deux
 > comptes de test **`testa-cadence@cadence.fr`** et **`test-cadenceb@cadence.fr`** sont volontairement

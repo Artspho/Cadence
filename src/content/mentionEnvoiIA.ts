@@ -30,7 +30,13 @@
 // qui n'a pas été pris. Ne JAMAIS ajouter au texte une phrase sur la non-conservation : elle serait
 // fausse. Le texte ne promet que l'absence d'entraînement — exactement ce qui est acquis, ni plus.
 //
-// Le texte lui-même n'a pas changé depuis le 31/07/2026 : seule sa véracité a été acquise.
+// Le texte lui-même n'a pas changé depuis le 31/07/2026 jusqu'au commit 5 de la phase 6 (05/08/2026),
+// où UNE quatrième phrase a été ajoutée — PHRASES[3] — pour combler une OMISSION, pas corriger une
+// contre-vérité : jusqu'ici, rien ne disait que le document est aussi conservé sur le serveur
+// (bucket `justificatifs`) une fois lu. ⚠️ FORMULÉE AU CONDITIONNEL (« si tu es connecté ») parce que
+// le stockage exige une session réelle (RLS) — sans compte, cette phrase resterait vraie mais ne se
+// réaliserait pas, exactement comme la phrase [2] sur la saisie manuelle reste vraie qu'on l'utilise
+// ou non. Ne jamais la rendre inconditionnelle : ce serait faux pour qui utilise ce canal sans compte.
 //
 // Texte BRUT volontairement (même principe que content/contradictionHorsA10.ts) : ni balisage à
 // parser, ni fragments à recoller. L'emphase reste l'affaire du composant.
@@ -40,19 +46,21 @@
  * pouvoir se recomposer exactement en cette chaîne, sans un mot de plus ni de moins.
  */
 export const MENTION_ENVOI_IA_INTEGRALE =
-  "Import assisté par IA (Mistral) — ce document est envoyé aux serveurs de Mistral AI (France, hébergement UE) pour lecture automatique. Ces documents ne sont pas utilisés pour entraîner les modèles de Mistral. Si tu préfères l'éviter, la saisie manuelle reste gratuite et ne quitte jamais ton appareil.";
+  "Import assisté par IA (Mistral) — ce document est envoyé aux serveurs de Mistral AI (France, hébergement UE) pour lecture automatique. Ces documents ne sont pas utilisés pour entraîner les modèles de Mistral. Si tu préfères l'éviter, la saisie manuelle reste gratuite et ne quitte jamais ton appareil. Si tu es connecté, il est aussi conservé sur le serveur, dans « Mon dossier », pour que tu puisses le retrouver et le retélécharger.";
 
 /**
- * Le même texte découpé en trois phrases, pour l'aération typographique de la modale — jamais pour
+ * Le même texte découpé en quatre phrases, pour l'aération typographique de la modale — jamais pour
  * en montrer une partie seulement. La concaténation est vérifiée par test contre
  * `MENTION_ENVOI_IA_INTEGRALE` : impossible d'en perdre un morceau en chemin.
  *
- * [0] ce qui se passe · [1] la conséquence (la phrase qui coûte) · [2] l'alternative gratuite
+ * [0] ce qui se passe · [1] la conséquence (la phrase qui coûte) · [2] l'alternative gratuite ·
+ * [3] la conservation sur le serveur (phase 6, commit 5 — conditionnelle à la session)
  */
 export const MENTION_ENVOI_IA_PHRASES = [
   "Import assisté par IA (Mistral) — ce document est envoyé aux serveurs de Mistral AI (France, hébergement UE) pour lecture automatique.",
   "Ces documents ne sont pas utilisés pour entraîner les modèles de Mistral.",
   "Si tu préfères l'éviter, la saisie manuelle reste gratuite et ne quitte jamais ton appareil.",
+  "Si tu es connecté, il est aussi conservé sur le serveur, dans « Mon dossier », pour que tu puisses le retrouver et le retélécharger.",
 ] as const;
 
 /**

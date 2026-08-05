@@ -29,6 +29,10 @@ import { extraireDocumentIA } from "../lib/extraireDocumentIA";
 import { lirePdfEnBase64, validerFichierPourEnvoiIA } from "../lib/fichierImportIA";
 import { ConsentementEnvoiIA } from "./ConsentementEnvoiIA";
 import { RevueExtraction } from "./RevueExtraction";
+import { obtenirClientAuth, obtenirClientDocuments, obtenirClientFichiers, type ClientAuth, type ClientDocuments, type ClientFichiers } from "../auth/supabaseClient";
+import { useSession } from "../auth/session";
+import { deposerDocument, typeDocumentDepuisDetection } from "../storage/documentsStorage";
+import { LIBELLES_TYPE_DOCUMENT, TYPES_DOCUMENT_ORDONNES } from "../content/typeDocumentLabels";
 
 interface ImportDocumentIAProps {
   profil: Profil;
@@ -39,17 +43,76 @@ interface ImportDocumentIAProps {
   onAjouterPeriode: (periode: Omit<PeriodeAssimilee, "id">) => void;
   onModifierProfil: (profil: Profil) => ResultatEcritureProfil;
   onModifierContrat: (id: string, contrat: Omit<Contrat, "id">) => void;
+  /** Injectés par les tests ; par défaut, les clients de l'app (`null` si non configurés). */
+  clientAuth?: ClientAuth | null;
+  clientDocuments?: ClientDocuments | null;
+  clientFichiers?: ClientFichiers | null;
 }
 
 const ECHEC_INATTENDU = "L'envoi a échoué pour une raison inattendue. Réessaie, ou saisis les informations à la main.";
 
-export function ImportDocumentIA({ profil, config, decompteActuel, contrats, onAjouterContrat, onAjouterPeriode, onModifierProfil, onModifierContrat }: ImportDocumentIAProps) {
+/**
+ * Modale affichée UNIQUEMENT quand l'IA n'a rien reconnu (`non_reconnu`) chez un utilisateur
+ * connecté — devoir n°1 (ne pas jeter le fichier) contre devoir n°2 (ne jamais deviner son type).
+ * « Ne pas conserver » n'annule rien d'autre que la conservation : les propositions extraites
+ * s'affichent dans les deux cas.
+ */
+function SelecteurTypeNonReconnu({ enCours, onConserver, onIgnorer }: { enCours: boolean; onConserver: (type: (typeof TYPES_DOCUMENT_ORDONNES)[number]) => void; onIgnorer: () => void }) {
+  const [type, setType] = useState<(typeof TYPES_DOCUMENT_ORDONNES)[number]>("document_non_classe");
+  return (
+    <div className="fixed inset-0 z-50 bg-bg/80 backdrop-blur-sm flex items-center justify-center p-6" role="alertdialog" aria-modal="true" aria-labelledby="titre-type-non-reconnu">
+      <div className="bg-surface border border-line rounded-hero p-6 max-w-[480px] space-y-4">
+        <h2 id="titre-type-non-reconnu" className="font-display text-lg font-semibold tracking-tight">
+          Cadence n'a pas reconnu ce document
+        </h2>
+        <p className="text-sm text-muted leading-relaxed">Tu peux quand même le conserver sur le serveur — choisis simplement de quel type il s'agit.</p>
+        <select value={type} onChange={(e) => setType(e.target.value as (typeof TYPES_DOCUMENT_ORDONNES)[number])} className="w-full bg-surface-2 border border-line rounded-lg px-3 py-2 text-sm">
+          {TYPES_DOCUMENT_ORDONNES.map((t) => (
+            <option key={t} value={t}>
+              {LIBELLES_TYPE_DOCUMENT[t]}
+            </option>
+          ))}
+        </select>
+        <div className="flex gap-2 pt-2">
+          <button
+            onClick={() => onConserver(type)}
+            disabled={enCours}
+            className="flex-1 bg-mint text-bg font-medium rounded-lg py-2.5 disabled:opacity-40 disabled:cursor-not-allowed transition-opacity"
+          >
+            {enCours ? "Envoi…" : "Conserver sur le serveur"}
+          </button>
+          <button onClick={onIgnorer} disabled={enCours} className="px-4 rounded-lg border border-line text-muted disabled:opacity-40">
+            Ne pas conserver
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function ImportDocumentIA({
+  profil,
+  config,
+  decompteActuel,
+  contrats,
+  onAjouterContrat,
+  onAjouterPeriode,
+  onModifierProfil,
+  onModifierContrat,
+  clientAuth = obtenirClientAuth(),
+  clientDocuments = obtenirClientDocuments(),
+  clientFichiers = obtenirClientFichiers(),
+}: ImportDocumentIAProps) {
+  const session = useSession(clientAuth);
   /** Fichier choisi et validé, en attente du consentement. Non nul ⇒ la modale est ouverte. */
   const [fichierEnAttente, setFichierEnAttente] = useState<File | null>(null);
   const [envoiEnCours, setEnvoiEnCours] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
   const [resultat, setResultat] = useState<ExtractionResult | null>(null);
   const [survole, setSurvole] = useState(false);
+  const [erreurConservation, setErreurConservation] = useState<string | null>(null);
+  /** Non nul UNIQUEMENT quand l'IA a rendu `non_reconnu` chez un utilisateur connecté. */
+  const [choixTypeEnAttente, setChoixTypeEnAttente] = useState<{ fichier: File; extraction: ExtractionResult } | null>(null);
 
   function choisirFichier(fichier: File) {
     setErreur(null);
@@ -75,9 +138,33 @@ export function ImportDocumentIA({ profil, config, decompteActuel, contrats, onA
     if (!fichierEnAttente) return;
     setEnvoiEnCours(true);
     setErreur(null);
+    setErreurConservation(null);
     try {
       const base64 = await lirePdfEnBase64(fichierEnAttente);
       const extraction = await extraireDocumentIA(base64);
+
+      // Conservation : UNIQUEMENT si connecté (RLS exige une session réelle — cf. PHRASES[3] de
+      // mentionEnvoiIA.ts, formulée au conditionnel pour cette même raison).
+      if (session.statut === "connecte" && clientDocuments && clientFichiers) {
+        const typeDocument = typeDocumentDepuisDetection(extraction.typeDocumentDetecte);
+        if (typeDocument === null) {
+          // L'IA n'a rien reconnu : on ne devine JAMAIS (devoir n°2), on demande à l'utilisateur —
+          // et on garde le fichier de côté pour l'upload qui suivra son choix, ou son refus.
+          setChoixTypeEnAttente({ fichier: fichierEnAttente, extraction });
+          setFichierEnAttente(null);
+          return;
+        }
+        const resultatDepot = await deposerDocument(clientFichiers, clientDocuments, {
+          utilisateurId: session.utilisateurId,
+          fichier: fichierEnAttente,
+          typeDocument,
+          // Aucune date canonique unique dans ExtractionResult (types de proposition hétérogènes) :
+          // l'année d'import sert de classement dans « Mon dossier », sans conséquence réglementaire.
+          anneeFiscale: new Date().getFullYear(),
+        });
+        if (resultatDepot.statut === "echec" || resultatDepot.statut === "ficherEnvoyeLigneEchouee") setErreurConservation(resultatDepot.message);
+      }
+
       setResultat(extraction);
       setFichierEnAttente(null);
     } catch (e) {
@@ -94,18 +181,51 @@ export function ImportDocumentIA({ profil, config, decompteActuel, contrats, onA
     }
   }
 
+  /** Après un choix explicite de type pour un document `non_reconnu`. */
+  async function validerChoixType(type: (typeof TYPES_DOCUMENT_ORDONNES)[number]) {
+    if (!choixTypeEnAttente || session.statut !== "connecte" || !clientDocuments || !clientFichiers) return;
+    setEnvoiEnCours(true);
+    try {
+      const resultatDepot = await deposerDocument(clientFichiers, clientDocuments, {
+        utilisateurId: session.utilisateurId,
+        fichier: choixTypeEnAttente.fichier,
+        typeDocument: type,
+        anneeFiscale: new Date().getFullYear(),
+      });
+      if (resultatDepot.statut === "echec" || resultatDepot.statut === "ficherEnvoyeLigneEchouee") setErreurConservation(resultatDepot.message);
+    } finally {
+      setEnvoiEnCours(false);
+      setResultat(choixTypeEnAttente.extraction);
+      setChoixTypeEnAttente(null);
+    }
+  }
+
+  function ignorerConservation() {
+    if (!choixTypeEnAttente) return;
+    setResultat(choixTypeEnAttente.extraction);
+    setChoixTypeEnAttente(null);
+  }
+
   if (resultat) {
     return (
       <div className="space-y-4">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <h3 className="font-display text-base font-medium tracking-tight">Propositions issues de ton document</h3>
           <button
-            onClick={() => setResultat(null)}
+            onClick={() => {
+              setResultat(null);
+              setErreurConservation(null);
+            }}
             className="px-3 py-1.5 rounded-full border border-line text-muted text-xs hover:text-ink transition-colors"
           >
             Importer un autre document
           </button>
         </div>
+        {erreurConservation !== null && (
+          <p className="text-xs text-amber leading-relaxed" role="alert">
+            Le fichier n'a pas pu être conservé sur le serveur ({erreurConservation}) — les informations ci-dessous restent utilisables normalement.
+          </p>
+        )}
         {/* `documentEnvoye` : ce résultat vient d'un vrai envoi, le rappel du destinataire est donc
             exact ici — contrairement au banc d'essai sur fixtures, où rien n'est parti. */}
         <RevueExtraction
@@ -129,6 +249,8 @@ export function ImportDocumentIA({ profil, config, decompteActuel, contrats, onA
       {fichierEnAttente && (
         <ConsentementEnvoiIA nomFichier={fichierEnAttente.name} enCours={envoiEnCours} onAnnuler={annuler} onConfirmer={envoyer} />
       )}
+
+      {choixTypeEnAttente && <SelecteurTypeNonReconnu enCours={envoiEnCours} onConserver={validerChoixType} onIgnorer={ignorerConservation} />}
 
       <div>
         <h3 className="font-display text-base font-medium tracking-tight">Importer avec l'IA</h3>
