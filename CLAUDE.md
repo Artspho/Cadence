@@ -95,18 +95,20 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 
 ## État actuel
 
-> **Repère au 05/08/2026, session (8) — PHASE 5 TERMINÉE : LA BASCULE EST CODÉE ET VÉRIFIÉE EN
-> CONDITIONS RÉELLES, ET LES TROIS MANQUES DU COMMIT D SONT TRAITÉS.** **994 tests verts**
-> (79 fichiers), `tsc -b` propre, `npm run build` propre.
+> **Repère au 05/08/2026, session (8) — PHASE 5 TERMINÉE ET SA DETTE SOLDÉE.** La bascule est codée
+> et vérifiée en conditions réelles, les trois manques du commit D sont traités, et
+> `donnees_sauvegarde` est désormais alimentée (trigger + preuve, cf. plus bas). **994 tests verts**
+> (79 fichiers), `tsc -b` propre, `npm run build` propre — inchangés depuis E, cette dette ne touche
+> que du SQL et des scripts, aucun fichier `src/`.
 >
-> ⚠️ **PAS ENCORE POUSSÉ.** `master` est en avance de **8 commits** sur `origin/master` (qui reste à
-> `8f6089c`, fin de la phase 4) : `57c3e22` (outillage non branché) · `de188e8` (verrou prouvé contre
-> le vrai serveur) · `57c576a` (LA BASCULE — le serveur devient la source de vérité) · `4249391`
-> (trois phrases fausses trouvées en vérifiant à l'écran, corrigées) · `1e96429` (doc) · `17fb941`
-> (**commit D** — section « Compte » trouvable, mot de passe ajoutable à une session, réserve PKCE
-> explicite à l'écran) — plus les deux commits de doc `96dd787`/`40fddfa` déjà présents en session 7.
-> **Tous validés par Benoît, un par un, avec diff et sortie de tests montrés avant chaque commit.**
-> Ne pas pousser sans qu'il le redemande explicitement dans le fil — c'est sa règle, cf.
+> ✅ **POUSSÉ jusqu'à `b44e1eb` (commit E) le 05/08/2026, sur demande explicite de Benoît dans le
+> fil.** `origin/master` a rattrapé tout le travail de la phase 5 : `57c3e22` (outillage non
+> branché) · `de188e8` (verrou prouvé contre le vrai serveur) · `57c576a` (LA BASCULE) · `4249391`
+> (trois phrases fausses corrigées) · `1e96429` (doc) · `17fb941` (commit D — Compte trouvable, mot
+> de passe, réserve PKCE) · `b44e1eb` (commit E — doc de fin de phase). ⚠️ **Le commit qui règle la
+> dette `donnees_sauvegarde` (migration 0002 + script de preuve) n'est ni commité ni poussé** — diff
+> et sortie de `verifier:sauvegarde`/`verifier:rls` en cours de revue par Benoît au moment d'écrire
+> cette ligne. Ne pas pousser sans qu'il le redemande explicitement dans le fil — c'est sa règle, cf.
 > `cadence_push_credentials` en mémoire.
 >
 > ✅ **Le déploiement est configuré pour de bon** : `VITE_SUPABASE_URL` et `VITE_SUPABASE_ANON_KEY`
@@ -468,20 +470,34 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 > sécurité pour un problème qu'une fonctionnalité déjà prévue va résoudre différemment. Détail :
 > `cadence_pkce_reserve_lien_magique` en mémoire.
 >
+> ### ✅ DETTE `donnees_sauvegarde` SOLDÉE (05/08/2026, session 8, après le commit E)
+>
+> **`supabase/migrations/0002_sauvegarde_serveur.sql`** : un trigger `BEFORE UPDATE` sur
+> `donnees_utilisateur` recopie `OLD.donnees` (le contenu D'AVANT l'écriture) dans
+> `donnees_sauvegarde`, via un upsert qui réécrit aussi `cree_le` explicitement (le `DEFAULT now()`
+> de la colonne ne joue qu'à l'INSERT — le laisser aurait figé la date sur la toute première
+> sauvegarde, exactement le défaut que cette dette avait identifié). **Une seule ligne par
+> utilisateur, jamais un historique** : chaque mise à jour REMPLACE la précédente, donc l'espace ne
+> grossit jamais avec le nombre d'écritures, seulement avec le nombre de comptes — question posée
+> par Benoît avant d'appliquer, réponse vérifiée dans le schéma (`user_id` clé primaire).
+>
+> ⚠️ **`npm run verifier:rls` NE PROUVE PAS que le trigger fonctionne** — il n'exerce jamais un
+> utilisateur qui met à jour SA PROPRE ligne, seulement l'isolation entre deux comptes. D'où
+> **`scripts/verifier-sauvegarde-serveur.mjs`** (nouveau, même patron que `verifier-verrou.mjs`),
+> qui exerce une vraie écriture contre le vrai projet et relit `donnees_sauvegarde` pour confirmer
+> qu'elle porte le contenu D'AVANT (jamais celui qu'on vient d'écrire), qu'un simple insert ne la
+> crée pas, et que `cree_le` avance réellement entre deux sauvegardes.
+>
+> **PROUVÉ le 05/08/2026, contre le vrai projet, migration appliquée par Benoît dans l'éditeur SQL
+> de Supabase** (même geste qu'en 0001 — aucun accès direct à sa base depuis cet environnement) :
+> `npm run verifier:sauvegarde` → **7 contrôles, 7 conformes**. `npm run verifier:rls` relancé par
+> prudence → **64 contrôles, 64 conformes** — le trigger n'a rien changé à l'isolation.
+>
 > ### ▶ PROCHAINE ACTION — à décider avec Benoît
 >
-> **Phase 5 terminée.** Rien n'est engagé pour la suite : reste à choisir avec lui entre reprendre la
-> **phase 6** (documents — conserver, puis envoyer, cf. tableau des 9 phases plus haut) ou traiter
-> d'abord la dette ouverte ci-dessous. Ne pas décider seul, les deux options changent le périmètre.
->
-> ⚠️ **DETTE OUVERTE, non bloquante, toujours à trancher** (constatée le 05/08/2026, session 8) : la
-> table serveur `donnees_sauvegarde` (l'équivalent du filet local `cadence:v1:donnees.backup`) n'est
-> PAS alimentée. **Ce n'est pas une régression** : le filet local continue de fonctionner à l'identique
-> après la bascule (la copie locale suit toujours chaque écriture serveur réussie). `donnees_sauvegarde`
-> serait un filet **supplémentaire**, qui n'a jamais existé, protégeant contre la perte du navigateur
-> lui-même. Sa colonne `cree_le` n'a pas de trigger : la réécrire laisserait une date périmée en base —
-> donc ça implique une migration `0002` et de relancer `npm run verifier:rls`. Ne pas la faire en même
-> temps qu'un autre changement de schéma.
+> **Phase 5 terminée, dette soldée.** Rien n'est engagé pour la suite : reste à choisir avec Benoît
+> quoi reprendre — la **phase 6** (documents — conserver, puis envoyer, cf. tableau des 9 phases plus
+> haut) est le chantier d'origine, mais ne pas décider seul.
 >
 > ⚠️ **Relancer `npm run verifier:rls` après tout changement de schéma ou de politique.** Les deux
 > comptes de test **`testa-cadence@cadence.fr`** et **`test-cadenceb@cadence.fr`** sont volontairement
