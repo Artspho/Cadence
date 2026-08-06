@@ -45,6 +45,38 @@ const FRANCHISE_SALAIRES_NON_CERTIFIEE: FranchiseSalairesResultat = {
 // "YYYY-MM", recalcule ce champ correctement (même mécanique que `franchiseSalaires` ci-dessus).
 const MONTANT_MENSUEL_INDISPONIBLE: MontantMensuelResultat = { calculable: false, raison: "aj_manquante" };
 
+// Plafond de cumul ARE + rémunérations à 118 % du PMSS (point 25 de docs/critique_2026-08-03.md,
+// guide France Travail p.17 étape 5) : « Le montant total de vos rémunérations cumulé au montant de
+// l'ARE à verser ne doit pas dépasser 118 % du plafond mensuel de la sécurité sociale. […] Si le
+// cumul est supérieur au plafond : le montant mensuel de l'ARE à verser est recalculé = Montant du
+// plafond − rémunérations brutes mensuelles. » Le guide précise aussi que le nombre de jours
+// indemnisables est alors recalculé, arrondi à l'entier supérieur, depuis le montant écrêté —
+// exposé ici en `joursIndemnisesEcretes`, purement informatif : jamais réinjecté dans le solde ou
+// les franchises, qui se consomment sur le TRAVAIL du mois, pas sur ce plafond (règle d'or « deux
+// compteurs, jamais mélangés »).
+//
+// `pmssMensuel` nullable (`config.valeursDatees`) : `null` → aucun écrêtement plutôt qu'un plafond
+// deviné (devoir n°2, même principe que `smicMensuelBrut`/`smicJournalierBrut` ci-dessous).
+//
+// ⚠️ Le guide compare le cumul au « montant de l'ARE à verser » sans préciser s'il s'agit du montant
+// avant ou après prélèvement à la source — même réserve non tranchée que `RisqueTropPercu`
+// (docs/validation.md, « Verrou 2 »). Faute de source qui le précise POUR CE PLAFOND-CI, la
+// comparaison porte sur `montant` (AJ réelle × jours, avant PAS), pas sur le net.
+function calculerEcretementPMSS(
+  montant: number,
+  ajUtilisee: number,
+  salairesContratsBruts: number,
+  config: FranceTravailConfig,
+): { montantEcrete: number; montantAvantEcretement: number; plafond: number; joursIndemnisesEcretes: number } | null {
+  const { pmssMensuel } = config.valeursDatees;
+  if (pmssMensuel === null) return null;
+  const plafond = Math.round(pmssMensuel * config.indemnisationMensuelle.plafondCumulCoeffPMSS * 100) / 100;
+  if (salairesContratsBruts + montant <= plafond) return null;
+  const montantEcrete = Math.max(0, Math.round((plafond - salairesContratsBruts) * 100) / 100);
+  const joursIndemnisesEcretes = ajUtilisee > 0 ? Math.ceil(montantEcrete / ajUtilisee) : 0;
+  return { montantEcrete, montantAvantEcretement: montant, plafond, joursIndemnisesEcretes };
+}
+
 // Montant réellement versé pour un mois donné = joursIndemnises × AJ réelle applicable ce mois-là.
 // `debutDuMoisISO` doit être une vraie date ISO (ex. "2026-03-01") — jamais un `moisLabel` non
 // vérifié, cf. avertissement ci-dessus.
@@ -53,17 +85,28 @@ function calculerMontantMensuel(
   debutDuMoisISO: string,
   ajReelleHistorique: { dateEffet: string; valeur: number }[] | undefined,
   tauxPrelevementSourceHistorique: { dateEffet: string; valeur: number }[] | undefined,
+  salairesContratsBruts: number,
+  config: FranceTravailConfig,
 ): MontantMensuelResultat {
   const ajUtilisee = getAjReelleAt(ajReelleHistorique, debutDuMoisISO);
   if (ajUtilisee === null) {
     return { calculable: false, raison: "aj_manquante" };
   }
-  const montant = Math.round(joursIndemnises * ajUtilisee * 100) / 100;
+  const montantAvantEcretement = Math.round(joursIndemnises * ajUtilisee * 100) / 100;
+  const ecretement = calculerEcretementPMSS(montantAvantEcretement, ajUtilisee, salairesContratsBruts, config);
+  const montant = ecretement ? ecretement.montantEcrete : montantAvantEcretement;
   // Taux applicable CE mois-là (getTauxPASAt), jamais le taux courant réappliqué à tous les mois
-  // passés — cf. types/index.ts, tauxPrelevementSourceHistorique.
+  // passés — cf. types/index.ts, tauxPrelevementSourceHistorique. Appliqué au montant déjà écrêté :
+  // le PAS se prélève sur ce qui est réellement versé, pas sur un montant théorique dépassé.
   const tauxPAS = getTauxPASAt(tauxPrelevementSourceHistorique, debutDuMoisISO);
   const montantNet = tauxPAS != null ? Math.round(montant * (1 - tauxPAS / 100) * 100) / 100 : undefined;
-  return { calculable: true, montant, ajUtilisee, montantNet };
+  return {
+    calculable: true,
+    montant,
+    ajUtilisee,
+    montantNet,
+    ...(ecretement ? { ecretementPMSS: { montantAvantEcretement: ecretement.montantAvantEcretement, plafond: ecretement.plafond, joursIndemnisesEcretes: ecretement.joursIndemnisesEcretes } } : {}),
+  };
 }
 
 // Mois de transition — décisions actées, pas encore câblées (TODO d'implémentation, pas de
@@ -373,19 +416,22 @@ export function calculerSerieDepuisContrats(
   // dans les deux cas.
   const resultatsAffiches: LigneSerieIndemnisation[] = resultatsComplets
     .filter((resultat) => resultat.moisLabel >= moisAffichageDebut)
-    .map((resultat) => ({
-      ...resultat,
-      montantMensuel: calculerMontantMensuel(resultat.joursIndemnises, `${resultat.moisLabel}-01`, profil.ajReelleHistorique, ouvertureDroits.tauxPrelevementSourceHistorique),
-      salairesContratsBruts: salairesParMois.get(resultat.moisLabel) ?? 0,
-      ...(resultat.moisLabel === moisOuverture && moisOuverturePartiel
-        ? {
-            ouverturePartielle: {
-              depuis: ouvertureDroits.dateOuverture,
-              messageTooltip: messageMoisOuverturePartielle(profil.situation === "readmission"),
-            },
-          }
-        : {}),
-    }));
+    .map((resultat) => {
+      const salairesContratsBruts = salairesParMois.get(resultat.moisLabel) ?? 0;
+      return {
+        ...resultat,
+        montantMensuel: calculerMontantMensuel(resultat.joursIndemnises, `${resultat.moisLabel}-01`, profil.ajReelleHistorique, ouvertureDroits.tauxPrelevementSourceHistorique, salairesContratsBruts, config),
+        salairesContratsBruts,
+        ...(resultat.moisLabel === moisOuverture && moisOuverturePartiel
+          ? {
+              ouverturePartielle: {
+                depuis: ouvertureDroits.dateOuverture,
+                messageTooltip: messageMoisOuverturePartielle(profil.situation === "readmission"),
+              },
+            }
+          : {}),
+      };
+    });
 
   return { calculable: true, mois: resultatsAffiches };
 }

@@ -419,7 +419,19 @@ export interface SoldeIndemnisationDepart {
 // même période d'indemnisation). `calculable: false` couvre à la fois une AJ jamais renseignée et
 // un mois antérieur à toute entrée connue de l'historique — dans les deux cas Cadence ne peut pas
 // recalculer l'AJ réelle elle-même (devoir n°2 : jamais un montant sur la base d'une AJ devinée).
-export type MontantMensuelResultat = { calculable: false; raison: "aj_manquante" } | { calculable: true; montant: number; ajUtilisee: number; montantNet?: number };
+//
+// `ecretementPMSS` (07/08/2026, point 25 de docs/critique_2026-08-03.md) : présent SEULEMENT quand
+// le cumul (rémunérations du mois + ARE) dépasse 118 % du PMSS — `montant` porte alors déjà la
+// valeur ÉCRÊTÉE (guide FT p.17 étape 5), jamais les deux valeurs en parallèle sans le dire.
+export type MontantMensuelResultat =
+  | { calculable: false; raison: "aj_manquante" }
+  | {
+      calculable: true;
+      montant: number;
+      ajUtilisee: number;
+      montantNet?: number;
+      ecretementPMSS?: { montantAvantEcretement: number; plafond: number; joursIndemnisesEcretes: number };
+    };
 
 export interface MoisIndemnisationResultat {
   calculable: true; // conservé : discriminant historique de LigneSerieIndemnisation, cf. ce type

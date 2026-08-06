@@ -316,7 +316,24 @@ function TableauResultats({
                   <td className="text-right px-4 py-3 text-muted">{l.delaiConsomme}</td>
                   <td className="text-right px-4 py-3 text-muted">{l.franchiseCPConsommee}</td>
                   <td className="text-right px-4 py-3 font-medium">{l.joursIndemnisables}</td>
-                  <td className="text-right px-4 py-3 font-medium">{l.montant != null ? `${l.montant.toFixed(2)} €` : "—"}</td>
+                  <td className="text-right px-4 py-3 font-medium">
+                    {l.montant != null ? (
+                      <span className="inline-flex items-center gap-1.5 justify-end">
+                        {l.montant.toFixed(2)} €
+                        {l.ecretementPMSS && (
+                          <span
+                            title={`Écrêté par le plafond de cumul (ARE + rémunérations ≤ 118 % du PMSS, soit ${l.ecretementPMSS.plafond.toFixed(2)} € ce mois-ci) — sans ce plafond, le montant aurait été de ${l.ecretementPMSS.montantAvantEcretement.toFixed(2)} €.`}
+                            aria-label="Montant écrêté par le plafond de cumul à 118 % du PMSS"
+                            className="cursor-help"
+                          >
+                            ✂️
+                          </span>
+                        )}
+                      </span>
+                    ) : (
+                      "—"
+                    )}
+                  </td>
                   {tauxRenseigne && <td className="text-right px-4 py-3 font-medium">{l.montantNet != null ? `${l.montantNet.toFixed(2)} €` : "—"}</td>}
                   <td className="text-right px-4 py-3 text-muted">{l.salairesContratsBruts > 0 ? `${l.salairesContratsBruts.toFixed(2)} €` : "—"}</td>
                   <td className="text-right px-4 py-3">
@@ -365,12 +382,14 @@ function TableauResultats({
         {desMoisSansAj && <p className="text-amber">Certains mois n'ont pas de taux d'AJ connu pour leur période (« — ») — ajoute une période dont la date d'effet les couvre dans « Mon profil ».</p>}
         {/* Formulation revue le 03/08/2026. L'ancienne disait « ce mois-là, et les suivants tant que
             franchise/délai ne sont pas épuisés, restent approximatifs » — ce qui laissait entendre
-            qu'au-delà les chiffres devenaient certains. Ils ne le sont jamais : cinq réserves connues
-            et documentées subsistent (plafond de cumul 118 % du PMSS non appliqué, formule des jours
-            non indemnisables calée sur 4 relevés et non déduite du texte, total de franchise salaires
-            déclaré et non calculé, jours d'inscription supposés couvrir le mois entier, modèle validé
-            sur un seul droit — cf. docs/critique_2026-08-03.md). Et les mois à venir reposent sur des
-            contrats pas encore travaillés. Le chiffre qui fait foi reste celui du relevé. */}
+            qu'au-delà les chiffres devenaient certains. Ils ne le sont jamais : quatre réserves
+            connues et documentées subsistent (formule des jours non indemnisables calée sur 4 relevés
+            et non déduite du texte, total de franchise salaires déclaré et non calculé, jours
+            d'inscription supposés couvrir le mois entier, modèle validé sur un seul droit — cf.
+            docs/critique_2026-08-03.md). Et les mois à venir reposent sur des contrats pas encore
+            travaillés. Le chiffre qui fait foi reste celui du relevé. (Le plafond de cumul à 118 % du
+            PMSS, cinquième réserve à l'origine, est appliqué depuis le 07/08/2026 — signalé ligne par
+            ligne ci-dessus quand il joue réellement, cf. `ecretementPMSS`.) */}
         {desMoisEnEstimation && (
           <p className="text-faint">
             <strong className="text-ink font-medium">Estimation</strong> : chaque ligne est une estimation calculée depuis la franchise congés payés et le délai d'attente de ta notification France

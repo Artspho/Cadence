@@ -482,3 +482,84 @@ describe("calculerFranchiseSalaires — formule certifiée le 2026-07-23 (ARTCEN
     expect(resultat).toEqual({ valeur: null, avertissement: "franchise_salaires_non_certifiee" });
   });
 });
+
+describe("calculerSerieDepuisContrats — plafond de cumul à 118 % du PMSS (point 25, 07/08/2026)", () => {
+  // Sans franchise CP ni délai : tout le mois (28 j en février 2026) est indemnisable avant
+  // écrêtement, pour isoler le seul mécanisme testé ici — même principe que les tests montantMensuel
+  // ci-dessus.
+  const ouvertureDroits = { dateOuverture: "2026-02-01", franchiseCPTotale: 0, delaiAttenteInitial: 0 };
+  const unCachetA4000Euros = contrat({ dateDebut: "2026-02-10", date: "2026-02-10", typeRemuneration: "cachet" as const, nbCachets: 1, salaireBrut: 4000 });
+
+  it("écrête le montant ET recalcule les jours indemnisables équivalents quand le cumul dépasse le plafond", () => {
+    const p = profil({ ouvertureDroits, ajReelleHistorique: [{ dateEffet: "2026-01-01", valeur: 55 }] });
+    const resultat = calculerSerieDepuisContrats(p, { dateDepart: "2026-02-01" }, [unCachetA4000Euros], "2026-02-28", franceTravailConfig);
+    if (!resultat.calculable) throw new Error("devrait être calculable");
+    const fevrier = resultat.mois[0];
+    if (!fevrier.calculable) throw new Error("devrait être calculable (pas un mois de réadmission)");
+    // 1 cachet = 12 h -> floor(12 × 1,3 / 10) = 1 jour non indemnisable -> 27 jours indemnisés à 55 € = 1 485 €.
+    expect(fevrier.joursIndemnises).toBe(27);
+    expect(fevrier.salairesContratsBruts).toBe(4000);
+    const montantMensuel = fevrier.montantMensuel;
+    if (!montantMensuel.calculable) throw new Error("devrait être calculable");
+    // Plafond = 4 005 € (PMSS) × 1,18 = 4 725,90 €. Cumul 4 000 + 1 485 = 5 485 € > plafond.
+    // Montant écrêté = 4 725,90 − 4 000 = 725,90 € ; jours équivalents = ceil(725,90 / 55) = 14.
+    expect(montantMensuel.montant).toBe(725.9);
+    expect(montantMensuel.ecretementPMSS).toEqual({ montantAvantEcretement: 1485, plafond: 4725.9, joursIndemnisesEcretes: 14 });
+    // `joursIndemnises` (solde/franchises) n'est JAMAIS modifié par l'écrêtement — deux compteurs
+    // distincts, cf. commentaire de calculerEcretementPMSS.
+    expect(fevrier.joursIndemnises).toBe(27);
+  });
+
+  it("ne s'active pas quand le cumul reste sous 118 % du PMSS", () => {
+    const p = profil({ ouvertureDroits, ajReelleHistorique: [{ dateEffet: "2026-01-01", valeur: 55 }] });
+    const resultat = calculerSerieDepuisContrats(p, { dateDepart: "2026-02-01" }, [], "2026-02-28", franceTravailConfig);
+    if (!resultat.calculable) throw new Error("devrait être calculable");
+    const fevrier = resultat.mois[0];
+    if (!fevrier.calculable) throw new Error("devrait être calculable");
+    const montantMensuel = fevrier.montantMensuel;
+    if (!montantMensuel.calculable) throw new Error("devrait être calculable");
+    expect(montantMensuel.montant).toBe(28 * 55);
+    expect(montantMensuel.ecretementPMSS).toBeUndefined();
+  });
+
+  it("n'écrête RIEN quand pmssMensuel est absent de la config — jamais un plafond deviné (devoir n°2)", () => {
+    const configSansPmss = { ...franceTravailConfig, valeursDatees: { ...franceTravailConfig.valeursDatees, pmssMensuel: null } };
+    const p = profil({ ouvertureDroits, ajReelleHistorique: [{ dateEffet: "2026-01-01", valeur: 55 }] });
+    const resultat = calculerSerieDepuisContrats(p, { dateDepart: "2026-02-01" }, [unCachetA4000Euros], "2026-02-28", configSansPmss);
+    if (!resultat.calculable) throw new Error("devrait être calculable");
+    const fevrier = resultat.mois[0];
+    if (!fevrier.calculable) throw new Error("devrait être calculable");
+    const montantMensuel = fevrier.montantMensuel;
+    if (!montantMensuel.calculable) throw new Error("devrait être calculable");
+    expect(montantMensuel.montant).toBe(27 * 55); // jamais écrêté, malgré un cumul qui dépasserait le plafond réel
+    expect(montantMensuel.ecretementPMSS).toBeUndefined();
+  });
+
+  it("plafonne le montant écrêté à 0, jamais négatif, quand les rémunérations seules dépassent déjà le plafond", () => {
+    const p = profil({ ouvertureDroits, ajReelleHistorique: [{ dateEffet: "2026-01-01", valeur: 55 }] });
+    const unCachetA6000Euros = contrat({ dateDebut: "2026-02-10", date: "2026-02-10", typeRemuneration: "cachet" as const, nbCachets: 1, salaireBrut: 6000 });
+    const resultat = calculerSerieDepuisContrats(p, { dateDepart: "2026-02-01" }, [unCachetA6000Euros], "2026-02-28", franceTravailConfig);
+    if (!resultat.calculable) throw new Error("devrait être calculable");
+    const fevrier = resultat.mois[0];
+    if (!fevrier.calculable) throw new Error("devrait être calculable");
+    const montantMensuel = fevrier.montantMensuel;
+    if (!montantMensuel.calculable) throw new Error("devrait être calculable");
+    expect(montantMensuel.montant).toBe(0);
+    expect(montantMensuel.ecretementPMSS?.joursIndemnisesEcretes).toBe(0);
+  });
+
+  it("le PAS se prélève sur le montant DÉJÀ écrêté, pas sur le montant théorique dépassé", () => {
+    const p = profil({
+      ouvertureDroits: { ...ouvertureDroits, tauxPrelevementSourceHistorique: [{ dateEffet: "2026-01-01", valeur: 10 }] },
+      ajReelleHistorique: [{ dateEffet: "2026-01-01", valeur: 55 }],
+    });
+    const resultat = calculerSerieDepuisContrats(p, { dateDepart: "2026-02-01" }, [unCachetA4000Euros], "2026-02-28", franceTravailConfig);
+    if (!resultat.calculable) throw new Error("devrait être calculable");
+    const fevrier = resultat.mois[0];
+    if (!fevrier.calculable) throw new Error("devrait être calculable");
+    const montantMensuel = fevrier.montantMensuel;
+    if (!montantMensuel.calculable) throw new Error("devrait être calculable");
+    expect(montantMensuel.montant).toBe(725.9);
+    expect(montantMensuel.montantNet).toBe(Math.round(725.9 * (1 - 10 / 100) * 100) / 100);
+  });
+});
