@@ -793,7 +793,12 @@ export default async function handler(req: Request): Promise<Response> {
     }
 
     // Cas 3 : tout le reste. Ne jamais renvoyer le contenu du document dans un
-    // message d'erreur.
+    // message d'erreur AU CLIENT — mais le logguer côté serveur, sinon la vraie cause est perdue
+    // pour de bon (trouvé le 06/08/2026 : un relevé de situation réel a produit un 500 générique,
+    // sans aucune trace exploitable, ni côté client ni côté serveur). `err` seul, jamais le PDF ni son
+    // contenu extrait — un message d'erreur Mistral/Zod ne porte que des noms de champs et des codes,
+    // jamais le texte du document.
+    console.error("extract-document — échec non catégorisé :", err);
     return new Response(
       JSON.stringify({ error: "Échec de l'extraction. Réessaie ou saisis manuellement." }),
       { status: 500, headers: { "Content-Type": "application/json" } }
