@@ -2,8 +2,9 @@ import { useState } from "react";
 import type { CategorieFrais, Depense, StatutJustificatif } from "../../types/fraisReels";
 import { CATEGORIES_ORDONNEES, LIBELLES_CATEGORIE_COMPLETS } from "./categorieLabels";
 import { calculerStatutJustificatif } from "../../lib/statutJustificatif";
-import { remplacerDocument } from "../../storage/documentsStorage";
+import { chercherDoublon, remplacerDocument, type LigneDocument } from "../../storage/documentsStorage";
 import type { ClientDocuments, ClientFichiers } from "../../auth/supabaseClient";
+import { AvertissementDoublonDocument } from "../AvertissementDoublonDocument";
 
 interface DepenseFormProps {
   anneeFiscale: number;
@@ -31,6 +32,9 @@ export function DepenseForm({ anneeFiscale, valeurInitiale, ratioLocalPro, nombr
   const [notes, setNotes] = useState(valeurInitiale?.notes ?? "");
   const [erreur, setErreur] = useState<string | null>(null);
   const [envoiEnCours, setEnvoiEnCours] = useState(false);
+  /** Non nul UNIQUEMENT quand `chercherDoublon` a trouvé, dans « Mon dossier », un document du même
+   *  nom/taille — même logique que les canaux d'import AEM/bulletin (cf. AvertissementDoublonDocument). */
+  const [doublon, setDoublon] = useState<{ fichier: File; existant: LigneDocument } | null>(null);
 
   const partProEffectivePct = categorie === "C6" && ratioLocalPro !== null ? Math.round(ratioLocalPro * 100) : Number(partProPct) || 0;
   const partProVerrouillee = categorie === "C6" && ratioLocalPro !== null;
@@ -50,20 +54,18 @@ export function DepenseForm({ anneeFiscale, valeurInitiale, ratioLocalPro, nombr
    * commit 6 de la phase 6 (05/08/2026, retrait complet de Google Drive et du repli localStorage).
    * `remplacerDocument` ne retire l'ancien fichier qu'APRÈS que le nouveau a réussi (devoir n°1).
    */
-  async function onFichierChoisi(fichier: File | undefined) {
-    if (!fichier) return;
-    if (fichier.size > 5 * 1024 * 1024) {
-      setErreur("Fichier trop volumineux (max 5 Mo).");
-      return;
-    }
-    if (!clientDocuments || !clientFichiers) {
-      setErreur("Le stockage n'est pas disponible pour l'instant — réessaie dans un instant.");
-      return;
-    }
-
+  async function deposerFichier(fichier: File, ignorerDoublon = false) {
+    if (!clientDocuments || !clientFichiers) return;
     setEnvoiEnCours(true);
     setErreur(null);
     try {
+      if (!ignorerDoublon) {
+        const existant = await chercherDoublon(clientDocuments, utilisateurId, fichier.name, fichier.size);
+        if (existant) {
+          setDoublon({ fichier, existant });
+          return;
+        }
+      }
       const resultat = await remplacerDocument(clientFichiers, clientDocuments, documentId ?? null, {
         utilisateurId,
         fichier,
@@ -83,11 +85,25 @@ export function DepenseForm({ anneeFiscale, valeurInitiale, ratioLocalPro, nombr
         setErreur(`Le fichier a été envoyé mais n'a pas pu être enregistré : ${resultat.message}`);
         return;
       }
+      setDoublon(null);
       setDocumentId(resultat.id);
       setJustificatifNom(fichier.name);
     } finally {
       setEnvoiEnCours(false);
     }
+  }
+
+  async function onFichierChoisi(fichier: File | undefined) {
+    if (!fichier) return;
+    if (fichier.size > 5 * 1024 * 1024) {
+      setErreur("Fichier trop volumineux (max 5 Mo).");
+      return;
+    }
+    if (!clientDocuments || !clientFichiers) {
+      setErreur("Le stockage n'est pas disponible pour l'instant — réessaie dans un instant.");
+      return;
+    }
+    await deposerFichier(fichier);
   }
 
   function soumettre(e: React.FormEvent) {
@@ -116,6 +132,15 @@ export function DepenseForm({ anneeFiscale, valeurInitiale, ratioLocalPro, nombr
 
   return (
     <div className="fixed inset-0 z-50 bg-bg/80 backdrop-blur-sm flex items-center justify-center p-6" role="dialog" aria-modal="true" aria-labelledby="titre-depense-form">
+      {doublon && (
+        <AvertissementDoublonDocument
+          nomFichier={doublon.fichier.name}
+          dateDepotExistant={doublon.existant.creeLe}
+          enCours={envoiEnCours}
+          onConfirmer={() => deposerFichier(doublon.fichier, true)}
+          onIgnorer={() => setDoublon(null)}
+        />
+      )}
       <form onSubmit={soumettre} className="bg-surface border border-line rounded-hero p-6 max-w-[560px] w-full space-y-4 max-h-[90vh] overflow-y-auto">
         <h2 id="titre-depense-form" className="font-display text-lg font-semibold tracking-tight">
           {valeurInitiale ? "Modifier la dépense" : "Ajouter une dépense"}

@@ -6,10 +6,11 @@
 import { useMemo, useState } from "react";
 import type { BienAmorti, CategorieBienAmorti } from "../../types/fraisReels";
 import type { ClientDocuments, ClientFichiers } from "../../auth/supabaseClient";
-import { remplacerDocument } from "../../storage/documentsStorage";
+import { chercherDoublon, remplacerDocument, type LigneDocument } from "../../storage/documentsStorage";
 import type { FranceTravailConfig } from "../../config/franceTravailConfig";
 import { calculerAmortissementsAnnee } from "../../engine/fraisReels/calculerAmortissementsAnnee";
 import { alertesContinuation, CATEGORIES_BIEN_ORDONNEES, depasseSeuilAmortissement, LIBELLE_CATEGORIE_BIEN, MENTION_DUREE_A_VALIDER } from "../../lib/amortissementBiensUi";
+import { AvertissementDoublonDocument } from "../AvertissementDoublonDocument";
 
 interface AmortissementBiensProps {
   anneeImposition: number;
@@ -95,6 +96,9 @@ function FormulaireBien({
   const [justificatifNom, setJustificatifNom] = useState<string | undefined>(undefined);
   const [envoiEnCours, setEnvoiEnCours] = useState(false);
   const [erreurFichier, setErreurFichier] = useState<string | null>(null);
+  /** Non nul UNIQUEMENT quand `chercherDoublon` a trouvé, dans « Mon dossier », un document du même
+   *  nom/taille — même logique que les canaux d'import AEM/bulletin (cf. AvertissementDoublonDocument). */
+  const [doublon, setDoublon] = useState<{ fichier: File; existant: LigneDocument } | null>(null);
 
   const prixHTNum = parseFloat(prixHT) || 0;
   const dureeAnsNum = parseInt(dureeAns, 10) || 0;
@@ -112,6 +116,31 @@ function FormulaireBien({
    * elle qui détermine `annee_fiscale` de la ligne `documents`. Sans elle, le document se rangerait
    * dans une année devinée — donc au mauvais endroit dans « Mon dossier ».
    */
+  async function deposerFichier(fichier: File, ignorerDoublon = false) {
+    if (!clientDocuments || !clientFichiers) return;
+    setEnvoiEnCours(true);
+    setErreurFichier(null);
+    try {
+      if (!ignorerDoublon) {
+        const existant = await chercherDoublon(clientDocuments, utilisateurId, fichier.name, fichier.size);
+        if (existant) {
+          setDoublon({ fichier, existant });
+          return;
+        }
+      }
+      const resultat = await deposerJustificatifBien(clientFichiers, clientDocuments, utilisateurId, documentId ?? null, fichier, dateAchat);
+      if (!resultat.ok) {
+        setErreurFichier(resultat.message);
+        return;
+      }
+      setDoublon(null);
+      setDocumentId(resultat.documentId);
+      setJustificatifNom(fichier.name);
+    } finally {
+      setEnvoiEnCours(false);
+    }
+  }
+
   async function onFichierChoisi(fichier: File | undefined) {
     if (!fichier) return;
     if (fichier.size > 5 * 1024 * 1024) {
@@ -126,20 +155,7 @@ function FormulaireBien({
       setErreurFichier("Le stockage n'est pas disponible pour l'instant — réessaie dans un instant.");
       return;
     }
-
-    setEnvoiEnCours(true);
-    setErreurFichier(null);
-    try {
-      const resultat = await deposerJustificatifBien(clientFichiers, clientDocuments, utilisateurId, documentId ?? null, fichier, dateAchat);
-      if (!resultat.ok) {
-        setErreurFichier(resultat.message);
-        return;
-      }
-      setDocumentId(resultat.documentId);
-      setJustificatifNom(fichier.name);
-    } finally {
-      setEnvoiEnCours(false);
-    }
+    await deposerFichier(fichier);
   }
 
   function soumettre(e: React.FormEvent) {
@@ -153,6 +169,15 @@ function FormulaireBien({
 
   return (
     <form onSubmit={soumettre} className="bg-surface-2 border border-line rounded-lg p-4 space-y-4">
+      {doublon && (
+        <AvertissementDoublonDocument
+          nomFichier={doublon.fichier.name}
+          dateDepotExistant={doublon.existant.creeLe}
+          enCours={envoiEnCours}
+          onConfirmer={() => deposerFichier(doublon.fichier, true)}
+          onIgnorer={() => setDoublon(null)}
+        />
+      )}
       <div className="grid grid-cols-2 gap-4">
         <div>
           <label className="block text-xs uppercase tracking-[.03em] text-muted mb-1" htmlFor="bien-designation">

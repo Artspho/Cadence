@@ -20,7 +20,7 @@ const UTILISATEUR = "u-42";
 /** Bien au-dessus du seuil : l'amortissement est obligatoire, donc le formulaire est enregistrable. */
 const PRIX_AU_DESSUS_DU_SEUIL = String(franceTravailConfig.fraisReels.amortissements.seuilAmortissementHT + 1500);
 
-function fauxClients(options: { erreurUpload?: string; erreurLigne?: string } = {}) {
+function fauxClients(options: { erreurUpload?: string; erreurLigne?: string; documentsExistants?: Record<string, unknown>[] } = {}) {
   const lignesInserees: Record<string, unknown>[] = [];
   const cheminsDeposes: string[] = [];
 
@@ -36,7 +36,7 @@ function fauxClients(options: { erreurUpload?: string; erreurLigne?: string } = 
 
   const clientDocuments: ClientDocuments = {
     from: () => ({
-      select: () => ({ eq: () => ({ order: async () => ({ data: [], error: null }) }) }),
+      select: () => ({ eq: () => ({ order: async () => ({ data: options.documentsExistants ?? [], error: null }) }) }),
       insert: (ligne: Record<string, unknown>) => ({
         select: async () => {
           if (options.erreurLigne) return { data: null, error: { message: options.erreurLigne } };
@@ -182,5 +182,42 @@ describe("AmortissementBiens — justificatif d'achat (commit 7)", () => {
     remplir("2024-03-15");
     choisirFichier();
     expect(await screen.findByRole("alert")).toHaveTextContent(/stockage n'est pas disponible/i);
+  });
+
+  describe("doublon détecté (même nom, même taille, déjà dans Mon dossier)", () => {
+    // "facture-violoncelle.pdf" déposé par `choisirFichier()` a le contenu ["contenu"] → 7 octets.
+    const DOUBLON_EXISTANT = [
+      { id: "doc-ancien", type_document: "justificatif_frais", categorie_frais: "C7", annee_fiscale: 2024, chemin_stockage: "u-42/2024/justificatif_frais/x-facture-violoncelle.pdf", nom_fichier: "facture-violoncelle.pdf", taille_octets: 7, mime: "application/pdf", cree_le: "2026-08-01T10:00:00.000Z" },
+    ];
+
+    it("affiche l'avertissement au lieu de déposer directement", async () => {
+      const clients = fauxClients({ documentsExistants: DOUBLON_EXISTANT });
+      rendre(clients);
+      remplir("2024-03-15");
+      choisirFichier();
+
+      expect(await screen.findByText(/semble déjà dans « Mon dossier »/i)).toBeInTheDocument();
+      expect(clients.clientFichiers.upload).not.toHaveBeenCalled();
+    });
+
+    it("« Conserver quand même » dépose malgré l'avertissement", async () => {
+      const clients = fauxClients({ documentsExistants: DOUBLON_EXISTANT });
+      rendre(clients);
+      remplir("2024-03-15");
+      choisirFichier();
+
+      fireEvent.click(await screen.findByRole("button", { name: /conserver quand même/i }));
+      await waitFor(() => expect(clients.lignesInserees).toHaveLength(1));
+    });
+
+    it("« Ne pas le conserver à nouveau » n'appelle jamais l'upload", async () => {
+      const clients = fauxClients({ documentsExistants: DOUBLON_EXISTANT });
+      rendre(clients);
+      remplir("2024-03-15");
+      choisirFichier();
+
+      fireEvent.click(await screen.findByRole("button", { name: /ne pas le conserver à nouveau/i }));
+      expect(clients.clientFichiers.upload).not.toHaveBeenCalled();
+    });
   });
 });

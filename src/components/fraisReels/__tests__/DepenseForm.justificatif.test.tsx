@@ -18,8 +18,19 @@ const UTILISATEUR = "u-42";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type FauxAppelable = (...args: any[]) => any;
 
-function fauxClientDocuments(insert: FauxAppelable = vi.fn(() => ({ select: vi.fn(async () => ({ data: [{ id: "doc-1" }], error: null })) }))): ClientDocuments {
-  return { from: vi.fn(() => ({ select: vi.fn(), insert, update: vi.fn(), delete: vi.fn() })) } as unknown as ClientDocuments;
+function fauxClientDocuments(
+  insert: FauxAppelable = vi.fn(() => ({ select: vi.fn(async () => ({ data: [{ id: "doc-1" }], error: null })) })),
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  documentsExistants: Record<string, any>[] = [],
+): ClientDocuments {
+  return {
+    from: vi.fn(() => ({
+      select: vi.fn(() => ({ eq: vi.fn(() => ({ order: vi.fn(async () => ({ data: documentsExistants, error: null })) })) })),
+      insert,
+      update: vi.fn(),
+      delete: vi.fn(),
+    })),
+  } as unknown as ClientDocuments;
 }
 
 function fauxClientFichiers(upload: FauxAppelable = vi.fn(async () => ({ data: { path: "x" }, error: null }))): ClientFichiers {
@@ -121,5 +132,43 @@ describe("DepenseForm — justificatif : dépôt sur Supabase Storage", () => {
     await waitFor(() => expect(screen.getByText("nouveau.pdf")).toBeInTheDocument());
     expect(deleteEq).toHaveBeenCalledWith("id", "doc-ancien");
     expect(remove).toHaveBeenCalledWith(["u-42/2026/justificatif_frais/ancien.pdf"]);
+  });
+
+  describe("doublon détecté (même nom, même taille, déjà dans Mon dossier)", () => {
+    // "facture.pdf" déposé par `deposer()` a le contenu ["contenu"] → 7 octets.
+    const DOUBLON_EXISTANT = [
+      { id: "doc-ancien", type_document: "justificatif_frais", categorie_frais: "C1", annee_fiscale: 2026, chemin_stockage: "u-42/2026/justificatif_frais/x-facture.pdf", nom_fichier: "facture.pdf", taille_octets: 7, mime: "application/pdf", cree_le: "2026-08-01T10:00:00.000Z" },
+    ];
+
+    it("affiche l'avertissement au lieu de déposer directement", async () => {
+      const insert = vi.fn(() => ({ select: vi.fn(async () => ({ data: [{ id: "doc-1" }], error: null })) }));
+      const upload = vi.fn(async () => ({ data: { path: "x" }, error: null }));
+      rendre({ clientDocuments: fauxClientDocuments(insert, DOUBLON_EXISTANT), clientFichiers: fauxClientFichiers(upload) });
+      deposer("facture.pdf");
+
+      expect(await screen.findByText(/semble déjà dans « Mon dossier »/i)).toBeInTheDocument();
+      expect(upload).not.toHaveBeenCalled();
+    });
+
+    it("« Conserver quand même » dépose malgré l'avertissement", async () => {
+      const insert = vi.fn(() => ({ select: vi.fn(async () => ({ data: [{ id: "doc-1" }], error: null })) }));
+      const upload = vi.fn(async () => ({ data: { path: "x" }, error: null }));
+      rendre({ clientDocuments: fauxClientDocuments(insert, DOUBLON_EXISTANT), clientFichiers: fauxClientFichiers(upload) });
+      deposer("facture.pdf");
+
+      fireEvent.click(await screen.findByRole("button", { name: /conserver quand même/i }));
+      await waitFor(() => expect(upload).toHaveBeenCalled());
+      expect(await screen.findByText("facture.pdf")).toBeInTheDocument();
+    });
+
+    it("« Ne pas le conserver à nouveau » n'appelle jamais l'upload", async () => {
+      const upload = vi.fn();
+      rendre({ clientDocuments: fauxClientDocuments(undefined, DOUBLON_EXISTANT), clientFichiers: fauxClientFichiers(upload) });
+      deposer("facture.pdf");
+
+      fireEvent.click(await screen.findByRole("button", { name: /ne pas le conserver à nouveau/i }));
+      expect(upload).not.toHaveBeenCalled();
+      expect(screen.queryByText("facture.pdf")).not.toBeInTheDocument();
+    });
   });
 });
