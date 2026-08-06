@@ -66,7 +66,7 @@ import { BandeauStockagePlein } from "./components/BandeauStockagePlein";
 import { MonDossier } from "./components/MonDossier";
 import { EcranConnexionObligatoire } from "./components/EcranConnexionObligatoire";
 import { EcranNouveauMotDePasse } from "./components/EcranNouveauMotDePasse";
-import { INDICE_RETOUR_LIEN, texteAvertissementLienConnecte } from "./auth/retourLienMagique";
+import { INDICE_RETOUR_LIEN, marquerReinitialisationReussie, texteAvertissementLienConnecte } from "./auth/retourLienMagique";
 import { MARQUEUR_REINITIALISATION } from "./auth/actions";
 
 const dateDuJour = new Date().toISOString().slice(0, 10);
@@ -156,7 +156,10 @@ export default function App() {
   const indiceRetour = INDICE_RETOUR_LIEN;
   // Texte du bandeau affiché plus bas quand une session est déjà active (cf. `avertissementLienFerme`
   // ci-dessus) — `null` quand `indiceRetour` n'a rien à signaler, ce qui masque le bandeau.
-  const avertissementLien = texteAvertissementLienConnecte(indiceRetour);
+  // `reinitialisationFaite` en plus depuis le 07/08/2026 : sans lui, ce bandeau annoncerait un faux
+  // échec juste après un succès (cf. le commentaire de `marquerReinitialisationReussie` dans
+  // `auth/retourLienMagique.ts` — `indiceRetour.present` reste vrai même quand tout a fonctionné).
+  const avertissementLien = reinitialisationFaite ? null : texteAvertissementLienConnecte(indiceRetour);
   const inputImportRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -574,6 +577,9 @@ export default function App() {
         client={clientAuth}
         onTermine={() => {
           setReinitialisationFaite(true);
+          // Fait taire le bandeau du mur (`EcranConnexionObligatoire`) si l'utilisateur se déconnecte
+          // ensuite dans cet onglet — cf. `marquerReinitialisationReussie` dans `retourLienMagique.ts`.
+          marquerReinitialisationReussie();
           // Le marqueur est retiré de l'URL pour qu'un simple rechargement ne repropose pas l'écran
           // alors que le mot de passe est déjà changé. `replaceState` et non `location.href` : on ne
           // veut ni rechargement ni entrée d'historique supplémentaire.

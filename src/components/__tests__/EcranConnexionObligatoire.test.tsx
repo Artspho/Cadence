@@ -20,6 +20,7 @@ import type { ClientAuth } from "../../auth/supabaseClient";
 import { VERSION_POLITIQUE } from "../../content/mentionsLegales";
 import { CLE_METADONNEE_CONSENTEMENT } from "../../storage/consentementStorage";
 import { MARQUEUR_REINITIALISATION } from "../../auth/actions";
+import { marquerReinitialisationReussie } from "../../auth/retourLienMagique";
 import type { EtatSession } from "../../auth/session";
 
 const ORIGINE = "https://cadence-git-master-benoit3.vercel.app";
@@ -318,5 +319,20 @@ describe("EcranConnexionObligatoire — retour d'un lien qui n'a pas ouvert de s
   it("ne dit rien quand rien dans l'URL n'évoque un lien reçu par e-mail", () => {
     render(<EcranConnexionObligatoire session={DECONNECTE} client={fauxClient()} origine={ORIGINE} indiceRetour={AUCUN_RETOUR} />);
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+
+  it("SE TAIT après une déconnexion qui suit une réinitialisation réussie dans cet onglet (07/08/2026)", () => {
+    // Bug réel : `indiceRetour.present` reste vrai pour toute la vie de l'onglet même quand la
+    // réinitialisation a réussi (le `code` est lu avant que la bibliothèque ne le nettoie de l'URL,
+    // de façon asynchrone) — sans `marquerReinitialisationReussie`, ce bandeau annonçait un faux échec
+    // juste après une déconnexion qui suivait un vrai succès.
+    window.sessionStorage.clear();
+    marquerReinitialisationReussie();
+    try {
+      render(<EcranConnexionObligatoire session={DECONNECTE} client={fauxClient()} origine={ORIGINE} indiceRetour={RETOUR_AVEC_CODE} />);
+      expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    } finally {
+      window.sessionStorage.clear();
+    }
   });
 });

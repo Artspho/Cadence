@@ -57,7 +57,7 @@ import { MentionsLegales } from "./MentionsLegales";
 import { BOUTON_PRINCIPAL, BOUTON_SECONDAIRE, CLASSE_CHAMP, CLASSE_ETIQUETTE, CadrePleinEcran } from "./CadrePleinEcran";
 import { obtenirClientAuth, type ClientAuth } from "../auth/supabaseClient";
 import type { EtatSession } from "../auth/session";
-import { INDICE_RETOUR_LIEN, type IndiceRetourLien } from "../auth/retourLienMagique";
+import { INDICE_RETOUR_LIEN, reinitialisationReussieCetteSession, type IndiceRetourLien } from "../auth/retourLienMagique";
 import { LONGUEUR_MINIMALE_MOT_DE_PASSE, connexionMotDePasse, creerCompte, demanderReinitialisationMotDePasse } from "../auth/actions";
 
 interface EcranConnexionObligatoireProps {
@@ -204,7 +204,11 @@ export function EcranConnexionObligatoire({
    * (« demandé depuis un autre navigateur »). Une cause fausse sous une erreur juste est pire que le
    * silence qu'on venait de supprimer.
    */
-  const bandeauRetour = indiceRetour.present && (
+  // `!reinitialisationReussieCetteSession()` depuis le 07/08/2026 : sans ce garde-fou, ce bandeau
+  // annoncerait un faux échec après une déconnexion qui suit une réinitialisation réussie dans ce
+  // même onglet — `indiceRetour.present` reste vrai même quand tout a fonctionné (cf. le commentaire
+  // de `marquerReinitialisationReussie` dans `auth/retourLienMagique.ts`).
+  const bandeauRetour = indiceRetour.present && !reinitialisationReussieCetteSession() && (
     <div className="rounded-lg border border-amber/40 bg-amber/5 px-3 py-2 space-y-1" role="status">
       <p className="text-amber leading-relaxed text-sm">
         {indiceRetour.erreurTransmise === null ? "Un lien reçu par e-mail a été ouvert, mais il n'a pas ouvert de session." : `Ce lien a été refusé : ${indiceRetour.erreurTransmise}`}

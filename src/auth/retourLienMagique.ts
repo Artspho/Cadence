@@ -111,3 +111,32 @@ export function texteAvertissementLienConnecte(indice: IndiceRetourLien): { titr
  */
 export const INDICE_RETOUR_LIEN: IndiceRetourLien =
   typeof window === "undefined" ? AUCUN_INDICE : lireIndiceRetour(window.location.search, window.location.hash);
+
+const CLE_REINITIALISATION_REUSSIE = "cadence:reinitialisationReussieCetteSession";
+
+/**
+ * Marque, pour la durée de cet onglet, qu'une réinitialisation de mot de passe vient de réussir —
+ * appelé une seule fois par `EcranNouveauMotDePasse` via `onTermine` (07/08/2026).
+ *
+ * POURQUOI CE MARQUEUR EXISTE — bug trouvé en conditions réelles, symétrique de celui du 04/08 : le
+ * `code` de l'URL n'est retiré qu'APRÈS que la bibliothèque a fini son échange PKCE, de façon
+ * asynchrone, alors qu'`INDICE_RETOUR_LIEN` le lit de façon SYNCHRONE à l'import du module — donc
+ * avant ce nettoyage. Sur une réinitialisation qui réussit, `present` vaut donc `true` quand même,
+ * pas seulement en cas d'échec. `texteAvertissementLienConnecte` et le bandeau du mur
+ * (`EcranConnexionObligatoire`) prenaient ça pour un échec silencieux et l'annonçaient comme tel —
+ * pour toute la vie de l'onglet, y compris après une déconnexion qui suit un succès réel. Ce
+ * marqueur, lui, n'est vrai qu'après un succès CONFIRMÉ par `updateUser`, et sert à faire taire les
+ * deux bandeaux dans ce cas précis.
+ *
+ * Limite acceptée : si un SECOND lien de réinitialisation, différent, est ouvert dans ce même onglet
+ * après un premier succès, un vrai nouvel échec resterait muet (le marqueur du premier succès
+ * masquerait le second bandeau). Scénario jugé assez rare pour ne pas complexifier davantage.
+ */
+export function marquerReinitialisationReussie(): void {
+  if (typeof window !== "undefined") window.sessionStorage.setItem(CLE_REINITIALISATION_REUSSIE, "1");
+}
+
+/** Lu par `EcranConnexionObligatoire` pour savoir si son bandeau doit rester muet malgré `indice.present`. */
+export function reinitialisationReussieCetteSession(): boolean {
+  return typeof window !== "undefined" && window.sessionStorage.getItem(CLE_REINITIALISATION_REUSSIE) === "1";
+}

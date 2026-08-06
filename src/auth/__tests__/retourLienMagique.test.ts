@@ -1,8 +1,13 @@
+// @vitest-environment jsdom
+//
 // Le défaut que ce module répare a été trouvé EN CONDITIONS RÉELLES le 04/08/2026, pas par un test :
 // lien magique reçu, ouvert dans un autre navigateur que le demandeur, échange PKCE impossible — et
 // aucun mot à l'écran pour le dire. Ces tests décrivent ce qu'il faut savoir reconnaître dans l'URL.
-import { describe, expect, it } from "vitest";
-import { lireIndiceRetour, texteAvertissementLienConnecte } from "../retourLienMagique";
+// Environnement `jsdom` (et non le `node` par défaut du reste de la suite) depuis le 07/08/2026 :
+// `marquerReinitialisationReussie`/`reinitialisationReussieCetteSession` ont besoin de
+// `window.sessionStorage`.
+import { afterEach, describe, expect, it } from "vitest";
+import { lireIndiceRetour, marquerReinitialisationReussie, reinitialisationReussieCetteSession, texteAvertissementLienConnecte } from "../retourLienMagique";
 import { MARQUEUR_REINITIALISATION } from "../actions";
 
 describe("lireIndiceRetour — reconnaître une page ouverte par un lien reçu par e-mail", () => {
@@ -114,5 +119,20 @@ describe("texteAvertissementLienConnecte — le bandeau d'App.tsx quand une sess
     const indice = lireIndiceRetour("?token_hash=abc123&type=magiclink", "");
     const texte = texteAvertissementLienConnecte(indice);
     expect(texte?.titre.toLowerCase()).not.toContain("connecte-toi");
+  });
+});
+
+describe("marquerReinitialisationReussie / reinitialisationReussieCetteSession (07/08/2026)", () => {
+  afterEach(() => {
+    window.sessionStorage.clear();
+  });
+
+  it("rend faux avant tout appel — rien à taire tant qu'aucun succès n'est survenu", () => {
+    expect(reinitialisationReussieCetteSession()).toBe(false);
+  });
+
+  it("rend vrai une fois le succès marqué — c'est ce qui fait taire les bandeaux du 04/08", () => {
+    marquerReinitialisationReussie();
+    expect(reinitialisationReussieCetteSession()).toBe(true);
   });
 });
