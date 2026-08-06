@@ -15,7 +15,8 @@
     "verifier:rls": "node --env-file=.env scripts/verifier-rls.mjs",
     "verifier:verrou": "node --env-file=.env scripts/verifier-verrou.mjs",
     "verifier:sauvegarde": "node --env-file=.env scripts/verifier-sauvegarde-serveur.mjs",
-    "verifier:documents": "node --env-file=.env scripts/verifier-documents.mjs"
+    "verifier:documents": "node --env-file=.env scripts/verifier-documents.mjs",
+    "verifier:frais-reels": "node --env-file=.env scripts/verifier-frais-reels.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.112.0",

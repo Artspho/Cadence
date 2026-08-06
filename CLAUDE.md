@@ -132,10 +132,22 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 > `lib/envoiJustificatifsEnAttente.ts` reciblés sur un `Uploader` générique (Supabase, plus Drive).
 > Suppression complète de `lib/googleDriveAuth.ts`, `lib/googleDriveStorage.ts`,
 > `components/fraisReels/DriveSettings.tsx` + leurs 3 tests, et de `ConfigFraisReels.stockageJustificatifs`/
-> `driveConnecte`. **Signalé, PAS corrigé (hors périmètre de ce commit)** : `public/confidentialite.html`
-> (page légale orpheline, non liée depuis l'app — `content/mentionsLegales.ts` est le texte réellement
-> utilisé) mentionne encore une connexion Google Drive optionnelle, désormais fausse ; à traiter avec
-> Benoît avant toute publication de cette page.
+> `driveConnecte`. **`public/confidentialite.html` SUPPRIMÉE** (commit suivant, sur demande de Benoît) :
+> page légale orpheline, non liée depuis l'app, créée au commit `f6902fa` en même temps que Drive —
+> selon toute vraisemblance pour l'écran de consentement OAuth Google, raison d'être disparue avec lui.
+> Elle n'était pas seulement fausse sur Drive : elle affirmait « aucune donnée envoyée à un serveur »,
+> « il n'existe pas de base de données centrale », « personne d'autre que vous n'a accès », et donnait
+> Benoît en personne comme éditeur (au lieu de l'association) avec un mauvais contact. Elle était
+> publiquement accessible. `content/mentionsLegales.ts` reste la SOURCE UNIQUE ; ne pas recréer de
+> doublon HTML écrit à la main — c'est cette duplication qui a produit la dérive.
+>
+> **Trouvé au passage, PAS corrigé (à arbitrer avec Benoît)** : le texte légal n'est atteignable QUE
+> depuis `MonProfil` (`MentionsLegales.tsx`), donc APRÈS connexion — alors que
+> `content/mentionsLegales.ts` donne pour base légale « ton consentement, donné explicitement à
+> l'inscription ». `EcranConnexionObligatoire.tsx` ne contient aucun lien vers ce texte (vérifié : zéro
+> occurrence de « confidentialité »/« légal »/« consent »). Un futur visiteur consent donc sans pouvoir
+> lire la politique. Si un jour une page publique est nécessaire pour combler ça, elle doit être
+> GÉNÉRÉE depuis `content/mentionsLegales.ts`, pas réécrite à la main.
 >
 > **Une fois ce commit validé et committé : reprendre le commit 6 de la phase 6** (frais réels —
 > bascule sur le canal unique Supabase Storage + retrait complet de Google Drive), inchangé dans son
