@@ -472,14 +472,19 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 > ✅ **LE FOURNISSEUR EST TRANCHÉ, ET CE N'EST PAS UN SERVICE D'E-MAILING** : Benoît a **OVH** pour la
 > messagerie de `lesartsphoceens.fr`, et ses identifiants SMTP se collent directement dans Supabase →
 > Authentication → Emails → SMTP Settings. Recommandé pour trois raisons : aucun compte à créer, aucun
-> DNS à configurer, et **aucun nouveau tiers** qui voit les adresses des testeurs. Il veut envoyer
-> depuis `noreply@lesartsphoceens.fr` — **c'est possible, à une condition** : OVH authentifie l'envoi
-> comme une **vraie boîte** et refuse en général un expéditeur qui ne correspond pas au compte
-> authentifié, donc `noreply@` doit être créée comme adresse e-mail (pas un alias), avec son mot de
-> passe. `Username` = l'adresse complète. Serveur selon le produit OVH, **à confirmer dans son espace
+> DNS à configurer, et **aucun nouveau tiers** qui voit les adresses des testeurs.
+> ⚠️ **ADRESSE RÉVISÉE le 06/08/2026 (troisième session) : `cadence@lesartsphoceens.fr`, PAS
+> `noreply@lesartsphoceens.fr`.** Benoît suit déjà cette boîte — ça évite la question de la redirection
+> des réponses, sinon nécessaire pour un `noreply@` (cf. la ligne barrée ci-dessous, gardée pour
+> mémoire). Reste vrai pour la nouvelle adresse : OVH authentifie l'envoi comme une **vraie boîte** et
+> refuse en général un expéditeur qui ne correspond pas au compte authentifié — `Username` = l'adresse
+> complète, mot de passe de la boîte. Serveur selon le produit OVH, **à confirmer dans son espace
 > client** : `ssl0.ovh.net` (MX Plan), `pro*.mail.ovh.net` (Email Pro), `ex*.mail.ovh.net` (Exchange).
-> Conseillé en plus : une redirection d'OVH de `noreply@` vers sa vraie adresse, sinon un testeur qui
-> répond écrit dans le vide.
+> 🔴 **BLOQUÉ au 06/08/2026 (troisième session) : Benoît n'a pas accès à son espace client OVH pour
+> l'instant** (« je demande un code plus tard ») — reporté, pas oublié.
+> ~~Il voulait d'abord envoyer depuis `noreply@lesartsphoceens.fr` — conseillé alors : une redirection
+> d'OVH de `noreply@` vers sa vraie adresse, sinon un testeur qui répond écrit dans le vide. Devenu sans
+> objet avec `cadence@lesartsphoceens.fr`.~~
 > ⚠️ **APRÈS le branchement, monter le plafond dans Authentication → Rate Limits.** Tant qu'on est sur
 > le service d'envoi de Supabase, ce champ ne sert à rien : les 2/h sont imposés par eux.
 > ⚠️ **CONSÉQUENCE JURIDIQUE À NE PAS OUBLIER** : le service d'envoi devient un intermédiaire qui voit
@@ -1185,6 +1190,78 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 > hybride Workspace » proprement dite** (recherche sur `CLAUDE.md`, `docs/`). Si cette recherche a été
 > faite ailleurs (fil Claude.ai, notes hors dépôt), en déposer la conclusion ici avant de trancher —
 > sinon la décision repartirait de zéro sans le savoir.
+>
+> ## ✅ SESSION DU 06/08/2026, SOIRÉE — IMPORT IA RECONFIRMÉ SUR SES 9 TYPES, DEUX BUGS DE STOCKAGE
+> ## CORRIGÉS (6 commits, `9a80785` → `402ad9a`)
+>
+> **Referme la réserve de la session précédente** (« l'import IA n'a PAS été reconfirmé fonctionnel ») :
+> Benoît a testé ses documents France Travail réels un par un, et confirme que les 9 types reconnus
+> stockent tous correctement dans « Mon dossier » (« j'ai toutes les catégories ça marche »).
+>
+> ### 🔴 « Invalid key » — Supabase Storage refuse les noms de fichier accentués (`402ad9a`)
+>
+> Cause exacte obtenue en demandant à Benoît le texte EXACT du bandeau d'erreur (au lieu de deviner) :
+> `Invalid key: …/releve_situation/…-Relevé_de_situation_20251125.pdf`. `construireCheminStockage`
+> (`storage/documentsStorage.ts`) ne nettoyait que les espaces et les séparateurs de chemin (`/`, `\`)
+> — les accents passaient tels quels. Touchait relevé de situation et déclaration fiscale annuelle
+> (ses vrais fichiers sont accentués), pas les types déjà testés avant (noms sans accent) : le même
+> bug, deux symptômes qui semblaient distincts.
+> Correctif : `normalize("NFD")` décompose chaque lettre accentuée en lettre de base + diacritique
+> séparé, `\p{M}` (propriété Unicode « Mark », pas une plage de points de code en dur) retire les
+> diacritiques, puis tout caractère restant hors alphanumérique/`.`/`-`/`_` devient `_`. Un nom ne peut
+> plus jamais devenir vide : la lettre de base survit toujours. 2 tests, dont le cas réel exact.
+>
+> ### 🔴 Le refus générique (500) de l'extraction n'était logué NULLE PART (`fdad60a`)
+>
+> Un relevé de situation avait produit un 500 sans aucune trace exploitable — le message reste
+> volontairement générique côté client (jamais le contenu du document dans un message d'erreur), et
+> le bloc `catch` du handler ne loguait rien côté serveur non plus. `console.error` ajouté avant la
+> réponse 500 dans `api/extract-document.ts` : visible dans Vercel → Logs (⚠️ case « Error » à cocher
+> explicitement, sinon la liste reste vide même avec des erreurs récentes ; rétention 1h sur le plan
+> gratuit).
+>
+> ### Détection de doublon (`9a80785`, `12fef21`) et indicateur de chargement (`9a80785`)
+>
+> Demande de Benoît : « les documents peuvent se mettre en double, on peut éviter ça ? ». Avant de
+> conserver un fichier sur le serveur, `chercherDoublon` (`storage/documentsStorage.ts`) cherche un
+> document du même utilisateur avec le même nom ET la même taille déjà dans « Mon dossier » —
+> approximatif par construction (pas de hash de contenu), mais ne bloque JAMAIS : un avertissement
+> (`AvertissementDoublonDocument.tsx`) laisse toujours le choix de « conserver quand même ». Posé sur
+> les deux canaux d'import (AEM/bulletin) puis étendu aux justificatifs de frais réels et de biens
+> amortis (`DepenseForm.tsx`, `AmortissementBiens.tsx`) — hors périmètre délibérément :
+> `envoyerJustificatifsLocaux` (migration ponctuelle, rien dont ces fichiers pourraient être le
+> doublon). ⚠️ **A été suspectée à chaque nouveau bug de stockage signalé ce fil, et n'était jamais la
+> cause** — vérifié en demandant si l'écran d'avertissement apparaissait, jamais supposé.
+> Même commit : un cercle animé (`Spinner.tsx`) pendant l'extraction/l'appel IA, qui n'affichait avant
+> qu'un texte statique pendant plusieurs secondes — donnait l'impression d'un plantage.
+>
+> ### Lien e-mail refusé/expiré, muet quand une session est déjà active (`de7905a`)
+>
+> Benoît a cliqué un lien de réinitialisation qui avait en réalité **expiré** (`otp_expired`) — pas un
+> bug du marqueur de retour. Mais ça a révélé un vrai défaut : `EcranConnexionObligatoire` porte déjà
+> un bandeau qui explique un lien refusé, mais IL NE S'AFFICHE QUE QUAND AUCUNE SESSION N'EST OUVERTE
+> (le mur). Avec une session déjà active (son cas), l'app continuait tout droit sur le tableau de bord,
+> sans jamais dire que le lien avait échoué — un état muet, interdit par le devoir n°2. Nouveau bandeau
+> symétrique dans `App.tsx` (ambre, refermable), texte partagé via la nouvelle fonction pure
+> `texteAvertissementLienConnecte` (`auth/retourLienMagique.ts`) — délibérément PAS le même texte que
+> celui du mur, qui invite à se connecter, ce qui ne veut rien dire une fois déjà connecté.
+> ⚠️ Le branchement dans `App.tsx` suit la même limite déjà documentée pour la branche sœur
+> (`reinitialisation`) : non couvert par un test React (`INDICE_RETOUR_LIEN` est figé à l'import du
+> module), vérifié à l'écran avec l'URL d'erreur réelle. La fonction pure, elle, a 3 tests.
+>
+> ### Un type de document hors périmètre IA, jamais vérifié à l'écran
+>
+> Benoît a signalé qu'un fichier nommé « Justificatif après inscription… » ne « marchait pas ». Lu
+> directement : c'est une lettre France Travail de demande de pièces complémentaires (RIB, attestations
+> employeur, contrat de travail) — aucun montant, taux ou période à extraire, donc rien à voir avec un
+> bug. `non_reconnu` attendu, classement manuel via `SelecteurTypeNonReconnu` (« Document non classé »).
+> ⚠️ **Benoît a dit « ok on oublie » avant de confirmer si ce sélecteur s'affiche vraiment** pour ce
+> document précis — ne pas écrire que c'est vérifié.
+>
+> **1171 tests verts** (91 fichiers), `tsc -b` propre sur les deux tsconfig, `tsc -p tsconfig.api.json`
+> propre, `npm run build` propre. Tout poussé sur `origin/master` jusqu'à `402ad9a`, sur demande
+> explicite de Benoît. Détail complet du bloc de reprise et des points encore ouverts (URL de
+> référence, SMTP OVH, réglage Supabase Site URL) : `docs/reprise.md`.
 
 ### Le plus récent d'abord — 03/08/2026 (revue complète du code, et ce qu'elle a déclenché)
 

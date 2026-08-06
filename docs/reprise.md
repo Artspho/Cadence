@@ -8,11 +8,12 @@ Mémoire durable à consulter au démarrage : `CLAUDE.md`, `docs/SPEC.md`, `docs
 
 Deux devoirs sacrés : (1) ne jamais perdre les données ; (2) ne jamais afficher un chiffre faux (ni faux « feu vert » rassurant, ni faux « Bloqué », ni faux montant, ni fausse alerte, ni valeur sentinelle brute).
 
-État (mis à jour le **06/08/2026**, fin de la SECONDE session du jour) : les deux devoirs sacrés sont
-tenus. **1147 tests verts (91 fichiers), `tsc -b` propre sur les deux tsconfig, `npm run build`
-propre.** Dernier commit : `f4a01f9`. `master` est la seule branche, working tree **propre**, et
-**tout est poussé sur `origin/master`** (écart vérifié à 0 après `git fetch`) — poussé sur demande
-explicite de Benoît, jamais spontanément (mémoire `cadence_push_credentials.md`).
+État (mis à jour le **06/08/2026**, fin de la TROISIÈME session du jour) : les deux devoirs sacrés
+sont tenus. **1171 tests verts (91 fichiers), `tsc -b` propre sur les deux tsconfig, `tsc -p
+tsconfig.api.json` propre, `npm run build` propre.** Dernier commit : `402ad9a`. `master` est la seule
+branche, working tree **propre**, et **tout est poussé sur `origin/master`** (écart vérifié à 0 après
+`git fetch`) — poussé sur demande explicite de Benoît, jamais spontanément (mémoire
+`cadence_push_credentials.md`).
 
 ⚠️ **La pile technique de l'en-tête ci-dessus n'est plus exacte** : « localStorage » n'est plus la
 source de vérité depuis la phase 5 de la refonte Supabase. **Supabase (Paris, `eu-west-3`) est la
@@ -22,29 +23,72 @@ plus que de copie locale (lecture seule si le serveur est muet). Dépendances aj
 
 ## ▶ BLOC DE REPRISE — à lire en premier au prochain fil
 
-**Où on en est :** la phase 6 est terminée depuis la session précédente. Cette session-ci a **refondu
-l'authentification** : le **lien magique n'existe plus** (demande de Benoît : « je ne comprends pas son
-intérêt, il me gonfle »), remplacé par le parcours standard — créer un compte (adresse + mot de passe)
-→ confirmer l'adresse par e-mail → se connecter → « **mot de passe oublié** » en secours. Détail
-complet dans `CLAUDE.md`, section « SESSION DU 06/08/2026, APRÈS-MIDI ».
+**Où on en est :** la phase 6 est terminée depuis deux sessions. La session précédente (la SECONDE du
+06/08) avait refondu l'authentification (lien magique supprimé). **Cette troisième session a fait
+passer l'import IA de « jamais reconfirmé fonctionnel » à « vérifié par Benoît sur ses 9 types de
+documents réels »**, en trouvant et corrigeant deux vrais bugs de stockage au passage — détail dans le
+résumé de session plus bas.
 
 **Les 4 migrations SQL 0001 à 0004 sont toutes appliquées** sur le vrai projet Supabase.
 
-🔴 **LE PREMIER POINT À TRAITER, ET IL EXPLIQUE À LUI SEUL TROIS SYMPTÔMES : l'URL de référence n'est
-pas tranchée.** Trois URL servent l'app (sondées le 06/08) — `cadence-git-master-benoit3.vercel.app`
-(**la seule autorisée**), `cadence-benoit3.vercel.app`, `cadence.vercel.app`. Benoît naviguait sur une
-non autorisée, ce qui a produit : (1) l'import IA refusé en 403, (2) l'écran de décision « local ou
-serveur » à sa connexion — **chaque origine a son propre `localStorage`**, (3) et « mot de passe
-oublié » qui échouerait aussi, les Redirect URLs de Supabase ne listant que l'URL de branche.
-**Sa décision est en attente** : garder l'URL de branche (rien à changer, mais imbuvable à donner à des
-testeurs) ou faire de `cadence.vercel.app` la référence (3 endroits à mettre à jour — liste d'origines
-de l'API, Redirect URLs Supabase, et une copie locale qui repart de zéro une fois).
-⚠️ **Ne PAS élargir la liste d'origines à `*.vercel.app`** : n'importe quelle page hébergée là pourrait
-alors faire tourner la facture Mistral. C'est exactement ce que la garde existe pour empêcher.
-⚠️ **L'import IA n'a PAS été reconfirmé fonctionnel** : la cause du 403 est identifiée, mais Benoît n'a
-pas retenté depuis la bonne URL. Ne pas écrire que c'est réglé.
+✅ **URL de référence : décidée, ne pas rouvrir sans que Benoît le redemande.** Il garde
+`cadence-git-master-benoit3.vercel.app` (« on change rien pour l'instant ») — aucun changement de code
+à faire. **Reste un réglage Supabase probablement toujours à faire de SON côté** (Authentication → URL
+Configuration) : `Site URL` pointait vers `http://localhost:5183`, ce qui a fait atterrir un lien de
+réinitialisation sur `localhost` au lieu de la bonne URL. La procédure lui a été donnée (`Site URL` =
+l'URL de branche, l'ajouter aussi aux `Redirect URLs`) — **jamais confirmé fait**. Si un testeur se
+plaint d'un lien mort, commencer par là.
 
-**Cinq scripts de preuve contre le VRAI serveur**, tous verts au 06/08/2026 :
+✅ **IMPORT IA RECONFIRMÉ FONCTIONNEL — Benoît l'a testé sur les 9 types reconnus, tous stockent
+correctement dans « Mon dossier » (« j'ai toutes les catégories ça marche »).** Referme la réserve de
+la session précédente. Deux vrais bugs trouvés et corrigés en creusant ses retours (aucun n'était la
+détection de doublon posée la veille, bien qu'elle en ait été la première suspecte à chaque fois) :
+1. **Un nom de fichier accentué faisait échouer le dépôt** (« Invalid key », Supabase Storage refuse
+   les clés accentuées) — touchait relevé de situation et déclaration fiscale annuelle, PAS les autres
+   types testés avant (noms sans accent). Corrigé (`402ad9a`), 2 tests.
+2. **Le refus générique (500) de l'extraction n'était logué NULLE PART**, ni côté client (message
+   volontairement générique) ni côté serveur (aucun `console.error`) — un relevé de situation avait
+   produit un 500 totalement indiagnosticable. Corrigé (`fdad60a`) : un `console.error` avant la
+   réponse, visible dans Vercel → Logs (case « Error » à cocher, rétention 1h sur le plan gratuit).
+
+⚠️ **Un type de document existe HORS du périmètre des 9 types IA, jamais vérifié à l'écran.** Une
+lettre France Travail « documents à transmettre concernant votre demande d'allocations » (demande de
+pièces complémentaires) n'a ni montant ni taux ni période à extraire — `non_reconnu` attendu, à
+classer manuellement (« Document non classé ») via `SelecteurTypeNonReconnu`. **Benoît a dit « ok on
+oublie » avant de confirmer si ce sélecteur s'affiche vraiment pour ce document précis** — ne pas
+écrire que c'est vérifié, le lui redemander s'il compte importer ce genre de courrier.
+
+⚠️ **`EcranNouveauMotDePasse` toujours pas vu à l'écran avec un lien VALIDE de bout en bout.** Le lien
+que Benoît a testé ce fil avait en fait **expiré** (`otp_expired`) — pas un bug du marqueur. Un vrai
+bug trouvé en creusant ce faux positif, et corrigé (`de7905a`) : le bandeau qui explique un lien
+refusé/expiré n'existait que sur le mur (session déconnectée) — avec une session déjà active (son
+cas), l'app continuait tout droit vers le tableau de bord, sans jamais dire que le lien avait échoué.
+Nouveau bandeau symétrique dans `App.tsx`, texte partagé via `texteAvertissementLienConnecte`
+(`retourLienMagique.ts`). **Reste à faire** : retester avec un lien FRAIS depuis la bonne URL, une fois
+le réglage Supabase ci-dessus vérifié.
+
+🔴 **SMTP OVH — toujours BLOQUANT dès qu'un testeur externe est invité.** Benoît n'a pas accès à son
+espace client OVH pour l'instant (« je demande un code plus tard ») — reporté, pas oublié. **Adresse
+retenue : `cadence@lesartsphoceens.fr`** (pas `noreply@` — c'est une vraie boîte qu'il suit déjà,
+évite la question de redirection des réponses). Procédure inchangée sinon : cf. section « DETTE
+ÉTABLIE — un SMTP » de `CLAUDE.md`. **Je ne peux ni créer le compte ni saisir le mot de passe.**
+
+✅ **Détection de doublon posée sur TOUS les canaux de dépôt** (import IA, import local AEM/bulletin,
+frais réels, biens amortis) : avant de conserver un fichier, `chercherDoublon` (même nom + même taille
+déjà dans « Mon dossier ») déclenche un avertissement — jamais un blocage, toujours une confirmation
+explicite possible (« Conserver quand même »). Hors périmètre délibérément : la migration ponctuelle
+`envoyerJustificatifsLocaux` (rien dont ces fichiers pourraient être le doublon, ce sont eux-mêmes
+jamais encore envoyés). Commits `9a80785`, `12fef21`.
+
+✅ **Indicateur de chargement animé** pendant l'extraction pdfjs / l'appel IA — avant, un texte statique
+pendant plusieurs secondes donnait l'impression d'un plantage (`9a80785`).
+
+⏸ **« Mon dossier » et le réimport des AEM/bulletins d'avant le 05/08** : Benoît a manifestement importé
+plusieurs documents ce fil (c'est comme ça que les deux bugs de stockage ont été trouvés), et confirme
+que le regroupement est « bien visible ». **Mais aucune confirmation explicite que TOUT est réimporté**
+— ne pas le supposer acquis, revérifier si le sujet revient.
+
+**Cinq scripts de preuve contre le VRAI serveur**, tous verts au 06/08/2026 (non rejoués ce fil) :
 `npm run verifier:rls` (64/64) · `verifier:verrou` (7/7) · `verifier:sauvegarde` (7/7) ·
 `verifier:documents` (15/15) · `verifier:frais-reels` (10/10) · `verifier:consentement` (7/7).
 ⚠️ `verifier:consentement` **ne nettoie pas** sa ligne de test, et c'est voulu : il ne PEUT pas
@@ -59,39 +103,63 @@ supprimer sa propre preuve. Benoît a effacé la ligne `TEST-VERIFICATION-%` dep
    l'affiliation aux 507 h ?) : si la réponse est non, Cadence **surcompte** aujourd'hui un mois très
    chargé et peut afficher un faux « Sécurité ». Aucun effet sur les données de Benoît (20 cachets
    maximum), mais ça ne vaut pas pour un autre testeur.
-2. ✅ **Phase 7 — le mur hors ligne est ARBITRÉ (06/08/2026) : ON NE CHANGE RIEN.** Trois options lui
+2. 🔴 **SMTP OVH** — cf. ci-dessus, bloqué sur l'accès de Benoît à OVH.
+3. ⚠️ **Réglage `Site URL`/`Redirect URLs` sur Supabase** — cf. ci-dessus, jamais confirmé fait, puis
+   retester le lien de réinitialisation avec un e-mail FRAIS.
+4. ✅ **Phase 7 — le mur hors ligne est ARBITRÉ (06/08/2026) : ON NE CHANGE RIEN.** Trois options lui
    ont été présentées, il a choisi **B** (statu quo). Cadence est donc **inutilisable hors ligne
    au-delà d'une heure** — jeton expiré, rafraîchissement impossible faute de réseau, `useSession`
    rend `indetermine`, le mur s'affiche alors que les données sont dans le navigateur. **C'est assumé,
-   ne pas le « réparer » spontanément.** Ce qui a été corrigé à la place, ce sont les trois endroits
-   qui affirmaient le contraire (décision 2 de la phase 5 dans `CLAUDE.md` citait le « jeton expiré »
-   comme cause de lecture seule ; un commentaire d'`App.tsx` prétendait que la bibliothèque rend
-   « déconnecté » hors ligne, alors qu'elle rend une **erreur** — vérifié dans
-   `@supabase/auth-js@2.112.0`). En dessous d'une heure, la lecture seule fonctionne et n'est pas
-   concernée. ⬜ **Le périmètre de la phase 7 dans son ENSEMBLE reste, lui, non écrit** : seul ce
-   défaut-là a été instruit et tranché.
-3. 🔴 **SMTP OVH — devenu BLOQUANT dès qu'il invite un testeur, alors que c'était « pas urgent ».** La
-   suppression du lien magique met la confirmation d'adresse sur le chemin critique de TOUTE
-   inscription : un testeur créerait son compte, ne recevrait jamais rien (le service d'envoi par défaut
-   de Supabase n'écrit **qu'aux adresses de son organisation**, et 2 messages/heure), et sa première
-   connexion échouerait en « Email not confirmed ». **Le fournisseur est tranché : OVH**, sa messagerie
-   existante — aucun compte à créer, aucun DNS, aucun nouveau tiers. Il veut envoyer depuis
-   `noreply@lesartsphoceens.fr` : possible, **à condition de la créer comme vraie boîte** (OVH refuse un
-   expéditeur qui n'est pas le compte authentifié). Valeurs et pièges : cf. la section « DETTE ÉTABLIE —
-   un SMTP » de `CLAUDE.md`, mise à jour ce jour. **Je ne peux ni créer le compte ni saisir le mot de
-   passe** — ces deux gestes sont les siens.
-4. ⚠️ **`EcranNouveauMotDePasse` n'a JAMAIS été vu à l'écran.** Benoît s'est débloqué par « Mon profil →
-   Compte », pas par le lien de réinitialisation (il avait grillé ses 2 envois de l'heure). Cet écran
-   est couvert par **7 tests, rien de plus**. Ne pas écrire qu'il est vérifié. Ce qui l'est : premier
-   écran directement sur adresse + mot de passe, écran « mot de passe oublié » sans champ mot de passe
-   et avec l'avertissement avant l'envoi, marqueur de réinitialisation sans session ⇒ le mur.
-5. ⏸ **État inconnu, il avait dit « en cours » puis n'en a plus reparlé** : la vérification du
-   regroupement de « Mon dossier » + téléchargement zip (prouvé par 35 tests seulement, `06d5190`,
-   `289c8e1`), et le réimport de ses AEM/bulletins d'avant le 05/08 avec « Conserver » (jusqu'au commit
-   4, l'app lisait le fichier puis le **jetait** — rien n'est perdu, ses PDF sont sur son disque).
-   **Le lui redemander, ne pas le supposer fait.**
+   ne pas le « réparer » spontanément.** ⬜ **Le périmètre de la phase 7 dans son ENSEMBLE reste, lui,
+   non écrit** : seul ce défaut-là a été instruit et tranché.
 
-**Quatre pièges de ce fil, à ne pas rejouer :**
+**Pièges de la TROISIÈME session, à ne pas rejouer :**
+- **Demander le texte EXACT d'un message d'erreur, mot pour mot, avant toute hypothèse.** Trois
+  hypothèses (doublon, contrainte SQL de migration 0003, RLS) auraient pu faire perdre du temps sur le
+  stockage manquant de la déclaration fiscale et du relevé de situation — le texte exact du bandeau
+  (« Invalid key: …Relevé_de_situation… ») a donné la vraie cause immédiatement.
+- **Ma détection de doublon de la veille était la suspecte évidente à chaque nouveau bug de stockage
+  signalé — et ne l'était jamais.** Vérifié en demandant directement si l'écran d'avertissement
+  apparaissait, plutôt que de supposer une régression de mon propre code. Généraliser : un changement
+  récent n'est pas automatiquement la cause du bug suivant, ça se vérifie comme le reste.
+- **Un chemin d'erreur catch-all peut rester invisible des DEUX côtés à la fois** (message générique
+  côté client par design, aucun log côté serveur par oubli) — les deux réserves se cumulent, pas
+  seulement l'une ou l'autre.
+
+**Faits utiles, mesurés ce fil :**
+- **Supabase Storage refuse les clés d'objet portant des caractères accentués** (« Invalid key ») —
+  à vérifier avant toute future convention de nommage de fichier dans ce projet.
+- **Rétention des logs Vercel : 1 heure sur le plan gratuit** (case « Error » à cocher explicitement
+  dans l'onglet Logs, sinon la liste reste vide même avec des erreurs récentes).
+- **`Justificatif après inscription`** (nom donné par Benoît) est en réalité une lettre France Travail
+  de demande de pièces complémentaires — pas un type que l'IA de Cadence reconnaît, et ce n'est pas un
+  bug qu'elle ne le reconnaisse pas.
+
+---
+
+**Résumé de la TROISIÈME session du 06/08/2026 (6 commits, `9a80785` → `402ad9a`, tous poussés)** :
+1. `9a80785` — feat : indicateur de chargement animé pendant l'extraction/l'appel IA, et détection de
+   doublon (même nom + même taille) avant de conserver un document — canaux AEM/bulletin (import local
+   et IA).
+2. `de7905a` — fix : un lien e-mail refusé/expiré restait muet quand une session était déjà active
+   (nouveau bandeau dans `App.tsx`, texte partagé via `texteAvertissementLienConnecte`).
+3. `12fef21` — feat : détection de doublon étendue aux justificatifs de frais réels et de biens amortis
+   (`DepenseForm.tsx`, `AmortissementBiens.tsx`).
+4. `fd0724e` — docs : rattrapage des notes de fin de session précédente, restées non commitées.
+5. `fdad60a` — fix : le refus générique (500) de l'import IA n'était logué nulle part — `console.error`
+   ajouté côté serveur (`api/extract-document.ts`).
+6. `402ad9a` — fix : un nom de fichier accentué faisait échouer le dépôt sur Supabase Storage
+   (« Invalid key ») — cause exacte trouvée dans le bandeau d'erreur affiché à Benoît, sur un relevé de
+   situation réel. Corrige aussi la déclaration fiscale annuelle (même cause).
+
+Méthode de ce fil : Benoît a testé l'import IA type par type en conditions réelles (ses propres
+documents France Travail) plutôt qu'en environnement de test — c'est ce qui a révélé les deux bugs de
+stockage, invisibles depuis la lecture du code seule (aucun test n'utilisait de nom de fichier
+accentué avant ce fil).
+
+---
+
+**Quatre pièges de la SECONDE session, à ne pas rejouer :**
 - 🔴 **CINQUIÈME FOIS : un test ne compare un composant qu'à lui-même.** Benoît ne pouvait pas créer de
   compte — « Créer un compte reste grisé même avec la case cochée ». Le bouton était **ACTIF**
   (`disabled=false`, mesuré) mais son seul écart visuel actif/inactif était l'opacité 0,4 → 1 sur du
