@@ -10,13 +10,15 @@
  * se trompe sur un type rarement testé (ex. `attestation_cpam`, sans spécimen réel pour l'instant).
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { obtenirClientAuth, obtenirClientDocuments, obtenirClientFichiers, type ClientAuth, type ClientDocuments, type ClientFichiers } from "../auth/supabaseClient";
 import { useSession } from "../auth/session";
 import { corrigerTypeDocument, listerDocuments, obtenirUrlTelechargement, type LigneDocument, type TypeDocument } from "../storage/documentsStorage";
 import { formaterTaille } from "../lib/capaciteStockage";
-import { telechargerDepuisUrl } from "../lib/telechargement";
+import { horodatagePourNomFichier, telechargerBlob, telechargerDepuisUrl } from "../lib/telechargement";
 import { LIBELLES_TYPE_DOCUMENT, TYPES_DOCUMENT_ORDONNES } from "../content/typeDocumentLabels";
+import { regrouperDocuments, type GroupeDossier, type SousGroupeDossier } from "../lib/regroupementDossier";
+import { construireArchive, nomArchive, type EchecArchive } from "../lib/archiveDossier";
 
 interface MonDossierProps {
   /** Injectés par les tests ; par défaut, les clients de l'app (`null` si non configurés). */
@@ -39,6 +41,84 @@ function Cadre({ children }: { children: React.ReactNode }) {
       </div>
       <div className="border-t border-line">{children}</div>
     </section>
+  );
+}
+
+type EtatArchive =
+  | { statut: "repos" }
+  | { statut: "construction"; traites: number; total: number }
+  /** L'archive est téléchargée, mais des fichiers manquent — À AFFICHER, jamais à taire. */
+  | { statut: "partiel"; echecs: EchecArchive[]; nombreInclus: number }
+  | { statut: "echec"; message: string };
+
+/**
+ * Bouton « tout télécharger » d'un groupe (ou du dossier entier) — 06/08/2026.
+ *
+ * ⚠️ L'ÉTAT `partiel` EST LE POINT DÉLICAT. Une archive à laquelle il manque des fichiers est bel et
+ * bien téléchargée (les autres documents sont dedans, autant les donner), mais elle NE DOIT JAMAIS
+ * passer pour complète : les manquants sont nommés à l'écran, et `construireArchive` les inscrit
+ * aussi dans l'archive. Afficher un simple « Téléchargé » ici serait un faux feu vert (devoir n°2).
+ */
+function BoutonArchive({
+  documents,
+  clientFichiers,
+  libelleGroupe,
+  intitule,
+}: {
+  documents: LigneDocument[];
+  clientFichiers: ClientFichiers;
+  /** Suffixe du nom de fichier. Absent = archive du dossier entier. */
+  libelleGroupe?: string;
+  intitule: string;
+}) {
+  const [etat, setEtat] = useState<EtatArchive>({ statut: "repos" });
+
+  async function telecharger() {
+    setEtat({ statut: "construction", traites: 0, total: documents.length });
+    try {
+      const resultat = await construireArchive(documents, {
+        obtenirUrl: (document) => obtenirUrlTelechargement(clientFichiers, document.cheminStockage),
+        onProgression: (traites, total) => setEtat({ statut: "construction", traites, total }),
+      });
+      telechargerBlob(nomArchive(horodatagePourNomFichier(), libelleGroupe), resultat.archive);
+      setEtat(resultat.echecs.length > 0 ? { statut: "partiel", echecs: resultat.echecs, nombreInclus: resultat.nombreInclus } : { statut: "repos" });
+    } catch (incident: unknown) {
+      setEtat({ statut: "echec", message: incident instanceof Error ? incident.message : String(incident) });
+    }
+  }
+
+  const enCours = etat.statut === "construction";
+
+  return (
+    <div className="min-w-0">
+      <button
+        type="button"
+        onClick={telecharger}
+        disabled={enCours || documents.length === 0}
+        className="text-xs px-3 py-1.5 rounded-lg border border-line text-muted disabled:opacity-40 whitespace-nowrap"
+      >
+        {enCours ? `${etat.traites}/${etat.total}…` : intitule}
+      </button>
+      {etat.statut === "partiel" && (
+        <div className="text-xs text-amber leading-relaxed mt-1" role="alert">
+          <p>
+            Archive téléchargée mais INCOMPLÈTE : {etat.nombreInclus} document(s) inclus, {etat.echecs.length} manquant(s). Ils sont toujours dans Cadence — réessaie.
+          </p>
+          <ul className="list-disc pl-4 mt-0.5">
+            {etat.echecs.map((echec) => (
+              <li key={echec.nomFichier}>
+                {echec.nomFichier} — {echec.motif}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {etat.statut === "echec" && (
+        <p className="text-xs text-red leading-relaxed mt-1" role="alert">
+          Archive impossible : {etat.message}
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -126,6 +206,88 @@ function LigneDocumentAffichee({
   );
 }
 
+/** Résumé « 4 documents · 1,2 Mo » — le total par catégorie que Benoît veut voir d'un coup d'œil. */
+function resume(nombre: number, octets: number): string {
+  return `${nombre} document${nombre > 1 ? "s" : ""} · ${formaterTaille(octets)}`;
+}
+
+function SousGroupeAffiche({
+  sousGroupe,
+  clientFichiers,
+  clientDocuments,
+  onTypeCorrige,
+}: {
+  sousGroupe: SousGroupeDossier;
+  clientFichiers: ClientFichiers;
+  clientDocuments: ClientDocuments;
+  onTypeCorrige: (id: string, nouveauType: TypeDocument) => void;
+}) {
+  return (
+    <div className="border-t border-line">
+      <div className="px-4 py-2 bg-surface-2/30 flex items-center justify-between gap-3 flex-wrap">
+        <div className="min-w-0">
+          <p className="text-xs text-ink">{sousGroupe.libelle}</p>
+          <p className="text-xs text-faint mt-0.5">{resume(sousGroupe.documents.length, sousGroupe.totalOctets)}</p>
+        </div>
+        <BoutonArchive documents={sousGroupe.documents} clientFichiers={clientFichiers} libelleGroupe={sousGroupe.categorie ?? "sans-categorie"} intitule="Tout télécharger" />
+      </div>
+      {sousGroupe.documents.map((document) => (
+        <LigneDocumentAffichee key={document.id} document={document} clientFichiers={clientFichiers} clientDocuments={clientDocuments} onTypeCorrige={onTypeCorrige} />
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Un groupe de type de document, repliable. OUVERT par défaut : un dossier dont tout est replié
+ * donnerait l'impression d'être vide, ce qui est exactement l'inverse du but.
+ */
+function GroupeAffiche({
+  groupe,
+  clientFichiers,
+  clientDocuments,
+  onTypeCorrige,
+}: {
+  groupe: GroupeDossier;
+  clientFichiers: ClientFichiers;
+  clientDocuments: ClientDocuments;
+  onTypeCorrige: (id: string, nouveauType: TypeDocument) => void;
+}) {
+  const [ouvert, setOuvert] = useState(true);
+
+  return (
+    <div className="border-t border-line first:border-t-0">
+      <div className="px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
+        <button type="button" onClick={() => setOuvert((o) => !o)} aria-expanded={ouvert} className="min-w-0 text-left">
+          <p className="text-sm text-ink">
+            <span aria-hidden="true" className="text-faint mr-1.5">
+              {ouvert ? "▾" : "▸"}
+            </span>
+            {groupe.libelle}
+          </p>
+          <p className="text-xs text-faint mt-0.5 ml-4">{resume(groupe.documents.length, groupe.totalOctets)}</p>
+        </button>
+        <BoutonArchive documents={groupe.documents} clientFichiers={clientFichiers} libelleGroupe={groupe.libelle} intitule="Tout télécharger" />
+      </div>
+
+      {ouvert &&
+        (groupe.sousGroupes.length > 0
+          ? groupe.sousGroupes.map((sousGroupe) => (
+              <SousGroupeAffiche
+                key={sousGroupe.categorie ?? "sans-categorie"}
+                sousGroupe={sousGroupe}
+                clientFichiers={clientFichiers}
+                clientDocuments={clientDocuments}
+                onTypeCorrige={onTypeCorrige}
+              />
+            ))
+          : groupe.documents.map((document) => (
+              <LigneDocumentAffichee key={document.id} document={document} clientFichiers={clientFichiers} clientDocuments={clientDocuments} onTypeCorrige={onTypeCorrige} />
+            )))}
+    </div>
+  );
+}
+
 export function MonDossier({
   clientAuth = obtenirClientAuth(),
   clientDocuments = obtenirClientDocuments(),
@@ -133,6 +295,9 @@ export function MonDossier({
 }: MonDossierProps) {
   const session = useSession(clientAuth);
   const [etatListe, setEtatListe] = useState<EtatListe>({ statut: "chargement" });
+  // Le classement vit dans `lib/regroupementDossier.ts` (fonction pure, testée) — cet écran ne fait
+  // que le rendre. Aucune règle de regroupement ici.
+  const groupes = useMemo(() => (etatListe.statut === "charge" ? regrouperDocuments(etatListe.documents) : []), [etatListe]);
 
   useEffect(() => {
     if (session.statut !== "connecte" || !clientDocuments) return;
@@ -215,10 +380,17 @@ export function MonDossier({
         </p>
       )}
       {etatListe.statut === "charge" && etatListe.documents.length === 0 && <p className="text-muted p-4">Aucun document pour l'instant.</p>}
-      {etatListe.statut === "charge" &&
-        etatListe.documents.map((document) => (
-          <LigneDocumentAffichee key={document.id} document={document} clientFichiers={clientFichiers} clientDocuments={clientDocuments} onTypeCorrige={corriger} />
-        ))}
+      {etatListe.statut === "charge" && etatListe.documents.length > 0 && (
+        <>
+          <div className="px-4 py-3 flex items-center justify-between gap-3 flex-wrap bg-surface-2/40">
+            <p className="text-xs text-muted">{resume(etatListe.documents.length, etatListe.documents.reduce((t, d) => t + d.tailleOctets, 0))} au total</p>
+            <BoutonArchive documents={etatListe.documents} clientFichiers={clientFichiers} intitule="Tout télécharger (dossier entier)" />
+          </div>
+          {groupes.map((groupe) => (
+            <GroupeAffiche key={groupe.type} groupe={groupe} clientFichiers={clientFichiers} clientDocuments={clientDocuments} onTypeCorrige={corriger} />
+          ))}
+        </>
+      )}
     </Cadre>
   );
 }

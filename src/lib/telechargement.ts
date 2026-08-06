@@ -33,6 +33,17 @@ export function telechargerTexte(nomFichier: string, contenu: string): void {
 export async function telechargerDepuisUrl(nomFichier: string, url: string): Promise<void> {
   const reponse = await fetch(url);
   const blob = await reponse.blob();
+  telechargerBlob(nomFichier, blob);
+}
+
+/**
+ * Déclenche le téléchargement d'un contenu DÉJÀ en mémoire — l'archive zip de « Mon dossier »
+ * (06/08/2026), construite dans le navigateur et qui n'a donc aucune URL à récupérer.
+ *
+ * Extrait de `telechargerDepuisUrl` plutôt que dupliqué : les deux chemins partagent exactement le
+ * même geste, et deux copies auraient divergé au premier correctif.
+ */
+export function telechargerBlob(nomFichier: string, blob: Blob): void {
   const urlObjet = URL.createObjectURL(blob);
   const lien = document.createElement("a");
   lien.href = urlObjet;

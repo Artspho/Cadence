@@ -9,10 +9,15 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { MonDossier } from "../MonDossier";
 import type { ClientAuth, ClientDocuments, ClientFichiers, SessionMinimale } from "../../auth/supabaseClient";
 
+// `telechargerBlob` et `horodatagePourNomFichier` s'ajoutent au mock depuis le regroupement du
+// 06/08/2026 : le bouton « tout télécharger » les appelle. Les omettre les rendrait `undefined` et
+// ferait planter le composant au clic — un faux échec qui n'apprendrait rien.
 vi.mock("../../lib/telechargement", () => ({
   telechargerDepuisUrl: vi.fn(async () => undefined),
+  telechargerBlob: vi.fn(() => undefined),
+  horodatagePourNomFichier: vi.fn(() => "2026-08-06_0930"),
 }));
-import { telechargerDepuisUrl } from "../../lib/telechargement";
+import { telechargerBlob, telechargerDepuisUrl } from "../../lib/telechargement";
 
 const SESSION: SessionMinimale = { user: { id: "u-42", email: "benoit@example.com" } };
 
@@ -44,6 +49,21 @@ const DOC_A = {
   date_document: null,
   notes: null,
   cree_le: "2026-08-05T10:00:00.000Z",
+};
+
+/** Justificatif de frais catégorie A — sert à prouver le regroupement et les sous-groupes. */
+const DOC_FRAIS_A = {
+  id: "doc-2",
+  type_document: "justificatif_frais",
+  categorie_frais: "A",
+  annee_fiscale: 2026,
+  chemin_stockage: "u-42/2026/justificatif_frais/y-violon.pdf",
+  nom_fichier: "violon.pdf",
+  taille_octets: 4096,
+  mime: "application/pdf",
+  date_document: null,
+  notes: null,
+  cree_le: "2026-08-06T10:00:00.000Z",
 };
 
 function fauxClientDocuments(lignes: Record<string, unknown>[] = [DOC_A]): ClientDocuments {
@@ -84,7 +104,9 @@ describe("MonDossier — connecté", () => {
   it("liste les documents avec nom, date et taille", async () => {
     render(<MonDossier clientAuth={CONNECTE} clientDocuments={fauxClientDocuments()} clientFichiers={fauxClientFichiers()} />);
     expect(await screen.findByText("bulletin.pdf")).toBeInTheDocument();
-    expect(screen.getByText(/2,0 Ko/)).toBeInTheDocument();
+    // La taille apparaît désormais PLUSIEURS fois (total du dossier, total du groupe, ligne) depuis
+    // le regroupement du 06/08/2026 — `getAllByText` au lieu de `getByText`.
+    expect(screen.getAllByText(/2,0 Ko/).length).toBeGreaterThan(0);
   });
 
   it("dit qu'il n'y a rien quand la liste est vide", async () => {
@@ -95,12 +117,13 @@ describe("MonDossier — connecté", () => {
   it("le téléchargement demande une URL signée puis appelle telechargerDepuisUrl avec le nom d'origine", async () => {
     const fichiers = fauxClientFichiers();
     render(<MonDossier clientAuth={CONNECTE} clientDocuments={fauxClientDocuments()} clientFichiers={fichiers} />);
-    fireEvent.click(await screen.findByRole("button", { name: /télécharger/i }));
+    // Nom EXACT : « Tout télécharger » (groupe et dossier entier) matcherait aussi /télécharger/i.
+    fireEvent.click(await screen.findByRole("button", { name: "Télécharger" }));
     await waitFor(() => expect(fichiers.createSignedUrl).toHaveBeenCalledWith("u-42/2026/aem_bulletin/x-bulletin.pdf", 60));
     await waitFor(() => expect(telechargerDepuisUrl).toHaveBeenCalledWith("bulletin.pdf", "https://exemple/signee"));
   });
 
-  it("corriger le type appelle updateType et reflète le nouveau type dans le sélecteur", async () => {
+  it("corriger le type RECLASSE le document dans le groupe du nouveau type", async () => {
     const documents = fauxClientDocuments();
     render(<MonDossier clientAuth={CONNECTE} clientDocuments={documents} clientFichiers={fauxClientFichiers()} />);
     const select = (await screen.findByLabelText(/type de « bulletin\.pdf/i)) as HTMLSelectElement;
@@ -108,6 +131,83 @@ describe("MonDossier — connecté", () => {
     await act(async () => {
       fireEvent.change(select, { target: { value: "attestation_cpam" } });
     });
-    await waitFor(() => expect(select.value).toBe("attestation_cpam"));
+
+    // ⚠️ IL FAUT RE-INTERROGER LE DOM : depuis le regroupement du 06/08/2026, changer le type déplace
+    // le document dans un AUTRE groupe — l'ancien élément est démonté, la référence `select` capturée
+    // plus haut est détachée et garderait éternellement son ancienne valeur. C'est le comportement
+    // voulu (corriger un type reclasse la pièce), pas un bug à contourner.
+    await waitFor(() => {
+      const apres = screen.getByLabelText(/type de « bulletin\.pdf/i) as HTMLSelectElement;
+      expect(apres.value).toBe("attestation_cpam");
+    });
+    // Et le groupe affiché est bien celui du nouveau type. L'en-tête de groupe est un BOUTON
+    // repliable — le cibler par son rôle évite de confondre avec les <option> du sélecteur, qui
+    // portent aussi le mot « Attestation ».
+    expect(screen.getByRole("button", { name: /Attestation CPAM/ })).toBeInTheDocument();
+  });
+});
+
+describe("MonDossier — regroupement et téléchargement groupé (06/08/2026)", () => {
+  it("regroupe par type, et par catégorie sous les justificatifs de frais", async () => {
+    render(<MonDossier clientAuth={CONNECTE} clientDocuments={fauxClientDocuments([DOC_A, DOC_FRAIS_A])} clientFichiers={fauxClientFichiers()} />);
+    await screen.findByText("violon.pdf");
+    // Le sous-groupe porte le libellé complet de la catégorie A.
+    expect(screen.getByText(/A — Instruments/)).toBeInTheDocument();
+    // Et le total du dossier est annoncé.
+    expect(screen.getByText(/2 documents .* au total/)).toBeInTheDocument();
+  });
+
+  it("compte et pèse chaque groupe — c'est ce que Benoît veut voir d'un coup d'œil", async () => {
+    render(<MonDossier clientAuth={CONNECTE} clientDocuments={fauxClientDocuments([DOC_FRAIS_A])} clientFichiers={fauxClientFichiers()} />);
+    await screen.findByText("violon.pdf");
+    expect(screen.getAllByText(/1 document · 4,0 Ko/).length).toBeGreaterThan(0);
+  });
+
+  it("replier un groupe cache ses documents sans les faire disparaître du total", async () => {
+    render(<MonDossier clientAuth={CONNECTE} clientDocuments={fauxClientDocuments([DOC_FRAIS_A])} clientFichiers={fauxClientFichiers()} />);
+    await screen.findByText("violon.pdf");
+    const entete = screen.getByRole("button", { expanded: true });
+    fireEvent.click(entete);
+    expect(screen.queryByText("violon.pdf")).not.toBeInTheDocument();
+    // Le total du dossier reste affiché : replier n'est pas supprimer.
+    expect(screen.getByText(/1 document .* au total/)).toBeInTheDocument();
+  });
+
+  it("« tout télécharger » construit une archive et la remet à l'utilisateur", async () => {
+    const fichiers = fauxClientFichiers();
+    // `fetch` est appelé par `construireArchive` pour récupérer chaque contenu.
+    const fauxFetch = vi.fn(async () => ({ ok: true, arrayBuffer: async () => new TextEncoder().encode("x").buffer }));
+    vi.stubGlobal("fetch", fauxFetch);
+
+    render(<MonDossier clientAuth={CONNECTE} clientDocuments={fauxClientDocuments([DOC_A, DOC_FRAIS_A])} clientFichiers={fichiers} />);
+    await screen.findByText("violon.pdf");
+    fireEvent.click(screen.getByRole("button", { name: /tout télécharger \(dossier entier\)/i }));
+
+    await waitFor(() => expect(telechargerBlob).toHaveBeenCalled());
+    // `.at(-1)` n'est pas dans la cible TypeScript de ce projet (< es2022) — index explicite.
+    const appels = vi.mocked(telechargerBlob).mock.calls;
+    const [nomFichier] = appels[appels.length - 1];
+    expect(nomFichier).toBe("cadence-dossier-2026-08-06_0930.zip");
+    // Les deux documents ont été récupérés.
+    expect(fauxFetch).toHaveBeenCalledTimes(2);
+    vi.unstubAllGlobals();
+  });
+
+  it("NOMME LES FICHIERS MANQUANTS quand l'archive est incomplète — jamais un succès muet", async () => {
+    const fichiers = fauxClientFichiers();
+    fichiers.createSignedUrl = vi.fn(async () => ({ data: null, error: { message: "objet introuvable" } }));
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, arrayBuffer: async () => new TextEncoder().encode("x").buffer })));
+
+    render(<MonDossier clientAuth={CONNECTE} clientDocuments={fauxClientDocuments([DOC_FRAIS_A])} clientFichiers={fichiers} />);
+    await screen.findByText("violon.pdf");
+    fireEvent.click(screen.getByRole("button", { name: /tout télécharger \(dossier entier\)/i }));
+
+    const alerte = await screen.findByRole("alert");
+    expect(alerte).toHaveTextContent(/INCOMPLÈTE/);
+    expect(alerte).toHaveTextContent("violon.pdf");
+    expect(alerte).toHaveTextContent(/objet introuvable/);
+    // Et surtout : dire que rien n'est perdu.
+    expect(alerte).toHaveTextContent(/toujours dans Cadence/i);
+    vi.unstubAllGlobals();
   });
 });
