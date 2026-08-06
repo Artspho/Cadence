@@ -95,6 +95,71 @@ describe("extraireDocumentIA — messages d'erreur honnêtes", () => {
     await expect(extraireDocumentIA("UERG")).rejects.toThrow(messageServeur);
   });
 
+  /*
+   * LES TROIS REFUS DE LA GARDE (06/08/2026) — ajoutés parce que Benoît est resté bloqué dessus.
+   *
+   * Il voyait « L'extraction a échoué. Réessaie, ou saisis le document à la main. » sans savoir
+   * pourquoi, alors que le serveur avait rédigé la raison exacte. Et « Réessaie » est FAUX dans ces
+   * trois cas : aucun ne change au deuxième essai. Le serveur savait, le client jetait.
+   */
+  it("remonte tel quel le 413 — un document trop gros ne passera pas mieux au deuxième essai", async () => {
+    const messageServeur = "Ce document pèse 4,2 Mo, au-delà de la limite de 3,0 Mo que le service peut recevoir. Rien n'a été envoyé.";
+    simulerReponse(413, { error: messageServeur });
+    await expect(extraireDocumentIA("UERG")).rejects.toThrow(messageServeur);
+  });
+
+  it("remonte tel quel le 403 — origine non autorisée, réessayer n'y changera jamais rien", async () => {
+    const messageServeur = "Cette requête ne vient pas d'une origine autorisée. Rien n'a été envoyé.";
+    simulerReponse(403, { error: messageServeur });
+    await expect(extraireDocumentIA("UERG")).rejects.toThrow(messageServeur);
+  });
+
+  it("remonte tel quel le 400 de la garde", async () => {
+    simulerReponse(400, { error: "pdfBase64 manquant" });
+    await expect(extraireDocumentIA("UERG")).rejects.toThrow("pdfBase64 manquant");
+  });
+
+  it("le filtre HTML s'applique AUSSI aux trois nouveaux statuts — un 403 de pare-feu n'est pas de nous", async () => {
+    // Un WAF ou un CDN peut lui aussi répondre 403. `messageMontrable` reste donc le dernier filtre :
+    // élargir la liste blanche ne doit pas ouvrir la porte au corps d'un intermédiaire.
+    simulerReponse(403, { error: "<html><body>Forbidden — edge node 10.0.0.4</body></html>" });
+    await expect(extraireDocumentIA("UERG")).rejects.toThrow(/saisis le document à la main/i);
+  });
+
+  it("LES 5xx RESTENT DEHORS, volontairement", async () => {
+    // Le 500 de notre endpoint porte déjà un texte générique : rien à y gagner, et un 5xx est
+    // justement ce qu'un proxy renvoie le plus volontiers avec son propre corps.
+    simulerReponse(500, { error: "Échec de l'extraction. Réessaie ou saisis manuellement." });
+    await expect(extraireDocumentIA("UERG")).rejects.toThrow(/saisis le document à la main/i);
+  });
+
+  /*
+   * LE CODE HTTP DANS LE MESSAGE GÉNÉRIQUE (06/08/2026).
+   *
+   * Sans lui, « L'extraction a échoué. Réessaie » couvrait indifféremment un dépassement de délai, une
+   * erreur de Mistral, un refus de proxy et un mauvais verbe HTTP — Benoît a signalé une panne avec
+   * cette seule phrase, et il a fallu sonder l'endpoint au `curl` pour éliminer des hypothèses. Un
+   * utilisateur n'a pas ce recours.
+   */
+  it("affiche le CODE HTTP quand le message n'est pas de nous — sinon la panne est indiagnosticable", async () => {
+    simulerReponse(504, { error: "Gateway Timeout" });
+    await expect(extraireDocumentIA("UERG")).rejects.toThrow(/code 504/);
+  });
+
+  it("l'affiche aussi sur un statut à nous dont le corps a été filtré", async () => {
+    // Filtré parce que c'est du HTML : on ne montre pas le corps, mais on ne cache pas le code.
+    simulerReponse(403, { error: "<html>Forbidden</html>" });
+    await expect(extraireDocumentIA("UERG")).rejects.toThrow(/code 403/);
+  });
+
+  it("N'INVENTE PAS de code quand il n'y en a pas — un échec réseau n'a pas de statut", async () => {
+    // `fetch` qui rejette (hors ligne, DNS) : aucune réponse, donc aucun code. Afficher « code 0 » ou
+    // « code undefined » serait une information fabriquée.
+    vi.stubGlobal("fetch", vi.fn(async () => { throw new Error("Failed to fetch"); }));
+    await expect(extraireDocumentIA("UERG")).rejects.toThrow(/connexion interrompue/i);
+    await expect(extraireDocumentIA("UERG")).rejects.not.toThrow(/code/i);
+  });
+
   // Un proxy / CDN / tunnel de dev peut répondre son propre 504 avec son propre corps : ce n'est pas
   // notre texte, il ne doit pas atterrir à l'écran (adresse interne exposée au passage).
   it("n'affiche pas le corps d'un statut qui n'est pas le nôtre (504 de proxy)", async () => {

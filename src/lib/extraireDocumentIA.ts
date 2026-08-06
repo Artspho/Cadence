@@ -24,7 +24,22 @@ import { extractionResultSchema, type ExtractionResult } from "../types/extracti
 
 export const ENDPOINT_EXTRACTION = "/api/extract-document";
 
-const ECHEC_GENERIQUE = "L'extraction a échoué. Réessaie, ou saisis le document à la main.";
+/**
+ * Le repli, quand le corps de la réponse n'est pas un texte que nous avons rédigé.
+ *
+ * ⚠️ LE CODE HTTP EST AFFICHÉ, ET C'EST LE 06/08/2026 QUI L'A IMPOSÉ. Benoît a signalé « l'import IA
+ * ne marche plus » avec, pour seule information, « L'extraction a échoué. Réessaie ». Impossible d'en
+ * déduire quoi que ce soit : le même texte couvrait un dépassement de délai, une erreur de Mistral, un
+ * refus de proxy et un mauvais verbe HTTP. Sonder l'endpoint au `curl` a été nécessaire pour éliminer
+ * la moitié des hypothèses — un utilisateur, lui, n'a pas ce recours.
+ *
+ * Le code est un nombre lu sur la réponse, pas un extrait de corps : il ne peut donc rien divulguer du
+ * document ni d'une adresse interne, contrairement au corps lui-même (cf. `messageMontrable`).
+ */
+function echecGenerique(statut?: number): string {
+  const code = statut === undefined ? "" : ` (code ${statut})`;
+  return `L'extraction a échoué${code}. Réessaie, ou saisis le document à la main.`;
+}
 const REPONSE_INATTENDUE =
   "Le service d'extraction a répondu quelque chose d'inattendu. Aucune proposition n'a été retenue — saisis le document à la main.";
 /**
@@ -37,17 +52,29 @@ const ECHEC_RESEAU =
   "Le service d'extraction n'a pas pu être joint (connexion interrompue). Aucune proposition n'a été reçue — réessaie, ou saisis les informations à la main.";
 
 /**
- * Les SEULS statuts dont on accepte de réafficher le message : le 503 que notre endpoint renvoie
- * quand `MISTRAL_API_KEY` est absente (réessayer n'y changera jamais rien), et le 422 renvoyé quand
- * l'OCR n'a rien pu extraire du document (`OcrIllisibleError`, cf. api/extract-document.ts et
- * lib/ocrIllisible.ts) — ce cas précis doit s'afficher différemment de « rien d'exploitable dedans »,
- * pour que l'utilisateur sache qu'il s'agit d'un échec de lecture, pas d'un document sans intérêt.
+ * Les SEULS statuts dont on accepte de réafficher le message : ceux dont NOUS écrivons le texte.
  *
- * Liste blanche et non liste noire, volontairement : entre nous et l'endpoint peuvent se glisser un
- * proxy, un CDN, un tunnel de dev, qui renvoient leurs propres 500/502/504 avec leur propre corps.
- * Tout ce qui n'est pas explicitement à nous retombe sur le message générique.
+ *  · **503** — `MISTRAL_API_KEY` absente côté serveur (réessayer n'y changera jamais rien) ;
+ *  · **422** — l'OCR n'a rien pu extraire (`OcrIllisibleError`, cf. lib/ocrIllisible.ts). Doit
+ *    s'afficher différemment de « rien d'exploitable dedans », pour que l'utilisateur sache qu'il
+ *    s'agit d'un échec de LECTURE et pas d'un document sans intérêt ;
+ *  · **413 / 403 / 400** — les trois refus de `lib/gardeEndpointExtraction.ts`.
+ *
+ * ⚠️ LES TROIS DERNIERS ONT ÉTÉ AJOUTÉS LE 06/08/2026, ET C'ÉTAIT UN VRAI DÉFAUT, PAS UN CONFORT.
+ * Benoît a vu « L'extraction a échoué. Réessaie, ou saisis le document à la main. » sans pouvoir
+ * savoir pourquoi. Or dans ces trois cas le serveur avait rédigé une raison exacte — « Ce document
+ * pèse 4,2 Mo, au-delà de la limite de 3,0 Mo », « Cette requête ne vient pas d'une origine
+ * autorisée » — et le client la jetait pour afficher **« Réessaie »**, qui est un conseil FAUX :
+ * aucun de ces trois refus ne change au deuxième essai. Un message qui envoie sur une fausse piste
+ * est du même ordre qu'un chiffre faux (devoir n°2), et celui-là faisait chercher une panne
+ * inexistante.
+ *
+ * Liste blanche et non liste noire, volontairement, et **les 5xx restent dehors** : entre nous et
+ * l'endpoint peuvent se glisser un proxy, un CDN, un tunnel de dev, qui renvoient leurs propres
+ * 500/502/504 avec leur propre corps. Le 500 de notre endpoint porte de toute façon déjà un texte
+ * générique, il n'y a rien à y gagner. `messageMontrable` reste le dernier filtre pour tous.
  */
-const STATUTS_AU_MESSAGE_MAITRISE = new Set([503, 422]);
+const STATUTS_AU_MESSAGE_MAITRISE = new Set([503, 422, 413, 403, 400]);
 
 /**
  * Un message que l'on accepte de montrer : non vide, de longueur raisonnable, et sans chevrons —
@@ -64,7 +91,7 @@ function messageMontrable(message: unknown): message is string {
  * réponse d'origine inconnue : ni page d'erreur de proxy, ni trace technique, ni adresse interne.
  */
 async function lireMessageErreur(reponse: Response): Promise<string> {
-  if (!STATUTS_AU_MESSAGE_MAITRISE.has(reponse.status)) return ECHEC_GENERIQUE;
+  if (!STATUTS_AU_MESSAGE_MAITRISE.has(reponse.status)) return echecGenerique(reponse.status);
   try {
     const corps = (await reponse.json()) as unknown;
     if (corps && typeof corps === "object" && "error" in corps) {
@@ -74,7 +101,7 @@ async function lireMessageErreur(reponse: Response): Promise<string> {
   } catch {
     // Corps illisible ou non-JSON : on retombe sur le message générique, sans rien exposer.
   }
-  return ECHEC_GENERIQUE;
+  return echecGenerique(reponse.status);
 }
 
 export async function extraireDocumentIA(pdfBase64: string): Promise<ExtractionResult> {
