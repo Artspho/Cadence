@@ -95,12 +95,36 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 
 ## État actuel
 
-> **Repère au 05/08/2026, session (8, toujours en cours) — PHASE 5 TERMINÉE ET SOLDÉE ; COMPTE
-> OBLIGATOIRE FAIT ET COMMITÉ (`1c685e6`, hors plan initial) ; PHASE 6 EN COURS : commits 1 à 5
-> commités, COMMIT 6 (frais réels — bascule Supabase Storage + retrait complet de Google Drive)
-> CODÉ ET TESTÉ, PAS ENCORE COMMITÉ (en revue avec Benoît).**
-> **1042 tests verts** (86 fichiers), `tsc -b` propre, `npm run build` propre — y compris le commit 6
-> non commité (voir juste en dessous).
+> **Repère au 06/08/2026 — PHASE 6 TERMINÉE (commits 1 à 7 committés), plus trois chantiers demandés
+> par Benoît en cours de route et committés eux aussi.**
+> **1122 tests verts** (90 fichiers), `tsc -b` propre, `npm run build` propre.
+>
+> Les commits de la phase 6 et de sa suite immédiate, dans l'ordre :
+> | Hash | Contenu |
+> |---|---|
+> | `88354b3` | commit 1 — migration 0003, `type_document` étendu à 10 valeurs |
+> | `6161af5` | commit 2 — fondation stockage documents, non branchée |
+> | `a61551e` | commit 3 — écran « Mon dossier » (lecture seule) |
+> | `e674266` | commit 4 — canal local branché sur Supabase Storage |
+> | `e48250a` | commit 5 — canal IA branché sur Supabase Storage |
+> | `1c685e6` | compte obligatoire (hors plan initial, décidé pendant la revue du commit 6) |
+> | `fa3df59` | commit 6 — frais réels sur Supabase Storage, **Google Drive retiré** |
+> | `fc383d8` | commit 6 prouvé contre le vrai serveur ; `public/confidentialite.html` supprimée |
+> | `c63a16f` | consentement à la politique de confidentialité à l'inscription |
+> | `7e4e4c3` | **preuve** du consentement conservée (migration 0004, table `consentements`) |
+> | `d826bf5` | commit 7 — biens amortis, justificatif d'achat sur Supabase Storage |
+> | `06d5190` | « Mon dossier » regroupé par type et catégorie + téléchargement groupé (zip) |
+> | `289c8e1` | avertissement mesuré avant une archive volumineuse |
+>
+> ⚠️ **RIEN N'EST POUSSÉ** : 14 commits d'avance sur `origin/master` au moment d'écrire ces lignes.
+> Benoît décide du push (cf. mémoire `cadence_push_credentials`).
+>
+> ⚠️ **CE QUI N'A PAS ÉTÉ VU À L'ÉCRAN**, à ne pas relire comme vérifié : le regroupement de « Mon
+> dossier » et le téléchargement groupé (`06d5190`, `289c8e1`) n'ont été prouvés que par les tests et
+> par un banc d'essai JSZip en navigateur — l'écran lui-même exige une session, et le navigateur
+> intégré de Claude n'est pas celui de Benoît (cf. mémoire `cadence_navigateurs_distincts`). Le
+> parcours frais réels (dépense + justificatif → « Mon dossier »), lui, a bien été confirmé par Benoît
+> à l'écran le 06/08/2026.
 >
 > ✅ **COMPTE OBLIGATOIRE (05/08/2026) — COMMITÉ (`1c685e6`).** Décidé par Benoît en pleine revue du
 > commit 6, en dehors du plan de la phase 6 : plus AUCUN usage de Cadence sans compte, dès le premier
@@ -116,7 +140,8 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 > l'app. **Hors périmètre, signalé mais pas construit** : consentement horodaté aux mentions légales à
 > l'inscription (« arbitrage 6 ») ; intégration calendrier (notée pour plus tard, sans rapport).
 >
-> 🟡 **COMMIT 6 DE LA PHASE 6 (frais réels, `05/08/2026`) — CODÉ, TESTÉ, PAS ENCORE COMMITÉ.** Le
+> ✅ **COMMIT 6 DE LA PHASE 6 (frais réels) — COMMITÉ le 06/08/2026 : `fa3df59`**, puis prouvé contre le
+> vrai serveur par `fc383d8` (`npm run verifier:frais-reels`, 10/10). Le
 > compte étant désormais obligatoire, la question « que se passe-t-il sans session ? » qui bloquait ce
 > commit avant la parenthèse ci-dessus ne se pose plus : `DepenseForm`/`JustificatifsEnAttente` ne
 > sont jamais atteints sans être connecté, donc `documentId` (Supabase Storage) est la SEULE
@@ -198,10 +223,10 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 > dossier », lecture seule) · `e674266` (commit 4 — canal local `ImportBulletins.tsx` branché).
 > Ne pas pousser sans que Benoît le redemande explicitement — cf. `cadence_push_credentials`.
 >
-> 🟡 **COMMIT 5 (canal IA, `ImportDocumentIA.tsx`) : CODÉ, TESTÉ, PAS ENCORE COMMITÉ.** Benoît a
-> explicitement choisi (05/08/2026) de le revoir/commiter depuis un **autre fil** plutôt qu'ici — ne
-> pas prétendre qu'il est commité tant que `git log` ne le montre pas. Diff en attente dans l'arbre
-> de travail au moment d'écrire cette ligne : `src/components/ImportDocumentIA.tsx`,
+> ✅ **COMMIT 5 (canal IA, `ImportDocumentIA.tsx`) — COMMITÉ : `e48250a`.** Cette ligne annonçait
+> jusqu'au 06/08/2026 « CODÉ, TESTÉ, PAS ENCORE COMMITÉ », Benoît ayant choisi (05/08/2026) de le
+> revoir depuis un autre fil ; `git log` le montre désormais, donc c'est fait. Ce qu'il contenait :
+> `src/components/ImportDocumentIA.tsx`,
 > `src/components/ConsentementEnvoiIA.tsx`, `src/content/mentionEnvoiIA.ts` (+ son test), nouveau
 > `src/components/__tests__/ImportDocumentIA.test.tsx`. Ce que ce commit fait : après extraction
 > réussie, si connecté, dépose le document (type traduit automatiquement pour 8 cas ; un sélecteur
@@ -262,11 +287,11 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 > |---|---|---|
 > | 0 | points **8** et **9** | ✅ faite (`c786ecb`, `5607854`) — le 8 reste **compté ouvert** (ni auth ni quota) |
 > | 1 | projet Supabase, 7 tables, RLS | ✅ **PROUVÉE** — `npm run verifier:rls` : **64 contrôles, 64 conformes** |
-> | 2 | authentification | ✅ **PROUVÉE de bout en bout** le 04/08/2026 à 19h19 : session réellement ouverte par lien magique. Connexion **facultative**, l'app fonctionne toujours sans compte |
+> | 2 | authentification | ✅ **PROUVÉE de bout en bout** le 04/08/2026 à 19h19 : session réellement ouverte par lien magique. ⚠️ « Connexion facultative » N'EST PLUS VRAI depuis `1c685e6` (05/08/2026) : un compte est OBLIGATOIRE |
 > | 3 | miroir Supabase en écriture seule (contrats + profil) | ✅ **PROUVÉE contre le vrai serveur** : ligne relue en REST (200, `maj_le` = l'heure du témoin) |
 > | 4 | migration + vérification chiffrée | ✅ **PROUVÉE le 05/08/2026 à 01:05** — verdict `identique`, SHA-256 concordant sur **trois** sources |
 > | 5 | bascule, sur son feu vert écrit | ✅ **FAITE** — le serveur fait référence, VÉRIFIÉ EN VRAI (588 h, 62 contrats) ; commit D (section « Compte » trouvable, mot de passe, réserve PKCE) et E (cette doc) faits |
-> | 6 | documents (conserver, puis envoyer) | ⬜ — le chantier d'origine |
+> | 6 | documents (conserver, puis envoyer) | ✅ **FAITE** (06/08/2026) — commits 1 à 7 ; les 3 canaux (local, IA, frais réels) et les biens amortis déposent sur Supabase Storage, Drive supprimé. Prouvée contre le vrai serveur : `npm run verifier:documents`, `verifier:frais-reels`, `verifier:consentement` |
 > | 7 | hors ligne | ⬜ **optionnel, repoussé exprès** : il n'a jamais répondu sur ce point, la question est sortie du chemin critique pour ne pas le bloquer |
 > | 8 | les 7 points réglementaires restants | ⬜ quand une source tombe |
 >
@@ -278,13 +303,20 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 > `psql` sur la machine), est passé du premier coup.
 >
 > ⚠️ **Ce que la phase 1 ne prouve PAS** : la clé `service_role` contourne tout par conception. RLS
-> protège les testeurs **les uns des autres**, pas de Benoît. C'est exactement ce que son texte de
-> consentement ne dit pas encore (cf. arbitrage 6).
+> protège les testeurs **les uns des autres**, pas de Benoît. ✅ **L'arbitrage 6 est désormais soldé** :
+> `content/mentionsLegales.ts` le DIT à l'écran (« Cette protection ne s'applique pas au titulaire du
+> compte technique de l'association, qui peut, techniquement, accéder à l'ensemble des données
+> hébergées »), le texte est lisible AVANT l'inscription depuis `c63a16f`, et la preuve du consentement
+> est conservée depuis `7e4e4c3`.
 >
-> **Drive est supplanté** : les documents iront dans Supabase Storage (phase 6). L'ancienne prochaine
-> action — créer l'ID client OAuth Google — est **annulée**, ne pas la relancer. Le code Drive
-> (3 fichiers + tests) **dort** ; aucune décision de le supprimer n'a été prise. Ne jamais dire
-> « Drive fonctionne » : l'aller-retour réel n'a **jamais** été exercé.
+> **Drive n'existe plus dans ce dépôt.** Supprimé au commit `fa3df59` (06/08/2026) : `lib/
+> googleDriveAuth.ts`, `lib/googleDriveStorage.ts`, `components/fraisReels/DriveSettings.tsx` et leurs
+> 3 tests, plus `ConfigFraisReels.stockageJustificatifs`/`driveConnecte` et
+> `VITE_GOOGLE_DRIVE_CLIENT_ID`. L'aller-retour réel n'avait JAMAIS été exercé, et un audit a confirmé
+> avant le retrait qu'aucune dépense réelle n'avait de justificatif seulement sur Drive — le retrait
+> était donc sans perte. Ne pas ressortir « créer l'ID client OAuth Google » : cette action est
+> annulée depuis longtemps. Ce qui subsiste : `Depense.driveFileId`/`driveWebViewLink` restent
+> acceptés EN LECTURE et ne sont jamais réécrits (schéma de lecture élargi, jamais durci).
 >
 > ## PHASE 2 — l'authentification, faite le 04/08/2026
 >
@@ -294,10 +326,16 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 > `@supabase/supabase-js@2.112.0` — **+59 ko gzip** sur le bundle (381 → 440 ko, mesuré contre le
 > bundle déployé, pas estimé). Aucune vulnérabilité apportée.
 >
-> **LA PROMESSE EST TENUE, ET UN TEST LA GARDE.** `src/components/__tests__/App.sansCompte.test.tsx`
-> rend le vrai `App` sans configuration Supabase et parcourt les 8 onglets : aucun mur de connexion,
-> les données locales s'affichent, et le contenu du `localStorage` est relu inchangé à la fin. Ce test
-> doit rougir le jour où quelqu'un ajouterait un « connectez-vous pour continuer ».
+> ⚠️⚠️ **CETTE PROMESSE A ÉTÉ RETIRÉE, PAS OUBLIÉE — NE PAS LA RÉTABLIR SANS DEMANDER.** Cette section
+> affirmait jusqu'au 06/08/2026 que « l'app fonctionne sans compte » et que
+> `src/components/__tests__/App.sansCompte.test.tsx` le gardait. **CE FICHIER N'EXISTE PLUS** : la
+> décision « compte obligatoire » de Benoît (05/08/2026, commit `1c685e6`) a inversé la garantie, et le
+> test qui la protégeait a été remplacé par `App.compteObligatoire.test.tsx`, qui prouve l'inverse — le
+> mur s'affiche à la place de toute l'app tant qu'aucune session n'est ouverte.
+>
+> Conséquence assumée et documentée dans `EcranConnexionObligatoire.tsx` : sans
+> `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY` en production, PERSONNE ne peut plus ouvrir Cadence. Il
+> n'y a plus de repli local.
 >
 > **Trois conceptions à ne pas défaire :**
 > 1. **configuration absente => `null`, jamais d'exception.** `construireClientAuth` rend `null` sur
@@ -620,37 +658,34 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 > 1000 tests verts (81 fichiers), `tsc -b` propre, `npm run build` propre. Texte relu à l'écran par
 > Benoît avant validation (modale ouverte en conditions réelles, localhost:5185).
 >
-> ### ▶ PROCHAINE ACTION — valider le commit 6, puis enchaîner les commits 7 et 8
+> ### ▶ PROCHAINE ACTION — la phase 6 est CLOSE ; trois choses restent ouvertes
 >
-> **D'abord : montrer le diff du commit 6 à Benoît, attendre son « oui », committer, confirmer le
-> hash.** Ne rien committer d'autre avant ça — c'est sa règle (revue avant commit, cf. mémoire
-> `cadence_revue_avant_commit`). Les commits 1 à 5 sont déjà faits ; le compte obligatoire
-> (`1c685e6`), codé pendant la revue du commit 6, est déjà commité aussi.
+> **Tout le plan de la phase 6 est fait et committé** (commits 1 à 8, cf. le tableau de « État actuel »).
+> `content/mentionsLegales.ts` peut désormais être poussé sans mentir : il est enfin vrai qu'un document
+> déposé est réellement conservé. La décision fondatrice de `lib/documentsRequis.ts` (« l'app ne garde
+> AUCUNE trace des fichiers déposés ») a bien été inversée au commit 4, en conservant la logique de
+> checklist (calcul sur les DONNÉES présentes, jamais sur la présence d'un fichier stocké).
 >
-> **Commit 6 — frais réels : bascule sur le canal unique + retrait complet de Drive — FAIT, CODÉ ET
-> TESTÉ, EN ATTENTE DU FEU VERT.** L'audit préalable (05/08/2026) avait confirmé : **aucune dépense
-> réelle n'a de justificatif SEULEMENT sur Drive** (jamais exercé en vrai) — le retrait était donc sûr,
-> sans migration de données à faire. Détail de ce qui a été fait : voir le paragraphe dédié dans
-> « État actuel » plus haut.
+> ✅ **L'arbitrage 6 est soldé**, alors qu'il était encore noté « hors périmètre, jamais construit » ici :
+> la case de consentement existe (`c63a16f`) et sa preuve est conservée (`7e4e4c3`, migration 0004).
 >
-> **Ensuite, dans l'ordre du plan** (`C:\Users\benoi\.claude\plans\humming-wandering-kite.md`) :
-> - **Commit 7 — biens amortis : upload réel.** `BienAmorti.justificatifId` → `documentId`.
->   Décision déjà validée avec Benoît (05/08/2026, avec la vraie justification cette fois — pas une
->   supposition) : **`categorie_frais` toujours `'C7'`**, parce que « Biens amortis » dans Cadence
->   ne sert QUE quand un bien quitte le forfait A (14 %) pour le réel — la catégorie A elle-même
->   couvre déjà l'achat d'un instrument au forfait, sans passer par cet écran. Source :
->   `engine/fraisReels/calculerAmortissement.ts:1` et `content/explicationsFraisReels.ts` (règle des
->   500 € HT). `annee_fiscale` = année de `dateAchat`.
-> - **Commit 8 — documentation de fin de phase 6** (tableau des 9 phases, retirer les mentions
->   « Drive dort », vérifier que `mentionsLegales.ts` peut enfin être poussé).
+> **CE QUI RESTE, par ordre d'importance :**
 >
-> ⚠️ **Ceci inverse une décision fondatrice documentée dans `lib/documentsRequis.ts`** (« l'app ne
-> garde AUCUNE trace des fichiers déposés ») : déjà mise à jour au commit 4, avec la même logique de
-> checklist conservée (calcul sur les DONNÉES présentes, jamais sur la présence d'un fichier stocké).
+> 1. ⚠️ **Aucun compte créé AVANT le 06/08/2026 n'a de preuve de consentement**, et il ne faut surtout
+>    pas en fabriquer une (`synchroniserConsentement` rend `aucuneMetadonnee` et n'écrit rien). Pour en
+>    recueillir une auprès des comptes existants, il faudrait un écran « la politique a changé, accepte
+>    pour continuer », déclenché en incrémentant `VERSION_POLITIQUE`. **Pas construit, à décider avec
+>    Benoît** : il a répondu « pas grave pour mon compte » le 06/08/2026 — ce qui règle SON cas, pas
+>    celui de futurs testeurs.
+> 2. **Le regroupement de « Mon dossier » n'a jamais été vu à l'écran** (`06d5190`, `289c8e1`) : prouvé
+>    par 35 tests et un banc d'essai JSZip en navigateur, jamais par un rendu réel avec session. À faire
+>    confirmer par Benoît.
+> 3. **Une ligne de test à effacer sur le compte de test** — `verifier:consentement` ne PEUT pas nettoyer
+>    la sienne, et c'est la démonstration même que le sujet ne peut pas supprimer sa preuve. Depuis
+>    l'éditeur SQL : `delete from public.consentements where version_texte like 'TEST-VERIFICATION-%';`
 >
-> **Signalé mais explicitement HORS PÉRIMÈTRE de cette phase 6** (à ne pas ajouter sans que Benoît
-> le redemande) : l'arbitrage 6 (case de consentement à l'inscription, horodatée et journalisée)
-> n'a jamais été construit — trouvé en creusant pour le commit 2, pas demandé cette fois.
+> **Phase 7 (hors ligne)** reste optionnelle et repoussée exprès ; **phase 8** (les 7 points
+> réglementaires) attend qu'une source tombe.
 >
 > ⚠️ **Relancer `npm run verifier:rls` après tout changement de schéma ou de politique.** Les deux
 > comptes de test **`testa-cadence@cadence.fr`** et **`test-cadenceb@cadence.fr`** sont volontairement
