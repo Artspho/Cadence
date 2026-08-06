@@ -671,12 +671,15 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 >
 > **CE QUI RESTE, par ordre d'importance :**
 >
-> 1. ⚠️ **Aucun compte créé AVANT le 06/08/2026 n'a de preuve de consentement**, et il ne faut surtout
->    pas en fabriquer une (`synchroniserConsentement` rend `aucuneMetadonnee` et n'écrit rien). Pour en
->    recueillir une auprès des comptes existants, il faudrait un écran « la politique a changé, accepte
->    pour continuer », déclenché en incrémentant `VERSION_POLITIQUE`. **Pas construit, à décider avec
->    Benoît** : il a répondu « pas grave pour mon compte » le 06/08/2026 — ce qui règle SON cas, pas
->    celui de futurs testeurs.
+> 1. ✅ **Preuve de consentement des comptes antérieurs — CLOS pour l'instant.** Benoît a précisé le
+>    06/08/2026 qu'il est **le seul compte existant** et que son propre cas ne l'inquiète pas. Il n'y a
+>    donc aucun testeur sans preuve à rattraper aujourd'hui, et rien à construire.
+>    ⚠️ **CE QUI REND CE POINT RÉOUVRABLE** : dès qu'un deuxième compte existe, il aura, lui, une preuve
+>    (tout compte créé depuis `7e4e4c3` en produit une). Le trou ne concerne donc QUE les comptes
+>    antérieurs, c'est-à-dire le sien seul — et il se refermera tout seul. Ne pas construire d'écran
+>    « la politique a changé » sans qu'il le demande. Et ne JAMAIS fabriquer une preuve manquante :
+>    `synchroniserConsentement` rend `aucuneMetadonnee` et n'écrit rien, une ligne datée du jour serait
+>    une preuve fausse (devoir n°2).
 > 2. **Le regroupement de « Mon dossier » n'a jamais été vu à l'écran** (`06d5190`, `289c8e1`) : prouvé
 >    par 35 tests et un banc d'essai JSZip en navigateur, jamais par un rendu réel avec session. À faire
 >    confirmer par Benoît.
