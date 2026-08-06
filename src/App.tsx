@@ -66,7 +66,7 @@ import { BandeauStockagePlein } from "./components/BandeauStockagePlein";
 import { MonDossier } from "./components/MonDossier";
 import { EcranConnexionObligatoire } from "./components/EcranConnexionObligatoire";
 import { EcranNouveauMotDePasse } from "./components/EcranNouveauMotDePasse";
-import { INDICE_RETOUR_LIEN } from "./auth/retourLienMagique";
+import { INDICE_RETOUR_LIEN, texteAvertissementLienConnecte } from "./auth/retourLienMagique";
 import { MARQUEUR_REINITIALISATION } from "./auth/actions";
 
 const dateDuJour = new Date().toISOString().slice(0, 10);
@@ -124,6 +124,20 @@ export default function App() {
   // onglet, comme celui de `erreurSauvegarde`. Un rejet silencieux serait pire que le bug d'origine.
   const [refusEcriture, setRefusEcriture] = useState<string | null>(null);
   /**
+   * Le bandeau ci-dessous a été fermé par l'utilisateur — sans cet état, il resterait affiché à
+   * chaque rendu jusqu'au rechargement de la page, `indiceRetour` étant figé pour toute la vie du
+   * module (cf. `auth/retourLienMagique.ts`).
+   *
+   * 🔴 DÉFAUT TROUVÉ EN CONDITIONS RÉELLES LE 06/08/2026, PAS PAR UN TEST : Benoît a cliqué un lien de
+   * réinitialisation expiré (« Email link is invalid or has expired ») ALORS QU'IL ÉTAIT DÉJÀ
+   * CONNECTÉ. `EcranConnexionObligatoire` porte déjà un bandeau qui explique cette erreur — mais il
+   * ne s'affiche QUE quand aucune session n'est ouverte (le mur). Avec une session déjà active, l'app
+   * continue tout droit sur le tableau de bord, sans jamais dire que le lien a été refusé : un état
+   * muet, exactement ce que le devoir n°2 interdit. Ce bandeau couvre le cas symétrique : présent en
+   * dehors du mur, dès qu'une session existe déjà.
+   */
+  const [avertissementLienFerme, setAvertissementLienFerme] = useState(false);
+  /**
    * Le mot de passe vient d'être redéfini au retour du lien de réinitialisation (06/08/2026).
    *
    * ⚠️ POURQUOI UN ÉTAT LOCAL ET PAS UNE RELECTURE DE L'URL : `EcranNouveauMotDePasse` retire le
@@ -140,6 +154,9 @@ export default function App() {
    * par un test React : limite assumée et vérifiée à l'écran, comme pour l'onboarding.
    */
   const indiceRetour = INDICE_RETOUR_LIEN;
+  // Texte du bandeau affiché plus bas quand une session est déjà active (cf. `avertissementLienFerme`
+  // ci-dessus) — `null` quand `indiceRetour` n'a rien à signaler, ce qui masque le bandeau.
+  const avertissementLien = texteAvertissementLienConnecte(indiceRetour);
   const inputImportRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -842,6 +859,19 @@ export default function App() {
             <strong className="font-medium">Contrat refusé.</strong> {refusEcriture} Aucune de tes données existantes n'a été modifiée.
           </span>
           <button type="button" onClick={() => setRefusEcriture(null)} className="text-amber/70 hover:text-amber shrink-0" aria-label="Fermer l'avertissement">
+            ✕
+          </button>
+        </div>
+      )}
+      {/* Cf. le commentaire de `avertissementLienFerme` plus haut : symétrique du bandeau de
+          `EcranConnexionObligatoire`, pour le cas où une session est déjà active. Texte partagé via
+          `texteAvertissementLienConnecte` (retourLienMagique.ts) plutôt que dupliqué ici. */}
+      {avertissementLien !== null && !avertissementLienFerme && (
+        <div role="alert" className="bg-amber/15 text-amber px-6 py-3 text-sm flex items-start justify-between gap-4">
+          <span>
+            <strong className="font-medium">{avertissementLien.titre}</strong> {avertissementLien.detail}
+          </span>
+          <button type="button" onClick={() => setAvertissementLienFerme(true)} className="text-amber/70 hover:text-amber shrink-0" aria-label="Fermer l'avertissement">
             ✕
           </button>
         </div>

@@ -2,7 +2,7 @@
 // lien magique reçu, ouvert dans un autre navigateur que le demandeur, échange PKCE impossible — et
 // aucun mot à l'écran pour le dire. Ces tests décrivent ce qu'il faut savoir reconnaître dans l'URL.
 import { describe, expect, it } from "vitest";
-import { lireIndiceRetour } from "../retourLienMagique";
+import { lireIndiceRetour, texteAvertissementLienConnecte } from "../retourLienMagique";
 import { MARQUEUR_REINITIALISATION } from "../actions";
 
 describe("lireIndiceRetour — reconnaître une page ouverte par un lien reçu par e-mail", () => {
@@ -93,5 +93,26 @@ describe("lireIndiceRetour — le marqueur de réinitialisation (06/08/2026)", (
 
   it("ne le confond pas avec une URL ordinaire qui parlerait d'autre chose", () => {
     expect(lireIndiceRetour("?onglet=reinitialiser", "").reinitialisation).toBe(false);
+  });
+});
+
+describe("texteAvertissementLienConnecte — le bandeau d'App.tsx quand une session est déjà active", () => {
+  it("rend null sur une URL ordinaire — pas de bandeau à afficher", () => {
+    expect(texteAvertissementLienConnecte(lireIndiceRetour("", ""))).toBeNull();
+  });
+
+  it("cite le motif exact de Supabase quand un refus a été transmis", () => {
+    // Cas réel du 06/08/2026 : Benoît a cliqué un lien de réinitialisation expiré ALORS QU'IL ÉTAIT
+    // DÉJÀ CONNECTÉ — le mur (qui porte son propre bandeau) ne s'affiche jamais dans ce cas, donc
+    // rien ne disait que le lien avait échoué avant ce correctif.
+    const indice = lireIndiceRetour("?error=access_denied&error_code=otp_expired&error_description=Email+link+is+invalid+or+has+expired", "");
+    const texte = texteAvertissementLienConnecte(indice);
+    expect(texte?.titre).toBe("Ce lien a été refusé : Email link is invalid or has expired.");
+  });
+
+  it("ne renvoie jamais la phrase du mur invitant à se connecter — elle ne veut rien dire ici", () => {
+    const indice = lireIndiceRetour("?token_hash=abc123&type=magiclink", "");
+    const texte = texteAvertissementLienConnecte(indice);
+    expect(texte?.titre.toLowerCase()).not.toContain("connecte-toi");
   });
 });

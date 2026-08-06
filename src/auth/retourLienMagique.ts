@@ -83,6 +83,27 @@ export function lireIndiceRetour(recherche: string, fragment: string): IndiceRet
 }
 
 /**
+ * Le texte du bandeau affiché quand un lien reçu par e-mail n'a rien ouvert de session — VERSION
+ * « une session existe déjà » (`App.tsx`), symétrique du texte inline de
+ * `EcranConnexionObligatoire.tsx` mais pas identique : ce dernier invite à se connecter, ce qui ne
+ * veut rien dire quand une session est déjà active. `null` si rien à afficher — l'appelant décide
+ * seul de la fermeture (état local, `indice` étant figé pour toute la vie de la page).
+ */
+export function texteAvertissementLienConnecte(indice: IndiceRetourLien): { titre: string; detail: string } | null {
+  if (!indice.present) return null;
+  if (indice.erreurTransmise === null) {
+    return {
+      titre: "Un lien reçu par e-mail a été ouvert, mais il n'a pas modifié ta session actuelle.",
+      detail: "Si c'était un lien de réinitialisation, il doit être ouvert depuis le navigateur qui l'a demandé — redemande-en un si besoin.",
+    };
+  }
+  return {
+    titre: `Ce lien a été refusé : ${indice.erreurTransmise}.`,
+    detail: "Un lien reçu par e-mail ne sert qu'une fois et n'est valable qu'un temps limité — redemande-en un si besoin.",
+  };
+}
+
+/**
  * L'indice de CETTE page, figé au chargement.
  *
  * `typeof window` gardé pour les tests en environnement `node` (la majorité de la suite) : ce module
