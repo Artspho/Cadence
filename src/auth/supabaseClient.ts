@@ -83,6 +83,12 @@ export interface UtilisateurMinimal {
 
 export interface SessionMinimale {
   user: { id: string; email?: string };
+  /**
+   * Le jeton de LA session en cours — 07/08/2026, point 8 : `ImportDocumentIA.tsx` le lit pour
+   * authentifier l'appel à `/api/extract-document` (`Authorization: Bearer`). Rien d'autre dans
+   * Cadence ne s'en servait avant, d'où son absence jusqu'ici de cette surface volontairement étroite.
+   */
+  access_token: string;
 }
 
 export interface ErreurAuth {

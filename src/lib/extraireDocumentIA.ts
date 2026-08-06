@@ -54,13 +54,18 @@ const ECHEC_RESEAU =
 /**
  * Les SEULS statuts dont on accepte de réafficher le message : ceux dont NOUS écrivons le texte.
  *
- *  · **503** — `MISTRAL_API_KEY` absente côté serveur (réessayer n'y changera jamais rien) ;
+ *  · **503** — `MISTRAL_API_KEY` absente côté serveur, ou authentification non configurée (réessayer
+ *    n'y changera jamais rien) ;
  *  · **422** — l'OCR n'a rien pu extraire (`OcrIllisibleError`, cf. lib/ocrIllisible.ts). Doit
  *    s'afficher différemment de « rien d'exploitable dedans », pour que l'utilisateur sache qu'il
  *    s'agit d'un échec de LECTURE et pas d'un document sans intérêt ;
- *  · **413 / 403 / 400** — les trois refus de `lib/gardeEndpointExtraction.ts`.
+ *  · **413 / 403 / 400** — les trois refus de `lib/gardeEndpointExtraction.ts` (origine, taille) ;
+ *  · **401** — authentification refusée par `lib/gardeEndpointExtraction.ts` (07/08/2026) : jeton
+ *    absent ou session expirée. Message distinct des autres, puisque le geste qui répare n'est pas
+ *    « réessaie » mais « reconnecte-toi ».
  *
- * ⚠️ LES TROIS DERNIERS ONT ÉTÉ AJOUTÉS LE 06/08/2026, ET C'ÉTAIT UN VRAI DÉFAUT, PAS UN CONFORT.
+ * ⚠️ LES QUATRE PREMIERS (413/403/400, PUIS 401) ONT ÉTÉ AJOUTÉS EN DEUX TEMPS (06 PUIS 07/08/2026),
+ * ET C'ÉTAIT UN VRAI DÉFAUT, PAS UN CONFORT.
  * Benoît a vu « L'extraction a échoué. Réessaie, ou saisis le document à la main. » sans pouvoir
  * savoir pourquoi. Or dans ces trois cas le serveur avait rédigé une raison exacte — « Ce document
  * pèse 4,2 Mo, au-delà de la limite de 3,0 Mo », « Cette requête ne vient pas d'une origine
@@ -74,7 +79,7 @@ const ECHEC_RESEAU =
  * 500/502/504 avec leur propre corps. Le 500 de notre endpoint porte de toute façon déjà un texte
  * générique, il n'y a rien à y gagner. `messageMontrable` reste le dernier filtre pour tous.
  */
-const STATUTS_AU_MESSAGE_MAITRISE = new Set([503, 422, 413, 403, 400]);
+const STATUTS_AU_MESSAGE_MAITRISE = new Set([503, 422, 413, 403, 401, 400]);
 
 /**
  * Un message que l'on accepte de montrer : non vide, de longueur raisonnable, et sans chevrons —
@@ -104,7 +109,14 @@ async function lireMessageErreur(reponse: Response): Promise<string> {
   return echecGenerique(reponse.status);
 }
 
-export async function extraireDocumentIA(pdfBase64: string): Promise<ExtractionResult> {
+/**
+ * `accessToken` : le jeton de la session Supabase EN COURS (`ClientAuth.getSession()`,
+ * `session.access_token`) — 07/08/2026, point 8. Envoyé en `Authorization: Bearer`, jamais en
+ * paramètre d'URL (jamais de donnée sensible dans une query string). Sans lui, le serveur répond 401
+ * (`lib/gardeEndpointExtraction.ts::verifierAuthentification`) : aucun document n'est transmis à un
+ * appelant non authentifié.
+ */
+export async function extraireDocumentIA(pdfBase64: string, accessToken: string): Promise<ExtractionResult> {
   // Cette fonction ne doit JAMAIS laisser échapper une erreur dont le message vient d'ailleurs que
   // d'ici : son appelant (ImportDocumentIA.tsx) affiche `error.message` tel quel à l'utilisateur, en
   // se fiant à cette garantie. D'où les deux enveloppes ci-dessous — sans elles, un « Failed to
@@ -113,7 +125,7 @@ export async function extraireDocumentIA(pdfBase64: string): Promise<ExtractionR
   try {
     reponse = await fetch(ENDPOINT_EXTRACTION, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
       body: JSON.stringify({ pdfBase64 }),
     });
   } catch {

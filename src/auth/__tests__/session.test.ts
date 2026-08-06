@@ -14,7 +14,7 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { useSession } from "../session";
 import type { ClientAuth, SessionMinimale } from "../supabaseClient";
 
-const SESSION: SessionMinimale = { user: { id: "u-42", email: "benoit@example.com" } };
+const SESSION: SessionMinimale = { user: { id: "u-42", email: "benoit@example.com" }, access_token: "jeton-test" };
 
 function fauxClient(reponses: Partial<ClientAuth> = {}): ClientAuth {
   return {

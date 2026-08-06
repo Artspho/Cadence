@@ -30,7 +30,7 @@ afterEach(() => {
 describe("extraireDocumentIA — le seul chemin réseau du navigateur", () => {
   it("appelle NOTRE endpoint en POST avec le PDF, et rien d'autre", async () => {
     const fetchSimule = simulerReponse(200, RESULTAT_VALIDE);
-    await extraireDocumentIA("UERGLWZpY3RpZg==");
+    await extraireDocumentIA("UERGLWZpY3RpZg==", "jeton-test");
 
     expect(fetchSimule).toHaveBeenCalledTimes(1);
     const [url, options] = fetchSimule.mock.calls[0];
@@ -39,11 +39,21 @@ describe("extraireDocumentIA — le seul chemin réseau du navigateur", () => {
     expect(JSON.parse(options?.body as string)).toEqual({ pdfBase64: "UERGLWZpY3RpZg==" });
   });
 
+  // 07/08/2026, point 8 : sans ce jeton, le serveur (`gardeEndpointExtraction.ts::verifierAuthentification`)
+  // refuse tout — c'est la garantie que ce test verrouille côté appelant.
+  it("transmet le jeton de session en Authorization: Bearer", async () => {
+    const fetchSimule = simulerReponse(200, RESULTAT_VALIDE);
+    await extraireDocumentIA("UERGLWZpY3RpZg==", "jeton-de-session");
+
+    const [, options] = fetchSimule.mock.calls[0];
+    expect((options?.headers as Record<string, string>)?.Authorization).toBe("Bearer jeton-de-session");
+  });
+
   // Le défaut exact du brouillon docs/files/ImportDocumentIA.jsx : appeler Mistral depuis la page,
   // avec la clé API dans le navigateur. Ce test échouerait si quelqu'un refaisait ce chemin ici.
   it("n'appelle JAMAIS api.mistral.ai directement (la clé ne doit pas exister côté navigateur)", async () => {
     const fetchSimule = simulerReponse(200, RESULTAT_VALIDE);
-    await extraireDocumentIA("UERG");
+    await extraireDocumentIA("UERG", "jeton-test");
 
     for (const appel of fetchSimule.mock.calls) {
       expect(String(appel[0])).not.toContain("mistral.ai");
@@ -52,21 +62,21 @@ describe("extraireDocumentIA — le seul chemin réseau du navigateur", () => {
 
   it("renvoie le résultat validé quand la réponse est conforme", async () => {
     simulerReponse(200, RESULTAT_VALIDE);
-    await expect(extraireDocumentIA("UERG")).resolves.toEqual(RESULTAT_VALIDE);
+    await expect(extraireDocumentIA("UERG", "jeton-test")).resolves.toEqual(RESULTAT_VALIDE);
   });
 });
 
 describe("extraireDocumentIA — aucune proposition douteuse ne passe (devoir n°2)", () => {
   it("rejette une réponse dont la forme ne correspond pas au schéma partagé", async () => {
     simulerReponse(200, { typeDocumentDetecte: "type_qui_nexiste_pas", propositions: [] });
-    await expect(extraireDocumentIA("UERG")).rejects.toThrow(/inattendu/i);
+    await expect(extraireDocumentIA("UERG", "jeton-test")).rejects.toThrow(/inattendu/i);
   });
 
   it("rejette une réponse amputée plutôt que d'en retenir la moitié", async () => {
     // `avertissementsGeneraux` manquant : accepter ça reviendrait à perdre en silence les
     // avertissements du document, qui sont justement ce qui empêche un faux feu vert.
     simulerReponse(200, { typeDocumentDetecte: "bulletin_paie", propositions: [] });
-    await expect(extraireDocumentIA("UERG")).rejects.toThrow(/inattendu/i);
+    await expect(extraireDocumentIA("UERG", "jeton-test")).rejects.toThrow(/inattendu/i);
   });
 });
 
@@ -76,12 +86,12 @@ describe("extraireDocumentIA — messages d'erreur honnêtes", () => {
     const messageServeur =
       "MISTRAL_API_KEY n'est pas définie côté serveur : l'import de document est indisponible. Aucun document n'a été envoyé.";
     simulerReponse(503, { error: messageServeur });
-    await expect(extraireDocumentIA("UERG")).rejects.toThrow(messageServeur);
+    await expect(extraireDocumentIA("UERG", "jeton-test")).rejects.toThrow(messageServeur);
   });
 
   it("retombe sur un message générique quand le corps d'erreur n'est pas exploitable", async () => {
     simulerReponse(500, null, true);
-    await expect(extraireDocumentIA("UERG")).rejects.toThrow(/saisis le document à la main/i);
+    await expect(extraireDocumentIA("UERG", "jeton-test")).rejects.toThrow(/saisis le document à la main/i);
   });
 
   // 30/07/2026 : un OCR vide (bulletin GHS-sPAIEctacle) s'affichait comme un document lu
@@ -92,7 +102,7 @@ describe("extraireDocumentIA — messages d'erreur honnêtes", () => {
       "Ce document n'a pas pu être lu (aucun texte détecté à l'intérieur) — ce n'est pas qu'il n'y avait rien " +
       "d'exploitable dedans, c'est un échec de lecture. Essaie un export PDF différent.";
     simulerReponse(422, { error: messageServeur });
-    await expect(extraireDocumentIA("UERG")).rejects.toThrow(messageServeur);
+    await expect(extraireDocumentIA("UERG", "jeton-test")).rejects.toThrow(messageServeur);
   });
 
   /*
@@ -105,32 +115,32 @@ describe("extraireDocumentIA — messages d'erreur honnêtes", () => {
   it("remonte tel quel le 413 — un document trop gros ne passera pas mieux au deuxième essai", async () => {
     const messageServeur = "Ce document pèse 4,2 Mo, au-delà de la limite de 3,0 Mo que le service peut recevoir. Rien n'a été envoyé.";
     simulerReponse(413, { error: messageServeur });
-    await expect(extraireDocumentIA("UERG")).rejects.toThrow(messageServeur);
+    await expect(extraireDocumentIA("UERG", "jeton-test")).rejects.toThrow(messageServeur);
   });
 
   it("remonte tel quel le 403 — origine non autorisée, réessayer n'y changera jamais rien", async () => {
     const messageServeur = "Cette requête ne vient pas d'une origine autorisée. Rien n'a été envoyé.";
     simulerReponse(403, { error: messageServeur });
-    await expect(extraireDocumentIA("UERG")).rejects.toThrow(messageServeur);
+    await expect(extraireDocumentIA("UERG", "jeton-test")).rejects.toThrow(messageServeur);
   });
 
   it("remonte tel quel le 400 de la garde", async () => {
     simulerReponse(400, { error: "pdfBase64 manquant" });
-    await expect(extraireDocumentIA("UERG")).rejects.toThrow("pdfBase64 manquant");
+    await expect(extraireDocumentIA("UERG", "jeton-test")).rejects.toThrow("pdfBase64 manquant");
   });
 
   it("le filtre HTML s'applique AUSSI aux trois nouveaux statuts — un 403 de pare-feu n'est pas de nous", async () => {
     // Un WAF ou un CDN peut lui aussi répondre 403. `messageMontrable` reste donc le dernier filtre :
     // élargir la liste blanche ne doit pas ouvrir la porte au corps d'un intermédiaire.
     simulerReponse(403, { error: "<html><body>Forbidden — edge node 10.0.0.4</body></html>" });
-    await expect(extraireDocumentIA("UERG")).rejects.toThrow(/saisis le document à la main/i);
+    await expect(extraireDocumentIA("UERG", "jeton-test")).rejects.toThrow(/saisis le document à la main/i);
   });
 
   it("LES 5xx RESTENT DEHORS, volontairement", async () => {
     // Le 500 de notre endpoint porte déjà un texte générique : rien à y gagner, et un 5xx est
     // justement ce qu'un proxy renvoie le plus volontiers avec son propre corps.
     simulerReponse(500, { error: "Échec de l'extraction. Réessaie ou saisis manuellement." });
-    await expect(extraireDocumentIA("UERG")).rejects.toThrow(/saisis le document à la main/i);
+    await expect(extraireDocumentIA("UERG", "jeton-test")).rejects.toThrow(/saisis le document à la main/i);
   });
 
   /*
@@ -143,21 +153,21 @@ describe("extraireDocumentIA — messages d'erreur honnêtes", () => {
    */
   it("affiche le CODE HTTP quand le message n'est pas de nous — sinon la panne est indiagnosticable", async () => {
     simulerReponse(504, { error: "Gateway Timeout" });
-    await expect(extraireDocumentIA("UERG")).rejects.toThrow(/code 504/);
+    await expect(extraireDocumentIA("UERG", "jeton-test")).rejects.toThrow(/code 504/);
   });
 
   it("l'affiche aussi sur un statut à nous dont le corps a été filtré", async () => {
     // Filtré parce que c'est du HTML : on ne montre pas le corps, mais on ne cache pas le code.
     simulerReponse(403, { error: "<html>Forbidden</html>" });
-    await expect(extraireDocumentIA("UERG")).rejects.toThrow(/code 403/);
+    await expect(extraireDocumentIA("UERG", "jeton-test")).rejects.toThrow(/code 403/);
   });
 
   it("N'INVENTE PAS de code quand il n'y en a pas — un échec réseau n'a pas de statut", async () => {
     // `fetch` qui rejette (hors ligne, DNS) : aucune réponse, donc aucun code. Afficher « code 0 » ou
     // « code undefined » serait une information fabriquée.
     vi.stubGlobal("fetch", vi.fn(async () => { throw new Error("Failed to fetch"); }));
-    await expect(extraireDocumentIA("UERG")).rejects.toThrow(/connexion interrompue/i);
-    await expect(extraireDocumentIA("UERG")).rejects.not.toThrow(/code/i);
+    await expect(extraireDocumentIA("UERG", "jeton-test")).rejects.toThrow(/connexion interrompue/i);
+    await expect(extraireDocumentIA("UERG", "jeton-test")).rejects.not.toThrow(/code/i);
   });
 
   // Un proxy / CDN / tunnel de dev peut répondre son propre 504 avec son propre corps : ce n'est pas
@@ -165,19 +175,19 @@ describe("extraireDocumentIA — messages d'erreur honnêtes", () => {
   it("n'affiche pas le corps d'un statut qui n'est pas le nôtre (504 de proxy)", async () => {
     const fuite = "Gateway Timeout — upstream 10.0.0.4:8080";
     simulerReponse(504, { error: fuite });
-    await expect(extraireDocumentIA("UERG")).rejects.toThrow(/saisis le document à la main/i);
-    await expect(extraireDocumentIA("UERG")).rejects.not.toThrow(fuite);
+    await expect(extraireDocumentIA("UERG", "jeton-test")).rejects.toThrow(/saisis le document à la main/i);
+    await expect(extraireDocumentIA("UERG", "jeton-test")).rejects.not.toThrow(fuite);
   });
 
   // Garde-fou de dernier recours : même sur un 503, un corps fait de balises n'est pas de nous.
   it("n'affiche pas une page HTML même renvoyée sur un 503", async () => {
     simulerReponse(503, { error: "<html><body>Service Unavailable — 10.0.0.4</body></html>" });
-    await expect(extraireDocumentIA("UERG")).rejects.toThrow(/saisis le document à la main/i);
+    await expect(extraireDocumentIA("UERG", "jeton-test")).rejects.toThrow(/saisis le document à la main/i);
   });
 
   it("ignore un message anormalement long plutôt que de le déverser à l'écran", async () => {
     simulerReponse(503, { error: "x".repeat(5000) });
-    await expect(extraireDocumentIA("UERG")).rejects.toThrow(/saisis le document à la main/i);
+    await expect(extraireDocumentIA("UERG", "jeton-test")).rejects.toThrow(/saisis le document à la main/i);
   });
 });
 
@@ -192,8 +202,8 @@ describe("extraireDocumentIA — aucun message technique ne peut fuir vers l'uti
         throw new TypeError("Failed to fetch");
       })
     );
-    await expect(extraireDocumentIA("UERG")).rejects.toThrow(/connexion interrompue/i);
-    await expect(extraireDocumentIA("UERG")).rejects.not.toThrow(/Failed to fetch/);
+    await expect(extraireDocumentIA("UERG", "jeton-test")).rejects.toThrow(/connexion interrompue/i);
+    await expect(extraireDocumentIA("UERG", "jeton-test")).rejects.not.toThrow(/Failed to fetch/);
   });
 
   // Ne prétend pas que le document n'est pas parti : une coupure peut survenir après l'envoi du corps.
@@ -204,12 +214,12 @@ describe("extraireDocumentIA — aucun message technique ne peut fuir vers l'uti
         throw new TypeError("Failed to fetch");
       })
     );
-    await expect(extraireDocumentIA("UERG")).rejects.not.toThrow(/n'a pas été transmis|n'a pas été envoyé/);
+    await expect(extraireDocumentIA("UERG", "jeton-test")).rejects.not.toThrow(/n'a pas été transmis|n'a pas été envoyé/);
   });
 
   it("traduit un 200 qui ne contient pas du JSON (page HTML d'un proxy) sans exposer la SyntaxError", async () => {
     simulerReponse(200, null, true);
-    await expect(extraireDocumentIA("UERG")).rejects.toThrow(/inattendu/i);
-    await expect(extraireDocumentIA("UERG")).rejects.not.toThrow(/Unexpected token|JSON/);
+    await expect(extraireDocumentIA("UERG", "jeton-test")).rejects.toThrow(/inattendu/i);
+    await expect(extraireDocumentIA("UERG", "jeton-test")).rejects.not.toThrow(/Unexpected token|JSON/);
   });
 });

@@ -12,25 +12,19 @@
 // chemin qui protège une facture n'a aucune valeur de preuve. Même convention que `lib/ocrIllisible.ts`,
 // déjà importé par `api/extract-document.ts`.
 //
-// ⚠️ CE QUE CETTE GARDE NE FAIT PAS. À lire avant de la croire suffisante (devoir n°2 : dire la
-// bonne raison, et ne pas afficher un faux feu vert) :
+// ⚠️ CE QUE CETTE GARDE NE FAIT PAS ENCORE (07/08/2026). À lire avant de la croire suffisante
+// (devoir n°2 : dire la bonne raison, et ne pas afficher un faux feu vert) :
 //
-//   1. AUCUN QUOTA. Un quota réel exige un compteur PARTAGÉ entre les instances. Le runtime Edge est
-//      sans état, et le projet n'a ni KV ni Redis (vérifié dans package.json le 04/08/2026 : aucune
-//      dépendance de ce type). Un compteur en mémoire se réinitialiserait à chaque instance — une
-//      protection qui ne protège pas. Le quota est donc REPORTÉ en phase 2, adossé à l'identité de
-//      l'utilisateur et à la base Supabase de la phase 1, qui fournit enfin l'endroit où compter.
-//      Ne pas « ajouter un petit compteur en attendant » : ce serait précisément le faux feu vert.
+//   1. AUCUN QUOTA. Reporté délibérément (demande explicite de Benoît le 07/08/2026, une fois
+//      l'authentification posée) : un quota réel exige un compteur PARTAGÉ entre les instances — le
+//      runtime Edge est sans état, et le projet n'a ni KV ni Redis. Il s'adossera à la base Supabase
+//      et à l'identité que l'authentification ci-dessous fournit désormais.
 //
-//   2. AUCUNE AUTHENTIFICATION. Elle est la phase 2 du plan. **Le point 8 ne se ferme donc pas
-//      complètement ici** : ce fichier en couvre la moitié vérifiable aujourd'hui, et il ne faut pas
-//      écrire ailleurs que le point 8 est clos.
-//
-//   3. LE CONTRÔLE D'ORIGINE N'EST PAS UNE SERRURE. Il arrête un navigateur qui appellerait
+//   2. LE CONTRÔLE D'ORIGINE N'EST PAS UNE SERRURE. Il arrête un navigateur qui appellerait
 //      l'endpoint depuis un autre site (l'en-tête `Origin` est posé par le navigateur, une page ne
 //      peut pas mentir dessus). Il n'arrête pas un `curl` qui forge l'en-tête à la main. C'est une
-//      réduction de surface réelle contre l'abus opportuniste, pas une protection contre quelqu'un
-//      qui vise Cadence.
+//      réduction de surface réelle contre l'abus opportuniste — la VRAIE serrure est
+//      `verifierAuthentification` ci-dessous : un jeton de session valide, lui, ne se forge pas.
 
 import { TAILLE_MAX_PDF_OCTETS } from "./fichierImportIA";
 
@@ -148,4 +142,86 @@ export function verifierRequeteExtraction(params: {
   }
 
   return { ok: true };
+}
+
+/**
+ * Verdict de l'authentification. `503` couvre une configuration serveur absente (pas la faute de
+ * l'appelant, même famille que `ConfigurationManquanteError` pour `MISTRAL_API_KEY`) ; `401` couvre
+ * tout le reste — jeton absent, expiré, révoqué ou serveur d'authentification muet. Volontairement
+ * pas plus précis que ça : distinguer « expiré » de « invalide » n'aiderait pas l'utilisateur (le
+ * geste est le même : se reconnecter), et le distinguer inviterait à essayer de deviner pourquoi un
+ * jeton précis a été refusé, ce que Supabase seul sait.
+ */
+export type VerdictAuthentification = { ok: true; utilisateurId: string } | { ok: false; statut: 401 | 503; erreur: string };
+
+/**
+ * Réduit à ce que `verifierAuthentification` lit vraiment de la réponse — pas `Response` au complet.
+ * Même conception que `ClientAuth` (`auth/supabaseClient.ts`) : les tests fabriquent un faux objet de
+ * trois champs au lieu de simuler un `Response` DOM complet, et `fetch` satisfait ce type telle quelle.
+ */
+export interface ReponseAuthSupabase {
+  ok: boolean;
+  status: number;
+  json(): Promise<unknown>;
+}
+
+const MESSAGE_AUTH_REQUISE = "Authentification requise. Reconnecte-toi puis réessaie. Rien n'a été envoyé.";
+const MESSAGE_SESSION_INVALIDE = "Ta session n'est plus valide. Reconnecte-toi puis réessaie. Rien n'a été envoyé.";
+const MESSAGE_CONFIGURATION_MANQUANTE = "L'authentification n'est pas configurée côté serveur : l'import de document est indisponible pour l'instant.";
+
+/**
+ * Valide le jeton de session envoyé par le navigateur (`Authorization: Bearer <access_token>`)
+ * auprès du serveur d'authentification Supabase — point 8, phase authentification (07/08/2026).
+ *
+ * C'EST LA VRAIE SERRURE, contrairement au contrôle d'origine ci-dessus : un jeton de session
+ * Supabase valide ne se forge pas (il est signé par le serveur d'authentification), là où un en-tête
+ * `Origin` se recopie à la main dans n'importe quel `curl`. Un appelant anonyme — donc un bot qui
+ * scanne les endpoints publics — n'a structurellement aucun moyen de produire un jeton qui passe
+ * cette étape.
+ *
+ * `appelerSupabase` est injecté (défaut `fetch`) pour que les tests n'appellent jamais le vrai
+ * serveur Supabase — même discipline que `client: ClientAuth` dans `EcranConnexionObligatoire.tsx`.
+ * On appelle `GET {url}/auth/v1/user` directement (l'API REST du serveur d'authentification, pas le
+ * SDK `@supabase/supabase-js`) : c'est la même vérification, sans dépendre de la compatibilité du SDK
+ * avec le runtime Edge pour une seule requête HTTP.
+ */
+export async function verifierAuthentification(
+  autorisation: string | null,
+  supabaseUrl: string,
+  supabaseAnonKey: string,
+  appelerSupabase: (url: string, init: RequestInit) => Promise<ReponseAuthSupabase> = fetch,
+): Promise<VerdictAuthentification> {
+  if (!supabaseUrl || !supabaseAnonKey) {
+    return { ok: false, statut: 503, erreur: MESSAGE_CONFIGURATION_MANQUANTE };
+  }
+
+  const jeton = autorisation?.startsWith("Bearer ") ? autorisation.slice("Bearer ".length).trim() : "";
+  if (jeton === "") {
+    return { ok: false, statut: 401, erreur: MESSAGE_AUTH_REQUISE };
+  }
+
+  let reponse: ReponseAuthSupabase;
+  try {
+    reponse = await appelerSupabase(`${supabaseUrl.replace(/\/+$/, "")}/auth/v1/user`, {
+      headers: { Authorization: `Bearer ${jeton}`, apikey: supabaseAnonKey },
+    });
+  } catch {
+    return { ok: false, statut: 401, erreur: MESSAGE_SESSION_INVALIDE };
+  }
+  if (!reponse.ok) {
+    return { ok: false, statut: 401, erreur: MESSAGE_SESSION_INVALIDE };
+  }
+
+  let corps: unknown;
+  try {
+    corps = await reponse.json();
+  } catch {
+    return { ok: false, statut: 401, erreur: MESSAGE_SESSION_INVALIDE };
+  }
+  const utilisateurId = (corps as { id?: unknown } | null)?.id;
+  if (typeof utilisateurId !== "string" || utilisateurId === "") {
+    return { ok: false, statut: 401, erreur: MESSAGE_SESSION_INVALIDE };
+  }
+
+  return { ok: true, utilisateurId };
 }

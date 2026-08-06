@@ -30,7 +30,7 @@ const DECOMPTE: DecompteHeuresResultat = {
   cachetsParMois: {},
 };
 
-const SESSION: SessionMinimale = { user: { id: "u-42", email: "benoit@example.com" } };
+const SESSION: SessionMinimale = { user: { id: "u-42", email: "benoit@example.com" }, access_token: "jeton-test" };
 
 function fauxClientAuth(reponses: Partial<ClientAuth> = {}): ClientAuth {
   return {

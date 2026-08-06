@@ -32,7 +32,7 @@ function resultatAvec(typeDocumentDetecte: ExtractionResult["typeDocumentDetecte
   return { typeDocumentDetecte, propositions: [], avertissementsGeneraux: [] };
 }
 
-const SESSION: SessionMinimale = { user: { id: "u-42", email: "benoit@example.com" } };
+const SESSION: SessionMinimale = { user: { id: "u-42", email: "benoit@example.com" }, access_token: "jeton-test" };
 
 function fauxClientAuth(reponses: Partial<ClientAuth> = {}): ClientAuth {
   return {
@@ -112,13 +112,19 @@ async function deposerEtConfirmer() {
 
 const CONNECTE = fauxClientAuth({ getSession: vi.fn(async () => ({ data: { session: SESSION }, error: null })) });
 
-describe("ImportDocumentIA — sans session", () => {
-  it("n'appelle jamais l'upload : affiche la revue directement", async () => {
+describe("ImportDocumentIA — sans session (07/08/2026, point 8)", () => {
+  // Avant le point 8, l'extraction réussissait quand même sans session (seul le dépôt en base était
+  // conditionné à `session.statut === "connecte"`). Depuis, l'extraction elle-même exige un jeton —
+  // sans lui, ni l'extraction ni l'upload n'ont lieu. Dans la vraie app ce cas ne se présente jamais
+  // (le mur de connexion exige déjà un compte), mais le composant ne doit ni planter ni appeler
+  // `extraireDocumentIA` sans jeton si jamais il était monté sans session malgré tout.
+  it("n'appelle ni l'extraction ni l'upload : affiche le message d'authentification requise", async () => {
     vi.mocked(extraireDocumentIA).mockResolvedValue(resultatAvec("notification_admission"));
     const upload = vi.fn();
     rendre({ clientFichiers: fauxClientFichiers(upload) });
     await deposerEtConfirmer();
-    expect(await screen.findByText(/propositions issues de ton document/i)).toBeInTheDocument();
+    expect(await screen.findByText(/authentification requise/i)).toBeInTheDocument();
+    expect(extraireDocumentIA).not.toHaveBeenCalled();
     expect(upload).not.toHaveBeenCalled();
   });
 });

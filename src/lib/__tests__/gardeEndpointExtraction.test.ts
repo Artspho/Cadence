@@ -1,14 +1,15 @@
-// Tests de la garde de `/api/extract-document` (point 8, phase 0).
+// Tests de la garde de `/api/extract-document` (point 8).
 //
 // Ce qui est réellement en jeu ici : la facture Mistral. Un test qui passerait « par construction »
 // ne vaudrait rien, donc chaque refus est vérifié avec son STATUT, et la limite de taille est
 // vérifiée de part et d'autre du seuil, pas seulement très au-dessus.
 //
-// ⚠️ Ces tests ne prouvent RIEN sur le quota ni sur l'authentification : ils n'existent pas encore
-// (cf. l'en-tête de lib/gardeEndpointExtraction.ts). Ne pas lire une suite verte ici comme
-// « le point 8 est clos ».
+// ⚠️ Ces tests ne prouvent RIEN sur le quota : il n'existe pas encore (cf. l'en-tête de
+// lib/gardeEndpointExtraction.ts, reporté sur demande explicite de Benoît). Ne pas lire une suite
+// verte ici comme « le point 8 est clos ». L'authentification, elle, EST couverte depuis le
+// 07/08/2026 (`verifierAuthentification`, tout en bas de ce fichier).
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { TAILLE_MAX_PDF_OCTETS } from "../fichierImportIA";
 import {
   LONGUEUR_MAX_BASE64,
@@ -16,6 +17,7 @@ import {
   lireOriginesAutorisees,
   origineAutorisee,
   tailleDocumentDepuisBase64,
+  verifierAuthentification,
   verifierRequeteExtraction,
 } from "../gardeEndpointExtraction";
 
@@ -175,5 +177,89 @@ describe("verdict complet, dans l'ordre voulu", () => {
       originesAutorisees: AUTORISEES,
     });
     expect(verdict.ok).toBe(false);
+  });
+});
+
+describe("verifierAuthentification — la VRAIE serrure (point 8, 07/08/2026)", () => {
+  const URL_SUPABASE = "https://exemple.supabase.co";
+  const CLE_ANON = "cle-anon-test";
+
+  /** Simule la réponse de `GET {url}/auth/v1/user` sans jamais appeler le vrai serveur Supabase. */
+  function fauxSupabase(statut: number, corps: unknown, corpsIllisible = false) {
+    return vi.fn(async (_url: string, _init: RequestInit) => ({
+      ok: statut >= 200 && statut < 300,
+      status: statut,
+      json: async () => {
+        if (corpsIllisible) throw new Error("corps non-JSON");
+        return corps;
+      },
+    }));
+  }
+
+  it("refuse SANS appeler Supabase quand l'en-tête Authorization est absent — un scanner anonyme n'a rien à présenter", async () => {
+    const appelerSupabase = fauxSupabase(200, { id: "u-1" });
+    const verdict = await verifierAuthentification(null, URL_SUPABASE, CLE_ANON, appelerSupabase);
+    if (verdict.ok) throw new Error("devrait être refusé");
+    expect(verdict.statut).toBe(401);
+    expect(appelerSupabase).not.toHaveBeenCalled();
+  });
+
+  it("refuse un en-tête qui ne porte pas le schéma Bearer", async () => {
+    const appelerSupabase = fauxSupabase(200, { id: "u-1" });
+    const verdict = await verifierAuthentification("jeton-sans-bearer", URL_SUPABASE, CLE_ANON, appelerSupabase);
+    if (verdict.ok) throw new Error("devrait être refusé");
+    expect(verdict.statut).toBe(401);
+    expect(appelerSupabase).not.toHaveBeenCalled();
+  });
+
+  it("accepte un jeton que Supabase valide, et rend l'identifiant de l'utilisateur", async () => {
+    const appelerSupabase = fauxSupabase(200, { id: "u-42" });
+    const verdict = await verifierAuthentification("Bearer jeton-valide", URL_SUPABASE, CLE_ANON, appelerSupabase);
+    expect(verdict).toEqual({ ok: true, utilisateurId: "u-42" });
+    // Le jeton envoyé à Supabase est celui reçu, PAS l'en-tête brut (sans le préfixe « Bearer »
+    // redoublé) — et la clé anon voyage dans `apikey`, jamais dans le jeton lui-même.
+    const [url, options] = appelerSupabase.mock.calls[0];
+    expect(url).toBe(`${URL_SUPABASE}/auth/v1/user`);
+    expect((options as RequestInit).headers).toEqual({ Authorization: "Bearer jeton-valide", apikey: CLE_ANON });
+  });
+
+  it("refuse un jeton que Supabase rejette (expiré ou révoqué)", async () => {
+    const appelerSupabase = fauxSupabase(401, { message: "invalid JWT" });
+    const verdict = await verifierAuthentification("Bearer jeton-expire", URL_SUPABASE, CLE_ANON, appelerSupabase);
+    if (verdict.ok) throw new Error("devrait être refusé");
+    expect(verdict.statut).toBe(401);
+  });
+
+  it("refuse proprement une réponse Supabase illisible, sans laisser fuiter une erreur technique", async () => {
+    const appelerSupabase = fauxSupabase(200, null, true);
+    const verdict = await verifierAuthentification("Bearer jeton-valide", URL_SUPABASE, CLE_ANON, appelerSupabase);
+    if (verdict.ok) throw new Error("devrait être refusé");
+    expect(verdict.statut).toBe(401);
+  });
+
+  it("refuse un corps sans identifiant exploitable, même sur un 200", async () => {
+    const appelerSupabase = fauxSupabase(200, { pas_d_id: true });
+    const verdict = await verifierAuthentification("Bearer jeton-valide", URL_SUPABASE, CLE_ANON, appelerSupabase);
+    if (verdict.ok) throw new Error("devrait être refusé");
+    expect(verdict.statut).toBe(401);
+  });
+
+  it("refuse un échec réseau vers Supabase comme une session invalide, pas comme un crash", async () => {
+    const appelerSupabase = vi.fn(async (_url: string, _init: RequestInit) => {
+      throw new TypeError("Failed to fetch");
+    });
+    const verdict = await verifierAuthentification("Bearer jeton-valide", URL_SUPABASE, CLE_ANON, appelerSupabase);
+    if (verdict.ok) throw new Error("devrait être refusé");
+    expect(verdict.statut).toBe(401);
+  });
+
+  it("rend 503 (configuration serveur, pas la faute de l'appelant) quand l'URL ou la clé Supabase manquent", async () => {
+    const appelerSupabase = fauxSupabase(200, { id: "u-1" });
+    const sansUrl = await verifierAuthentification("Bearer jeton-valide", "", CLE_ANON, appelerSupabase);
+    const sansCle = await verifierAuthentification("Bearer jeton-valide", URL_SUPABASE, "", appelerSupabase);
+    if (sansUrl.ok || sansCle.ok) throw new Error("devrait être refusé");
+    expect(sansUrl.statut).toBe(503);
+    expect(sansCle.statut).toBe(503);
+    expect(appelerSupabase).not.toHaveBeenCalled();
   });
 });

@@ -15,7 +15,7 @@ import type { ClientAuth, ErreurAuth, SessionMinimale } from "../supabaseClient"
 import { VERSION_POLITIQUE } from "../../content/mentionsLegales";
 import { CLE_METADONNEE_CONSENTEMENT } from "../../storage/consentementStorage";
 
-const SESSION: SessionMinimale = { user: { id: "u-1", email: "benoit@example.com" } };
+const SESSION: SessionMinimale = { user: { id: "u-1", email: "benoit@example.com" }, access_token: "jeton-test" };
 const ORIGINE = "https://cadence-git-master-benoit3.vercel.app";
 
 /** Faux client minimal : chaque test ne renseigne que ce qu'il exerce. */

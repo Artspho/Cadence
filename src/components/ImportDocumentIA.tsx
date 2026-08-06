@@ -147,7 +147,15 @@ export function ImportDocumentIA({
     setErreurConservation(null);
     try {
       const base64 = await lirePdfEnBase64(fichierEnAttente);
-      const extraction = await extraireDocumentIA(base64);
+      // Jeton lu ICI, au moment de l'envoi — pas depuis `session` (l'état de `useSession`, qui peut
+      // dater de la dernière connexion/rafraîchissement) — pour envoyer le jeton le plus à jour
+      // possible (07/08/2026, point 8 : le serveur exige désormais une session valide).
+      const { data: donneesSession } = clientAuth ? await clientAuth.getSession() : { data: { session: null } };
+      const accessToken = donneesSession.session?.access_token;
+      if (!accessToken) {
+        throw new Error("Authentification requise pour envoyer un document. Reconnecte-toi puis réessaie.");
+      }
+      const extraction = await extraireDocumentIA(base64, accessToken);
 
       // Conservation : UNIQUEMENT si connecté (RLS exige une session réelle — cf. PHRASES[3] de
       // mentionEnvoiIA.ts, formulée au conditionnel pour cette même raison).

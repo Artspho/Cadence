@@ -31,7 +31,7 @@ import { extractionResultSchema, type ExtractionResult } from "../src/types/extr
 import { texteOcrIllisible } from "../src/lib/ocrIllisible";
 // Garde du point 8 — même convention que `ocrIllisible` ci-dessus : la logique vit dans `src/lib/`
 // pour être couverte par les tests, `api/` ne fait que la brancher.
-import { lireOriginesAutorisees, verifierRequeteExtraction } from "../src/lib/gardeEndpointExtraction";
+import { lireOriginesAutorisees, verifierAuthentification, verifierRequeteExtraction } from "../src/lib/gardeEndpointExtraction";
 
 /**
  * Runtime Edge (et non Node). Choix cohérent avec le code : le handler ci-dessous
@@ -734,16 +734,18 @@ export default async function handler(req: Request): Promise<Response> {
     return new Response("Method not allowed", { status: 405 });
   }
 
-  // Garde du point 8 (phase 0 de la refonte Supabase) : contrôle d'origine + contrôle de taille
-  // CÔTÉ SERVEUR. Avant, la limite de 3 Mo n'existait que dans le navigateur, donc un appelant
+  // Garde du point 8 : contrôle d'origine + contrôle de taille CÔTÉ SERVEUR, PUIS authentification
+  // (07/08/2026). Avant, la limite de 3 Mo n'existait que dans le navigateur, donc un appelant
   // direct l'ignorait entièrement et faisait tourner la facture Mistral. La logique et son
   // raisonnement vivent dans src/lib/gardeEndpointExtraction.ts (testée — `include` de
   // vite.config.ts ne couvre pas `api/`).
   //
-  // ⚠️ Le point 8 n'est PAS clos ici : il reste sans authentification et sans quota, tous deux
-  // reportés en phase 2 pour une raison technique explicite (pas d'endroit où compter avant la base
-  // Supabase). Ne pas écrire ailleurs que ce point est fermé. Cette garde vient AVANT toute lecture
-  // du corps utile et avant tout appel réseau : un refus ne coûte rien et n'envoie rien.
+  // ⚠️ Le point 8 n'est TOUJOURS PAS clos ici : il reste sans quota, reporté sur demande explicite
+  // de Benoît une fois l'authentification posée (pas d'endroit où compter avant la base Supabase, et
+  // priorité donnée à la vraie serrure d'abord). Ne pas écrire ailleurs que ce point est fermé.
+  //
+  // ORDRE : origine et taille d'abord (gratuit, aucun appel réseau), authentification ensuite (un
+  // aller-retour vers Supabase) — un refus gratuit ne doit jamais attendre un appel réseau évitable.
   let corps: unknown;
   try {
     corps = await req.json();
@@ -759,6 +761,22 @@ export default async function handler(req: Request): Promise<Response> {
   if (!verdict.ok) {
     return new Response(JSON.stringify({ error: verdict.erreur }), {
       status: verdict.statut,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  // Même convention de repli que les scripts `verifier:*` (cf. scripts/verifier-rls.mjs) : la
+  // variable sans préfixe l'emporte si elle est posée, sinon celle du client (`VITE_...`) — publique
+  // par conception (c'est la clé « anon », protégée par RLS, pas un secret), donc sans risque à relire
+  // ici. Aucune nouvelle variable à configurer dans Vercel : les deux sont déjà présentes pour le front.
+  const verdictAuth = await verifierAuthentification(
+    req.headers.get("authorization"),
+    process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL ?? "",
+    process.env.SUPABASE_ANON_KEY ?? process.env.VITE_SUPABASE_ANON_KEY ?? "",
+  );
+  if (!verdictAuth.ok) {
+    return new Response(JSON.stringify({ error: verdictAuth.erreur }), {
+      status: verdictAuth.statut,
       headers: { "Content-Type": "application/json" },
     });
   }
