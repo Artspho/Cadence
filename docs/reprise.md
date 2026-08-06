@@ -8,12 +8,11 @@ Mémoire durable à consulter au démarrage : `CLAUDE.md`, `docs/SPEC.md`, `docs
 
 Deux devoirs sacrés : (1) ne jamais perdre les données ; (2) ne jamais afficher un chiffre faux (ni faux « feu vert » rassurant, ni faux « Bloqué », ni faux montant, ni fausse alerte, ni valeur sentinelle brute).
 
-État (mis à jour le **06/08/2026**, fin de la TROISIÈME session du jour) : les deux devoirs sacrés
-sont tenus. **1171 tests verts (91 fichiers), `tsc -b` propre sur les deux tsconfig, `tsc -p
-tsconfig.api.json` propre, `npm run build` propre.** Dernier commit : `402ad9a`. `master` est la seule
-branche, working tree **propre**, et **tout est poussé sur `origin/master`** (écart vérifié à 0 après
-`git fetch`) — poussé sur demande explicite de Benoît, jamais spontanément (mémoire
-`cadence_push_credentials.md`).
+État (mis à jour le **07/08/2026**) : les deux devoirs sacrés sont tenus. **1174 tests verts (91
+fichiers), `tsc -b` propre sur les deux tsconfig, `tsc -p tsconfig.api.json` propre, `npm run build`
+propre.** Dernier commit : `5bfa256`. `master` est la seule branche, working tree **propre**, et
+**tout est poussé sur `origin/master`** — poussé sur demande explicite de Benoît, jamais spontanément
+(mémoire `cadence_push_credentials.md`).
 
 ⚠️ **La pile technique de l'en-tête ci-dessus n'est plus exacte** : « localStorage » n'est plus la
 source de vérité depuis la phase 5 de la refonte Supabase. **Supabase (Paris, `eu-west-3`) est la
@@ -33,11 +32,15 @@ résumé de session plus bas.
 
 ✅ **URL de référence : décidée, ne pas rouvrir sans que Benoît le redemande.** Il garde
 `cadence-git-master-benoit3.vercel.app` (« on change rien pour l'instant ») — aucun changement de code
-à faire. **Reste un réglage Supabase probablement toujours à faire de SON côté** (Authentication → URL
-Configuration) : `Site URL` pointait vers `http://localhost:5183`, ce qui a fait atterrir un lien de
-réinitialisation sur `localhost` au lieu de la bonne URL. La procédure lui a été donnée (`Site URL` =
-l'URL de branche, l'ajouter aussi aux `Redirect URLs`) — **jamais confirmé fait**. Si un testeur se
-plaint d'un lien mort, commencer par là.
+à faire.
+
+✅ **Réglage Supabase `Site URL`/`Redirect URLs` — FAIT et VÉRIFIÉ le 07/08/2026.** `Site URL` pointait
+vers `http://localhost:3000` (constaté à l'écran, pas `5183` comme noté précédemment — l'un ou l'autre,
+peu importe, les deux sont du `localhost`), ce qui faisait atterrir un lien de réinitialisation sur
+`localhost` au lieu de la bonne URL. Benoît l'a changé lui-même pour
+`https://cadence-git-master-benoit3.vercel.app` (`Redirect URLs` portait déjà le bon wildcard
+`https://cadence-git-master-benoit3.vercel.app/**`, rien à y toucher). Confirmé par un test de bout en
+bout dans la foulée (cf. point suivant).
 
 ✅ **IMPORT IA RECONFIRMÉ FONCTIONNEL — Benoît l'a testé sur les 9 types reconnus, tous stockent
 correctement dans « Mon dossier » (« j'ai toutes les catégories ça marche »).** Referme la réserve de
@@ -58,14 +61,26 @@ classer manuellement (« Document non classé ») via `SelecteurTypeNonReconnu`.
 oublie » avant de confirmer si ce sélecteur s'affiche vraiment pour ce document précis** — ne pas
 écrire que c'est vérifié, le lui redemander s'il compte importer ce genre de courrier.
 
-⚠️ **`EcranNouveauMotDePasse` toujours pas vu à l'écran avec un lien VALIDE de bout en bout.** Le lien
-que Benoît a testé ce fil avait en fait **expiré** (`otp_expired`) — pas un bug du marqueur. Un vrai
-bug trouvé en creusant ce faux positif, et corrigé (`de7905a`) : le bandeau qui explique un lien
-refusé/expiré n'existait que sur le mur (session déconnectée) — avec une session déjà active (son
-cas), l'app continuait tout droit vers le tableau de bord, sans jamais dire que le lien avait échoué.
-Nouveau bandeau symétrique dans `App.tsx`, texte partagé via `texteAvertissementLienConnecte`
-(`retourLienMagique.ts`). **Reste à faire** : retester avec un lien FRAIS depuis la bonne URL, une fois
-le réglage Supabase ci-dessus vérifié.
+✅ **`EcranNouveauMotDePasse` CONFIRMÉ FONCTIONNEL de bout en bout — testé le 07/08/2026** avec un lien
+frais depuis la bonne URL (après le réglage Supabase ci-dessus) : URL d'arrivée
+`https://cadence-git-master-benoit3.vercel.app/...`, écran « nouveau mot de passe » bien affiché,
+nouveau mot de passe accepté et confirmé actif (l'ancien ne fonctionne plus, le nouveau oui — testé
+directement par Benoît).
+
+🔴→✅ **Bug trouvé PENDANT ce test, et corrigé le jour même (`5bfa256`) : un bandeau annonçait un FAUX
+échec juste après un succès réel.** Après avoir enregistré le nouveau mot de passe, Benoît est arrivé
+sur son tableau de bord avec « Un lien reçu par e-mail a été ouvert, mais il n'a pas modifié ta session
+actuelle » — puis, en se déconnectant pour vérifier, le même message (variante du mur) : « … mais il
+n'a pas ouvert de session ». Cause exacte : `INDICE_RETOUR_LIEN` lit le `code` de l'URL de façon
+SYNCHRONE à l'import du module, AVANT que la bibliothèque ne le nettoie de façon asynchrone une fois
+l'échange PKCE réussi — donc `present` reste vrai même sur un succès, pas seulement sur un échec, et ce
+pour toute la vie de l'onglet (y compris après déconnexion). Les deux bandeaux (`App.tsx` et
+`EcranConnexionObligatoire.tsx`) prenaient ce `present` figé pour argent comptant. Corrigé par un
+marqueur `sessionStorage` (`marquerReinitialisationReussie`/`reinitialisationReussieCetteSession`,
+`auth/retourLienMagique.ts`) posé au succès réel (`updateUser`), qui fait taire les deux bandeaux dans
+ce cas précis. **Limite documentée, acceptée** : un second lien de réinitialisation différent, ouvert
+dans le même onglet après un premier succès, verrait son propre échec rester muet — jugé assez rare.
+3 nouveaux tests, 1174 tests verts au total.
 
 🔴 **SMTP OVH — toujours BLOQUANT dès qu'un testeur externe est invité.** Benoît n'a pas accès à son
 espace client OVH pour l'instant (« je demande un code plus tard ») — reporté, pas oublié. **Adresse
@@ -104,8 +119,8 @@ supprimer sa propre preuve. Benoît a effacé la ligne `TEST-VERIFICATION-%` dep
    chargé et peut afficher un faux « Sécurité ». Aucun effet sur les données de Benoît (20 cachets
    maximum), mais ça ne vaut pas pour un autre testeur.
 2. 🔴 **SMTP OVH** — cf. ci-dessus, bloqué sur l'accès de Benoît à OVH.
-3. ⚠️ **Réglage `Site URL`/`Redirect URLs` sur Supabase** — cf. ci-dessus, jamais confirmé fait, puis
-   retester le lien de réinitialisation avec un e-mail FRAIS.
+3. ✅ **Réglage `Site URL`/`Redirect URLs` sur Supabase, et parcours de réinitialisation — FAITS et
+   VÉRIFIÉS le 07/08/2026.** Cf. ci-dessus, plus rien à faire ici sauf régression.
 4. ✅ **Phase 7 — le mur hors ligne est ARBITRÉ (06/08/2026) : ON NE CHANGE RIEN.** Trois options lui
    ont été présentées, il a choisi **B** (statu quo). Cadence est donc **inutilisable hors ligne
    au-delà d'une heure** — jeton expiré, rafraîchissement impossible faute de réseau, `useSession`
@@ -134,6 +149,25 @@ supprimer sa propre preuve. Benoît a effacé la ligne `TEST-VERIFICATION-%` dep
 - **`Justificatif après inscription`** (nom donné par Benoît) est en réalité une lettre France Travail
   de demande de pièces complémentaires — pas un type que l'IA de Cadence reconnaît, et ce n'est pas un
   bug qu'elle ne le reconnaisse pas.
+
+---
+
+**Résumé de la session du 07/08/2026 (1 commit, `5bfa256`, poussé)** :
+1. `5bfa256` — fix : un bandeau annonçait un faux échec juste après une réinitialisation de mot de
+   passe réussie (« un lien reçu par e-mail a été ouvert, mais il n'a pas modifié/ouvert de session »),
+   sur le tableau de bord puis sur le mur après déconnexion. Trouvé en testant le parcours de bout en
+   bout avec Benoît (réglage `Site URL` Supabase corrigé juste avant, cf. bloc de reprise ci-dessus).
+   Cause : `INDICE_RETOUR_LIEN` lit le `code` de l'URL de façon synchrone, avant le nettoyage
+   asynchrone de la bibliothèque une fois l'échange PKCE réussi — `present` reste donc vrai même sur un
+   succès. Marqueur `sessionStorage` posé au succès réel (`auth/retourLienMagique.ts`), lu par
+   `App.tsx` et `EcranConnexionObligatoire.tsx` pour faire taire les deux bandeaux dans ce cas. Limite
+   documentée : un second lien de réinitialisation différent dans le même onglet verrait son propre
+   échec rester muet. 3 tests ajoutés, 1174 tests verts, `tsc -b`/`tsc -p tsconfig.api.json`/`npm run
+   build` propres.
+
+Méthode de ce fil : test manuel guidé du parcours réel (changer `Site URL`, demander un e-mail de
+réinitialisation, l'ouvrir, changer le mot de passe, se reconnecter) plutôt que supposer que le réglage
+suffisait — c'est ce qui a révélé le bandeau faux, invisible en lisant le code seul.
 
 ---
 
