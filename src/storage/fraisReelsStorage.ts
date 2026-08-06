@@ -157,6 +157,10 @@ const bienAmortiSchema = z.object({
   dateAchat: z.string(),
   dureeAns: z.number(),
   tauxPro: z.number(),
+  // Commit 7 de la phase 6 : `documentId` est la SEULE référence écrite. `justificatifId` reste
+  // accepté EN LECTURE et n'est jamais réécrit — schéma de lecture élargi, jamais durci
+  // (cf. types/fraisReels.ts, même principe qu'au commit 6 pour `Depense`).
+  documentId: z.string().optional(),
   justificatifId: z.string().optional(),
 });
 

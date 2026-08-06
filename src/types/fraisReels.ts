@@ -95,7 +95,21 @@ export interface BienAmorti {
   dateAchat: string; // ISO "YYYY-MM-DD"
   dureeAns: number; // peut différer de la durée par défaut de la config
   tauxPro: number; // ∈ ]0, 1], défaut 1.0
-  justificatifId?: string; // id Drive ou local, géré par le layer storage
+  /**
+   * Référence de la ligne `documents` (Supabase Storage), commit 7 de la phase 6 — SEULE destination
+   * en écriture. `categorie_frais` vaut toujours `'C7'` et `annee_fiscale` l'année de `dateAchat`
+   * (décision de Benoît du 05/08/2026 : cet écran ne sert QUE quand un bien quitte le forfait A pour
+   * le réel, cf. engine/fraisReels/calculerAmortissement.ts).
+   */
+  documentId?: string;
+  /**
+   * ⚠️ CODE MORT, CONSERVÉ EN LECTURE SEULE ET JAMAIS RÉÉCRIT. `justificatifId` n'a jamais été câblé à
+   * la moindre UI (audit du plan de la phase 6 : `AmortissementBiens.tsx` vérifié) — aucune donnée
+   * réelle ne peut donc en porter. Gardé quand même dans le schéma de LECTURE par principe (jamais
+   * durcir ce qu'on relit, cf. [[cadence_schema_lecture_ecriture]]) : le supprimer ferait échouer la
+   * validation Zod d'un fichier exporté qui l'aurait, au lieu de l'ignorer.
+   */
+  justificatifId?: string;
 }
 
 export type RecommandationFraisReels = "frais_reels" | "forfait_10" | "identique";

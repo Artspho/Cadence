@@ -5,6 +5,8 @@
 // amortir viennent tous du résultat retourné par le moteur.
 import { useMemo, useState } from "react";
 import type { BienAmorti, CategorieBienAmorti } from "../../types/fraisReels";
+import type { ClientDocuments, ClientFichiers } from "../../auth/supabaseClient";
+import { remplacerDocument } from "../../storage/documentsStorage";
 import type { FranceTravailConfig } from "../../config/franceTravailConfig";
 import { calculerAmortissementsAnnee } from "../../engine/fraisReels/calculerAmortissementsAnnee";
 import { alertesContinuation, CATEGORIES_BIEN_ORDONNEES, depasseSeuilAmortissement, LIBELLE_CATEGORIE_BIEN, MENTION_DUREE_A_VALIDER } from "../../lib/amortissementBiensUi";
@@ -15,6 +17,49 @@ interface AmortissementBiensProps {
   ftConfig: FranceTravailConfig;
   onAjouter: (bien: Omit<BienAmorti, "id">) => void;
   onSupprimer: (id: string) => void;
+  /** Commit 7 de la phase 6 : dépôt du justificatif d'achat. Cf. `deposerJustificatifBien`. */
+  utilisateurId: string;
+  clientDocuments: ClientDocuments | null;
+  clientFichiers: ClientFichiers | null;
+}
+
+/**
+ * Dépose le justificatif d'achat d'un bien amorti sur Supabase Storage — commit 7 de la phase 6.
+ *
+ * ⚠️ `categorieFrais` VAUT TOUJOURS `'C7'`, et ce n'est pas une supposition : « Biens amortis » ne
+ * sert QUE quand un bien quitte le forfait A (14 %) pour le réel — la catégorie A couvre déjà l'achat
+ * d'un instrument au forfait, sans passer par cet écran (décision de Benoît du 05/08/2026, sources
+ * `engine/fraisReels/calculerAmortissement.ts` et `content/explicationsFraisReels.ts`).
+ *
+ * ⚠️ `anneeFiscale` = ANNÉE DE `dateAchat`, pas l'année d'imposition affichée : un bien acheté en 2024
+ * et encore amorti en 2026 doit se ranger dans « Mon dossier » à l'année où la facture a été émise,
+ * sinon le document devient introuvable pour qui cherche sa facture.
+ */
+async function deposerJustificatifBien(
+  clientFichiers: ClientFichiers,
+  clientDocuments: ClientDocuments,
+  utilisateurId: string,
+  ancienDocumentId: string | null,
+  fichier: File,
+  dateAchat: string,
+): Promise<{ ok: true; documentId: string } | { ok: false; message: string }> {
+  const anneeAchat = parseInt(dateAchat.slice(0, 4), 10);
+  const resultat = await remplacerDocument(clientFichiers, clientDocuments, ancienDocumentId, {
+    utilisateurId,
+    fichier,
+    typeDocument: "justificatif_frais",
+    categorieFrais: "C7",
+    anneeFiscale: anneeAchat,
+    dateDocument: dateAchat || undefined,
+  });
+  if (resultat.statut === "echec") return { ok: false, message: `Envoi impossible : ${resultat.message}` };
+  if (resultat.statut === "ficherEnvoyeLigneEchouee") {
+    // Même arbitrage qu'au commit 6 (DepenseForm) : un `documentId` sans ligne serait introuvable
+    // dans « Mon dossier ». On le dit comme un échec plutôt que d'annoncer un justificatif
+    // exploitable qui ne l'est pas (devoir n°2).
+    return { ok: false, message: `Le fichier a été envoyé mais n'a pas pu être enregistré : ${resultat.message}` };
+  }
+  return { ok: true, documentId: resultat.id };
 }
 
 function formatMoisAnneeFr(iso: string): string {
@@ -22,7 +67,21 @@ function formatMoisAnneeFr(iso: string): string {
   return `${iso.slice(5, 7)}/${iso.slice(0, 4)}`;
 }
 
-function FormulaireBien({ ftConfig, onAjouter, onAnnuler }: { ftConfig: FranceTravailConfig; onAjouter: (bien: Omit<BienAmorti, "id">) => void; onAnnuler: () => void }) {
+function FormulaireBien({
+  ftConfig,
+  onAjouter,
+  onAnnuler,
+  utilisateurId,
+  clientDocuments,
+  clientFichiers,
+}: {
+  ftConfig: FranceTravailConfig;
+  onAjouter: (bien: Omit<BienAmorti, "id">) => void;
+  onAnnuler: () => void;
+  utilisateurId: string;
+  clientDocuments: ClientDocuments | null;
+  clientFichiers: ClientFichiers | null;
+}) {
   const [designation, setDesignation] = useState("");
   const [categorie, setCategorie] = useState<CategorieBienAmorti>("instrument");
   const [dateAchat, setDateAchat] = useState("");
@@ -32,6 +91,10 @@ function FormulaireBien({ ftConfig, onAjouter, onAnnuler }: { ftConfig: FranceTr
   // Sous le seuil uniquement : l'utilisateur choisit entre déduction immédiate et amortissement.
   // Au-dessus, le choix n'existe pas (amortissement obligatoire), cf. `amortissementObligatoire`.
   const [lisserSousSeuil, setLisserSousSeuil] = useState(false);
+  const [documentId, setDocumentId] = useState<string | undefined>(undefined);
+  const [justificatifNom, setJustificatifNom] = useState<string | undefined>(undefined);
+  const [envoiEnCours, setEnvoiEnCours] = useState(false);
+  const [erreurFichier, setErreurFichier] = useState<string | null>(null);
 
   const prixHTNum = parseFloat(prixHT) || 0;
   const dureeAnsNum = parseInt(dureeAns, 10) || 0;
@@ -44,10 +107,47 @@ function FormulaireBien({ ftConfig, onAjouter, onAnnuler }: { ftConfig: FranceTr
   const enregistrementPossible = amortissementObligatoire || lisserSousSeuil;
   const formulaireValide = enregistrementPossible && designation.trim() !== "" && dateAchat !== "" && prixHTNum > 0 && dureeAnsNum > 0;
 
+  /**
+   * ⚠️ LA DATE D'ACHAT EST EXIGÉE AVANT LE FICHIER, et ce n'est pas un caprice d'ergonomie : c'est
+   * elle qui détermine `annee_fiscale` de la ligne `documents`. Sans elle, le document se rangerait
+   * dans une année devinée — donc au mauvais endroit dans « Mon dossier ».
+   */
+  async function onFichierChoisi(fichier: File | undefined) {
+    if (!fichier) return;
+    if (fichier.size > 5 * 1024 * 1024) {
+      setErreurFichier("Fichier trop volumineux (max 5 Mo).");
+      return;
+    }
+    if (!dateAchat) {
+      setErreurFichier("Renseigne d'abord la date d'achat : c'est elle qui classe le justificatif dans ton dossier.");
+      return;
+    }
+    if (!clientDocuments || !clientFichiers) {
+      setErreurFichier("Le stockage n'est pas disponible pour l'instant — réessaie dans un instant.");
+      return;
+    }
+
+    setEnvoiEnCours(true);
+    setErreurFichier(null);
+    try {
+      const resultat = await deposerJustificatifBien(clientFichiers, clientDocuments, utilisateurId, documentId ?? null, fichier, dateAchat);
+      if (!resultat.ok) {
+        setErreurFichier(resultat.message);
+        return;
+      }
+      setDocumentId(resultat.documentId);
+      setJustificatifNom(fichier.name);
+    } finally {
+      setEnvoiEnCours(false);
+    }
+  }
+
   function soumettre(e: React.FormEvent) {
     e.preventDefault();
     if (!formulaireValide) return;
-    onAjouter({ designation: designation.trim(), categorie, dateAchat, prixHT: prixHTNum, dureeAns: dureeAnsNum, tauxPro: tauxProNum });
+    // `documentId` peut être `undefined` : le justificatif reste OPTIONNEL ici (aucune règle fiscale
+    // dans Cadence ne le rend obligatoire pour un bien amorti — ne pas en inventer une).
+    onAjouter({ designation: designation.trim(), categorie, dateAchat, prixHT: prixHTNum, dureeAns: dureeAnsNum, tauxPro: tauxProNum, documentId });
     onAnnuler();
   }
 
@@ -143,8 +243,28 @@ function FormulaireBien({ ftConfig, onAjouter, onAnnuler }: { ftConfig: FranceTr
         </div>
       )}
 
+      <div>
+        <span className="block text-xs uppercase tracking-[.03em] text-muted mb-1">Justificatif d'achat (facultatif)</span>
+        <label className="inline-block cursor-pointer px-3 py-2 rounded-lg border border-line text-sm text-muted hover:text-ink transition-colors">
+          {envoiEnCours ? "Envoi…" : justificatifNom ? "Remplacer le fichier" : "Choisir un fichier (PDF, JPG, PNG)"}
+          <input
+            type="file"
+            accept="application/pdf,image/jpeg,image/png"
+            className="hidden"
+            disabled={envoiEnCours}
+            onChange={(e) => onFichierChoisi(e.target.files?.[0])}
+          />
+        </label>
+        {justificatifNom && <span className="text-xs text-muted ml-2">{justificatifNom}</span>}
+        {erreurFichier !== null && (
+          <p className="text-xs text-red leading-relaxed mt-1" role="alert">
+            {erreurFichier}
+          </p>
+        )}
+      </div>
+
       <div className="flex gap-2">
-        <button type="submit" disabled={!formulaireValide} className="bg-mint text-bg font-medium rounded-lg px-4 py-2 text-sm disabled:opacity-40 disabled:cursor-not-allowed">
+        <button type="submit" disabled={!formulaireValide || envoiEnCours} className="bg-mint text-bg font-medium rounded-lg px-4 py-2 text-sm disabled:opacity-40 disabled:cursor-not-allowed">
           Ajouter ce bien
         </button>
         <button type="button" onClick={onAnnuler} className="px-4 py-2 rounded-lg border border-line text-muted text-sm">
@@ -155,7 +275,7 @@ function FormulaireBien({ ftConfig, onAjouter, onAnnuler }: { ftConfig: FranceTr
   );
 }
 
-export function AmortissementBiens({ anneeImposition, biens, ftConfig, onAjouter, onSupprimer }: AmortissementBiensProps) {
+export function AmortissementBiens({ anneeImposition, biens, ftConfig, onAjouter, onSupprimer, utilisateurId, clientDocuments, clientFichiers }: AmortissementBiensProps) {
   const [formulaireOuvert, setFormulaireOuvert] = useState(false);
 
   const retour = useMemo(() => calculerAmortissementsAnnee(biens, anneeImposition, ftConfig), [biens, anneeImposition, ftConfig]);
@@ -239,7 +359,14 @@ export function AmortissementBiens({ anneeImposition, biens, ftConfig, onAjouter
       {retour.biensSoldes.length > 0 && <p className="text-xs text-faint">{retour.biensSoldes.length} bien(s) intégralement amorti(s) — conservés pour mémoire, sans effet sur {anneeImposition}.</p>}
 
       {formulaireOuvert ? (
-        <FormulaireBien ftConfig={ftConfig} onAjouter={onAjouter} onAnnuler={() => setFormulaireOuvert(false)} />
+        <FormulaireBien
+          ftConfig={ftConfig}
+          onAjouter={onAjouter}
+          onAnnuler={() => setFormulaireOuvert(false)}
+          utilisateurId={utilisateurId}
+          clientDocuments={clientDocuments}
+          clientFichiers={clientFichiers}
+        />
       ) : (
         <button type="button" onClick={() => setFormulaireOuvert(true)} className="px-4 py-2 rounded-lg border border-line text-sm text-ink">
           + Ajouter un bien à amortir

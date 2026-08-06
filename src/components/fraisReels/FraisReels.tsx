@@ -294,7 +294,16 @@ export function FraisReels({
         onRemplacerDepenses={remplacerDepenses}
         uploaderJustificatifs={uploaderJustificatifs}
       >
-        <AmortissementBiens anneeImposition={anneeFiscale} biens={biens} ftConfig={config} onAjouter={ajouterBienAmorti} onSupprimer={supprimerBienAmorti} />
+        <AmortissementBiens
+          anneeImposition={anneeFiscale}
+          biens={biens}
+          ftConfig={config}
+          onAjouter={ajouterBienAmorti}
+          onSupprimer={supprimerBienAmorti}
+          utilisateurId={session.utilisateurId}
+          clientDocuments={clientDocuments}
+          clientFichiers={clientFichiers}
+        />
       </ForfaitsReglages>
 
       <RecapitulatifCategories resultat={resultat} />
