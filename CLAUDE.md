@@ -115,9 +115,15 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 > | `d826bf5` | commit 7 — biens amortis, justificatif d'achat sur Supabase Storage |
 > | `06d5190` | « Mon dossier » regroupé par type et catégorie + téléchargement groupé (zip) |
 > | `289c8e1` | avertissement mesuré avant une archive volumineuse |
+> | `422135c` | commit 8 — la doc referme la phase 6 et cesse de mentir |
+> | `bcb44b5` | le trou de consentement ne concerne qu'un seul compte — celui de Benoît |
+> | `9e5f209` | trois commentaires faux corrigés + questions à France Travail rédigées |
+> | `3c6fdc1` | courrier France Travail élargi de 6 à 16 questions |
 >
-> ⚠️ **RIEN N'EST POUSSÉ** : 14 commits d'avance sur `origin/master` au moment d'écrire ces lignes.
-> Benoît décide du push (cf. mémoire `cadence_push_credentials`).
+> ✅ **TOUT EST POUSSÉ** sur `origin/master` jusqu'à `3c6fdc1` (06/08/2026, sur demande explicite de
+> Benoît dans le fil — cf. mémoire `cadence_push_credentials` : jamais de push spontané). Écart
+> vérifié à 0. ⚠️ Cette ligne a annoncé « RIEN N'EST POUSSÉ, 14 commits d'avance » pendant quelques
+> heures : c'était vrai à l'écriture, faux ensuite. **Revérifier `git status -sb` avant de la croire.**
 >
 > ⚠️ **CE QUI N'A PAS ÉTÉ VU À L'ÉCRAN**, à ne pas relire comme vérifié : le regroupement de « Mon
 > dossier » et le téléchargement groupé (`06d5190`, `289c8e1`) n'ont été prouvés que par les tests et
@@ -216,7 +222,9 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 > contenu, cf. `C:\Users\benoi\.claude\plans\humming-wandering-kite.md`.
 >
 > ✅ **POUSSÉ jusqu'à `6bdf58f`** (dette `donnees_sauvegarde` soldée), sur demande explicite de
-> Benoît dans le fil. ⚠️ **`origin/master` est en retard de 5 commits, tous LOCAUX et NON POUSSÉS** —
+> Benoît dans le fil. ⚠️ **CE QUI SUIT EST PÉRIMÉ, CONSERVÉ COMME HISTORIQUE** : les 5 commits décrits
+> ci-dessous comme « LOCAUX et NON POUSSÉS » ont été poussés depuis, avec tout le reste, jusqu'à
+> `3c6fdc1` le 06/08/2026 (cf. le tableau de « État actuel » en tête de fichier). Ancien texte :
 > `34c0ea3` (prérequis légal : mentions légales/confidentialité) · `88354b3` (commit 1 — migration
 > 0003, `type_document` étendu à 10 valeurs) · `6161af5` (commit 2 — fondation stockage, non
 > branchée, prouvée par `npm run verifier:documents` : 15/15) · `a61551e` (commit 3 — écran « Mon

@@ -8,15 +8,80 @@ Mémoire durable à consulter au démarrage : `CLAUDE.md`, `docs/SPEC.md`, `docs
 
 Deux devoirs sacrés : (1) ne jamais perdre les données ; (2) ne jamais afficher un chiffre faux (ni faux « feu vert » rassurant, ni faux « Bloqué », ni faux montant, ni fausse alerte, ni valeur sentinelle brute).
 
-État (mis à jour le 03/08/2026, fin de session) : les deux devoirs sacrés sont tenus. **602 tests
-verts, `tsc -b` propre sur les deux tsconfig (src et api).** Dernier commit local : `be09ee3`.
-`master` reste la seule branche de travail, working tree propre (rien en attente). `origin/master`
-était à jour au dernier point de contrôle (poussé par Benoît lui-même en cours de session) — non
-revérifié depuis le commit `440d6c2`, donc probablement en retard de plusieurs commits à ce stade
-(pousser reste à l'initiative de Benoît, jamais automatique, cf. mémoire longue durée
-`cadence_push_credentials.md`). Tous les items §11.A du SPEC restent traités.
+État (mis à jour le **06/08/2026**, fin de session) : les deux devoirs sacrés sont tenus. **1122 tests
+verts (90 fichiers), `tsc -b` propre sur les deux tsconfig, `npm run build` propre.** Dernier commit :
+`3c6fdc1`. `master` est la seule branche, working tree **propre**, et **tout est poussé sur
+`origin/master`** (écart vérifié à 0) — poussé sur demande explicite de Benoît, jamais spontanément
+(mémoire `cadence_push_credentials.md`).
 
-**Résumé de cette session (15 commits, `bcc4f6e` → `be09ee3`)** :
+⚠️ **La pile technique de l'en-tête ci-dessus n'est plus exacte** : « localStorage » n'est plus la
+source de vérité depuis la phase 5 de la refonte Supabase. **Supabase (Paris, `eu-west-3`) est la
+source de vérité**, un **compte est OBLIGATOIRE** pour ouvrir Cadence, et le `localStorage` ne sert
+plus que de copie locale (lecture seule si le serveur est muet). Dépendances ajoutées depuis :
+`@supabase/supabase-js`, `jszip`.
+
+## ▶ BLOC DE REPRISE — à lire en premier au prochain fil
+
+**Où on en est :** la **phase 6 de la refonte Supabase est TERMINÉE et POUSSÉE** (commits 1 à 8). Les
+trois canaux d'import (local, IA, frais réels) et les biens amortis déposent leurs documents sur
+Supabase Storage ; Google Drive a été **supprimé du dépôt** ; « Mon dossier » les regroupe par type et
+par catégorie de frais, avec téléchargement groupé en zip. Le consentement à la politique de
+confidentialité est recueilli à l'inscription **et sa preuve est conservée** (migration 0004).
+
+**Les 4 migrations SQL 0001 à 0004 sont toutes appliquées** sur le vrai projet Supabase.
+
+**Cinq scripts de preuve contre le VRAI serveur**, tous verts au 06/08/2026 :
+`npm run verifier:rls` (64/64) · `verifier:verrou` (7/7) · `verifier:sauvegarde` (7/7) ·
+`verifier:documents` (15/15) · `verifier:frais-reels` (10/10) · `verifier:consentement` (7/7).
+⚠️ `verifier:consentement` **ne nettoie pas** sa ligne de test, et c'est voulu : il ne PEUT pas
+supprimer sa propre preuve. Benoît a effacé la ligne `TEST-VERIFICATION-%` depuis l'éditeur SQL.
+
+**Ce qui reste, par ordre d'importance :**
+
+1. ⏸ **Phase 8 — 16 questions à France Travail, courrier rédigé et prêt** :
+   `docs/questions_france_travail.md`. Benoît va les poser à son conseiller. **NE RIEN CODER de
+   réglementaire avant ses réponses écrites**, et les citer avec leur date — une réponse orale n'est
+   pas une source. La plus grave est la question 5 (les cachets au-delà de 28 comptent-ils pour
+   l'affiliation aux 507 h ?) : si la réponse est non, Cadence **surcompte** aujourd'hui un mois très
+   chargé et peut afficher un faux « Sécurité ». Aucun effet sur les données de Benoît (20 cachets
+   maximum), mais ça ne vaut pas pour un autre testeur.
+2. ⬜ **Phase 7 — hors ligne : SON PÉRIMÈTRE N'EST ÉCRIT NULLE PART**, et il est documenté que Benoît
+   n'a jamais répondu sur ce point. Il n'y a pas de chantier à reprendre, il y a une question à
+   écrire. Le seul défaut concret trouvé (analyse du 06/08, **non arbitré avec lui**) : hors ligne avec
+   un jeton expiré (1 h par défaut), `useSession` rend `indetermine` et le mur rend Cadence
+   **inutilisable alors que les données sont dans le navigateur**. Trois options lui ont été
+   présentées, aucune choisie. Le cas « lecture seule hors ligne » est, lui, déjà traité par la
+   phase 5.
+3. **Non vérifié à l'écran** : le regroupement de « Mon dossier » et le téléchargement groupé
+   (`06d5190`, `289c8e1`) ne sont prouvés que par 35 tests et un banc d'essai JSZip en navigateur.
+   Benoît devait le regarder. Le parcours frais réels (dépense + justificatif → « Mon dossier »), lui,
+   **a été confirmé par Benoît à l'écran**.
+4. **Ses AEM/bulletins importés avant le 05/08/2026 ne sont PAS dans « Mon dossier »**, et c'est
+   normal : jusqu'au commit 4, l'app lisait le fichier puis le **jetait**. Rien n'est perdu (ses PDF
+   sont sur son disque) mais il doit les **réimporter** en choisissant « Conserver » — la conservation
+   est un choix explicite à chaque import, pas un automatisme.
+
+**Deux pièges de ce fil, à ne pas rejouer :**
+- La méthode qui a le mieux payé : **vérifier chaque affirmation de la doc avant de s'y fier**. Ce fil
+  a trouvé une section de `CLAUDE.md` qui proclamait « LA PROMESSE EST TENUE, ET UN TEST LA GARDE » en
+  citant un fichier de test **supprimé**, pour une promesse **délibérément inversée** ; un commentaire
+  de `decoupageMensuel.ts` affirmant un écrêtement qui n'existe nulle part dans le code ; et un
+  `vite.config.ts` promettant un hors-ligne mort depuis la phase 5. Aucun test ne rougissait.
+- **Ne jamais fabriquer une preuve de consentement manquante** : `synchroniserConsentement` rend
+  `aucuneMetadonnee` et n'écrit rien pour les comptes antérieurs au 06/08/2026. Benoît est le seul
+  compte concerné et a dit que ça ne l'inquiétait pas.
+
+---
+
+**Résumé de la session du 06/08/2026 (18 commits, `34c0ea3` → `3c6fdc1`, tous poussés)** :
+phase 6 complète (commits 1 à 8) · compte obligatoire · retrait de Google Drive · consentement +
+preuve conservée (migration 0004) · biens amortis sur Supabase Storage · « Mon dossier » regroupé avec
+zip et garde-fou mesuré · trois commentaires faux corrigés · 16 questions à France Travail rédigées.
+Détail commit par commit : tableau en tête de la section « État actuel » de `CLAUDE.md`.
+
+---
+
+**Résumé de la session du 03/08/2026 (15 commits, `bcc4f6e` → `be09ee3`)** :
 1. `bcc4f6e` — doc : correction de la note périmée sur le déploiement/test PWA téléphone (l'app
    était déjà déployée sur Vercel et l'installation Android confirmée depuis le 01/08 ; `reprise.md`
    affirmait encore le contraire).
