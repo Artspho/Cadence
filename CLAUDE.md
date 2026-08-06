@@ -271,8 +271,15 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 > **Ses 7 arbitrages, validés par écrit. Ne pas les re-litiger :**
 > 1. **JSONB, une ligne par utilisateur** (option B), pas 7 tables relationnelles : la forme des
 >    données ne change pas, donc le schéma Zod reste le validateur et la migration est réversible ;
-> 2. auth = **lien magique + mot de passe de secours** (supprime le point de panne unique sur l'accès
->    à ses propres données) ;
+> 2. ~~auth = **lien magique + mot de passe de secours**~~ — ⚠️ **RENVERSÉ LE 06/08/2026, À SA DEMANDE.
+>    Le lien magique n'existe plus** (« je ne comprends pas l'intérêt du lien magique, il me gonfle »).
+>    Le mot de passe n'est plus un secours, c'est **le seul moyen de connexion** ; le parcours est
+>    celui du standard : créer un compte (adresse + mot de passe) → confirmer l'adresse par e-mail →
+>    se connecter → « mot de passe oublié » en secours. Son argument tenait : une connexion sans mot de
+>    passe était un doublon du chemin mot de passe, et elle portait seule la contrainte PKCE du même
+>    navigateur. L'intention d'origine de cet arbitrage — pas de point de panne unique sur l'accès à ses
+>    propres données — est **mieux servie** ainsi : le mot de passe marche sur n'importe quel appareil
+>    sans e-mail. Cf. `components/EcranConnexionObligatoire.tsx` ;
 > 3. région **Paris `eu-west-3`** — ⚠️ **pas** « Europe », qui inclut Londres et Zurich, hors UE ;
 > 4. **palier gratuit d'abord**, payant quand les limites arrivent. ⚠️ **Le point de décision tombe à
 >    la phase 5** : un projet gratuit est mis en pause après **7 jours d'inactivité**, et une pause =
@@ -295,7 +302,7 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 > |---|---|---|
 > | 0 | points **8** et **9** | ✅ faite (`c786ecb`, `5607854`) — le 8 reste **compté ouvert** (ni auth ni quota) |
 > | 1 | projet Supabase, 7 tables, RLS | ✅ **PROUVÉE** — `npm run verifier:rls` : **64 contrôles, 64 conformes** |
-> | 2 | authentification | ✅ **PROUVÉE de bout en bout** le 04/08/2026 à 19h19 : session réellement ouverte par lien magique. ⚠️ « Connexion facultative » N'EST PLUS VRAI depuis `1c685e6` (05/08/2026) : un compte est OBLIGATOIRE |
+> | 2 | authentification | ✅ **PROUVÉE de bout en bout** le 04/08/2026 à 19h19 (session réellement ouverte, par lien magique à l'époque). ⚠️ DEUX RENVERSEMENTS DEPUIS : « connexion facultative » est faux depuis `1c685e6` (05/08, compte OBLIGATOIRE), et **le lien magique a été SUPPRIMÉ le 06/08** (`917792f`) — mot de passe uniquement, avec « mot de passe oublié ». La preuve du 04/08 porte donc sur un chemin qui n'existe plus ; ce qui est vérifié à l'écran pour le nouveau, cf. la section du 06/08 plus bas |
 > | 3 | miroir Supabase en écriture seule (contrats + profil) | ✅ **PROUVÉE contre le vrai serveur** : ligne relue en REST (200, `maj_le` = l'heure du témoin) |
 > | 4 | migration + vérification chiffrée | ✅ **PROUVÉE le 05/08/2026 à 01:05** — verdict `identique`, SHA-256 concordant sur **trois** sources |
 > | 5 | bascule, sur son feu vert écrit | ✅ **FAITE** — le serveur fait référence, VÉRIFIÉ EN VRAI (588 h, 62 contrats) ; commit D (section « Compte » trouvable, mot de passe, réserve PKCE) et E (cette doc) faits |
@@ -446,13 +453,43 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 > - n'offre **aucune garantie** de livraison (« best-effort »).
 >
 > Conséquence exacte, à ne pas arrondir : ce n'est pas « trop lent pour une bêta », c'est
-> **impossible** d'envoyer un lien magique, un e-mail de confirmation ou une réinitialisation de mot de
-> passe à un testeur. Le mot de passe de secours ne contourne rien.
+> **impossible** d'envoyer un e-mail de confirmation ou une réinitialisation de mot de passe à un
+> testeur.
 > **Position de Benoît, le 04/08/2026 : « à traiter avant le premier vrai testeur externe, pas urgent
-> avant. »** Donc : rien à faire tant qu'il est seul utilisateur ; le choix du fournisseur SMTP est
-> **sa décision**, elle a un coût, ne pas la prendre à sa place. Le code n'en dépend pas — c'est un
-> réglage de tableau de bord. `messageErreur` (dans `src/auth/actions.ts`) traduit déjà les deux
-> refus correspondants en expliquant la vraie cause, pour ne pas faire chercher un bug inexistant.
+> avant. »** Le code n'en dépend pas — c'est un réglage de tableau de bord. `messageErreur` (dans
+> `src/auth/actions.ts`) traduit déjà les deux refus correspondants en expliquant la vraie cause, pour
+> ne pas faire chercher un bug inexistant.
+>
+> 🔴 **CETTE DETTE A CHANGÉ DE NATURE LE 06/08/2026, ET IL FAUT LE DIRE.** Depuis la suppression du lien
+> magique, la confirmation d'adresse par e-mail est sur le **chemin critique de toute inscription** :
+> un testeur créerait son compte, ne recevrait jamais rien, et sa première connexion échouerait en
+> « Email not confirmed ». La dette n'est donc plus « à traiter avant le premier testeur », elle est
+> **bloquante à la seconde où il en invite un**. (Contournement possible s'il le veut : décocher
+> « Confirm email » dans Supabase → `signUp` ouvre la session immédiatement, zéro e-mail — `creerCompte`
+> gère déjà les deux cas, aucun code à changer. Contrepartie : une adresse non vérifiée peut être
+> utilisée. RLS isole toujours chaque compte, donc pas de fuite ; le risque est une adresse squattée.)
+>
+> ✅ **LE FOURNISSEUR EST TRANCHÉ, ET CE N'EST PAS UN SERVICE D'E-MAILING** : Benoît a **OVH** pour la
+> messagerie de `lesartsphoceens.fr`, et ses identifiants SMTP se collent directement dans Supabase →
+> Authentication → Emails → SMTP Settings. Recommandé pour trois raisons : aucun compte à créer, aucun
+> DNS à configurer, et **aucun nouveau tiers** qui voit les adresses des testeurs. Il veut envoyer
+> depuis `noreply@lesartsphoceens.fr` — **c'est possible, à une condition** : OVH authentifie l'envoi
+> comme une **vraie boîte** et refuse en général un expéditeur qui ne correspond pas au compte
+> authentifié, donc `noreply@` doit être créée comme adresse e-mail (pas un alias), avec son mot de
+> passe. `Username` = l'adresse complète. Serveur selon le produit OVH, **à confirmer dans son espace
+> client** : `ssl0.ovh.net` (MX Plan), `pro*.mail.ovh.net` (Email Pro), `ex*.mail.ovh.net` (Exchange).
+> Conseillé en plus : une redirection d'OVH de `noreply@` vers sa vraie adresse, sinon un testeur qui
+> répond écrit dans le vide.
+> ⚠️ **APRÈS le branchement, monter le plafond dans Authentication → Rate Limits.** Tant qu'on est sur
+> le service d'envoi de Supabase, ce champ ne sert à rien : les 2/h sont imposés par eux.
+> ⚠️ **CONSÉQUENCE JURIDIQUE À NE PAS OUBLIER** : le service d'envoi devient un intermédiaire qui voit
+> les adresses des testeurs. `content/mentionsLegales.ts` liste aujourd'hui Vercel, Supabase et Mistral
+> — il faudra l'ajouter, donc **incrémenter `VERSION_POLITIQUE`**, ce qui fera **redemander la case de
+> consentement aux comptes déjà créés**. C'est le mécanisme voulu, mais le lui dire avant, pas après.
+>
+> ⚠️ **PLAFOND DE 2/H REMESURÉ EN VRAI le 06/08/2026** (déjà mesuré le 04/08) : Benoît l'a atteint en
+> testant « mot de passe oublié », et l'app a affiché la bonne cause. Deux essais par heure, pas dix —
+> **ne pas gâcher un envoi avant d'avoir vérifié la configuration** (Redirect URLs en particulier).
 >
 > ## PHASE 3 — le miroir Supabase, codée le 04/08/2026
 >
@@ -707,8 +744,104 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 >    la sienne, et c'est la démonstration même que le sujet ne peut pas supprimer sa preuve. Depuis
 >    l'éditeur SQL : `delete from public.consentements where version_texte like 'TEST-VERIFICATION-%';`
 >
-> **Phase 7 (hors ligne)** reste optionnelle et repoussée exprès ; **phase 8** (les 7 points
-> réglementaires) attend qu'une source tombe.
+> **Phase 7 (hors ligne)** : son défaut concret (mur au jeton expiré) est **arbitré le 06/08/2026 —
+> on ne change rien**, cf. décision 2 de la phase 5 ; le périmètre de la phase entière reste non écrit.
+> **Phase 8** (les 7 points réglementaires) attend qu'une source tombe.
+>
+> ## ✅ SESSION DU 06/08/2026, APRÈS-MIDI — L'AUTHENTIFICATION REFONDUE (3 commits)
+>
+> ### 🔴 LE LIEN MAGIQUE N'EXISTE PLUS (`917792f`) — NE PAS LE RÉTABLIR SANS DEMANDER
+>
+> Demande de Benoît, dans ses mots : « je ne comprends pas l'intérêt du lien magique, il me gonfle ».
+> Il avait raison sur le fond : une connexion SANS mot de passe était un doublon du chemin mot de
+> passe, et elle portait **seule** la contrainte la plus pénible du projet (ouvrir le lien dans le
+> navigateur qui l'a demandé, à cause de PKCE). `demanderLienMagique` et `signInWithOtp` ont disparu du
+> code **et des types** — retirer le membre de `ClientAuth` a fait trouver au compilateur les 11
+> fichiers qui le supposaient. Cf. l'arbitrage 2 de la refonte, désormais barré.
+>
+> **Le parcours retenu, tel qu'il l'a décrit** : créer un compte (adresse + mot de passe) → un e-mail
+> de confirmation arrive, on clique son lien → se connecter avec adresse + mot de passe → « mot de passe
+> oublié » en secours. `resetPasswordForEmail` ajouté à `ClientAuth`.
+>
+> ⚠️⚠️ **TROIS LIENS PAR E-MAIL EXISTENT, ET ILS N'ONT PAS LES MÊMES CONTRAINTES. Les confondre a
+> coûté une session entière** — Benoît lui-même les appelait tous « lien magique » :
+> | Lien | Ouvre une session ? | Même navigateur exigé ? |
+> |---|---|---|
+> | magique | oui | **SUPPRIMÉ** |
+> | **confirmation d'adresse** (émis par `signUp`) | non — il prouve l'adresse, c'est tout | **NON**, cliquable depuis le téléphone (vérifié en vrai le 04/08 : ouvert ailleurs, l'adresse a bien été confirmée) |
+> | **réinitialisation** (`resetPasswordForEmail`) | **oui** | **OUI** — dit à l'écran AVANT l'envoi |
+>
+> **Le piège du lien de réinitialisation, et le test qui le garde.** Ce lien OUVRE une session. Sans
+> marqueur de retour, `App.tsx` aurait rendu le tableau de bord et l'utilisateur serait reparti avec le
+> mot de passe qu'il venait de déclarer oublié, **sans un mot d'explication** — le parcours aurait eu
+> l'air de marcher sans rien réinitialiser. D'où `MARQUEUR_REINITIALISATION` (`auth/actions.ts`),
+> reconnu par `auth/retourLienMagique.ts` **y compris quand l'échange a RÉUSSI et que l'URL n'a plus de
+> `code`** (le cas normal — c'est le bug le plus facile à écrire ici), et `EcranNouveauMotDePasse.tsx`
+> placé juste après le mur dans `App.tsx`.
+>
+> ⚠️ Le fichier `auth/retourLienMagique.ts` **garde son nom historique** alors que le lien magique
+> n'existe plus : un renommage aurait noyé, dans le diff du chantier, la seule modification qui
+> comptait. À renommer un jour, seul.
+>
+> ### 🔴 LE DÉFAUT QUI A DÉCLENCHÉ TOUT ÇA — CINQUIÈME FOIS QU'UN TEST NE VOIT RIEN
+>
+> Benoît ne pouvait pas créer de compte : « **Créer un compte reste grisé même avec la case cochée** ».
+> Mesuré dans le navigateur : le bouton était **ACTIF** (`disabled=false`, curseur main, opacité 1).
+> Son seul écart visuel entre inactif et actif était l'opacité **0,4 → 1**, sur du texte `text-muted`
+> gris, fond transparent, posé à côté d'un « Se connecter » vert vif. Illisible comme cliquable.
+> **Un test vérifiait `not.toBeDisabled()` et passait.** Un test ne compare un composant qu'à
+> lui-même, jamais à ce qu'un œil humain en conclut.
+>
+> D'où `components/CadrePleinEcran.tsx` : cadre partagé + **`BOUTON_PRINCIPAL` / `BOUTON_SECONDAIRE`**.
+> **RÈGLE : l'action principale d'un écran porte TOUJOURS un fond plein, et un bouton désactivé doit
+> l'être franchement** (`opacity-30` + `grayscale`). Ne pas remettre une action essentielle en style
+> secondaire. Mesuré après correctif : décoché = vert désaturé + opacité 0,3 + curseur interdit + la
+> phrase « Coche la case ci-dessus pour pouvoir créer ton compte » ; coché = vert plein, phrase partie.
+> Le bouton « Enregistrer » de `Compte.tsx` a reçu le même traitement — c'est LUI qui sert à sortir du
+> blocage, le laisser illisible aurait reproduit la panne à l'endroit qui permet d'en sortir.
+>
+> ### ✅ LE MUR HORS LIGNE AU JETON EXPIRÉ — ARBITRÉ, ON NE CHANGE RIEN (`a1da06d`)
+>
+> Écart trouvé en instruisant la phase 7 : la décision 2 de la phase 5 citait le « jeton expiré » parmi
+> les causes d'ouverture en lecture seule, et **c'était faux** depuis le mur `1c685e6` (le même jour,
+> plus tard). Vérifié dans `@supabase/auth-js@2.112.0` (`GoTrueClient.__loadSession` lu, pas supposé) :
+> hors ligne depuis plus d'une heure, le rafraîchissement échoue et la bibliothèque rend une **erreur**
+> — donc `indetermine`, donc le mur. **Benoît a tranché : statu quo** (option B sur trois). Cadence est
+> inutilisable hors ligne au-delà d'une heure, c'est assumé. Trois affirmations contraires corrigées.
+>
+> ### ✅ UN ÉCHEC D'IMPORT IA DISAIT « RÉESSAIE » SANS DIRE POURQUOI (`f4a01f9`)
+>
+> Une seule phrase couvrait **six** situations. `STATUTS_AU_MESSAGE_MAITRISE` passe de `{503, 422}` à
+> `{503, 422, 413, 403, 400}` — les trois refus de `lib/gardeEndpointExtraction.ts` sont écrits par
+> nous, ne contiennent aucune donnée du document, et « Réessaie » y est un conseil **FAUX**. Le **code
+> HTTP** est désormais affiché dans le générique (un nombre lu sur la réponse, jamais un extrait de
+> corps ; et **jamais inventé** — un échec réseau n'a pas de statut). Les 5xx restent dehors exprès.
+> **Ce correctif a immédiatement payé** : la tentative suivante de Benoît a affiché la vraie cause.
+>
+> ### 🔴 TROIS URL SERVENT L'APP, UNE SEULE EST AUTORISÉE — CAUSE COMMUNE À TROIS SYMPTÔMES
+>
+> Sondé le 06/08/2026 : `cadence-git-master-benoit3.vercel.app` (200, **la seule autorisée**),
+> `cadence-benoit3.vercel.app` (200), `cadence.vercel.app` (200), `cadence-git-main-…` (404).
+> Benoît naviguait sur l'une des deux non autorisées, ce qui explique **d'un coup** trois choses qu'on
+> aurait pu instruire séparément pendant des heures :
+> 1. l'import IA refusé en 403 (`ORIGINES_AUTORISEES_PAR_DEFAUT` ne contient que l'URL de branche) ;
+> 2. l'écran de décision « local ou serveur » juste après sa connexion — **chaque origine a sa propre
+>    copie `localStorage`**, donc changer d'URL fait arriver avec une copie locale étrangère au serveur.
+>    Ce n'était pas un défaut : le garde-fou a fait son travail, et il ne s'est plus affiché ensuite ;
+> 3. « mot de passe oublié » échouerait aussi depuis ces URL — les **Redirect URLs** de Supabase ne
+>    listent que l'URL de branche (avec joker `/**`, ajouté ce jour-là).
+> ⚠️ **DÉCISION EN ATTENTE, à ne pas prendre à sa place** : garder l'URL de branche (rien à changer,
+> mais imbuvable à donner à des testeurs) ou faire de `cadence.vercel.app` la référence (3 endroits à
+> mettre à jour, et une copie locale qui repart de zéro une fois). Ne PAS élargir la liste d'origines à
+> `*.vercel.app` : n'importe quelle page hébergée là pourrait alors faire tourner la facture Mistral.
+>
+> ### ⚠️ CE QUI N'A PAS ÉTÉ VÉRIFIÉ À L'ÉCRAN, ET NE PAS ÉCRIRE LE CONTRAIRE
+>
+> **`EcranNouveauMotDePasse` n'a jamais été vu en vrai.** Benoît s'est débloqué par « Mon profil →
+> Compte », pas par le lien de réinitialisation (il avait grillé ses 2 envois/heure). Cet écran est
+> couvert par 7 tests, rien de plus. Ce qui EST vérifié à l'écran : premier écran directement sur
+> adresse + mot de passe, écran « mot de passe oublié » sans champ mot de passe et avec l'avertissement
+> avant l'envoi, marqueur de réinitialisation sans session ⇒ le mur (pas un écran absurde).
 >
 > ⚠️ **Relancer `npm run verifier:rls` après tout changement de schéma ou de politique.** Les deux
 > comptes de test **`testa-cadence@cadence.fr`** et **`test-cadenceb@cadence.fr`** sont volontairement

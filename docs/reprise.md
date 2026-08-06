@@ -8,11 +8,11 @@ Mémoire durable à consulter au démarrage : `CLAUDE.md`, `docs/SPEC.md`, `docs
 
 Deux devoirs sacrés : (1) ne jamais perdre les données ; (2) ne jamais afficher un chiffre faux (ni faux « feu vert » rassurant, ni faux « Bloqué », ni faux montant, ni fausse alerte, ni valeur sentinelle brute).
 
-État (mis à jour le **06/08/2026**, fin de session) : les deux devoirs sacrés sont tenus. **1122 tests
-verts (90 fichiers), `tsc -b` propre sur les deux tsconfig, `npm run build` propre.** Dernier commit :
-`3c6fdc1`. `master` est la seule branche, working tree **propre**, et **tout est poussé sur
-`origin/master`** (écart vérifié à 0) — poussé sur demande explicite de Benoît, jamais spontanément
-(mémoire `cadence_push_credentials.md`).
+État (mis à jour le **06/08/2026**, fin de la SECONDE session du jour) : les deux devoirs sacrés sont
+tenus. **1147 tests verts (91 fichiers), `tsc -b` propre sur les deux tsconfig, `npm run build`
+propre.** Dernier commit : `f4a01f9`. `master` est la seule branche, working tree **propre**, et
+**tout est poussé sur `origin/master`** (écart vérifié à 0 après `git fetch`) — poussé sur demande
+explicite de Benoît, jamais spontanément (mémoire `cadence_push_credentials.md`).
 
 ⚠️ **La pile technique de l'en-tête ci-dessus n'est plus exacte** : « localStorage » n'est plus la
 source de vérité depuis la phase 5 de la refonte Supabase. **Supabase (Paris, `eu-west-3`) est la
@@ -22,13 +22,27 @@ plus que de copie locale (lecture seule si le serveur est muet). Dépendances aj
 
 ## ▶ BLOC DE REPRISE — à lire en premier au prochain fil
 
-**Où on en est :** la **phase 6 de la refonte Supabase est TERMINÉE et POUSSÉE** (commits 1 à 8). Les
-trois canaux d'import (local, IA, frais réels) et les biens amortis déposent leurs documents sur
-Supabase Storage ; Google Drive a été **supprimé du dépôt** ; « Mon dossier » les regroupe par type et
-par catégorie de frais, avec téléchargement groupé en zip. Le consentement à la politique de
-confidentialité est recueilli à l'inscription **et sa preuve est conservée** (migration 0004).
+**Où on en est :** la phase 6 est terminée depuis la session précédente. Cette session-ci a **refondu
+l'authentification** : le **lien magique n'existe plus** (demande de Benoît : « je ne comprends pas son
+intérêt, il me gonfle »), remplacé par le parcours standard — créer un compte (adresse + mot de passe)
+→ confirmer l'adresse par e-mail → se connecter → « **mot de passe oublié** » en secours. Détail
+complet dans `CLAUDE.md`, section « SESSION DU 06/08/2026, APRÈS-MIDI ».
 
 **Les 4 migrations SQL 0001 à 0004 sont toutes appliquées** sur le vrai projet Supabase.
+
+🔴 **LE PREMIER POINT À TRAITER, ET IL EXPLIQUE À LUI SEUL TROIS SYMPTÔMES : l'URL de référence n'est
+pas tranchée.** Trois URL servent l'app (sondées le 06/08) — `cadence-git-master-benoit3.vercel.app`
+(**la seule autorisée**), `cadence-benoit3.vercel.app`, `cadence.vercel.app`. Benoît naviguait sur une
+non autorisée, ce qui a produit : (1) l'import IA refusé en 403, (2) l'écran de décision « local ou
+serveur » à sa connexion — **chaque origine a son propre `localStorage`**, (3) et « mot de passe
+oublié » qui échouerait aussi, les Redirect URLs de Supabase ne listant que l'URL de branche.
+**Sa décision est en attente** : garder l'URL de branche (rien à changer, mais imbuvable à donner à des
+testeurs) ou faire de `cadence.vercel.app` la référence (3 endroits à mettre à jour — liste d'origines
+de l'API, Redirect URLs Supabase, et une copie locale qui repart de zéro une fois).
+⚠️ **Ne PAS élargir la liste d'origines à `*.vercel.app`** : n'importe quelle page hébergée là pourrait
+alors faire tourner la facture Mistral. C'est exactement ce que la garde existe pour empêcher.
+⚠️ **L'import IA n'a PAS été reconfirmé fonctionnel** : la cause du 403 est identifiée, mais Benoît n'a
+pas retenté depuis la bonne URL. Ne pas écrire que c'est réglé.
 
 **Cinq scripts de preuve contre le VRAI serveur**, tous verts au 06/08/2026 :
 `npm run verifier:rls` (64/64) · `verifier:verrou` (7/7) · `verifier:sauvegarde` (7/7) ·
@@ -56,28 +70,70 @@ supprimer sa propre preuve. Benoît a effacé la ligne `TEST-VERIFICATION-%` dep
    `@supabase/auth-js@2.112.0`). En dessous d'une heure, la lecture seule fonctionne et n'est pas
    concernée. ⬜ **Le périmètre de la phase 7 dans son ENSEMBLE reste, lui, non écrit** : seul ce
    défaut-là a été instruit et tranché.
-3. **Non vérifié à l'écran** : le regroupement de « Mon dossier » et le téléchargement groupé
-   (`06d5190`, `289c8e1`) ne sont prouvés que par 35 tests et un banc d'essai JSZip en navigateur.
-   Benoît devait le regarder. Le parcours frais réels (dépense + justificatif → « Mon dossier »), lui,
-   **a été confirmé par Benoît à l'écran**.
-4. **Ses AEM/bulletins importés avant le 05/08/2026 ne sont PAS dans « Mon dossier »**, et c'est
-   normal : jusqu'au commit 4, l'app lisait le fichier puis le **jetait**. Rien n'est perdu (ses PDF
-   sont sur son disque) mais il doit les **réimporter** en choisissant « Conserver » — la conservation
-   est un choix explicite à chaque import, pas un automatisme.
+3. 🔴 **SMTP OVH — devenu BLOQUANT dès qu'il invite un testeur, alors que c'était « pas urgent ».** La
+   suppression du lien magique met la confirmation d'adresse sur le chemin critique de TOUTE
+   inscription : un testeur créerait son compte, ne recevrait jamais rien (le service d'envoi par défaut
+   de Supabase n'écrit **qu'aux adresses de son organisation**, et 2 messages/heure), et sa première
+   connexion échouerait en « Email not confirmed ». **Le fournisseur est tranché : OVH**, sa messagerie
+   existante — aucun compte à créer, aucun DNS, aucun nouveau tiers. Il veut envoyer depuis
+   `noreply@lesartsphoceens.fr` : possible, **à condition de la créer comme vraie boîte** (OVH refuse un
+   expéditeur qui n'est pas le compte authentifié). Valeurs et pièges : cf. la section « DETTE ÉTABLIE —
+   un SMTP » de `CLAUDE.md`, mise à jour ce jour. **Je ne peux ni créer le compte ni saisir le mot de
+   passe** — ces deux gestes sont les siens.
+4. ⚠️ **`EcranNouveauMotDePasse` n'a JAMAIS été vu à l'écran.** Benoît s'est débloqué par « Mon profil →
+   Compte », pas par le lien de réinitialisation (il avait grillé ses 2 envois de l'heure). Cet écran
+   est couvert par **7 tests, rien de plus**. Ne pas écrire qu'il est vérifié. Ce qui l'est : premier
+   écran directement sur adresse + mot de passe, écran « mot de passe oublié » sans champ mot de passe
+   et avec l'avertissement avant l'envoi, marqueur de réinitialisation sans session ⇒ le mur.
+5. ⏸ **État inconnu, il avait dit « en cours » puis n'en a plus reparlé** : la vérification du
+   regroupement de « Mon dossier » + téléchargement zip (prouvé par 35 tests seulement, `06d5190`,
+   `289c8e1`), et le réimport de ses AEM/bulletins d'avant le 05/08 avec « Conserver » (jusqu'au commit
+   4, l'app lisait le fichier puis le **jetait** — rien n'est perdu, ses PDF sont sur son disque).
+   **Le lui redemander, ne pas le supposer fait.**
 
-**Deux pièges de ce fil, à ne pas rejouer :**
-- La méthode qui a le mieux payé : **vérifier chaque affirmation de la doc avant de s'y fier**. Ce fil
-  a trouvé une section de `CLAUDE.md` qui proclamait « LA PROMESSE EST TENUE, ET UN TEST LA GARDE » en
-  citant un fichier de test **supprimé**, pour une promesse **délibérément inversée** ; un commentaire
-  de `decoupageMensuel.ts` affirmant un écrêtement qui n'existe nulle part dans le code ; et un
-  `vite.config.ts` promettant un hors-ligne mort depuis la phase 5. Aucun test ne rougissait.
+**Quatre pièges de ce fil, à ne pas rejouer :**
+- 🔴 **CINQUIÈME FOIS : un test ne compare un composant qu'à lui-même.** Benoît ne pouvait pas créer de
+  compte — « Créer un compte reste grisé même avec la case cochée ». Le bouton était **ACTIF**
+  (`disabled=false`, mesuré) mais son seul écart visuel actif/inactif était l'opacité 0,4 → 1 sur du
+  texte gris, fond transparent, à côté d'un bouton vert vif. **Un test vérifiait `not.toBeDisabled()`
+  et passait.** D'où la règle de `CadrePleinEcran.tsx` : l'action principale d'un écran porte TOUJOURS
+  un fond plein. **Ce qui a trouvé le défaut, c'est de mesurer les styles calculés dans le navigateur**,
+  pas de lire le code ni les tests.
+- **Un message d'erreur qui couvre six causes ne dit rien.** « L'extraction a échoué. Réessaie » a
+  masqué la vraie cause pendant tout l'échange ; il a fallu sonder l'endpoint au `curl` pour éliminer
+  des hypothèses. Corrigé (`f4a01f9`) : les refus rédigés par nous remontent, et le **code HTTP**
+  s'affiche. La tentative suivante de Benoît a immédiatement donné la vraie cause. **Généraliser
+  l'idée** : un message générique sans code est indiagnosticable pour un utilisateur.
+- **Lire la bibliothèque installée plutôt que supposer son comportement.** `GoTrueClient.__loadSession`
+  de `@supabase/auth-js@2.112.0` rend une **erreur** hors ligne au jeton expiré, pas « déconnecté » —
+  un commentaire d'`App.tsx` affirmait l'inverse depuis des jours.
 - **Ne jamais fabriquer une preuve de consentement manquante** : `synchroniserConsentement` rend
   `aucuneMetadonnee` et n'écrit rien pour les comptes antérieurs au 06/08/2026. Benoît est le seul
   compte concerné et a dit que ça ne l'inquiétait pas.
 
+**Trois faits utiles, mesurés ce fil :**
+- son compte `admin@lesartsphoceens.fr` **existe et est confirmé** (UID `2ed466db-…`) — « Créer un
+  compte » avec cette adresse sera toujours refusé, c'est normal ;
+- le **plafond de 2 e-mails/heure** a été atteint en vrai : deux essais par heure, pas dix. Vérifier la
+  configuration AVANT de dépenser un envoi ;
+- **sonder le bundle déployé au `curl`** est la façon fiable de savoir si un push est arrivé sur Vercel
+  (le nom du bundle change ; chercher une chaîne du nouveau code dedans).
+
 ---
 
-**Résumé de la session du 06/08/2026 (18 commits, `34c0ea3` → `3c6fdc1`, tous poussés)** :
+**Résumé de la SECONDE session du 06/08/2026 (3 commits, `7271f60` → `f4a01f9`, tous poussés)** :
+1. `a1da06d` — docs : le mur hors ligne au jeton expiré est **arbitré (statu quo)**, et trois
+   affirmations contraires corrigées (décision 2 de la phase 5, un commentaire d'`App.tsx`, la ligne
+   « phase 7 » du tableau). Aucun changement de comportement.
+2. `917792f` — feat : **lien magique supprimé** (code ET types — le compilateur a trouvé les 11 fichiers
+   qui le supposaient), parcours mot de passe unique, « mot de passe oublié » avec écran de retour, et
+   le bouton illisible corrigé. 23 fichiers, +973/−439.
+3. `f4a01f9` — fix : un échec d'import IA disait « Réessaie » sans dire pourquoi. Les refus 413/403/400
+   remontent, le code HTTP s'affiche.
+
+---
+
+**Résumé de la PREMIÈRE session du 06/08/2026 (18 commits, `34c0ea3` → `3c6fdc1`, tous poussés)** :
 phase 6 complète (commits 1 à 8) · compte obligatoire · retrait de Google Drive · consentement +
 preuve conservée (migration 0004) · biens amortis sur Supabase Storage · « Mon dossier » regroupé avec
 zip et garde-fou mesuré · trois commentaires faux corrigés · 16 questions à France Travail rédigées.
