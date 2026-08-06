@@ -8,9 +8,9 @@ Mémoire durable à consulter au démarrage : `CLAUDE.md`, `docs/SPEC.md`, `docs
 
 Deux devoirs sacrés : (1) ne jamais perdre les données ; (2) ne jamais afficher un chiffre faux (ni faux « feu vert » rassurant, ni faux « Bloqué », ni faux montant, ni fausse alerte, ni valeur sentinelle brute).
 
-État (mis à jour le **07/08/2026**) : les deux devoirs sacrés sont tenus. **1174 tests verts (91
+État (mis à jour le **07/08/2026**) : les deux devoirs sacrés sont tenus. **1188 tests verts (91
 fichiers), `tsc -b` propre sur les deux tsconfig, `tsc -p tsconfig.api.json` propre, `npm run build`
-propre.** Dernier commit : `5bfa256`. `master` est la seule branche, working tree **propre**, et
+propre.** Dernier commit : `6cd46ac`. `master` est la seule branche, working tree **propre**, et
 **tout est poussé sur `origin/master`** — poussé sur demande explicite de Benoît, jamais spontanément
 (mémoire `cadence_push_credentials.md`).
 
@@ -127,6 +127,16 @@ supprimer sa propre preuve. Benoît a effacé la ligne `TEST-VERIFICATION-%` dep
    rend `indetermine`, le mur s'affiche alors que les données sont dans le navigateur. **C'est assumé,
    ne pas le « réparer » spontanément.** ⬜ **Le périmètre de la phase 7 dans son ENSEMBLE reste, lui,
    non écrit** : seul ce défaut-là a été instruit et tranché.
+5. ⏸ **Point 8 — le quota par utilisateur reste à faire.** Le volet authentification est fermé
+   (`6cd46ac`, 07/08/2026) ; le quota, adossé à la base Supabase, est reporté sur demande explicite de
+   Benoît — pas oublié, juste pas prioritaire une fois la vraie serrure posée.
+6. ⬜ **Reprendre le design** (ajouté le 07/08/2026, à préciser avec Benoît — aucun brief détaillé
+   encore donné : quel écran, quel défaut, quelle inspiration).
+7. ⬜ **Définir le tarif de l'API** (ajouté le 07/08/2026) — probablement lié au point « Monétisation
+   envisagée » déjà au backlog (`docs/SPEC.md` §11.B : 2 mois d'essai gratuit puis app payante,
+   architecture délibérément non tranchée) et aux chiffres Mistral mesurés ce fil (10 $/mois inclus,
+   4 $/1000 pages OCR au-delà, plafond de dépense configurable en payant) — à relier explicitement
+   plutôt qu'à instruire séparément, si Benoît confirme que c'est la même question.
 
 **Pièges de la TROISIÈME session, à ne pas rejouer :**
 - **Demander le texte EXACT d'un message d'erreur, mot pour mot, avant toute hypothèse.** Trois
@@ -152,7 +162,7 @@ supprimer sa propre preuve. Benoît a effacé la ligne `TEST-VERIFICATION-%` dep
 
 ---
 
-**Résumé de la session du 07/08/2026 (1 commit, `5bfa256`, poussé)** :
+**Résumé de la session du 07/08/2026 (3 commits, `5bfa256` → `6cd46ac`, tous poussés)** :
 1. `5bfa256` — fix : un bandeau annonçait un faux échec juste après une réinitialisation de mot de
    passe réussie (« un lien reçu par e-mail a été ouvert, mais il n'a pas modifié/ouvert de session »),
    sur le tableau de bord puis sur le mur après déconnexion. Trouvé en testant le parcours de bout en
@@ -162,8 +172,24 @@ supprimer sa propre preuve. Benoît a effacé la ligne `TEST-VERIFICATION-%` dep
    succès. Marqueur `sessionStorage` posé au succès réel (`auth/retourLienMagique.ts`), lu par
    `App.tsx` et `EcranConnexionObligatoire.tsx` pour faire taire les deux bandeaux dans ce cas. Limite
    documentée : un second lien de réinitialisation différent dans le même onglet verrait son propre
-   échec rester muet. 3 tests ajoutés, 1174 tests verts, `tsc -b`/`tsc -p tsconfig.api.json`/`npm run
-   build` propres.
+   échec rester muet. 3 tests ajoutés.
+2. `46bbc8e` — feat : point 25 de `docs/critique_2026-08-03.md` fermé — le plafond de cumul ARE +
+   rémunérations à 118 % du PMSS (guide FT p.17 étape 5) est désormais appliqué
+   (`engine/indemnisationMensuelle.ts::calculerEcretementPMSS`). Signalé à l'écran (icône + infobulle)
+   uniquement quand ça joue réellement ; `pmssMensuel` absent de la config → aucun écrêtement, jamais
+   un plafond deviné. Portée nulle sur les données actuelles de Benoît. 5 tests ajoutés.
+3. `6cd46ac` — feat : point 8 de `docs/critique_2026-08-03.md`, volet AUTHENTIFICATION fermé (le volet
+   quota reste délibérément ouvert, sur demande explicite de Benoît). `/api/extract-document` exige
+   désormais une session Supabase valide (`Authorization: Bearer`, vérifiée auprès de
+   `GET /auth/v1/user`) avant tout appel à Mistral — un bot anonyme ne peut plus faire tourner le
+   budget mensuel Mistral (10 $/mois ≈ 2 500 pages OCR, vidable en moins de 4 minutes à débit maximal
+   avant ce correctif). Recherche préalable menée en direct sur le vrai compte Mistral de Benoît
+   (en-têtes de débit mesurés par un appel réel, sans coût — aucune carte enregistrée) : 625 pages
+   OCR/minute, budget mensuel inclus 10 $ partagé entre Studio/Vibe/API. Comptes multiples écartés
+   (interdits par les CGU Mistral, risque de bannissement).
+
+Au total ce fil : 9 tests ajoutés (1179 → 1188), `tsc -b`/`tsc -p tsconfig.api.json`/`npm run build`
+propres à chaque commit.
 
 Méthode de ce fil : test manuel guidé du parcours réel (changer `Site URL`, demander un e-mail de
 réinitialisation, l'ouvrir, changer le mot de passe, se reconnecter) plutôt que supposer que le réglage
