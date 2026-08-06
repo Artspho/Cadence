@@ -4,7 +4,7 @@
 // DOM (Blob, URL.createObjectURL) hors du périmètre de ce test, déjà couvertes par son propre usage
 // ailleurs. Ici, on vérifie seulement que MonDossier l'appelle avec la bonne URL et le bon nom.
 import "@testing-library/jest-dom/vitest";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MonDossier } from "../MonDossier";
 import type { ClientAuth, ClientDocuments, ClientFichiers, SessionMinimale } from "../../auth/supabaseClient";
@@ -36,6 +36,14 @@ function fauxClientAuth(reponses: Partial<ClientAuth> = {}): ClientAuth {
 }
 
 const CONNECTE = fauxClientAuth({ getSession: vi.fn(async () => ({ data: { session: SESSION }, error: null })) });
+
+// Les mocks de module (`telechargerBlob`, `telechargerDepuisUrl`) sont PARTAGÉS entre les tests :
+// sans ça, un `not.toHaveBeenCalled()` échoue à cause de l'appel d'un test précédent. `clearAllMocks`
+// remet les compteurs à zéro SANS toucher aux implémentations (contrairement à `resetAllMocks`), donc
+// `CONNECTE` et les faux clients continuent de répondre.
+beforeEach(() => {
+  vi.clearAllMocks();
+});
 
 const DOC_A = {
   id: "doc-1",
@@ -190,6 +198,49 @@ describe("MonDossier — regroupement et téléchargement groupé (06/08/2026)",
     expect(nomFichier).toBe("cadence-dossier-2026-08-06_0930.zip");
     // Les deux documents ont été récupérés.
     expect(fauxFetch).toHaveBeenCalledTimes(2);
+    vi.unstubAllGlobals();
+  });
+
+  it("AVERTIT AVANT de lancer une grosse archive, et n'écrit rien tant qu'on n'a pas reconfirmé", async () => {
+    // 90 Mo : au-delà du seuil mesuré de 75 Mo (banc d'essai du 06/08/2026).
+    const GROS = { ...DOC_FRAIS_A, taille_octets: 90 * 1024 * 1024 };
+    const fauxFetch = vi.fn(async () => ({ ok: true, arrayBuffer: async () => new TextEncoder().encode("x").buffer }));
+    vi.stubGlobal("fetch", fauxFetch);
+
+    render(<MonDossier clientAuth={CONNECTE} clientDocuments={fauxClientDocuments([GROS])} clientFichiers={fauxClientFichiers()} />);
+    await screen.findByText("violon.pdf");
+    fireEvent.click(screen.getByRole("button", { name: /tout télécharger \(dossier entier\)/i }));
+
+    const alerte = await screen.findByRole("alert");
+    expect(alerte).toHaveTextContent(/l'onglet peut se fermer/i);
+    expect(alerte).toHaveTextContent(/catégorie par catégorie/i);
+    // RIEN n'a été lancé : c'est un avertissement, pas un compte rendu d'après-coup.
+    expect(fauxFetch).not.toHaveBeenCalled();
+    expect(telechargerBlob).not.toHaveBeenCalled();
+
+    // Second clic : on passe outre. L'avertissement informe, il n'interdit pas.
+    fireEvent.click(screen.getByRole("button", { name: /télécharger quand même/i }));
+    await waitFor(() => expect(telechargerBlob).toHaveBeenCalled());
+    vi.unstubAllGlobals();
+  });
+
+  it("« Annuler » referme l'avertissement sans rien télécharger", async () => {
+    const GROS = { ...DOC_FRAIS_A, taille_octets: 90 * 1024 * 1024 };
+    render(<MonDossier clientAuth={CONNECTE} clientDocuments={fauxClientDocuments([GROS])} clientFichiers={fauxClientFichiers()} />);
+    await screen.findByText("violon.pdf");
+    fireEvent.click(screen.getByRole("button", { name: /tout télécharger \(dossier entier\)/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /annuler/i }));
+    expect(screen.queryByText(/l'onglet peut se fermer/i)).not.toBeInTheDocument();
+    expect(telechargerBlob).not.toHaveBeenCalled();
+  });
+
+  it("n'avertit PAS sur un dossier ordinaire — pas de friction inutile", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, arrayBuffer: async () => new TextEncoder().encode("x").buffer })));
+    render(<MonDossier clientAuth={CONNECTE} clientDocuments={fauxClientDocuments([DOC_A, DOC_FRAIS_A])} clientFichiers={fauxClientFichiers()} />);
+    await screen.findByText("violon.pdf");
+    fireEvent.click(screen.getByRole("button", { name: /tout télécharger \(dossier entier\)/i }));
+    // Aucune confirmation : ça part directement.
+    await waitFor(() => expect(telechargerBlob).toHaveBeenCalled());
     vi.unstubAllGlobals();
   });
 

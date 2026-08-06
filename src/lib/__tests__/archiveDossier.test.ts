@@ -10,7 +10,7 @@
 // document perdu (devoir n°1) derrière un succès affiché (devoir n°2), les deux fautes d'un coup.
 import { describe, expect, it, vi } from "vitest";
 import JSZip from "jszip";
-import { construireArchive, nomArchive } from "../archiveDossier";
+import { SEUIL_AVERTISSEMENT_ARCHIVE_OCTETS, construireArchive, evaluerArchive, nomArchive } from "../archiveDossier";
 import type { LigneDocument } from "../../storage/documentsStorage";
 
 function doc(id: string, partiel: Partial<LigneDocument> = {}): LigneDocument {
@@ -163,6 +163,47 @@ describe("construireArchive — échec partiel, le cœur du sujet", () => {
     expect(recuperer).toHaveBeenCalledTimes(3);
     expect(resultat.nombreInclus).toBe(2);
     expect(resultat.echecs).toHaveLength(1);
+  });
+});
+
+describe("evaluerArchive — l'avertissement avant de lancer (seuil mesuré, cf. le banc d'essai)", () => {
+  /** `n` documents de `mo` mégaoctets chacun. */
+  function lot(n: number, mo: number): LigneDocument[] {
+    return Array.from({ length: n }, (_, i) => ({ ...doc(`d${i}`), tailleOctets: mo * 1024 * 1024 }));
+  }
+
+  it("n'avertit pas sur un dossier ordinaire", () => {
+    // 40 justificatifs de 500 Ko = 20 Mo : mesuré à ~0,9 s et 65 Mo de pic, confortable partout.
+    const evaluation = evaluerArchive(lot(40, 0.5));
+    expect(evaluation.doitAvertir).toBe(false);
+    expect(evaluation.nombre).toBe(40);
+  });
+
+  it("avertit au-delà de 75 Mo — là où un téléphone commence à être en danger", () => {
+    expect(evaluerArchive(lot(100, 1)).doitAvertir).toBe(true);
+  });
+
+  it("annonce un pic mémoire de DEUX FOIS le poids des fichiers (facteur mesuré)", () => {
+    const evaluation = evaluerArchive(lot(10, 1));
+    expect(evaluation.octets).toBe(10 * 1024 * 1024);
+    expect(evaluation.picMemoireOctets).toBe(20 * 1024 * 1024);
+  });
+
+  it("le seuil porte sur le POIDS, pas sur le nombre — 3 gros fichiers avertissent, 1000 minuscules non", () => {
+    // Ce qui tue l'onglet c'est la mémoire, pas le compte : un seuil sur le nombre serait faux.
+    expect(evaluerArchive(lot(3, 30)).doitAvertir).toBe(true);
+    expect(evaluerArchive(lot(1000, 0.01)).doitAvertir).toBe(false);
+  });
+
+  it("un dossier vide n'avertit pas et ne pèse rien", () => {
+    expect(evaluerArchive([])).toEqual({ nombre: 0, octets: 0, picMemoireOctets: 0, doitAvertir: false });
+  });
+
+  it("exactement au seuil, on n'avertit pas — la comparaison est stricte", () => {
+    const auSeuil = [{ ...doc("a"), tailleOctets: SEUIL_AVERTISSEMENT_ARCHIVE_OCTETS }];
+    expect(evaluerArchive(auSeuil).doitAvertir).toBe(false);
+    const justeAuDessus = [{ ...doc("a"), tailleOctets: SEUIL_AVERTISSEMENT_ARCHIVE_OCTETS + 1 }];
+    expect(evaluerArchive(justeAuDessus).doitAvertir).toBe(true);
   });
 });
 

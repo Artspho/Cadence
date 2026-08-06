@@ -23,6 +23,62 @@ import { cheminDansArchive, cheminUnique } from "./regroupementDossier";
  * l'archive elle-même — pour que la vérité voyage avec le zip, même ouvert dans six mois.
  */
 
+/**
+ * SEUIL D'AVERTISSEMENT AVANT DE CONSTRUIRE UNE ARCHIVE — 75 Mo de documents.
+ *
+ * ⚠️ CE CHIFFRE EST MESURÉ, PAS ESTIMÉ À VUE. Banc d'essai du 06/08/2026, dans un vrai navigateur,
+ * avec des fichiers incompressibles de 500 Ko (un justificatif typique) :
+ *
+ *   documents │ poids  │ génération du zip │ mémoire au pic
+ *   ──────────┼────────┼───────────────────┼───────────────
+ *          10 │ 4,9 Mo │             0,2 s │          26 Mo
+ *          50 │  24 Mo │             0,9 s │          65 Mo
+ *         100 │  49 Mo │             1,9 s │         115 Mo
+ *         200 │  98 Mo │             3,8 s │         213 Mo
+ *         400 │ 195 Mo │             7,4 s │         408 Mo
+ *
+ * Deux enseignements. (1) La GÉNÉRATION n'est pas le problème : linéaire, ~19 ms par document, et le
+ * zip pèse exactement le poids des fichiers — JSZip est en mode « stocker » par défaut, et un PDF ou
+ * un JPEG est déjà compressé : il n'y a rien à gagner à activer la compression, seulement du temps de
+ * calcul à perdre. (2) LE MUR EST LA MÉMOIRE, et c'est une falaise, pas une pente : le pic vaut
+ * environ DEUX FOIS le poids des fichiers, et un onglet de navigateur mobile est tué vers 200-400 Mo
+ * selon l'appareil. L'onglet ne ralentit pas — il FERME, sans rien produire.
+ *
+ * 75 Mo place donc l'avertissement avant le pic de ~150 Mo, là où un téléphone de quelques années
+ * commence à être en danger. ⚠️ Les seuils mobiles sont EXTRAPOLÉS de ces mesures et des budgets
+ * mémoire connus des navigateurs : aucun test n'a été fait sur un vrai téléphone.
+ */
+export const SEUIL_AVERTISSEMENT_ARCHIVE_OCTETS = 75 * 1024 * 1024;
+
+/** Le pic mémoire vaut environ deux fois le poids des fichiers (mesuré, cf. le banc d'essai). */
+export const FACTEUR_PIC_MEMOIRE = 2;
+
+export interface EvaluationArchive {
+  nombre: number;
+  octets: number;
+  /** Pic mémoire attendu, pour le dire à l'utilisateur plutôt que de le lui faire découvrir. */
+  picMemoireOctets: number;
+  /** `true` = demander confirmation avant de lancer. */
+  doitAvertir: boolean;
+}
+
+/**
+ * Pèse une archive AVANT de la construire.
+ *
+ * Fonction pure : c'est elle qui porte le seuil, l'écran ne fait que l'interroger. Le but n'est pas
+ * d'interdire — Benoît doit pouvoir télécharger son dossier entier s'il le veut — mais de ne jamais
+ * laisser un téléphone se faire tuer l'onglet en silence (devoir n°2 : pas de faux feu vert).
+ */
+export function evaluerArchive(documents: LigneDocument[]): EvaluationArchive {
+  const octets = documents.reduce((total, d) => total + d.tailleOctets, 0);
+  return {
+    nombre: documents.length,
+    octets,
+    picMemoireOctets: octets * FACTEUR_PIC_MEMOIRE,
+    doitAvertir: octets > SEUIL_AVERTISSEMENT_ARCHIVE_OCTETS,
+  };
+}
+
 export interface EchecArchive {
   nomFichier: string;
   motif: string;

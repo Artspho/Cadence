@@ -18,7 +18,7 @@ import { formaterTaille } from "../lib/capaciteStockage";
 import { horodatagePourNomFichier, telechargerBlob, telechargerDepuisUrl } from "../lib/telechargement";
 import { LIBELLES_TYPE_DOCUMENT, TYPES_DOCUMENT_ORDONNES } from "../content/typeDocumentLabels";
 import { regrouperDocuments, type GroupeDossier, type SousGroupeDossier } from "../lib/regroupementDossier";
-import { construireArchive, nomArchive, type EchecArchive } from "../lib/archiveDossier";
+import { construireArchive, evaluerArchive, nomArchive, type EchecArchive } from "../lib/archiveDossier";
 
 interface MonDossierProps {
   /** Injectés par les tests ; par défaut, les clients de l'app (`null` si non configurés). */
@@ -46,6 +46,8 @@ function Cadre({ children }: { children: React.ReactNode }) {
 
 type EtatArchive =
   | { statut: "repos" }
+  /** Au-delà du seuil : on dit le coût et on attend un second clic. Jamais un blocage. */
+  | { statut: "confirmation" }
   | { statut: "construction"; traites: number; total: number }
   /** L'archive est téléchargée, mais des fichiers manquent — À AFFICHER, jamais à taire. */
   | { statut: "partiel"; echecs: EchecArchive[]; nombreInclus: number }
@@ -72,8 +74,9 @@ function BoutonArchive({
   intitule: string;
 }) {
   const [etat, setEtat] = useState<EtatArchive>({ statut: "repos" });
+  const evaluation = evaluerArchive(documents);
 
-  async function telecharger() {
+  async function construire() {
     setEtat({ statut: "construction", traites: 0, total: documents.length });
     try {
       const resultat = await construireArchive(documents, {
@@ -89,16 +92,37 @@ function BoutonArchive({
 
   const enCours = etat.statut === "construction";
 
+  /** Premier clic : avertir si c'est gros. Second clic (ou dossier léger) : construire. */
+  function auClic() {
+    if (etat.statut !== "confirmation" && evaluation.doitAvertir) {
+      setEtat({ statut: "confirmation" });
+      return;
+    }
+    void construire();
+  }
+
   return (
     <div className="min-w-0">
       <button
         type="button"
-        onClick={telecharger}
+        onClick={auClic}
         disabled={enCours || documents.length === 0}
         className="text-xs px-3 py-1.5 rounded-lg border border-line text-muted disabled:opacity-40 whitespace-nowrap"
       >
-        {enCours ? `${etat.traites}/${etat.total}…` : intitule}
+        {enCours ? `${etat.traites}/${etat.total}…` : etat.statut === "confirmation" ? "Télécharger quand même" : intitule}
       </button>
+      {etat.statut === "confirmation" && (
+        <div className="text-xs text-amber leading-relaxed mt-1" role="alert">
+          <p>
+            {evaluation.nombre} documents, {formaterTaille(evaluation.octets)}. La préparation se fait dans ce navigateur et demandera environ {formaterTaille(evaluation.picMemoireOctets)} de
+            mémoire : sur un téléphone, l'onglet peut se fermer avant la fin. Les fichiers étant récupérés un par un, compte aussi plusieurs minutes.
+          </p>
+          <p className="mt-0.5">Plus sûr : télécharger catégorie par catégorie.</p>
+          <button type="button" onClick={() => setEtat({ statut: "repos" })} className="underline mt-0.5">
+            Annuler
+          </button>
+        </div>
+      )}
       {etat.statut === "partiel" && (
         <div className="text-xs text-amber leading-relaxed mt-1" role="alert">
           <p>
