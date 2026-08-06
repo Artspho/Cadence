@@ -1,20 +1,23 @@
 // @vitest-environment jsdom
 //
-// Chantier de sortie des justificatifs du localStorage (04/08/2026). Les tests de
-// lib/__tests__/envoiJustificatifsEnAttente.test.ts prouvent la logique d'envoi ; celui-ci prouve ce que
-// l'utilisateur VOIT et ce que le bouton fait réellement — dont le compte-rendu, qui doit nommer les
-// fichiers restés en arrière plutôt qu'afficher un nombre nu.
+// Chantier de sortie des justificatifs du localStorage (04/08/2026), destination Supabase Storage
+// depuis le commit 6 de la phase 6 (05/08/2026, retrait de Google Drive). Les tests de
+// lib/__tests__/envoiJustificatifsEnAttente.test.ts prouvent la logique d'envoi ; celui-ci prouve ce
+// que l'utilisateur VOIT et ce que le bouton fait réellement — dont le compte-rendu, qui doit nommer
+// les fichiers restés en arrière plutôt qu'afficher un nombre nu.
+//
+// `uploader` est injecté directement (prop), et non plus dérivé d'une connexion Drive à part : le
+// compte étant obligatoire, il n'y a plus de « connecte Drive d'abord » à tester.
 import "@testing-library/jest-dom/vitest";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { JustificatifsEnAttente } from "../JustificatifsEnAttente";
 import type { Depense } from "../../../types/fraisReels";
+import type { Uploader } from "../../../lib/envoiJustificatifsEnAttente";
 
 const DATA_URL = `data:application/pdf;base64,${btoa("x".repeat(3000))}`;
 
-vi.mock("../../../lib/googleDriveAuth", () => ({ getToken: () => "jeton-de-test" }));
-const uploader = vi.fn();
-vi.mock("../../../lib/googleDriveStorage", () => ({ uploaderJustificatif: (...args: unknown[]) => uploader(...args) }));
+const uploader = vi.fn() as unknown as Uploader & ReturnType<typeof vi.fn>;
 
 function depense(partiel: Partial<Depense> = {}): Depense {
   return {
@@ -36,9 +39,9 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-function rendre(depenses: Depense[], driveConnecte = true) {
+function rendre(depenses: Depense[]) {
   const onRemplacerDepenses = vi.fn();
-  render(<JustificatifsEnAttente depenses={depenses} driveConnecte={driveConnecte} onRemplacerDepenses={onRemplacerDepenses} />);
+  render(<JustificatifsEnAttente depenses={depenses} uploader={uploader} onRemplacerDepenses={onRemplacerDepenses} />);
   return onRemplacerDepenses;
 }
 
@@ -46,7 +49,7 @@ describe("JustificatifsEnAttente — ce qui s'affiche", () => {
   it("rien en attente : le bloc n'existe pas du tout", () => {
     // Un encart « 0 justificatif en attente » serait du bruit permanent, pour un cas qui sera le plus
     // fréquent.
-    rendre([depense({ driveFileId: "abc" }), depense({ id: "d2", statutJustificatif: "manquant" })]);
+    rendre([depense({ documentId: "doc-abc" }), depense({ id: "d2", statutJustificatif: "manquant" })]);
     expect(screen.queryByText(/stocké/i)).not.toBeInTheDocument();
   });
 
@@ -61,25 +64,24 @@ describe("JustificatifsEnAttente — ce qui s'affiche", () => {
     expect(screen.getByText(/2 justificatifs encore stockés dans ce navigateur/i)).toBeInTheDocument();
   });
 
-  it("Drive non connecté : pas de bouton d'envoi, mais l'explication de ce qu'il faut faire", () => {
-    rendre([depense({ justificatifData: DATA_URL })], false);
-    expect(screen.queryByRole("button")).not.toBeInTheDocument();
-    expect(screen.getByText(/connecte google drive/i)).toBeInTheDocument();
+  it("le bouton d'envoi est toujours disponible : plus de connexion préalable à faire", () => {
+    rendre([depense({ justificatifData: DATA_URL })]);
+    expect(screen.getByRole("button", { name: /envoyer ce justificatif sur le serveur/i })).toBeInTheDocument();
   });
 });
 
 describe("JustificatifsEnAttente — l'envoi", () => {
-  it("envoi réussi : les dépenses remontées portent le driveFileId et plus de base64", async () => {
-    uploader.mockResolvedValue({ driveFileId: "id-1", driveWebViewLink: "https://drive.example/id-1" });
+  it("envoi réussi : les dépenses remontées portent le documentId et plus de base64", async () => {
+    uploader.mockResolvedValue({ documentId: "doc-1" });
     const onRemplacerDepenses = rendre([depense({ justificatifNom: "a.pdf", justificatifData: DATA_URL })]);
 
-    fireEvent.click(screen.getByRole("button", { name: /envoyer ce justificatif vers google drive/i }));
+    fireEvent.click(screen.getByRole("button", { name: /envoyer ce justificatif sur le serveur/i }));
 
     await waitFor(() => expect(onRemplacerDepenses).toHaveBeenCalledTimes(1));
     const remontees = onRemplacerDepenses.mock.calls[0][0] as Depense[];
-    expect(remontees[0].driveFileId).toBe("id-1");
+    expect(remontees[0].documentId).toBe("doc-1");
     expect(remontees[0].justificatifData).toBeUndefined();
-    expect(screen.getByText(/1 justificatif envoyé sur Google Drive/i)).toBeInTheDocument();
+    expect(screen.getByText(/1 justificatif envoyé sur le serveur/i)).toBeInTheDocument();
   });
 
   it("échec : le compte-rendu NOMME les fichiers restés, et dit que rien n'est perdu", async () => {
@@ -94,13 +96,13 @@ describe("JustificatifsEnAttente — l'envoi", () => {
     // Le base64 est conservé dans ce qui est remonté : devoir sacré n°1.
     const remontees = onRemplacerDepenses.mock.calls[0][0] as Depense[];
     expect(remontees[0].justificatifData).toBe(DATA_URL);
-    expect(remontees[0].driveFileId).toBeUndefined();
+    expect(remontees[0].documentId).toBeUndefined();
   });
 
   it("échec partiel : les deux comptes sont annoncés, et l'écriture a bien lieu", async () => {
-    // L'écriture DOIT avoir lieu même partiellement : sinon un second essai renverrait sur Drive des
-    // fichiers déjà partis, en doublon.
-    uploader.mockResolvedValueOnce({ driveFileId: "ok", driveWebViewLink: "l" }).mockRejectedValueOnce(new Error("coupure"));
+    // L'écriture DOIT avoir lieu même partiellement : sinon un second essai renverrait sur le serveur
+    // des fichiers déjà partis, en doublon.
+    uploader.mockResolvedValueOnce({ documentId: "ok" }).mockRejectedValueOnce(new Error("coupure"));
     const onRemplacerDepenses = rendre([
       depense({ id: "a", justificatifNom: "a.pdf", justificatifData: DATA_URL }),
       depense({ id: "b", justificatifNom: "b.pdf", justificatifData: DATA_URL }),
@@ -111,16 +113,22 @@ describe("JustificatifsEnAttente — l'envoi", () => {
     await waitFor(() => expect(screen.getByText(/1 justificatif envoyé/i)).toBeInTheDocument());
     expect(screen.getByText(/b\.pdf/)).toBeInTheDocument();
     const remontees = onRemplacerDepenses.mock.calls[0][0] as Depense[];
-    expect(remontees.map((d) => Boolean(d.driveFileId))).toEqual([true, false]);
+    expect(remontees.map((d) => Boolean(d.documentId))).toEqual([true, false]);
   });
 
-  it("chaque justificatif est envoyé dans le dossier de son année fiscale", async () => {
-    uploader.mockResolvedValue({ driveFileId: "id", driveWebViewLink: "l" });
-    rendre([depense({ id: "a", anneeFiscale: 2025, justificatifData: DATA_URL }), depense({ id: "b", anneeFiscale: 2026, justificatifData: DATA_URL })]);
+  it("chaque justificatif est envoyé avec son année fiscale et sa catégorie", async () => {
+    uploader.mockResolvedValue({ documentId: "doc" });
+    rendre([
+      depense({ id: "a", anneeFiscale: 2025, categorie: "C1", justificatifData: DATA_URL }),
+      depense({ id: "b", anneeFiscale: 2026, categorie: "C7", justificatifData: DATA_URL }),
+    ]);
 
     fireEvent.click(screen.getByRole("button", { name: /envoyer/i }));
 
     await waitFor(() => expect(uploader).toHaveBeenCalledTimes(2));
-    expect(uploader.mock.calls.map((c) => c[2])).toEqual([2025, 2026]);
+    expect(uploader.mock.calls.map((c) => [c[1], c[2]])).toEqual([
+      [2025, "C1"],
+      [2026, "C7"],
+    ]);
   });
 });

@@ -2,31 +2,24 @@ import { useState } from "react";
 import type { CategorieFrais, Depense, StatutJustificatif } from "../../types/fraisReels";
 import { CATEGORIES_ORDONNEES, LIBELLES_CATEGORIE_COMPLETS } from "./categorieLabels";
 import { calculerStatutJustificatif } from "../../lib/statutJustificatif";
-import { getToken } from "../../lib/googleDriveAuth";
-import { uploaderJustificatif } from "../../lib/googleDriveStorage";
-import { chargeAdditionnelleTiendrait, formaterTaille, mesurerOccupation } from "../../lib/capaciteStockage";
+import { remplacerDocument } from "../../storage/documentsStorage";
+import type { ClientDocuments, ClientFichiers } from "../../auth/supabaseClient";
 
 interface DepenseFormProps {
   anneeFiscale: number;
   valeurInitiale?: Depense; // édition si présent, ajout sinon
   ratioLocalPro: number | null; // config.localPro.surfaceProM2/surfaceTotalM2, null si non renseigné
   nombreRepasC3Actif: boolean; // config.nombreRepasC3 renseigné (> 0)
-  driveActif: boolean; // config.driveConnecte && config.stockageJustificatifs === 'drive'
+  /** Compte obligatoire (05/08/2026) : toujours résolu par App.tsx avant que cet écran soit atteignable. */
+  utilisateurId: string;
+  clientDocuments: ClientDocuments | null;
+  clientFichiers: ClientFichiers | null;
   onValider: (depense: Omit<Depense, "id">) => void;
   onSupprimer?: () => void;
   onAnnuler: () => void;
 }
 
-function lireFichierEnBase64(fichier: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const lecteur = new FileReader();
-    lecteur.onload = () => resolve(lecteur.result as string);
-    lecteur.onerror = () => reject(lecteur.error);
-    lecteur.readAsDataURL(fichier);
-  });
-}
-
-export function DepenseForm({ anneeFiscale, valeurInitiale, ratioLocalPro, nombreRepasC3Actif, driveActif, onValider, onSupprimer, onAnnuler }: DepenseFormProps) {
+export function DepenseForm({ anneeFiscale, valeurInitiale, ratioLocalPro, nombreRepasC3Actif, utilisateurId, clientDocuments, clientFichiers, onValider, onSupprimer, onAnnuler }: DepenseFormProps) {
   const [date, setDate] = useState(valeurInitiale?.date ?? "");
   const [categorie, setCategorie] = useState<CategorieFrais>(valeurInitiale?.categorie ?? "C1");
   const [description, setDescription] = useState(valeurInitiale?.description ?? "");
@@ -34,9 +27,7 @@ export function DepenseForm({ anneeFiscale, valeurInitiale, ratioLocalPro, nombr
   const [remboursementEmployeur, setRemboursementEmployeur] = useState(valeurInitiale?.remboursementEmployeur?.toString() ?? "0");
   const [partProPct, setPartProPct] = useState(Math.round((valeurInitiale?.partPro ?? 1) * 100).toString());
   const [justificatifNom, setJustificatifNom] = useState(valeurInitiale?.justificatifNom);
-  const [justificatifData, setJustificatifData] = useState(valeurInitiale?.justificatifData);
-  const [driveFileId, setDriveFileId] = useState(valeurInitiale?.driveFileId);
-  const [driveWebViewLink, setDriveWebViewLink] = useState(valeurInitiale?.driveWebViewLink);
+  const [documentId, setDocumentId] = useState(valeurInitiale?.documentId);
   const [notes, setNotes] = useState(valeurInitiale?.notes ?? "");
   const [erreur, setErreur] = useState<string | null>(null);
   const [envoiEnCours, setEnvoiEnCours] = useState(false);
@@ -48,66 +39,54 @@ export function DepenseForm({ anneeFiscale, valeurInitiale, ratioLocalPro, nombr
   const remboursementNum = parseFloat(remboursementEmployeur) || 0;
   const montantDeductible = Math.max(0, (montantTotalNum - remboursementNum) * (partProEffectivePct / 100));
 
-  const statutJustificatif = calculerStatutJustificatif(categorie, Boolean(justificatifData) || Boolean(driveFileId));
+  // `documentId` (nouveau) OU un reliquat de lecture (justificatifData/driveFileId, jamais réécrits
+  // depuis ce commit, cf. types/fraisReels.ts) comptent tous les deux comme « fourni » : une dépense
+  // enregistrée avant ce commit ne doit pas soudain paraître sans justificatif.
+  const aUnJustificatif = Boolean(documentId) || Boolean(valeurInitiale?.justificatifData) || Boolean(valeurInitiale?.driveFileId);
+  const statutJustificatif = calculerStatutJustificatif(categorie, aUnJustificatif);
 
-  // Justificatif local (base64) et Drive sont exclusifs : on efface toujours l'autre mode avant
-  // d'écrire le nouveau, sinon une dépense pourrait garder un driveFileId périmé après un
-  // remplacement en local (ou l'inverse).
+  /**
+   * Dépose (ou remplace) le justificatif sur Supabase Storage — la SEULE destination depuis le
+   * commit 6 de la phase 6 (05/08/2026, retrait complet de Google Drive et du repli localStorage).
+   * `remplacerDocument` ne retire l'ancien fichier qu'APRÈS que le nouveau a réussi (devoir n°1).
+   */
   async function onFichierChoisi(fichier: File | undefined) {
     if (!fichier) return;
     if (fichier.size > 5 * 1024 * 1024) {
       setErreur("Fichier trop volumineux (max 5 Mo).");
       return;
     }
-
-    if (driveActif) {
-      const token = getToken();
-      if (token) {
-        setEnvoiEnCours(true);
-        setErreur(null);
-        try {
-          const { driveFileId: id, driveWebViewLink: lien } = await uploaderJustificatif(token, fichier, anneeFiscale);
-          setDriveFileId(id);
-          setDriveWebViewLink(lien);
-          setJustificatifNom(fichier.name);
-          setJustificatifData(undefined);
-          setEnvoiEnCours(false);
-          return;
-        } catch {
-          // Décision de Benoît du 04/08/2026 : le justificatif est gardé localement mais l'utilisateur
-          // doit SAVOIR qu'il n'est pas parti, et savoir qu'il pourra réessayer. L'ancien message
-          // (« fichier stocké localement à la place ») sonnait comme un rangement définitif : c'est ce
-          // repli d'apparence anodine qui remplissait le stockage à l'insu de l'utilisateur, exactement
-          // le problème que ce chantier ferme. Le compteur de « Réglages » liste ensuite ce qui attend.
-          setErreur("Envoi vers Google Drive impossible pour l'instant — le justificatif est conservé dans ce navigateur et reste à envoyer. Tu le retrouveras dans « Réglages forfaits » pour réessayer.");
-          setEnvoiEnCours(false);
-          // tombe dans le stockage local ci-dessous : rien n'est perdu, et l'envoi restera à faire
-        }
-      }
+    if (!clientDocuments || !clientFichiers) {
+      setErreur("Le stockage n'est pas disponible pour l'instant — réessaie dans un instant.");
+      return;
     }
 
+    setEnvoiEnCours(true);
+    setErreur(null);
     try {
-      const base64 = await lireFichierEnBase64(fichier);
-      // Point 2 : détection EN AMONT, par un essai réel (cf. lib/capaciteStockage.ts). Un justificatif
-      // en base64 est de loin le plus gros consommateur du stockage — c'est ici, et pas au moment de
-      // sauvegarder tout le jeu de données, qu'il faut savoir si ça tient. Sans cet essai, le fichier
-      // était accepté à l'écran, puis TOUTE la sauvegarde échouait ensuite : l'utilisateur voyait un
-      // bandeau « non enregistré » sans jamais savoir que son justificatif en était la cause.
-      if (!chargeAdditionnelleTiendrait(base64, window.localStorage)) {
-        const occupation = mesurerOccupation(window.localStorage);
-        setErreur(
-          `Plus de place dans le stockage de ce navigateur pour ce justificatif (${formaterTaille(base64.length)} une fois encodé). ` +
-            `Cadence occupe déjà ${formaterTaille(occupation.totalOctets)}. Exporte tes données, puis supprime des justificatifs de dépenses anciennes — ce sont eux qui prennent la place.`,
-        );
+      const resultat = await remplacerDocument(clientFichiers, clientDocuments, documentId ?? null, {
+        utilisateurId,
+        fichier,
+        typeDocument: "justificatif_frais",
+        categorieFrais: categorie,
+        anneeFiscale,
+        dateDocument: date || undefined,
+      });
+      if (resultat.statut === "echec") {
+        setErreur(`Envoi impossible : ${resultat.message}`);
         return;
       }
-      setJustificatifData(base64);
+      if (resultat.statut === "ficherEnvoyeLigneEchouee") {
+        // Le fichier est bien parti, mais sa ligne n'a pas pu être créée : `documentId` resterait
+        // inutilisable (rien à retrouver dans « Mon dossier »), donc on le dit comme un échec plutôt
+        // que de prétendre avoir un justificatif exploitable (devoir n°2).
+        setErreur(`Le fichier a été envoyé mais n'a pas pu être enregistré : ${resultat.message}`);
+        return;
+      }
+      setDocumentId(resultat.id);
       setJustificatifNom(fichier.name);
-      setDriveFileId(undefined);
-      setDriveWebViewLink(undefined);
-      if (!driveActif) setErreur(null);
-    } catch {
-      setErreur("Échec de la lecture du fichier.");
+    } finally {
+      setEnvoiEnCours(false);
     }
   }
 
@@ -125,9 +104,12 @@ export function DepenseForm({ anneeFiscale, valeurInitiale, ratioLocalPro, nombr
       montantDeductible: Math.round(montantDeductible * 100) / 100,
       statutJustificatif,
       justificatifNom,
-      justificatifData,
-      driveFileId,
-      driveWebViewLink,
+      documentId,
+      // Reliquats de lecture, jamais modifiés par ce formulaire — préservés tels quels pour ne pas
+      // effacer la référence d'un justificatif déposé avant ce commit (cf. types/fraisReels.ts).
+      justificatifData: valeurInitiale?.justificatifData,
+      driveFileId: valeurInitiale?.driveFileId,
+      driveWebViewLink: valeurInitiale?.driveWebViewLink,
       notes: notes.trim() || undefined,
     });
   }
@@ -221,11 +203,10 @@ export function DepenseForm({ anneeFiscale, valeurInitiale, ratioLocalPro, nombr
         <div>
           <span className="block text-xs uppercase tracking-[.03em] text-muted mb-1">Justificatif</span>
           <label className={`inline-block bg-surface-2 border border-line rounded-lg px-4 py-2 text-sm transition-colors ${envoiEnCours ? "opacity-60" : "cursor-pointer hover:border-line-strong"}`}>
-            {envoiEnCours ? "Envoi vers Drive…" : justificatifNom ? "Remplacer le fichier" : "Choisir un fichier (PDF, JPG, PNG)"}
+            {envoiEnCours ? "Envoi…" : justificatifNom ? "Remplacer le fichier" : "Choisir un fichier (PDF, JPG, PNG)"}
             <input type="file" accept="application/pdf,image/jpeg,image/png" className="hidden" disabled={envoiEnCours} onChange={(e) => onFichierChoisi(e.target.files?.[0])} />
           </label>
           {justificatifNom && <span className="text-xs text-muted ml-2">{justificatifNom}</span>}
-          {driveFileId && <span className="text-xs text-faint ml-2">(sur Google Drive)</span>}
           <p className="mt-2">
             <StatutBadge statut={statutJustificatif} />
           </p>

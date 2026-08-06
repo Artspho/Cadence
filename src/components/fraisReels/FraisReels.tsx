@@ -19,6 +19,10 @@ import { explicationsFraisReels } from "../../content/explicationsFraisReels";
 import { FraisReelsGraphiques } from "./FraisReelsGraphiques";
 import { DeclarationTexte } from "./DeclarationTexte";
 import { BandeauStockagePlein } from "../BandeauStockagePlein";
+import { obtenirClientDocuments, obtenirClientFichiers, type ClientDocuments, type ClientFichiers } from "../../auth/supabaseClient";
+import type { SessionConnectee } from "../../auth/session";
+import { deposerDocument } from "../../storage/documentsStorage";
+import type { Uploader } from "../../lib/envoiJustificatifsEnAttente";
 
 interface FraisReelsProps {
   profil: Profil;
@@ -28,6 +32,11 @@ interface FraisReelsProps {
   dateDuJour: string;
   /** Export JSON complet, fourni par App.tsx — affiché dans le bandeau si une écriture échoue (point 2). */
   onExporterSauvegarde: () => void;
+  /** Résolue par le mur (connexion obligatoire, 05/08/2026) — App.tsx ne rend cet onglet qu'une fois connecté. */
+  session: SessionConnectee;
+  /** Injectés par les tests ; par défaut, les clients de l'app (`null` si non configurés). */
+  clientDocuments?: ClientDocuments | null;
+  clientFichiers?: ClientFichiers | null;
 }
 
 function configParDefaut(anneeFiscale: number, totalAreCalcule: number | null): ConfigFraisReels {
@@ -49,7 +58,32 @@ function anneesSelectionnables(anneeCourante: number): number[] {
   return Array.from({ length: PROFONDEUR_ANNEES }, (_, i) => anneeCourante - i);
 }
 
-export function FraisReels({ profil, soldeIndemnisationDepart, contrats, config, dateDuJour, onExporterSauvegarde }: FraisReelsProps) {
+export function FraisReels({
+  profil,
+  soldeIndemnisationDepart,
+  contrats,
+  config,
+  dateDuJour,
+  onExporterSauvegarde,
+  session,
+  clientDocuments = obtenirClientDocuments(),
+  clientFichiers = obtenirClientFichiers(),
+}: FraisReelsProps) {
+  // Lié une seule fois par rendu — évite de reconstruire la fonction à chaque frappe dans le
+  // formulaire, sans conséquence fonctionnelle si React la recréait quand même.
+  const uploaderJustificatifs: Uploader = async (fichier, anneeFiscaleDuFichier, categorieFrais) => {
+    if (!clientDocuments || !clientFichiers) throw new Error("Stockage indisponible.");
+    const resultat = await deposerDocument(clientFichiers, clientDocuments, {
+      utilisateurId: session.utilisateurId,
+      fichier,
+      typeDocument: "justificatif_frais",
+      categorieFrais,
+      anneeFiscale: anneeFiscaleDuFichier,
+    });
+    if (resultat.statut !== "depose") throw new Error(resultat.message);
+    return { documentId: resultat.id };
+  };
+
   const anneeCourante = Number(dateDuJour.slice(0, 4));
   // Année d'exercice affichée — état, plus une valeur dérivée de `dateDuJour` : chaque exercice a sa
   // propre clé localStorage (`cadence_frais_reels_<annee>`), des données 2025 étaient donc
@@ -169,8 +203,10 @@ export function FraisReels({ profil, soldeIndemnisationDepart, contrats, config,
         libelle: d.description,
         categorie: d.categorie,
         montant: d.montantDeductible,
-        reference: d.driveWebViewLink ?? d.justificatifNom ?? "",
-        source: d.driveFileId ? "drive" : "local",
+        // `driveWebViewLink` : reliquat de lecture, module Drive retiré au commit 6 — plus aucun
+        // nouveau justificatif ne l'écrit (cf. types/fraisReels.ts).
+        reference: d.justificatifNom ?? d.driveWebViewLink ?? "",
+        source: d.documentId ? "serveur" : "local",
       }));
 
     return {
@@ -193,7 +229,6 @@ export function FraisReels({ profil, soldeIndemnisationDepart, contrats, config,
 
   const ratioLocalPro = fraisReelsConfig.localPro && fraisReelsConfig.localPro.surfaceTotalM2 > 0 ? fraisReelsConfig.localPro.surfaceProM2 / fraisReelsConfig.localPro.surfaceTotalM2 : null;
   const nombreRepasC3Actif = Boolean(fraisReelsConfig.nombreRepasC3 && fraisReelsConfig.nombreRepasC3 > 0);
-  const driveActif = Boolean(fraisReelsConfig.driveConnecte) && fraisReelsConfig.stockageJustificatifs === "drive";
 
   return (
     <div className="space-y-6 max-w-[900px]">
@@ -243,13 +278,22 @@ export function FraisReels({ profil, soldeIndemnisationDepart, contrats, config,
         depenses={depenses}
         ratioLocalPro={ratioLocalPro}
         nombreRepasC3Actif={nombreRepasC3Actif}
-        driveActif={driveActif}
+        utilisateurId={session.utilisateurId}
+        clientDocuments={clientDocuments}
+        clientFichiers={clientFichiers}
         onAjouter={ajouterDepense}
         onModifier={modifierDepense}
         onSupprimer={supprimerDepense}
       />
 
-      <ForfaitsReglages config={fraisReelsConfig} depenses={depenses} ftConfig={config} onChangerConfig={ecrireConfig} onRemplacerDepenses={remplacerDepenses}>
+      <ForfaitsReglages
+        config={fraisReelsConfig}
+        depenses={depenses}
+        ftConfig={config}
+        onChangerConfig={ecrireConfig}
+        onRemplacerDepenses={remplacerDepenses}
+        uploaderJustificatifs={uploaderJustificatifs}
+      >
         <AmortissementBiens anneeImposition={anneeFiscale} biens={biens} ftConfig={config} onAjouter={ajouterBienAmorti} onSupprimer={supprimerBienAmorti} />
       </ForfaitsReglages>
 

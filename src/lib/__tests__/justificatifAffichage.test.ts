@@ -23,6 +23,16 @@ describe("calculerAffichageJustificatif", () => {
     expect(calculerAffichageJustificatif(depense())).toEqual({ type: "aucun" });
   });
 
+  it("documentId (Supabase Storage) : type 'signe', l'URL se résout au clic", () => {
+    const d = depense({ documentId: "doc-1" });
+    expect(calculerAffichageJustificatif(d)).toEqual({ type: "signe", documentId: "doc-1" });
+  });
+
+  it("documentId a priorité sur tout le reste, y compris un ancien lien Drive", () => {
+    const d = depense({ documentId: "doc-1", driveFileId: "f1", driveWebViewLink: "https://drive.google.com/file/d/f1/view", justificatifData: "data:xxx" });
+    expect(calculerAffichageJustificatif(d)).toEqual({ type: "signe", documentId: "doc-1" });
+  });
+
   it("justificatifData (mode local) : lien vers la donnée base64", () => {
     const d = depense({ justificatifData: "data:application/pdf;base64,xxx" });
     expect(calculerAffichageJustificatif(d)).toEqual({ type: "lien", url: "data:application/pdf;base64,xxx" });

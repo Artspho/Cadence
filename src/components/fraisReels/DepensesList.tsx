@@ -3,13 +3,18 @@ import type { Depense, StatutJustificatif } from "../../types/fraisReels";
 import { COULEUR_BADGE_CATEGORIE, LIBELLES_CATEGORIE_COMPLETS } from "./categorieLabels";
 import { DepenseForm, StatutBadge } from "./DepenseForm";
 import { calculerAffichageJustificatif } from "../../lib/justificatifAffichage";
+import { obtenirDocument, obtenirUrlTelechargement } from "../../storage/documentsStorage";
+import type { ClientDocuments, ClientFichiers } from "../../auth/supabaseClient";
 
 interface DepensesListProps {
   anneeFiscale: number;
   depenses: Depense[];
   ratioLocalPro: number | null;
   nombreRepasC3Actif: boolean;
-  driveActif: boolean;
+  /** Compte obligatoire (05/08/2026) : toujours résolu par App.tsx avant que cet écran soit atteignable. */
+  utilisateurId: string;
+  clientDocuments: ClientDocuments | null;
+  clientFichiers: ClientFichiers | null;
   onAjouter: (depense: Omit<Depense, "id">) => void;
   onModifier: (depense: Depense) => void;
   onSupprimer: (id: string) => void;
@@ -19,8 +24,17 @@ type Tri = "date" | "categorie";
 
 const CATEGORIES_JUSTIFICATIF_REQUIS: Depense["categorie"][] = ["C1", "C2", "C3", "C4", "C5", "C6", "C7", "C8", "C9", "D"];
 
-function LienJustificatif({ depense }: { depense: Depense }) {
+/**
+ * Le lien « Voir » d'un justificatif — trois passés possibles (lien Drive/base64 hérité, badge
+ * « indisponible ») et un présent (Supabase Storage, `type: "signe"`) : contrairement aux autres,
+ * son URL n'existe pas tant qu'on ne l'a pas demandée (jamais mise en cache, cf. `ClientFichiers`),
+ * donc CE cas-là seul a besoin d'un état de chargement et de gérer un échec.
+ */
+function LienJustificatif({ depense, clientDocuments, clientFichiers }: { depense: Depense; clientDocuments: ClientDocuments | null; clientFichiers: ClientFichiers | null }) {
+  const [enCours, setEnCours] = useState(false);
+  const [erreur, setErreur] = useState<string | null>(null);
   const etat = calculerAffichageJustificatif(depense);
+
   if (etat.type === "lien") {
     return (
       <a href={etat.url} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="text-xs text-mint underline underline-offset-2">
@@ -35,10 +49,48 @@ function LienJustificatif({ depense }: { depense: Depense }) {
       </span>
     );
   }
+  if (etat.type === "signe") {
+    async function voir(e: React.MouseEvent) {
+      e.stopPropagation();
+      if (etat.type !== "signe" || !clientDocuments || !clientFichiers) {
+        setErreur("Stockage indisponible.");
+        return;
+      }
+      setEnCours(true);
+      setErreur(null);
+      try {
+        const document = await obtenirDocument(clientDocuments, etat.documentId);
+        if ("erreur" in document) {
+          setErreur(document.erreur);
+          return;
+        }
+        const url = await obtenirUrlTelechargement(clientFichiers, document.document.cheminStockage);
+        if ("erreur" in url) {
+          setErreur(url.erreur);
+          return;
+        }
+        window.open(url.url, "_blank", "noopener,noreferrer");
+      } finally {
+        setEnCours(false);
+      }
+    }
+    return (
+      <span className="inline-flex items-center gap-1.5">
+        <button type="button" onClick={voir} disabled={enCours} className="text-xs text-mint underline underline-offset-2 disabled:opacity-50">
+          {enCours ? "…" : "Voir"}
+        </button>
+        {erreur && (
+          <span className="text-xs text-red" role="alert">
+            {erreur}
+          </span>
+        )}
+      </span>
+    );
+  }
   return null;
 }
 
-export function DepensesList({ anneeFiscale, depenses, ratioLocalPro, nombreRepasC3Actif, driveActif, onAjouter, onModifier, onSupprimer }: DepensesListProps) {
+export function DepensesList({ anneeFiscale, depenses, ratioLocalPro, nombreRepasC3Actif, utilisateurId, clientDocuments, clientFichiers, onAjouter, onModifier, onSupprimer }: DepensesListProps) {
   const [tri, setTri] = useState<Tri>("date");
   const [formulaireOuvert, setFormulaireOuvert] = useState(false);
   const [depenseEnEdition, setDepenseEnEdition] = useState<Depense | null>(null);
@@ -95,7 +147,7 @@ export function DepensesList({ anneeFiscale, depenses, ratioLocalPro, nombreRepa
                     <span className="inline-flex items-center gap-1.5">
                       <StatutBadge statut={d.statutJustificatif} />
                       {sansJustificatif(d) && <span className="w-1.5 h-1.5 rounded-full bg-red" title="Justificatif requis pour cette catégorie" aria-label="Justificatif manquant" />}
-                      <LienJustificatif depense={d} />
+                      <LienJustificatif depense={d} clientDocuments={clientDocuments} clientFichiers={clientFichiers} />
                     </span>
                   </td>
                 </tr>
@@ -110,7 +162,9 @@ export function DepensesList({ anneeFiscale, depenses, ratioLocalPro, nombreRepa
           anneeFiscale={anneeFiscale}
           ratioLocalPro={ratioLocalPro}
           nombreRepasC3Actif={nombreRepasC3Actif}
-          driveActif={driveActif}
+          utilisateurId={utilisateurId}
+          clientDocuments={clientDocuments}
+          clientFichiers={clientFichiers}
           onValider={(d) => {
             onAjouter(d);
             setFormulaireOuvert(false);
@@ -125,7 +179,9 @@ export function DepensesList({ anneeFiscale, depenses, ratioLocalPro, nombreRepa
           valeurInitiale={depenseEnEdition}
           ratioLocalPro={ratioLocalPro}
           nombreRepasC3Actif={nombreRepasC3Actif}
-          driveActif={driveActif}
+          utilisateurId={utilisateurId}
+          clientDocuments={clientDocuments}
+          clientFichiers={clientFichiers}
           onValider={(d) => {
             onModifier({ ...d, id: depenseEnEdition.id });
             setDepenseEnEdition(null);

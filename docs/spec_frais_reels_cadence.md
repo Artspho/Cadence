@@ -354,6 +354,14 @@ TOTAL FRAIS REELS : X €
 
 ## 9. Stockage des justificatifs — Google Drive (optionnel)
 
+> ⚠️ **SECTION HISTORIQUE, RETIRÉE AU COMMIT 6 DE LA PHASE 6 (05/08/2026).** Ni le mode A
+> (localStorage) ni le mode B (Google Drive) décrits ci-dessous ne correspondent plus au code : tout
+> justificatif de frais réels passe désormais par Supabase Storage (même bucket `justificatifs` que
+> les autres documents de l'app, cf. `storage/documentsStorage.ts`), et le module Google Drive a été
+> supprimé (`lib/googleDriveAuth.ts`, `lib/googleDriveStorage.ts`,
+> `components/fraisReels/DriveSettings.tsx` n'existent plus). Conservé tel quel pour la trace du
+> raisonnement d'origine, pas comme documentation du comportement actuel.
+
 Deux modes de stockage, choix de l'utilisateur dans les réglages :
 
 ### Mode A — localStorage (défaut, zéro config)

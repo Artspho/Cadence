@@ -203,6 +203,73 @@ export async function listerDocuments(clientDocuments: ClientDocuments, utilisat
 }
 
 /**
+ * Retrouve la ligne d'un document par son `id` — sert au lien « Voir » d'un justificatif de dépense
+ * (phase 6, commit 6) : `Depense` ne porte que `documentId`, jamais le chemin de stockage (dérivé au
+ * moment de l'affichage, jamais mis en cache) ; et au remplacement d'un justificatif, pour retrouver
+ * le chemin de l'ANCIEN fichier avant de le supprimer (cf. `remplacerDocument`).
+ *
+ * `order` avec un filtre par `id` (donc au plus une ligne) est un artefact de `ClientDocuments`, qui
+ * n'expose pas de `select` sans lui — sans conséquence ici.
+ */
+export async function obtenirDocument(clientDocuments: ClientDocuments, documentId: string): Promise<{ document: LigneDocument } | { erreur: string }> {
+  try {
+    const { data, error } = await clientDocuments.from("documents").select("*").eq("id", documentId).order("cree_le", { ascending: false });
+    if (error) return { erreur: messageErreur(error) };
+    const document = (data ?? []).map(ligneDepuisBrut).find((l): l is LigneDocument => l !== null);
+    if (!document) return { erreur: "Document introuvable." };
+    return { document };
+  } catch (incident: unknown) {
+    return { erreur: messageDe(incident) };
+  }
+}
+
+/**
+ * Supprime un document : la LIGNE d'abord, puis le FICHIER — dans cet ordre, jamais l'inverse.
+ * Raison, symétrique à `deposerDocument` mais pour la direction opposée : entre les deux étapes, la
+ * situation la moins grave est un fichier orphelin (invisible, récupérable) — jamais une ligne qui
+ * pointerait vers un fichier déjà effacé (un lien de téléchargement cassé dans « Mon dossier »,
+ * c'est-à-dire une promesse fausse à l'écran, cf. devoir n°2).
+ */
+export async function supprimerDocument(clientFichiers: ClientFichiers, clientDocuments: ClientDocuments, document: { id: string; cheminStockage: string }): Promise<{ ok: true } | { ok: false; message: string }> {
+  try {
+    const { error: erreurLigne } = await clientDocuments.from("documents").delete().eq("id", document.id);
+    if (erreurLigne) return { ok: false, message: messageErreur(erreurLigne) };
+    const { error: erreurFichier } = await clientFichiers.remove([document.cheminStockage]);
+    if (erreurFichier) return { ok: false, message: erreurFichier.message };
+    return { ok: true };
+  } catch (incident: unknown) {
+    return { ok: false, message: messageDe(incident) };
+  }
+}
+
+/**
+ * Remplace un justificatif : dépose le NOUVEAU, et seulement s'il a réussi, retire l'ANCIEN — jamais
+ * dans l'autre ordre (devoir n°1 : ne jamais passer par un instant où ni l'un ni l'autre n'existe).
+ *
+ * Le nettoyage de l'ancien est délibérément AU MIEUX (« best effort ») : son échec ne fait pas échouer
+ * l'opération — le nouveau justificatif est déjà en sécurité, ce qui reste est un fichier orphelin
+ * (jamais un mensonge affiché), noté en console pour qui voudrait un jour faire le ménage.
+ */
+export async function remplacerDocument(
+  clientFichiers: ClientFichiers,
+  clientDocuments: ClientDocuments,
+  ancienDocumentId: string | null,
+  nouveau: NouveauDocument,
+): Promise<ResultatDepot> {
+  const resultat = await deposerDocument(clientFichiers, clientDocuments, nouveau);
+  if (resultat.statut !== "depose" || !ancienDocumentId) return resultat;
+
+  const ancien = await obtenirDocument(clientDocuments, ancienDocumentId);
+  if ("erreur" in ancien) {
+    console.error("Ancien justificatif introuvable, nettoyage ignoré.", ancien.erreur);
+    return resultat;
+  }
+  const suppression = await supprimerDocument(clientFichiers, clientDocuments, ancien.document);
+  if (!suppression.ok) console.error("Échec du nettoyage de l'ancien justificatif (orphelin, sans conséquence).", suppression.message);
+  return resultat;
+}
+
+/**
  * Corrige le type d'un document déjà déposé — le filet prévu si l'IA se trompe sur un type rare
  * (ex. `attestation_cpam`, jamais testé en vrai faute de spécimen). Ne touche jamais au fichier ni
  * au chemin de stockage, seulement à la ligne.

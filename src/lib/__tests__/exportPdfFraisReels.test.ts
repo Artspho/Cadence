@@ -123,7 +123,7 @@ describe('genererPdfFraisReels', () => {
     expect(octets.length).toBeGreaterThan(0);
   });
 
-  it("5. fonctionne avec des justificatifs source 'drive' et 'local'", () => {
+  it("5. fonctionne avec des justificatifs source 'serveur' et 'local'", () => {
     const dossier = dossierMinimal({
       justificatifs: [
         {
@@ -131,8 +131,8 @@ describe('genererPdfFraisReels', () => {
           libelle: 'Billet SNCF Paris-Lyon 14/03/2025',
           categorie: 'C2',
           montant: 47.5,
-          reference: 'https://drive.google.com/file/d/abc123',
-          source: 'drive',
+          reference: 'billet-sncf.pdf',
+          source: 'serveur',
         },
         {
           depenseId: 'dep-2',

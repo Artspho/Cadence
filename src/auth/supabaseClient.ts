@@ -173,6 +173,15 @@ export interface ClientDocuments {
         valeur: string,
       ): PromiseLike<{ data: Record<string, unknown>[] | null; error: ErreurPostgrest | null }>;
     };
+    /**
+     * Ajoutée phase 6 commit 6 : remplacer un justificatif de frais réels exige de retirer l'ancienne
+     * ligne (après que la nouvelle a été déposée avec succès, jamais avant — cf.
+     * `storage/documentsStorage.ts::remplacerDocument`). RLS l'autorise déjà (`documents_supprimer`,
+     * migration 0001) ; rien à changer côté SQL.
+     */
+    delete(): {
+      eq(colonne: string, valeur: string): PromiseLike<{ error: ErreurPostgrest | null }>;
+    };
   };
 }
 

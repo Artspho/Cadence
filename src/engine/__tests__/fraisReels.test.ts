@@ -162,18 +162,25 @@ describe("calculerFraisReels — cas certifiés spec §10", () => {
   });
 });
 
-describe("Depense — statut justificatif et stockage Drive (structure, cf. étape 3 pour le comportement complet)", () => {
-  it("dépense avec driveFileId : statutJustificatif = 'fourni', justificatifData absent", () => {
+describe("Depense — statut justificatif et stockage (structure ; comportement complet cf. storage/documentsStorage.ts)", () => {
+  it("dépense avec documentId (Supabase Storage, commit 6) : statutJustificatif = 'fourni'", () => {
+    const d = depense({ categorie: "C1", montantTotal: 50, statutJustificatif: "fourni", documentId: "doc-abc123" });
+    expect(d.statutJustificatif).toBe("fourni");
+    expect(d.documentId).toBe("doc-abc123");
+  });
+
+  it("driveFileId (reliquat de lecture, module Drive retiré) : conserve ce champ — aucune perte de données (devoir n°1)", () => {
     const d = depense({ categorie: "C1", montantTotal: 50, statutJustificatif: "fourni", driveFileId: "abc123", driveWebViewLink: "https://drive.google.com/abc123" });
     expect(d.statutJustificatif).toBe("fourni");
     expect(d.justificatifData).toBeUndefined();
     expect(d.driveFileId).toBe("abc123");
   });
 
-  it("une dépense référencée par driveFileId conserve ce champ même sans connexion Drive active — aucune perte de données (devoir n°1), l'affichage d'un badge « non accessible » est un comportement UI, cf. étape 3", () => {
+  it("une dépense référencée par driveFileId conserve ce champ à travers une sérialisation — aucune perte de données (devoir n°1), l'affichage d'un badge « non accessible » est un comportement UI, cf. lib/justificatifAffichage.ts", () => {
     const d = depense({ categorie: "C2", montantTotal: 30, driveFileId: "xyz789", driveWebViewLink: "https://drive.google.com/xyz789" });
-    // Simule un objet sérialisé/relu (ex. après rechargement de page, Drive déconnecté) : le champ
-    // driveFileId doit survivre intact, rien côté moteur ne le supprime ni ne le vide.
+    // Simule un objet sérialisé/relu (ex. après rechargement de page) : le champ driveFileId doit
+    // survivre intact, rien côté moteur ne le supprime ni ne le vide — le module Drive lui-même a
+    // disparu (commit 6), mais la RÉFÉRENCE historique reste lisible.
     const relu: Depense = JSON.parse(JSON.stringify(d));
     expect(relu.driveFileId).toBe("xyz789");
     expect(relu.driveWebViewLink).toBe("https://drive.google.com/xyz789");

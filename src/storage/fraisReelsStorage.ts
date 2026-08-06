@@ -23,6 +23,9 @@ const depenseSchema = z.object({
   montantDeductible: z.number(),
   statutJustificatif: z.enum(["fourni", "manquant", "non_requis"]),
   justificatifNom: z.string().optional(),
+  documentId: z.string().optional(),
+  // Lecture seule depuis le commit 6 (phase 6) — jamais écrits pour une nouvelle dépense, conservés
+  // pour ne pas perdre la référence d'un justificatif déposé avant la bascule Supabase Storage.
   justificatifData: z.string().optional(),
   driveFileId: z.string().optional(),
   driveWebViewLink: z.string().optional(),
@@ -69,8 +72,11 @@ const configFraisReelsSchema = z.object({
   modeB: z.enum(["forfait", "reel"]),
   localPro: z.object({ surfaceTotalM2: z.number(), surfaceProM2: z.number() }).optional(),
   nombreRepasC3: z.number().optional(),
-  stockageJustificatifs: z.enum(["local", "drive"]).optional(),
-  driveConnecte: z.boolean().optional(),
+  // ⚠️ `stockageJustificatifs`/`driveConnecte` (module Google Drive, retiré au commit 6 de la phase 6)
+  // n'apparaissent plus ici : un objet Zod non `.strict()` ignore silencieusement les clés inconnues à
+  // la lecture, donc une config déjà enregistrée avec ces champs continue de se lire sans erreur — ils
+  // sont juste tacitement oubliés, ce qui ne perd aucune donnée qui compte encore (ce n'étaient que des
+  // interrupteurs de mode, jamais une référence vers un fichier).
   fraisKm: z.object({ c1: paramsFraisKmC1Schema.optional(), c2: paramsFraisKmC2Schema.optional() }).optional(),
 });
 

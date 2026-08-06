@@ -2,17 +2,19 @@ import type { ConfigFraisReels, Depense, ModeForfait } from "../../types/fraisRe
 import type { FranceTravailConfig } from "../../config/franceTravailConfig";
 import { calculerArbitrageForfaits } from "../../lib/arbitrageForfaits";
 import { estSaisieNegative } from "../../lib/saisieNombrePositif";
-import { DriveSettings } from "./DriveSettings";
 import { JustificatifsEnAttente } from "./JustificatifsEnAttente";
 import { FraisKilometriques } from "./FraisKilometriques";
+import type { Uploader } from "../../lib/envoiJustificatifsEnAttente";
 
 interface ForfaitsReglagesProps {
   config: ConfigFraisReels;
   depenses: Depense[];
   ftConfig: FranceTravailConfig;
   onChangerConfig: (config: ConfigFraisReels) => void;
-  /** Remplace la liste entière de dépenses — l'envoi vers Drive en met plusieurs à jour d'un coup. */
+  /** Remplace la liste entière de dépenses — l'envoi vers le serveur en met plusieurs à jour d'un coup. */
   onRemplacerDepenses: (depenses: Depense[]) => void;
+  /** Lié à Supabase Storage par FraisReels.tsx (phase 6, commit 6 — le module Google Drive a été retiré). */
+  uploaderJustificatifs: Uploader;
   // Blocs supplémentaires de la carte « réglages » dont l'état ne vit pas dans ConfigFraisReels
   // (biens amortis : liste durable, hors année fiscale) — passés en children plutôt qu'en props
   // pour éviter de faire transiter leur état par ce composant, qui n'en a pas besoin.
@@ -44,7 +46,7 @@ function RubriqueForfait({ label, mode, montantForfait, montantReel, onChanger }
   );
 }
 
-export function ForfaitsReglages({ config, depenses, ftConfig, onChangerConfig, onRemplacerDepenses, children }: ForfaitsReglagesProps) {
+export function ForfaitsReglages({ config, depenses, ftConfig, onChangerConfig, onRemplacerDepenses, uploaderJustificatifs, children }: ForfaitsReglagesProps) {
   const forfaitsDesactives = config.profilFiscal === "enseignant_pur";
 
   // Même source que la carte de comparaison (FraisReelsGraphiques) : un seul endroit rejoue
@@ -165,13 +167,9 @@ export function ForfaitsReglages({ config, depenses, ftConfig, onChangerConfig, 
 
       {children}
 
-      {/* Placé AVANT le bloc de connexion Drive : quand il y a des justificatifs à faire sortir, c'est
-          l'information la plus utile de cette carte — et elle explique pourquoi connecter Drive. */}
       <div className="border-t border-line pt-5 space-y-3">
-        <JustificatifsEnAttente depenses={depenses} driveConnecte={Boolean(config.driveConnecte)} onRemplacerDepenses={onRemplacerDepenses} />
+        <JustificatifsEnAttente depenses={depenses} uploader={uploaderJustificatifs} onRemplacerDepenses={onRemplacerDepenses} />
       </div>
-
-      <DriveSettings config={config} onChangerConfig={onChangerConfig} />
     </section>
   );
 }

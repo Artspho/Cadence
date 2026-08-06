@@ -23,14 +23,17 @@ export interface ProfilDeclarant {
   anneeImposition: number; // ex. 2025
 }
 
-export type SourceJustificatif = 'drive' | 'local';
+// ⚠️ 'drive' A DISPARU au commit 6 de la phase 6 (05/08/2026, retrait de Google Drive) — remplacé
+// par 'serveur' (Supabase Storage). Sans conséquence sur d'anciens PDF déjà générés : ce module ne
+// LIT jamais un export passé, il en régénère un neuf à chaque appel depuis l'état courant des dépenses.
+export type SourceJustificatif = 'serveur' | 'local';
 
 export interface JustificatifFraisReels {
   depenseId: string;
   libelle: string; // ex. "Billet SNCF Paris-Lyon 14/03/2025"
   categorie: string; // ex. "C2"
   montant: number;
-  reference: string; // nom de fichier ou URL Drive (tronquée si > 80 car.)
+  reference: string; // nom de fichier (tronqué si > 80 car.)
   source: SourceJustificatif;
 }
 
@@ -358,9 +361,9 @@ function ajouterPageDetails(doc: jsPDF, dossier: DossierFraisReels): void {
       ecrire(doc,j.libelle, 35, y);
       ecrire(doc,j.categorie, 125, y);
       ecrire(doc,formatEuro(j.montant), 145, y);
-      // Pas de flèche « lien externe » ici : un PDF imprimé n'est pas cliquable, et l'URL Drive
-      // complète figure déjà sur la ligne de référence juste en dessous.
-      ecrire(doc, j.source === 'drive' ? 'Drive' : 'Local', MARGE_DROITE, y, { align: 'right' });
+      // Pas de flèche « lien externe » ici : un PDF imprimé n'est pas cliquable, et la référence
+      // complète figure déjà sur la ligne juste en dessous.
+      ecrire(doc, j.source === 'serveur' ? 'Serveur' : 'Local', MARGE_DROITE, y, { align: 'right' });
       y += 5;
       doc.setFontSize(7);
       doc.setTextColor(120);

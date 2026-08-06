@@ -957,6 +957,7 @@ export default function App() {
             config={franceTravailConfig}
             dateDuJour={dateDuJour}
             onExporterSauvegarde={exporter}
+            session={session}
           />
         )}
 

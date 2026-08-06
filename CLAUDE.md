@@ -95,33 +95,47 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 
 ## État actuel
 
-> **Repère au 05/08/2026, session (8, toujours en cours) — PHASE 5 TERMINÉE ET SOLDÉE, PHASE 6 EN
-> COURS (commits 1 à 5 faits et commités). Un chantier hors plan s'est intercalé et vient d'être codé :
-> LE COMPTE EST DÉSORMAIS OBLIGATOIRE — PAS ENCORE COMMITÉ, en revue avec Benoît.**
-> **1046 tests verts** (91 fichiers), `tsc -b` propre, `npm run build` propre — y compris ce
-> chantier non commité (voir juste en dessous). Vérifié en conditions réelles (`npm run dev`,
-> localhost:5173, vrai projet Supabase) : le mur s'affiche, formulaire lien magique/mot de passe
-> fonctionnels à l'écran. ⚠️ Le login/inscription bout en bout (avec un vrai compte) reste à faire par
-> Benoît — je n'ai pas accès à sa boîte mail pour confirmer un lien magique ou une confirmation
-> d'inscription.
+> **Repère au 05/08/2026, session (8, toujours en cours) — PHASE 5 TERMINÉE ET SOLDÉE ; COMPTE
+> OBLIGATOIRE FAIT ET COMMITÉ (`1c685e6`, hors plan initial) ; PHASE 6 EN COURS : commits 1 à 5
+> commités, COMMIT 6 (frais réels — bascule Supabase Storage + retrait complet de Google Drive)
+> CODÉ ET TESTÉ, PAS ENCORE COMMITÉ (en revue avec Benoît).**
+> **1042 tests verts** (86 fichiers), `tsc -b` propre, `npm run build` propre — y compris le commit 6
+> non commité (voir juste en dessous).
 >
-> 🟡 **COMPTE OBLIGATOIRE (05/08/2026) — CODÉ, TESTÉ, PAS ENCORE COMMITÉ.** Décidé par Benoît en
-> pleine revue du commit 6, en dehors du plan de la phase 6 : plus AUCUN usage de Cadence sans compte,
-> dès le premier lancement. Plan complet : `C:\Users\benoi\.claude\plans\fluttering-beaming-summit.md`.
-> Ce que ça fait : nouveau `components/EcranConnexionObligatoire.tsx` (mur plein écran, réutilise
-> `auth/actions.ts` — aucune logique dupliquée), branché dans `App.tsx` tout en amont du rendu (avant
-> même l'écran de récupération de données illisibles) ; `Compte.tsx` simplifié (ne gère plus que la
-> session déjà connectée, reçue en prop — les autres branches ont migré vers le mur) ; `useSession`
-> n'est plus appelé qu'à un seul endroit (`App.tsx`). ⚠️ **Fragilité nouvelle et assumée** : si
+> ✅ **COMPTE OBLIGATOIRE (05/08/2026) — COMMITÉ (`1c685e6`).** Décidé par Benoît en pleine revue du
+> commit 6, en dehors du plan de la phase 6 : plus AUCUN usage de Cadence sans compte, dès le premier
+> lancement. Plan complet : `C:\Users\benoi\.claude\plans\fluttering-beaming-summit.md`. Nouveau
+> `components/EcranConnexionObligatoire.tsx` (mur plein écran, réutilise `auth/actions.ts`), branché
+> dans `App.tsx` tout en amont du rendu ; `Compte.tsx` simplifié (session déjà connectée reçue en
+> prop) ; `useSession` n'est plus appelé qu'à `App.tsx`. ⚠️ **Fragilité nouvelle et assumée** : si
 > `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY` venaient à manquer en production, PERSONNE ne pourrait
-> plus ouvrir Cadence (avant, ce cas retombait sur le localStorage). Le mur le dit comme une panne, pas
-> comme un mode dégradé. ⚠️ **Bug trouvé et corrigé en cours de route** : `ecritureAutorisee` (App.tsx)
-> incluait encore `localSeul`, qui écrivait dans le navigateur MÊME QUAND le mur était affiché (les
-> `useEffect` de chargement/sauvegarde sont déclarés avant le `return` du mur — React les exécute quand
-> même). Rétréci à `statut === "active"` seul, prouvé par
-> `App.connexionNonConfiguree.test.tsx`. **Hors périmètre, signalé mais pas construit** : consentement
-> horodaté aux mentions légales à l'inscription (déjà repéré comme « arbitrage 6 » en phase 6) ;
-> intégration calendrier (mentionnée en passant par Benoît, notée pour plus tard, sans rapport).
+> plus ouvrir Cadence. Bug trouvé et corrigé en cours de route : `ecritureAutorisee` incluait encore
+> `localSeul`, qui écrivait dans le navigateur MÊME QUAND le mur était affiché — rétréci à
+> `statut === "active"` seul. **Vérifié en conditions réelles** (`npm run dev`, vrai projet Supabase) :
+> connexion réussie avec le compte de test `testa-cadence@cadence.fr`, mur cédant bien la place à
+> l'app. **Hors périmètre, signalé mais pas construit** : consentement horodaté aux mentions légales à
+> l'inscription (« arbitrage 6 ») ; intégration calendrier (notée pour plus tard, sans rapport).
+>
+> 🟡 **COMMIT 6 DE LA PHASE 6 (frais réels, `05/08/2026`) — CODÉ, TESTÉ, PAS ENCORE COMMITÉ.** Le
+> compte étant désormais obligatoire, la question « que se passe-t-il sans session ? » qui bloquait ce
+> commit avant la parenthèse ci-dessus ne se pose plus : `DepenseForm`/`JustificatifsEnAttente` ne
+> sont jamais atteints sans être connecté, donc `documentId` (Supabase Storage) est la SEULE
+> destination désormais, sans repli local à maintenir. Ce que ça fait : `Depense.documentId` remplace
+> `justificatifData`/`driveFileId`/`driveWebViewLink` en écriture (schéma de LECTURE élargi, jamais
+> durci — une dépense enregistrée avant ce commit reste lisible et son justificatif reste « fourni » :
+> `DepenseForm.tsx`, `storage/fraisReelsStorage.ts`) ; nouveau `remplacerDocument`/`supprimerDocument`/
+> `obtenirDocument` dans `storage/documentsStorage.ts` (le remplacement d'un justificatif insère le
+> nouveau AVANT de retirer l'ancien, jamais l'inverse — RLS `documents_supprimer` et
+> `justificatifs_supprimer` déjà en place depuis la migration 0001, rien à ajouter en SQL) ; lien
+> « Voir » d'un justificatif (`DepensesList.tsx`) capable de résoudre une URL signée à la demande pour
+> le nouveau cas (`lib/justificatifAffichage.ts`, type `"signe"`) ; `JustificatifsEnAttente`/
+> `lib/envoiJustificatifsEnAttente.ts` reciblés sur un `Uploader` générique (Supabase, plus Drive).
+> Suppression complète de `lib/googleDriveAuth.ts`, `lib/googleDriveStorage.ts`,
+> `components/fraisReels/DriveSettings.tsx` + leurs 3 tests, et de `ConfigFraisReels.stockageJustificatifs`/
+> `driveConnecte`. **Signalé, PAS corrigé (hors périmètre de ce commit)** : `public/confidentialite.html`
+> (page légale orpheline, non liée depuis l'app — `content/mentionsLegales.ts` est le texte réellement
+> utilisé) mentionne encore une connexion Google Drive optionnelle, désormais fausse ; à traiter avec
+> Benoît avant toute publication de cette page.
 >
 > **Une fois ce commit validé et committé : reprendre le commit 6 de la phase 6** (frais réels —
 > bascule sur le canal unique Supabase Storage + retrait complet de Google Drive), inchangé dans son
@@ -557,20 +571,20 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 > 1000 tests verts (81 fichiers), `tsc -b` propre, `npm run build` propre. Texte relu à l'écran par
 > Benoît avant validation (modale ouverte en conditions réelles, localhost:5185).
 >
-> ### ▶ PROCHAINE ACTION — valider le commit 5, puis enchaîner les commits 6 à 8
+> ### ▶ PROCHAINE ACTION — valider le commit 6, puis enchaîner les commits 7 et 8
 >
-> **D'abord : montrer le diff du commit 5 à Benoît (dans le nouveau fil), attendre son « oui »,
-> committer, confirmer le hash.** Ne rien committer d'autre avant ça — c'est sa règle (revue avant
-> commit, cf. mémoire `cadence_revue_avant_commit`).
+> **D'abord : montrer le diff du commit 6 à Benoît, attendre son « oui », committer, confirmer le
+> hash.** Ne rien committer d'autre avant ça — c'est sa règle (revue avant commit, cf. mémoire
+> `cadence_revue_avant_commit`). Les commits 1 à 5 sont déjà faits ; le compte obligatoire
+> (`1c685e6`), codé pendant la revue du commit 6, est déjà commité aussi.
+>
+> **Commit 6 — frais réels : bascule sur le canal unique + retrait complet de Drive — FAIT, CODÉ ET
+> TESTÉ, EN ATTENTE DU FEU VERT.** L'audit préalable (05/08/2026) avait confirmé : **aucune dépense
+> réelle n'a de justificatif SEULEMENT sur Drive** (jamais exercé en vrai) — le retrait était donc sûr,
+> sans migration de données à faire. Détail de ce qui a été fait : voir le paragraphe dédié dans
+> « État actuel » plus haut.
 >
 > **Ensuite, dans l'ordre du plan** (`C:\Users\benoi\.claude\plans\humming-wandering-kite.md`) :
-> - **Commit 6 — frais réels : bascule sur le canal unique + retrait complet de Drive.** Précédé
->   d'un audit déjà fait avec Benoît (05/08/2026) : **aucune dépense réelle n'a de justificatif
->   SEULEMENT sur Drive** (jamais exercé en vrai) — le retrait est donc sûr, sans migration de
->   données à faire. `Depense.documentId` remplace `justificatifData`/`driveFileId`/
->   `driveWebViewLink` en écriture (schéma de LECTURE élargi, jamais durci). Suppression complète de
->   `lib/googleDriveAuth.ts`, `lib/googleDriveStorage.ts`, `components/fraisReels/DriveSettings.tsx`
->   + leurs tests. Ne PAS scinder ce commit (retrait Drive / bascule) — le plan explique pourquoi.
 > - **Commit 7 — biens amortis : upload réel.** `BienAmorti.justificatifId` → `documentId`.
 >   Décision déjà validée avec Benoît (05/08/2026, avec la vraie justification cette fois — pas une
 >   supposition) : **`categorie_frais` toujours `'C7'`**, parce que « Biens amortis » dans Cadence

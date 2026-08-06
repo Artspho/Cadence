@@ -19,9 +19,15 @@ export interface Depense {
   montantDeductible: number; // calculé : (montantTotal - remboursementEmployeur) × partPro
   statutJustificatif: StatutJustificatif;
   justificatifNom?: string; // nom du fichier uploadé
-  // Stockage localStorage (mode défaut) :
-  justificatifData?: string; // base64
-  // Stockage Google Drive (mode optionnel, chantier séparé) — exclusif de justificatifData :
+  // Référence Supabase Storage (table `documents`, phase 6 commit 6) — la SEULE destination écrite
+  // pour un nouveau justificatif ou un remplacement, cf. `storage/documentsStorage.ts::remplacerDocument`.
+  documentId?: string;
+  // ⚠️ CHAMPS LECTURE SEULE, plus jamais écrits depuis le commit 6 — conservés pour ne PAS perdre la
+  // référence d'un justificatif déposé avant la bascule (schéma de lecture élargi, jamais durci, cf.
+  // [[cadence_schema_lecture_ecriture]]). `driveFileId`/`driveWebViewLink` : ancien stockage Google
+  // Drive, module retiré (aucune dépense réelle n'en portait un sans copie locale, audité le
+  // 05/08/2026 avant ce retrait). `justificatifData` : ancien stockage localStorage (base64).
+  justificatifData?: string;
   driveFileId?: string;
   driveWebViewLink?: string;
   notes?: string;
@@ -68,11 +74,6 @@ export interface ConfigFraisReels {
   // décision actée avec l'utilisateur le 2026-07-26 : « sans justificatifs suffisamment précis »
   // est une ALTERNATIVE aux dépenses réelles, pas un ajout.
   nombreRepasC3?: number;
-  // Étape 3 (Google Drive, optionnel) : mode de stockage des justificatifs à la création d'une
-  // nouvelle dépense. Absent = 'local' (comportement historique, aucune migration des dépenses
-  // déjà stockées en base64). N'affecte jamais les dépenses existantes, seulement les nouvelles.
-  stockageJustificatifs?: "local" | "drive";
-  driveConnecte?: boolean;
   // C1/C2 barème kilométrique (Q2/Q3, cf. engine/fraisReels/calculerFraisKilometriques.ts) —
   // saisies utilisateur uniquement (jamais de montant recalculé stocké ici) ; chaque bloc absent
   // (utilisateur n'a saisi que l'un des deux, ou aucun) reste `undefined`, jamais un objet à zéro.
