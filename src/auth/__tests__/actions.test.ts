@@ -1,10 +1,16 @@
-// Phase 2 de la refonte Supabase — les quatre gestes, et surtout ce qu'ils AFFIRMENT.
+// Phase 2 de la refonte Supabase — les gestes d'authentification, et surtout ce qu'ils AFFIRMENT.
 //
 // Devoir n°2 appliqué à l'authentification : ne jamais annoncer un succès que Supabase n'a pas
 // confirmé, et ne jamais remplacer une erreur par un message vague qui ferait chercher un bug là où
 // il n'y en a pas.
+//
+// ⚠️ `demanderLienMagique` A ÉTÉ SUPPRIMÉ le 06/08/2026 (demande de Benoît) et ses tests avec lui :
+// une connexion sans mot de passe était un doublon du chemin mot de passe, et elle portait seule la
+// contrainte du même navigateur. Ce sont désormais les tests de
+// `demanderReinitialisationMotDePasse` qui occupent cette place — même intention testée (ne rien
+// promettre qu'on ne sait pas, dire la contrainte AVANT l'envoi), sur le geste qui subsiste.
 import { describe, expect, it, vi } from "vitest";
-import { connexionMotDePasse, creerCompte, definirMotDePasse, demanderLienMagique, messageErreur, seDeconnecter } from "../actions";
+import { MARQUEUR_REINITIALISATION, connexionMotDePasse, creerCompte, definirMotDePasse, demanderReinitialisationMotDePasse, messageErreur, seDeconnecter } from "../actions";
 import type { ClientAuth, ErreurAuth, SessionMinimale } from "../supabaseClient";
 import { VERSION_POLITIQUE } from "../../content/mentionsLegales";
 import { CLE_METADONNEE_CONSENTEMENT } from "../../storage/consentementStorage";
@@ -17,7 +23,7 @@ function fauxClient(reponses: Partial<ClientAuth> = {}): ClientAuth {
   return {
     getSession: vi.fn(async () => ({ data: { session: null }, error: null })),
     onAuthStateChange: vi.fn(() => ({ data: { subscription: { unsubscribe: vi.fn() } } })),
-    signInWithOtp: vi.fn(async () => ({ error: null })),
+    resetPasswordForEmail: vi.fn(async () => ({ error: null })),
     signInWithPassword: vi.fn(async () => ({ data: { session: SESSION }, error: null })),
     signUp: vi.fn(async () => ({ data: { session: null }, error: null })),
     signOut: vi.fn(async () => ({ error: null })),
@@ -53,6 +59,30 @@ describe("messageErreur — expliquer la cause réelle, sans effacer le texte d'
     expect(messageErreur(erreur("User already registered"))).toMatch(/existe déjà/i);
   });
 
+  it("sur une adresse non confirmée, DIT QUOI FAIRE — devenu le cas central du parcours (06/08/2026)", () => {
+    // Avec le lien magique supprimé, c'est l'obstacle n°1 d'un premier lancement : le compte est créé
+    // mais la première connexion échoue. Un message qui se contente de constater laisserait
+    // l'utilisateur bloqué sans savoir que le lien attend dans sa boîte.
+    const message = messageErreur(erreur("Email not confirmed"));
+    expect(message).toMatch(/e-mail de confirmation/i);
+    expect(message).toMatch(/reviens te connecter/i);
+    // Et il dit la bonne contrainte : CE lien-là ne demande pas le même navigateur, contrairement à
+    // celui de réinitialisation. Confondre les deux a coûté une session entière.
+    expect(message).toMatch(/n'importe quel appareil/i);
+  });
+
+  it("AUCUN message ne parle plus de lien magique — il n'existe plus", () => {
+    // Garde-fou de vocabulaire : un message qui renverrait vers un chemin supprimé enverrait
+    // l'utilisateur chercher un bouton absent de l'écran.
+    const messages = [
+      messageErreur(erreur("Email not confirmed")),
+      messageErreur(erreur("User already registered")),
+      messageErreur(erreur("Invalid login credentials")),
+      messageErreur(erreur("Email address not authorized")),
+    ];
+    for (const message of messages) expect(message).not.toMatch(/lien magique/i);
+  });
+
   it("rend TEL QUEL un message qu'il ne reconnaît pas", () => {
     // Un « une erreur est survenue » ferait perdre des heures. Le texte brut, même en anglais, dit
     // au moins la vérité.
@@ -61,54 +91,44 @@ describe("messageErreur — expliquer la cause réelle, sans effacer le texte d'
   });
 });
 
-describe("demanderLienMagique", () => {
-  it("refuse une adresse incomplète SANS appeler Supabase", () => {
+describe("demanderReinitialisationMotDePasse (06/08/2026)", () => {
+  it("refuse une adresse incomplète SANS appeler Supabase", async () => {
     // Important : le service par défaut est plafonné à 2 messages par heure. Consommer un envoi pour
     // une adresse manifestement incomplète gâcherait la moitié du quota horaire.
     const client = fauxClient();
-    return demanderLienMagique(client, "benoit", ORIGINE).then((resultat) => {
-      expect(resultat).toEqual({ ok: false, message: "Adresse e-mail incomplète." });
-      expect(client.signInWithOtp).not.toHaveBeenCalled();
-    });
+    expect(await demanderReinitialisationMotDePasse(client, "benoit", ORIGINE)).toEqual({ ok: false, message: "Adresse e-mail incomplète." });
+    expect(client.resetPasswordForEmail).not.toHaveBeenCalled();
   });
 
-  it("transmet l'origine de retour telle quelle", async () => {
+  it("POSE LE MARQUEUR DE RETOUR, sinon la réinitialisation ne réinitialise rien", async () => {
+    // LE test qui garde le défaut le plus vicieux de ce parcours : le lien ouvre une SESSION. Sans ce
+    // marqueur dans l'URL de retour, App.tsx rendrait le tableau de bord et l'utilisateur repartirait
+    // avec le mot de passe qu'il vient justement de déclarer oublié, sans un mot d'explication.
     const client = fauxClient();
-    await demanderLienMagique(client, "  benoit@example.com  ", ORIGINE);
-    expect(client.signInWithOtp).toHaveBeenCalledWith({ email: "benoit@example.com", options: { emailRedirectTo: ORIGINE, shouldCreateUser: false } });
+    await demanderReinitialisationMotDePasse(client, "  benoit@example.com  ", ORIGINE);
+    expect(client.resetPasswordForEmail).toHaveBeenCalledWith("benoit@example.com", { redirectTo: `${ORIGINE}?${MARQUEUR_REINITIALISATION}=1` });
   });
 
-  it("NE CRÉE JAMAIS DE COMPTE (shouldCreateUser: false) — sinon inscription sans case ni preuve", async () => {
-    // Le défaut de Supabase est `true`. Sans ce paramètre explicite, ce bouton devenait la porte
-    // d'inscription la plus utilisée, sans consentement recueilli ni conservé (06/08/2026).
+  it("enchaîne le marqueur avec & quand l'origine porte déjà une requête", async () => {
     const client = fauxClient();
-    await demanderLienMagique(client, "inconnu@example.com", ORIGINE);
-    const parametres = vi.mocked(client.signInWithOtp).mock.calls[0][0];
-    expect(parametres.options?.shouldCreateUser).toBe(false);
+    await demanderReinitialisationMotDePasse(client, "benoit@example.com", "https://exemple.fr/?deja=1");
+    expect(client.resetPasswordForEmail).toHaveBeenCalledWith("benoit@example.com", { redirectTo: `https://exemple.fr/?deja=1&${MARQUEUR_REINITIALISATION}=1` });
   });
 
-  it("traduit le refus d'une adresse sans compte en indiquant où créer le compte", async () => {
-    // Conséquence directe de `shouldCreateUser: false` : Supabase refuse au lieu de créer en silence.
-    const client = fauxClient({ signInWithOtp: vi.fn(async () => ({ error: erreur("Signups not allowed for otp") })) });
-    const resultat = await demanderLienMagique(client, "inconnu@example.com", ORIGINE);
-    expect(resultat.ok).toBe(false);
-    expect(resultat.message).toMatch(/aucun compte n'existe pour cette adresse/i);
-    expect(resultat.message).toMatch(/créer un compte/i);
-  });
-
-  it("annonce une demande ACCEPTÉE, pas un e-mail arrivé, et prévient pour le navigateur", async () => {
-    // Le service par défaut est « best-effort », sans garantie de livraison : « e-mail envoyé »
-    // serait une affirmation que Supabase ne fait pas. Et le lien PKCE ne fonctionne que dans le
-    // navigateur qui l'a demandé — le taire produirait un échec incompréhensible.
-    const resultat = await demanderLienMagique(fauxClient(), "benoit@example.com", ORIGINE);
+  it("N'AFFIRME PAS qu'un e-mail est parti, et dit la contrainte du navigateur AVANT l'envoi", async () => {
+    // Supabase répond la même chose pour une adresse connue et une inconnue (pour qu'on ne puisse pas
+    // découvrir qui a un compte) : « un e-mail t'a été envoyé » serait une affirmation sans support.
+    // Et ce lien-ci, contrairement à celui de confirmation d'adresse, ouvre une session : il exige le
+    // même navigateur. Le taire produirait un échec incompréhensible — la leçon du 04/08/2026.
+    const resultat = await demanderReinitialisationMotDePasse(fauxClient(), "benoit@example.com", ORIGINE);
     expect(resultat.ok).toBe(true);
-    expect(resultat.message).toMatch(/si l'adresse correspond/i);
-    expect(resultat.message).toMatch(/CE navigateur/);
+    expect(resultat.message).toMatch(/si un compte existe/i);
+    expect(resultat.message).toMatch(/DEPUIS CE NAVIGATEUR/);
   });
 
-  it("remonte l'erreur de Supabase", async () => {
-    const client = fauxClient({ signInWithOtp: vi.fn(async () => ({ error: erreur("Email address not authorized") })) });
-    const resultat = await demanderLienMagique(client, "testeur@example.com", ORIGINE);
+  it("remonte l'erreur de Supabase en expliquant la vraie cause", async () => {
+    const client = fauxClient({ resetPasswordForEmail: vi.fn(async () => ({ error: erreur("Email address not authorized") })) });
+    const resultat = await demanderReinitialisationMotDePasse(client, "testeur@example.com", ORIGINE);
     expect(resultat.ok).toBe(false);
     expect(resultat.message).toMatch(/membres de l'organisation/i);
   });

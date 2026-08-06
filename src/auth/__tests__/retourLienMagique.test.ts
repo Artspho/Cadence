@@ -3,11 +3,12 @@
 // aucun mot à l'écran pour le dire. Ces tests décrivent ce qu'il faut savoir reconnaître dans l'URL.
 import { describe, expect, it } from "vitest";
 import { lireIndiceRetour } from "../retourLienMagique";
+import { MARQUEUR_REINITIALISATION } from "../actions";
 
-describe("lireIndiceRetour — reconnaître une page ouverte par un lien de connexion", () => {
+describe("lireIndiceRetour — reconnaître une page ouverte par un lien reçu par e-mail", () => {
   it("ne voit aucun indice sur une URL ordinaire", () => {
-    expect(lireIndiceRetour("", "")).toEqual({ present: false, erreurTransmise: null });
-    expect(lireIndiceRetour("?maj=BOHKJEhc", "#profil")).toEqual({ present: false, erreurTransmise: null });
+    expect(lireIndiceRetour("", "")).toEqual({ present: false, erreurTransmise: null, reinitialisation: false });
+    expect(lireIndiceRetour("?maj=BOHKJEhc", "#profil")).toEqual({ present: false, erreurTransmise: null, reinitialisation: false });
   });
 
   it("reconnaît le code du flux PKCE dans la chaîne de requête", () => {
@@ -15,6 +16,7 @@ describe("lireIndiceRetour — reconnaître une page ouverte par un lien de conn
     expect(lireIndiceRetour("?code=8f3c1a2b-dead-beef-0000-1234567890ab", "")).toEqual({
       present: true,
       erreurTransmise: null,
+      reinitialisation: false,
     });
   });
 
@@ -57,5 +59,39 @@ describe("lireIndiceRetour — reconnaître une page ouverte par un lien de conn
     const indice = lireIndiceRetour("?code=abc", "");
     expect(indice.present).toBe(true);
     expect(indice.erreurTransmise).toBeNull();
+  });
+});
+
+describe("lireIndiceRetour — le marqueur de réinitialisation (06/08/2026)", () => {
+  it("reconnaît le retour du lien de réinitialisation", () => {
+    expect(lireIndiceRetour(`?${MARQUEUR_REINITIALISATION}=1`, "").reinitialisation).toBe(true);
+  });
+
+  it("LE VOIT MÊME QUAND L'ÉCHANGE A RÉUSSI, donc sans `code` dans l'URL — le cas normal", () => {
+    // ⚠️ LE TEST QUI GARDE LE BUG LE PLUS FACILE À ÉCRIRE ICI. Sur un retour RÉUSSI, la bibliothèque a
+    // déjà consommé et nettoyé le `code` : `present` vaut donc `false`. Une version qui rendrait
+    // « aucun indice » dans ce cas (parce que `present` est faux) ferait taire l'écran de nouveau mot de
+    // passe précisément quand il doit s'afficher — et le parcours « mot de passe oublié » ne
+    // réinitialiserait plus rien, en silence.
+    const indice = lireIndiceRetour(`?${MARQUEUR_REINITIALISATION}=1`, "");
+    expect(indice.present).toBe(false);
+    expect(indice.reinitialisation).toBe(true);
+  });
+
+  it("le voit aussi en compagnie du code, et n'écrase pas les autres informations", () => {
+    const indice = lireIndiceRetour(`?code=abc&${MARQUEUR_REINITIALISATION}=1`, "");
+    expect(indice).toEqual({ present: true, erreurTransmise: null, reinitialisation: true });
+  });
+
+  it("le voit avec un refus transmis, sans perdre le motif", () => {
+    // Cas réel : lien de réinitialisation périmé. Il faut À LA FOIS savoir que c'était une
+    // réinitialisation et pouvoir citer le motif de Supabase.
+    const indice = lireIndiceRetour(`?${MARQUEUR_REINITIALISATION}=1&error_description=Email+link+is+invalid`, "");
+    expect(indice.reinitialisation).toBe(true);
+    expect(indice.erreurTransmise).toBe("Email link is invalid");
+  });
+
+  it("ne le confond pas avec une URL ordinaire qui parlerait d'autre chose", () => {
+    expect(lireIndiceRetour("?onglet=reinitialiser", "").reinitialisation).toBe(false);
   });
 });

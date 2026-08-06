@@ -31,13 +31,23 @@ export interface ClientAuth {
   onAuthStateChange(rappel: (evenement: string, session: SessionMinimale | null) => void): {
     data: { subscription: { unsubscribe: () => void } };
   };
-  /**
-   * `shouldCreateUser` est exposé EXPRÈS : Cadence le met à `false` (06/08/2026) pour que le lien
-   * par e-mail soit une pure CONNEXION. Sans lui, le défaut de Supabase est `true` et ce bouton
-   * créerait des comptes — donc une inscription sans case de consentement cochée ni preuve conservée.
-   */
-  signInWithOtp(parametres: { email: string; options?: { emailRedirectTo?: string; shouldCreateUser?: boolean } }): Promise<{ error: ErreurAuth | null }>;
   signInWithPassword(parametres: { email: string; password: string }): Promise<{ data: { session: SessionMinimale | null }; error: ErreurAuth | null }>;
+  /**
+   * Demande l'e-mail de réinitialisation du mot de passe.
+   *
+   * ⚠️ `signInWithOtp` A ÉTÉ RETIRÉ DE CETTE SURFACE LE 06/08/2026 — ne pas le rétablir sans demander.
+   * Le lien magique (une connexion SANS mot de passe) a été supprimé sur décision de Benoît : il
+   * n'apportait rien dès lors qu'un mot de passe existe, et il portait à lui seul la contrainte la
+   * plus pénible du projet (ouvrir le lien dans le navigateur qui l'a demandé, cf. `flowType: "pkce"`
+   * plus bas). Le retirer du TYPE et pas seulement de l'interface est délibéré : tant qu'il figurait
+   * ici, un futur appelant pouvait le rappeler en croyant le chemin encore soutenu.
+   *
+   * Ce qui subsiste par e-mail, et qui n'est PAS un lien magique : la confirmation d'adresse (émise
+   * par `signUp`, elle ne fait que prouver l'adresse) et cette réinitialisation-ci. Cette dernière,
+   * elle, ouvre bien une session de récupération — donc elle garde la contrainte PKCE du même
+   * navigateur, et l'interface le dit.
+   */
+  resetPasswordForEmail(email: string, options?: { redirectTo?: string }): Promise<{ error: ErreurAuth | null }>;
   /**
    * `options.data` alimente `raw_user_meta_data`, écrit par Supabase AU MOMENT MÊME de la création du
    * compte. C'est le seul endroit où le consentement peut voyager : à cet instant aucune session
@@ -49,7 +59,11 @@ export interface ClientAuth {
     options?: { emailRedirectTo?: string; data?: Record<string, unknown> };
   }): Promise<{ data: { session: SessionMinimale | null }; error: ErreurAuth | null }>;
   signOut(): Promise<{ error: ErreurAuth | null }>;
-  /** Définit ou change le mot de passe d'une session déjà ouverte (lien magique ou mot de passe). */
+  /**
+   * Définit ou change le mot de passe d'une session déjà ouverte. Deux appelants : « Mon profil » →
+   * Compte, et l'écran de retour du lien de réinitialisation (où la session vient d'être ouverte par
+   * le lien lui-même — c'est ce qui rend la réinitialisation possible sans connaître l'ancien).
+   */
   updateUser(attributs: { password: string }): Promise<{ error: ErreurAuth | null }>;
   /**
    * Lit l'utilisateur de la session en cours, métadonnées comprises — la seule façon de retrouver le
@@ -310,15 +324,21 @@ export function construireClient(configuration: ConfigurationSupabase): ClientCa
         // rafraîchissement écrit à la main est précisément ce qui déconnecte les gens en silence.
         persistSession: true,
         autoRefreshToken: true,
-        // Le lien magique renvoie sur l'app avec un code dans l'URL ; c'est la bibliothèque qui
-        // l'échange contre une session.
+        // Un lien reçu par e-mail renvoie sur l'app avec un code dans l'URL ; c'est la bibliothèque
+        // qui l'échange contre une session. Concerne désormais le lien de RÉINITIALISATION (le lien
+        // magique n'existe plus depuis le 06/08/2026) ; le lien de confirmation d'adresse, lui, fait
+        // son travail côté serveur même si cet échange échoue.
         detectSessionInUrl: true,
         // PKCE plutôt que le mode implicite : le jeton ne transite pas dans l'URL (donc ni dans
         // l'historique du navigateur ni dans les journaux d'un intermédiaire).
-        // ⚠️ CONTREPARTIE ASSUMÉE, à dire à l'utilisateur dans l'interface et non à cacher : le lien
-        // magique doit être ouvert DANS LE MÊME NAVIGATEUR que celui qui l'a demandé, parce que le
-        // vérificateur PKCE y est stocké. Ouvert ailleurs, l'échec est explicite — alors que le mode
-        // implicite aurait « marché » depuis n'importe où, en laissant le jeton dans l'URL.
+        // ⚠️ CONTREPARTIE ASSUMÉE, à dire à l'utilisateur dans l'interface et non à cacher : un lien
+        // qui doit OUVRIR UNE SESSION doit être ouvert DANS LE MÊME NAVIGATEUR que celui qui l'a
+        // demandé, parce que le vérificateur PKCE y est stocké. Ouvert ailleurs, l'échec est explicite
+        // — alors que le mode implicite aurait « marché » depuis n'importe où, en laissant le jeton
+        // dans l'URL.
+        // ⚠️ NE VAUT PLUS QUE POUR LA RÉINITIALISATION. C'est la contrainte qui a fait supprimer le
+        // lien magique, et elle ne touche plus le parcours quotidien : créer un compte et se connecter
+        // se font au mot de passe, sans lien, depuis n'importe quel appareil.
         flowType: "pkce",
       },
     });

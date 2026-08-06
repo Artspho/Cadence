@@ -165,10 +165,14 @@ export function Compte({
 
       <div className="border-t border-line pt-3">
         <label className={CLASSE_ETIQUETTE} htmlFor="compte-nouveau-mot-de-passe">
-          Définir un mot de passe
+          Changer de mot de passe
         </label>
+        {/* ⚠️ Ce texte disait « pour te connecter aussi sans lien magique » — devenu faux le
+            06/08/2026, le lien magique n'existe plus (cf. EcranConnexionObligatoire.tsx). C'est
+            désormais le seul moyen de connexion, donc la formulation ne peut plus le présenter comme un
+            complément. */}
         <p className="text-xs text-faint leading-relaxed mb-2">
-          Pour te connecter aussi sans lien magique, par exemple depuis un autre appareil.
+          C'est avec ce mot de passe que tu te connectes à Cadence, depuis n'importe quel appareil. Le changer ici prend effet immédiatement.
         </p>
         <div className="flex gap-2">
           <input
@@ -179,11 +183,17 @@ export function Compte({
             onChange={(e) => setNouveauMotDePasse(e.target.value)}
             className="flex-1 w-full bg-surface-2 border border-line rounded-lg px-3 py-2"
           />
+          {/* ⚠️ FOND PLEIN, PAS UN BOUTON GRIS — MÊME CORRECTIF QUE LE MUR (06/08/2026). Ce bouton
+              portait `text-muted` sur fond transparent, exactement le style qui a fait conclure à Benoît
+              que « Créer un compte » était grisé alors qu'il était actif. Or c'est ce bouton-ci qui sert
+              à se donner un mot de passe : le laisser illisible ici, c'est reproduire le même blocage à
+              l'endroit qui permet d'en sortir. Cf. `CadrePleinEcran.tsx` pour la règle. Classe locale
+              plutôt qu'importée : celui-ci est en ligne à côté d'un champ, pas en pleine largeur. */}
           <button
             type="button"
             onClick={() => lancer((c) => definirMotDePasse(c, nouveauMotDePasse))}
             disabled={enCours}
-            className="px-4 rounded-lg border border-line text-muted disabled:opacity-40"
+            className="px-4 rounded-lg bg-mint text-bg font-medium disabled:opacity-30 disabled:grayscale disabled:cursor-not-allowed"
           >
             {enCours ? "…" : "Enregistrer"}
           </button>

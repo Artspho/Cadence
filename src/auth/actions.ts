@@ -3,8 +3,16 @@ import { VERSION_POLITIQUE } from "../content/mentionsLegales";
 import { metadonneeConsentement } from "../storage/consentementStorage";
 
 /**
- * Les quatre gestes possibles : demander un lien magique, se connecter par mot de passe, créer un
- * compte, se déconnecter.
+ * Les cinq gestes possibles : se connecter par mot de passe, créer un compte, demander la
+ * réinitialisation du mot de passe, définir un mot de passe sur une session ouverte, se déconnecter.
+ *
+ * ⚠️ `demanderLienMagique` A ÉTÉ SUPPRIMÉ LE 06/08/2026, SUR DEMANDE DE BENOÎT — ne pas le
+ * rétablir sans lui demander. Motif, dans ses mots : le lien magique « ne sert à rien et me gonfle ».
+ * Il avait raison sur le fond : c'était une connexion SANS mot de passe, donc un doublon du chemin
+ * mot de passe, et il portait seul la contrainte du même navigateur (PKCE). Le parcours retenu est le
+ * standard : créer un compte (adresse + mot de passe) → confirmer l'adresse par e-mail → se
+ * connecter avec adresse + mot de passe → « mot de passe oublié » en secours.
+ * `signInWithOtp` a été retiré de `ClientAuth` en même temps, exprès (cf. auth/supabaseClient.ts).
  *
  * RÈGLE DE CE FICHIER : aucune erreur n'est avalée, et aucun succès n'est inventé. Un message
  * inconnu de Supabase est affiché TEL QUEL plutôt que remplacé par un « une erreur est survenue »
@@ -50,21 +58,17 @@ export function messageErreur(erreur: ErreurAuth): string {
   if (repere.includes("invalid login credentials")) {
     return "Adresse e-mail ou mot de passe incorrect.";
   }
-  // Conséquence directe de `shouldCreateUser: false` (06/08/2026) : Supabase refuse d'envoyer un lien
-  // à une adresse sans compte, au lieu d'en créer un en silence. Sans cette traduction, « Signups not
-  // allowed for otp » enverrait chercher une panne là où il n'y a qu'un compte à créer.
-  if (repere.includes("signups not allowed") || repere.includes("otp_disabled")) {
+  // Ce cas devient CENTRAL avec le parcours du 06/08/2026 : l'adresse doit être confirmée par e-mail
+  // avant la première connexion. Le message dit donc quoi faire, et pas seulement ce qui bloque.
+  if (repere.includes("email not confirmed")) {
     return (
-      "Aucun compte n'existe pour cette adresse. Le lien par e-mail sert à se connecter, pas à " +
-      "s'inscrire : passe par « Mot de passe » puis « Créer un compte », où la politique de " +
-      "confidentialité t'est présentée."
+      "Ce compte existe, mais son adresse n'a pas encore été confirmée. Ouvre l'e-mail de " +
+      "confirmation reçu à la création du compte, clique sur son lien, puis reviens te connecter ici. " +
+      "Ce lien-là peut être ouvert depuis n'importe quel appareil, y compris ton téléphone."
     );
   }
-  if (repere.includes("email not confirmed")) {
-    return "Ce compte existe, mais son adresse n'a pas encore été confirmée par e-mail.";
-  }
   if (repere.includes("user already registered") || repere.includes("already been registered")) {
-    return "Un compte existe déjà pour cette adresse. Utilise « Se connecter » ou le lien magique.";
+    return "Un compte existe déjà pour cette adresse. Utilise « Se connecter », ou « Mot de passe oublié » si tu ne l'as plus.";
   }
   if (repere.includes("password should be at least")) {
     return `Mot de passe trop court : ${LONGUEUR_MINIMALE_MOT_DE_PASSE} caractères au minimum. (Message d'origine : ${brut})`;
@@ -81,33 +85,44 @@ function adresseValide(email: string): boolean {
 }
 
 /**
- * Demande un lien magique.
+ * Le paramètre que Cadence ajoute à l'URL de retour du lien de réinitialisation, pour SAVOIR au
+ * retour qu'il faut demander un nouveau mot de passe.
  *
- * `emailRedirectTo` vaut l'origine courante, donc le lien ramène là d'où il a été demandé — ce qui
- * respecte la règle d'origine canonique du projet (une URL de déploiement Vercel et l'URL de branche
- * sont deux stockages distincts).
+ * POURQUOI IL EST NÉCESSAIRE, et ce n'est pas un détail de confort : le lien de réinitialisation
+ * OUVRE UNE SESSION (c'est ce qui autorise `updateUser`). Sans ce marqueur, `App.tsx` verrait une
+ * session normale, rendrait le tableau de bord, et l'utilisateur ne serait JAMAIS invité à choisir un
+ * nouveau mot de passe — il repartirait avec l'ancien, celui qu'il a précisément oublié, sans
+ * comprendre pourquoi. Supabase ne garantit pas de transmettre `type=recovery` jusqu'à l'URL finale
+ * du flux PKCE ; ce marqueur-ci, lui, nous appartient.
+ */
+export const MARQUEUR_REINITIALISATION = "reinitialisation";
+
+/**
+ * Demande l'e-mail de réinitialisation du mot de passe (« mot de passe oublié »).
+ *
+ * `redirectTo` ramène sur l'origine courante, MARQUEUR COMPRIS — même règle d'origine canonique que
+ * le reste du projet (une URL de déploiement Vercel et l'URL de branche sont deux stockages
+ * distincts).
  * ⚠️ L'origine doit figurer dans Supabase > Authentication > URL Configuration, sinon le retour est
  * refusé.
+ *
+ * ⚠️ CE MESSAGE NE PROMET PAS QU'UN E-MAIL EXISTE POUR CETTE ADRESSE, et c'est délibéré : Supabase
+ * répond la même chose pour une adresse connue et une inconnue, pour qu'on ne puisse pas découvrir
+ * qui a un compte. Écrire « un e-mail t'a été envoyé » serait une affirmation que rien ne soutient.
  */
-export async function demanderLienMagique(client: ClientAuth, email: string, origine: string): Promise<ResultatAuth> {
+export async function demanderReinitialisationMotDePasse(client: ClientAuth, email: string, origine: string): Promise<ResultatAuth> {
   if (!adresseValide(email)) return { ok: false, message: "Adresse e-mail incomplète." };
 
-  // ⚠️ `shouldCreateUser: false` — DÉCISION DE BENOÎT DU 06/08/2026, NE PAS RETIRER. Sans lui, le
-  // défaut de Supabase est `true` : ce bouton créait des comptes, donc des inscriptions sans case de
-  // consentement cochée ni preuve conservée (cf. storage/consentementStorage.ts). Le lien par e-mail
-  // est désormais une pure CONNEXION ; la création de compte passe uniquement par le mot de passe,
-  // seul endroit où la case et la preuve existent. C'est aussi ce qui rend « une seule fois suffit »
-  // possible : plus aucune case n'est demandée pour se connecter.
-  const { error } = await client.signInWithOtp({ email: email.trim(), options: { emailRedirectTo: origine, shouldCreateUser: false } });
+  const separateur = origine.includes("?") ? "&" : "?";
+  const { error } = await client.resetPasswordForEmail(email.trim(), { redirectTo: `${origine}${separateur}${MARQUEUR_REINITIALISATION}=1` });
   if (error) return { ok: false, message: messageErreur(error) };
 
-  // Formulation prudente et exacte : Supabase confirme avoir ACCEPTÉ la demande, pas que le message
-  // soit arrivé (le service par défaut est « best-effort », sans garantie de livraison).
   return {
     ok: true,
     message:
-      "Demande envoyée. Si l'adresse correspond à un compte autorisé, un lien arrive par e-mail. " +
-      "Ouvre-le depuis CE navigateur : le lien ne peut pas ouvrir la session ailleurs.",
+      "Demande enregistrée. Si un compte existe pour cette adresse, un lien de réinitialisation " +
+      "arrive par e-mail. ⚠️ Celui-ci doit être ouvert DEPUIS CE NAVIGATEUR : il ouvre une session " +
+      "pour te laisser choisir un nouveau mot de passe, et la clé de cette session est ici.",
   };
 }
 
@@ -162,11 +177,15 @@ export async function creerCompte(client: ClientAuth, email: string, motDePasse:
 }
 
 /**
- * Définit un mot de passe sur une session déjà ouverte (typiquement arrivée par lien magique).
+ * Définit (ou change) le mot de passe d'une session déjà ouverte.
+ *
+ * Deux appelants, et c'est la même opération : la section « Compte » de « Mon profil » (changer son
+ * mot de passe quand on est connecté) et l'écran de retour du lien de réinitialisation
+ * (`EcranNouveauMotDePasse.tsx`), où la session vient d'être ouverte par le lien lui-même.
  *
  * Ne demande pas le mot de passe actuel : `updateUser` agit sur la session en cours, pas sur les
- * identifiants — c'est ce qui permet à quelqu'un connecté par lien magique de s'équiper d'un mot de
- * passe sans jamais en avoir eu un.
+ * identifiants — c'est exactement ce qui rend la réinitialisation possible pour quelqu'un qui, par
+ * définition, ne connaît plus son mot de passe.
  */
 export async function definirMotDePasse(client: ClientAuth, motDePasse: string): Promise<ResultatAuth> {
   if (motDePasse.length < LONGUEUR_MINIMALE_MOT_DE_PASSE) {
@@ -175,7 +194,7 @@ export async function definirMotDePasse(client: ClientAuth, motDePasse: string):
 
   const { error } = await client.updateUser({ password: motDePasse });
   if (error) return { ok: false, message: messageErreur(error) };
-  return { ok: true, message: "Mot de passe enregistré. Tu peux désormais te connecter avec, en plus du lien magique." };
+  return { ok: true, message: "Mot de passe enregistré. C'est celui-ci qu'il faudra utiliser pour te connecter désormais." };
 }
 
 export async function seDeconnecter(client: ClientAuth): Promise<ResultatAuth> {

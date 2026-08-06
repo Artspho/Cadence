@@ -69,7 +69,7 @@ vi.mock("../../auth/supabaseClient", async (importOriginal) => {
       faux.notifier = rappel;
       return { data: { subscription: { unsubscribe: () => {} } } };
     },
-    signInWithOtp: async () => ({ error: null }),
+    resetPasswordForEmail: async () => ({ error: null }),
     signInWithPassword: async () => ({ data: { session: null }, error: null }),
     signUp: async () => ({ data: { session: null }, error: null }),
     signOut: async () => ({ error: null }),

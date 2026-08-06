@@ -26,7 +26,7 @@ vi.mock("../../auth/supabaseClient", async (importOriginal) => {
   const auth = {
     getSession: async () => ({ data: { session: { user: { id: "u-42", email: "benoit@example.com" } } }, error: null }),
     onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
-    signInWithOtp: async () => ({ error: null }),
+    resetPasswordForEmail: async () => ({ error: null }),
     signInWithPassword: async () => ({ data: { session: null }, error: null }),
     signUp: async () => ({ data: { session: null }, error: null }),
     signOut: async () => ({ error: null }),

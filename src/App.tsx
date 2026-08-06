@@ -65,6 +65,9 @@ import { validerContratsEEEPourEcriture } from "./lib/contratTerritoireEEE";
 import { BandeauStockagePlein } from "./components/BandeauStockagePlein";
 import { MonDossier } from "./components/MonDossier";
 import { EcranConnexionObligatoire } from "./components/EcranConnexionObligatoire";
+import { EcranNouveauMotDePasse } from "./components/EcranNouveauMotDePasse";
+import { INDICE_RETOUR_LIEN } from "./auth/retourLienMagique";
+import { MARQUEUR_REINITIALISATION } from "./auth/actions";
 
 const dateDuJour = new Date().toISOString().slice(0, 10);
 
@@ -120,6 +123,23 @@ export default function App() {
   // bulletin ou de la revue d'extraction IA — le bandeau doit être visible depuis n'importe quel
   // onglet, comme celui de `erreurSauvegarde`. Un rejet silencieux serait pire que le bug d'origine.
   const [refusEcriture, setRefusEcriture] = useState<string | null>(null);
+  /**
+   * Le mot de passe vient d'être redéfini au retour du lien de réinitialisation (06/08/2026).
+   *
+   * ⚠️ POURQUOI UN ÉTAT LOCAL ET PAS UNE RELECTURE DE L'URL : `EcranNouveauMotDePasse` retire le
+   * marqueur de l'URL en réussissant, mais `INDICE_RETOUR_LIEN` est figé À L'IMPORT du module et ne
+   * changera donc jamais pendant la vie de la page. Sans ce drapeau, l'écran se réafficherait à chaque
+   * rendu suivant, indéfiniment.
+   */
+  const [reinitialisationFaite, setReinitialisationFaite] = useState(false);
+  /**
+   * Capturé à l'import (cf. `auth/retourLienMagique.ts`), donc constant sur toute la vie de la page.
+   * Lu ici plutôt qu'injecté en prop : `App` n'accepte aucune prop, et le comportement de cet écran est
+   * couvert par ses propres tests (`EcranNouveauMotDePasse.test.tsx`) plus ceux du marqueur
+   * (`retourLienMagique.test.ts`). Le branchement lui-même — ce seul `if` plus bas — n'est pas couvert
+   * par un test React : limite assumée et vérifiée à l'écran, comme pour l'onboarding.
+   */
+  const indiceRetour = INDICE_RETOUR_LIEN;
   const inputImportRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -516,6 +536,38 @@ export default function App() {
   // juste en dessous) suppose déjà une session pour s'activer et n'a besoin d'aucun changement.
   if (session.statut !== "connecte") {
     return <EcranConnexionObligatoire session={session} client={clientAuth} />;
+  }
+
+  /*
+   * RETOUR DU LIEN DE RÉINITIALISATION (06/08/2026) — placé JUSTE APRÈS le mur, et l'ordre compte.
+   *
+   * Ce lien OUVRE UNE SESSION : c'est ce qui autorise `updateUser` sans connaître l'ancien mot de
+   * passe. Sans cet écran, la session étant valide, le mur ci-dessus se tairait, ce rendu continuerait,
+   * et l'utilisateur atterrirait sur son tableau de bord SANS qu'on lui ait jamais demandé de nouveau
+   * mot de passe — donc toujours avec celui qu'il a oublié. Le parcours « mot de passe oublié »
+   * n'aurait rien réinitialisé du tout, en silence.
+   *
+   * Le marqueur est lu dans `INDICE_RETOUR_LIEN`, capturé À L'IMPORT du module (la bibliothèque nettoie
+   * l'URL, un composant arriverait trop tard). `reinitialisationFaite` est le seul moyen de quitter cet
+   * écran : un état local, et non une relecture de l'URL, parce que l'URL a justement été nettoyée.
+   */
+  if (indiceRetour.reinitialisation && !reinitialisationFaite) {
+    return (
+      <EcranNouveauMotDePasse
+        client={clientAuth}
+        onTermine={() => {
+          setReinitialisationFaite(true);
+          // Le marqueur est retiré de l'URL pour qu'un simple rechargement ne repropose pas l'écran
+          // alors que le mot de passe est déjà changé. `replaceState` et non `location.href` : on ne
+          // veut ni rechargement ni entrée d'historique supplémentaire.
+          if (typeof window !== "undefined") {
+            const url = new URL(window.location.href);
+            url.searchParams.delete(MARQUEUR_REINITIALISATION);
+            window.history.replaceState(null, "", url.toString());
+          }
+        }}
+      />
+    );
   }
 
   // Écran bloquant : ni navigation, ni onboarding, ni tableau de bord à vide — l'utilisateur ne doit

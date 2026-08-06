@@ -37,13 +37,32 @@ describe("construireClientAuth — une configuration incomplète ne doit jamais 
   it("rend un client utilisable quand les deux variables sont là", () => {
     const client = construireClientAuth({ url: URL_VALIDE, cleAnon: CLE_FACTICE });
     expect(client).not.toBeNull();
-    // Les cinq gestes dont l'app a besoin sont bien présents : c'est ce qui prouve que `client.auth`
+    // Les gestes dont l'app a besoin sont bien présents : c'est ce qui prouve que `client.auth`
     // de la bibliothèque satisfait réellement l'interface étroite, et pas seulement au typage.
     expect(typeof client?.getSession).toBe("function");
     expect(typeof client?.onAuthStateChange).toBe("function");
-    expect(typeof client?.signInWithOtp).toBe("function");
     expect(typeof client?.signInWithPassword).toBe("function");
+    // Ajouté le 06/08/2026 avec « mot de passe oublié » — vérifié pour la même raison que les autres :
+    // le typage seul ne prouve pas que la méthode existe vraiment dans la bibliothèque installée.
+    expect(typeof client?.resetPasswordForEmail).toBe("function");
     expect(typeof client?.signOut).toBe("function");
+  });
+
+  it("NE DÉCLARE PLUS le lien magique dans sa surface (06/08/2026)", () => {
+    const client = construireClientAuth({ url: URL_VALIDE, cleAnon: CLE_FACTICE });
+
+    // @ts-expect-error — LE CŒUR DE CE TEST, ET IL EST STATIQUE : cette ligne NE DOIT PLUS COMPILER.
+    // Le jour où `signInWithOtp` reviendrait dans `ClientAuth` sans qu'on l'ait demandé, ce
+    // `@ts-expect-error` devient inutilisé et `tsc` échoue — c'est lui qui monte la garde, pas
+    // l'assertion ci-dessous.
+    const geste = client?.signInWithOtp;
+
+    // ⚠️ CE QUE CE TEST NE PROUVE PAS, ET IL FAUT LE DIRE : la bibliothèque Supabase possède
+    // TOUJOURS cette méthode — retirer un membre d'une interface TypeScript ne retire rien à
+    // l'exécution. Ce qui a changé, c'est la DÉCLARATION de Cadence, et c'est elle qui décide ce que le
+    // reste du code a le droit d'appeler (le compilateur a effectivement trouvé les 11 fichiers qui la
+    // supposaient). L'assertion suivante documente donc un fait, elle ne garde rien.
+    expect(typeof geste).toBe("function");
   });
 
   it("ne tient pas compte des espaces autour des valeurs", () => {

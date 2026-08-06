@@ -20,7 +20,7 @@ function fauxClient(reponses: Partial<ClientAuth> = {}): ClientAuth {
   return {
     getSession: vi.fn(async () => ({ data: { session: null }, error: null })),
     onAuthStateChange: vi.fn(() => ({ data: { subscription: { unsubscribe: vi.fn() } } })),
-    signInWithOtp: vi.fn(async () => ({ error: null })),
+    resetPasswordForEmail: vi.fn(async () => ({ error: null })),
     signInWithPassword: vi.fn(async () => ({ data: { session: null }, error: null })),
     signUp: vi.fn(async () => ({ data: { session: null }, error: null })),
     signOut: vi.fn(async () => ({ error: null })),
@@ -69,14 +69,17 @@ describe("Compte — connecté", () => {
   });
 });
 
-describe("Compte — connecté : définir un mot de passe", () => {
+describe("Compte — connecté : changer de mot de passe", () => {
   // Demandé le 05/08/2026 : « pour l'instant pas de compte avec mdp, mais je veux qu'à terme on ait
-  // ça ». Le geste manquant, ici : créer un mot de passe SANS redemander l'ancien, puisqu'il n'y en a
-  // pas forcément un (arrivée par lien magique).
+  // ça ». Le geste : enregistrer un mot de passe SANS redemander l'ancien (`updateUser` agit sur la
+  // session en cours, pas sur les identifiants).
+  // ⚠️ LIBELLÉ CHANGÉ LE 06/08/2026 : « Définir un mot de passe » → « Changer de mot de passe ». Le
+  // texte d'aide disait « pour te connecter aussi sans lien magique » — devenu faux, le lien magique
+  // n'existe plus, c'est désormais le SEUL moyen de connexion.
   it("appelle updateUser avec le mot de passe saisi, sans rien redemander d'autre", async () => {
     const client = fauxClient();
     render(<Compte session={SESSION_AVEC_EMAIL} client={client} />);
-    fireEvent.change(screen.getByLabelText(/définir un mot de passe/i), { target: { value: "motdepasse-solide" } });
+    fireEvent.change(screen.getByLabelText(/changer de mot de passe/i), { target: { value: "motdepasse-solide" } });
     fireEvent.click(screen.getByRole("button", { name: /enregistrer/i }));
     await waitFor(() => expect(client.updateUser).toHaveBeenCalledWith({ password: "motdepasse-solide" }));
     expect(await screen.findByText(/Mot de passe enregistré\./i)).toBeInTheDocument();
@@ -85,7 +88,7 @@ describe("Compte — connecté : définir un mot de passe", () => {
   it("refuse un mot de passe trop court sans appeler Supabase", async () => {
     const client = fauxClient();
     render(<Compte session={SESSION_AVEC_EMAIL} client={client} />);
-    fireEvent.change(screen.getByLabelText(/définir un mot de passe/i), { target: { value: "court12" } });
+    fireEvent.change(screen.getByLabelText(/changer de mot de passe/i), { target: { value: "court12" } });
     fireEvent.click(screen.getByRole("button", { name: /enregistrer/i }));
     expect(await screen.findByRole("alert")).toHaveTextContent(/8 caractères au minimum/);
     expect(client.updateUser).not.toHaveBeenCalled();

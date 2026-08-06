@@ -25,7 +25,7 @@ function fauxClientAuth(reponses: Partial<ClientAuth> = {}): ClientAuth {
   return {
     getSession: vi.fn(async () => ({ data: { session: null }, error: null })),
     onAuthStateChange: vi.fn(() => ({ data: { subscription: { unsubscribe: vi.fn() } } })),
-    signInWithOtp: vi.fn(async () => ({ error: null })),
+    resetPasswordForEmail: vi.fn(async () => ({ error: null })),
     signInWithPassword: vi.fn(async () => ({ data: { session: SESSION }, error: null })),
     signUp: vi.fn(async () => ({ data: { session: null }, error: null })),
     signOut: vi.fn(async () => ({ error: null })),

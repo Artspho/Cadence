@@ -20,7 +20,7 @@ function fauxClient(reponses: Partial<ClientAuth> = {}): ClientAuth {
   return {
     getSession: vi.fn(async () => ({ data: { session: null }, error: null })),
     onAuthStateChange: vi.fn(() => ({ data: { subscription: { unsubscribe: vi.fn() } } })),
-    signInWithOtp: vi.fn(async () => ({ error: null })),
+    resetPasswordForEmail: vi.fn(async () => ({ error: null })),
     signInWithPassword: vi.fn(async () => ({ data: { session: null }, error: null })),
     signUp: vi.fn(async () => ({ data: { session: null }, error: null })),
     signOut: vi.fn(async () => ({ error: null })),
@@ -68,7 +68,7 @@ describe("useSession — résolution initiale", () => {
 });
 
 describe("useSession — cycle de vie de l'abonnement", () => {
-  it("passe à connecte sur notification de l'écouteur (retour du lien magique)", async () => {
+  it("passe à connecte sur notification de l'écouteur (retour d'un lien reçu par e-mail)", async () => {
     let notifier: ((evenement: string, session: SessionMinimale | null) => void) | null = null;
     const client = fauxClient({
       onAuthStateChange: vi.fn((rappel) => {
