@@ -49,8 +49,18 @@ function fauxClientAuth(reponses: Partial<ClientAuth> = {}): ClientAuth {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type FauxAppelable = (...args: any[]) => any;
 
-function fauxClientDocuments(insert: FauxAppelable = vi.fn(() => ({ select: vi.fn(async () => ({ data: [{ id: "doc-1" }], error: null })) }))): ClientDocuments {
-  return { from: vi.fn(() => ({ select: vi.fn(), insert, update: vi.fn() })) } as unknown as ClientDocuments;
+function fauxClientDocuments(
+  insert: FauxAppelable = vi.fn(() => ({ select: vi.fn(async () => ({ data: [{ id: "doc-1" }], error: null })) })),
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  documentsExistants: Record<string, any>[] = [],
+): ClientDocuments {
+  return {
+    from: vi.fn(() => ({
+      select: vi.fn(() => ({ eq: vi.fn(() => ({ order: vi.fn(async () => ({ data: documentsExistants, error: null })) })) })),
+      insert,
+      update: vi.fn(),
+    })),
+  } as unknown as ClientDocuments;
 }
 
 function fauxClientFichiers(upload: FauxAppelable = vi.fn(async () => ({ data: { path: "x" }, error: null }))): ClientFichiers {
@@ -140,5 +150,64 @@ describe("ImportBulletins — connecté", () => {
     fireEvent.click(await screen.findByRole("button", { name: /conserver sur le serveur/i }));
     expect(await screen.findByText(/revue avant enregistrement/i)).toBeInTheDocument();
     expect(screen.getByRole("alert")).toHaveTextContent(/quota dépassé/);
+  });
+});
+
+describe("ImportBulletins — doublon détecté (même nom, même taille, déjà dans Mon dossier)", () => {
+  const CONNECTE = fauxClientAuth({ getSession: vi.fn(async () => ({ data: { session: SESSION }, error: null })) });
+  // "bulletin.pdf" déposé par `deposerFichier()` a le contenu ["contenu"] → 7 octets.
+  const DOUBLON_EXISTANT = [
+    { id: "doc-ancien", type_document: "aem_bulletin", chemin_stockage: "u-42/2026/aem_bulletin/x-bulletin.pdf", nom_fichier: "bulletin.pdf", taille_octets: 7, mime: "application/pdf", cree_le: "2026-08-01T10:00:00.000Z" },
+  ];
+
+  it("« Conserver sur le serveur » sur un doublon affiche l'avertissement au lieu de déposer directement", async () => {
+    vi.mocked(extraireBulletin).mockResolvedValue(EXTRAIT);
+    const insert = vi.fn(() => ({ select: vi.fn(async () => ({ data: [{ id: "doc-1" }], error: null })) }));
+    const upload = vi.fn(async () => ({ data: { path: "x" }, error: null }));
+    rendre({ clientAuth: CONNECTE, clientDocuments: fauxClientDocuments(insert, DOUBLON_EXISTANT), clientFichiers: fauxClientFichiers(upload) });
+    await screen.findByText(/tu peux ensuite choisir de conserver/i);
+    deposerFichier();
+    fireEvent.click(await screen.findByRole("button", { name: /conserver sur le serveur/i }));
+    expect(await screen.findByText(/semble déjà dans « Mon dossier »/i)).toBeInTheDocument();
+    expect(screen.getByText(/1er août 2026/)).toBeInTheDocument();
+    expect(upload).not.toHaveBeenCalled();
+  });
+
+  it("« Conserver quand même » dépose malgré l'avertissement", async () => {
+    vi.mocked(extraireBulletin).mockResolvedValue(EXTRAIT);
+    const insert = vi.fn(() => ({ select: vi.fn(async () => ({ data: [{ id: "doc-1" }], error: null })) }));
+    const upload = vi.fn(async () => ({ data: { path: "x" }, error: null }));
+    rendre({ clientAuth: CONNECTE, clientDocuments: fauxClientDocuments(insert, DOUBLON_EXISTANT), clientFichiers: fauxClientFichiers(upload) });
+    await screen.findByText(/tu peux ensuite choisir de conserver/i);
+    deposerFichier();
+    fireEvent.click(await screen.findByRole("button", { name: /conserver sur le serveur/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /conserver quand même/i }));
+    await waitFor(() => expect(upload).toHaveBeenCalled());
+    expect(await screen.findByText(/revue avant enregistrement/i)).toBeInTheDocument();
+  });
+
+  it("« Ne pas le conserver à nouveau » passe à la revue sans jamais appeler l'upload", async () => {
+    vi.mocked(extraireBulletin).mockResolvedValue(EXTRAIT);
+    const upload = vi.fn();
+    rendre({ clientAuth: CONNECTE, clientDocuments: fauxClientDocuments(undefined, DOUBLON_EXISTANT), clientFichiers: fauxClientFichiers(upload) });
+    await screen.findByText(/tu peux ensuite choisir de conserver/i);
+    deposerFichier();
+    fireEvent.click(await screen.findByRole("button", { name: /conserver sur le serveur/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /ne pas le conserver à nouveau/i }));
+    expect(await screen.findByText(/revue avant enregistrement/i)).toBeInTheDocument();
+    expect(upload).not.toHaveBeenCalled();
+  });
+
+  it("un fichier de nom ou de taille différents n'est jamais signalé comme doublon", async () => {
+    vi.mocked(extraireBulletin).mockResolvedValue(EXTRAIT);
+    const insert = vi.fn(() => ({ select: vi.fn(async () => ({ data: [{ id: "doc-1" }], error: null })) }));
+    const upload = vi.fn(async () => ({ data: { path: "x" }, error: null }));
+    const autreDocument = [{ ...DOUBLON_EXISTANT[0], nom_fichier: "autre.pdf" }];
+    rendre({ clientAuth: CONNECTE, clientDocuments: fauxClientDocuments(insert, autreDocument), clientFichiers: fauxClientFichiers(upload) });
+    await screen.findByText(/tu peux ensuite choisir de conserver/i);
+    deposerFichier();
+    fireEvent.click(await screen.findByRole("button", { name: /conserver sur le serveur/i }));
+    await waitFor(() => expect(upload).toHaveBeenCalled());
+    expect(screen.queryByText(/semble déjà dans « Mon dossier »/i)).not.toBeInTheDocument();
   });
 });

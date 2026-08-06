@@ -3,6 +3,7 @@
 // pour la preuve contre le vrai projet.
 import { describe, expect, it, vi } from "vitest";
 import {
+  chercherDoublon,
   construireCheminStockage,
   corrigerTypeDocument,
   deposerDocument,
@@ -193,6 +194,53 @@ describe("listerDocuments", () => {
     const select = vi.fn(() => ({ eq: vi.fn(() => ({ order: vi.fn(async () => ({ data: null, error: { message: "indisponible" } })) })) }));
     const resultat = await listerDocuments(fauxClientDocuments({ select }), "u-42");
     expect(resultat).toEqual({ erreur: "indisponible" });
+  });
+});
+
+describe("chercherDoublon", () => {
+  function selectAvec(documents: Record<string, unknown>[]) {
+    return vi.fn(() => ({ eq: vi.fn(() => ({ order: vi.fn(async () => ({ data: documents, error: null })) })) }));
+  }
+
+  const DOCUMENT_EXISTANT = {
+    id: "doc-1",
+    type_document: "aem_bulletin",
+    categorie_frais: null,
+    annee_fiscale: 2026,
+    chemin_stockage: "u-42/2026/aem_bulletin/x-bulletin.pdf",
+    nom_fichier: "bulletin.pdf",
+    taille_octets: 1234,
+    mime: "application/pdf",
+    date_document: null,
+    notes: null,
+    cree_le: "2026-08-05T10:00:00.000Z",
+  };
+
+  it("trouve un document du même nom ET de la même taille", async () => {
+    const documents = fauxClientDocuments({ select: selectAvec([DOCUMENT_EXISTANT]) });
+    const resultat = await chercherDoublon(documents, "u-42", "bulletin.pdf", 1234);
+    expect(resultat).toEqual(expect.objectContaining({ id: "doc-1", nomFichier: "bulletin.pdf", tailleOctets: 1234 }));
+  });
+
+  it("rend null si le nom diffère, même à taille égale", async () => {
+    const documents = fauxClientDocuments({ select: selectAvec([DOCUMENT_EXISTANT]) });
+    expect(await chercherDoublon(documents, "u-42", "autre.pdf", 1234)).toBeNull();
+  });
+
+  it("rend null si la taille diffère, même à nom égal", async () => {
+    const documents = fauxClientDocuments({ select: selectAvec([DOCUMENT_EXISTANT]) });
+    expect(await chercherDoublon(documents, "u-42", "bulletin.pdf", 9999)).toBeNull();
+  });
+
+  it("rend null quand aucun document n'existe", async () => {
+    const documents = fauxClientDocuments({ select: selectAvec([]) });
+    expect(await chercherDoublon(documents, "u-42", "bulletin.pdf", 1234)).toBeNull();
+  });
+
+  it("ÉCHOUE VERS null (jamais une exception) si la liste est indisponible — un avertissement de doublon ne doit jamais bloquer un dépôt", async () => {
+    const select = vi.fn(() => ({ eq: vi.fn(() => ({ order: vi.fn(async () => ({ data: null, error: { message: "indisponible" } })) })) }));
+    const documents = fauxClientDocuments({ select });
+    expect(await chercherDoublon(documents, "u-42", "bulletin.pdf", 1234)).toBeNull();
   });
 });
 

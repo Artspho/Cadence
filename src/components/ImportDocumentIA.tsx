@@ -31,8 +31,10 @@ import { ConsentementEnvoiIA } from "./ConsentementEnvoiIA";
 import { RevueExtraction } from "./RevueExtraction";
 import { obtenirClientAuth, obtenirClientDocuments, obtenirClientFichiers, type ClientAuth, type ClientDocuments, type ClientFichiers } from "../auth/supabaseClient";
 import { useSession } from "../auth/session";
-import { deposerDocument, typeDocumentDepuisDetection } from "../storage/documentsStorage";
+import { chercherDoublon, deposerDocument, typeDocumentDepuisDetection, type LigneDocument, type TypeDocument } from "../storage/documentsStorage";
 import { LIBELLES_TYPE_DOCUMENT, TYPES_DOCUMENT_ORDONNES } from "../content/typeDocumentLabels";
+import { AvertissementDoublonDocument } from "./AvertissementDoublonDocument";
+import { Spinner } from "./Spinner";
 
 interface ImportDocumentIAProps {
   profil: Profil;
@@ -113,6 +115,10 @@ export function ImportDocumentIA({
   const [erreurConservation, setErreurConservation] = useState<string | null>(null);
   /** Non nul UNIQUEMENT quand l'IA a rendu `non_reconnu` chez un utilisateur connecté. */
   const [choixTypeEnAttente, setChoixTypeEnAttente] = useState<{ fichier: File; extraction: ExtractionResult } | null>(null);
+  /** Non nul UNIQUEMENT quand `chercherDoublon` a trouvé, dans « Mon dossier », un document du même
+   *  nom/taille que celui qui vient d'être envoyé — la conservation attend la décision de l'utilisateur,
+   *  jamais automatique dans ce cas précis (contrairement au cas normal, sans doublon détecté). */
+  const [doublonEnAttente, setDoublonEnAttente] = useState<{ fichier: File; typeDocument: TypeDocument; extraction: ExtractionResult; doublon: LigneDocument } | null>(null);
 
   function choisirFichier(fichier: File) {
     setErreur(null);
@@ -154,6 +160,14 @@ export function ImportDocumentIA({
           setFichierEnAttente(null);
           return;
         }
+        const existant = await chercherDoublon(clientDocuments, session.utilisateurId, fichierEnAttente.name, fichierEnAttente.size);
+        if (existant) {
+          // Un document du même nom/taille existe déjà — la conservation n'est PAS automatique cette
+          // fois : on laisse l'utilisateur trancher (`AvertissementDoublonDocument`) avant tout dépôt.
+          setDoublonEnAttente({ fichier: fichierEnAttente, typeDocument, extraction, doublon: existant });
+          setFichierEnAttente(null);
+          return;
+        }
         const resultatDepot = await deposerDocument(clientFichiers, clientDocuments, {
           utilisateurId: session.utilisateurId,
           fichier: fichierEnAttente,
@@ -186,6 +200,12 @@ export function ImportDocumentIA({
     if (!choixTypeEnAttente || session.statut !== "connecte" || !clientDocuments || !clientFichiers) return;
     setEnvoiEnCours(true);
     try {
+      const existant = await chercherDoublon(clientDocuments, session.utilisateurId, choixTypeEnAttente.fichier.name, choixTypeEnAttente.fichier.size);
+      if (existant) {
+        setDoublonEnAttente({ fichier: choixTypeEnAttente.fichier, typeDocument: type, extraction: choixTypeEnAttente.extraction, doublon: existant });
+        setChoixTypeEnAttente(null);
+        return;
+      }
       const resultatDepot = await deposerDocument(clientFichiers, clientDocuments, {
         utilisateurId: session.utilisateurId,
         fichier: choixTypeEnAttente.fichier,
@@ -193,10 +213,10 @@ export function ImportDocumentIA({
         anneeFiscale: new Date().getFullYear(),
       });
       if (resultatDepot.statut === "echec" || resultatDepot.statut === "ficherEnvoyeLigneEchouee") setErreurConservation(resultatDepot.message);
-    } finally {
-      setEnvoiEnCours(false);
       setResultat(choixTypeEnAttente.extraction);
       setChoixTypeEnAttente(null);
+    } finally {
+      setEnvoiEnCours(false);
     }
   }
 
@@ -204,6 +224,33 @@ export function ImportDocumentIA({
     if (!choixTypeEnAttente) return;
     setResultat(choixTypeEnAttente.extraction);
     setChoixTypeEnAttente(null);
+  }
+
+  /** L'utilisateur confirme malgré l'avertissement : dépose quand même, comme si aucun doublon n'avait
+   *  été trouvé. */
+  async function confirmerDepotMalgreDoublon() {
+    if (!doublonEnAttente || session.statut !== "connecte" || !clientDocuments || !clientFichiers) return;
+    setEnvoiEnCours(true);
+    try {
+      const resultatDepot = await deposerDocument(clientFichiers, clientDocuments, {
+        utilisateurId: session.utilisateurId,
+        fichier: doublonEnAttente.fichier,
+        typeDocument: doublonEnAttente.typeDocument,
+        anneeFiscale: new Date().getFullYear(),
+      });
+      if (resultatDepot.statut === "echec" || resultatDepot.statut === "ficherEnvoyeLigneEchouee") setErreurConservation(resultatDepot.message);
+    } finally {
+      setEnvoiEnCours(false);
+      setResultat(doublonEnAttente.extraction);
+      setDoublonEnAttente(null);
+    }
+  }
+
+  /** L'utilisateur renonce à conserver ce fichier-ci — les informations extraites restent proposées. */
+  function ignorerDepotDoublon() {
+    if (!doublonEnAttente) return;
+    setResultat(doublonEnAttente.extraction);
+    setDoublonEnAttente(null);
   }
 
   if (resultat) {
@@ -252,6 +299,16 @@ export function ImportDocumentIA({
 
       {choixTypeEnAttente && <SelecteurTypeNonReconnu enCours={envoiEnCours} onConserver={validerChoixType} onIgnorer={ignorerConservation} />}
 
+      {doublonEnAttente && (
+        <AvertissementDoublonDocument
+          nomFichier={doublonEnAttente.fichier.name}
+          dateDepotExistant={doublonEnAttente.doublon.creeLe}
+          enCours={envoiEnCours}
+          onConfirmer={confirmerDepotMalgreDoublon}
+          onIgnorer={ignorerDepotDoublon}
+        />
+      )}
+
       <div>
         <h3 className="font-display text-base font-medium tracking-tight">Importer avec l'IA</h3>
         {/* Annonce permanente : ce que fait ce bouton, su avant de cliquer. Le détail complet reste
@@ -283,6 +340,7 @@ export function ImportDocumentIA({
         }}
         className={`border-2 border-dashed rounded-card p-10 text-center transition-colors ${survole ? "border-amber bg-amber/5" : "border-line-strong"}`}
       >
+        {envoiEnCours && <Spinner className="h-6 w-6 mx-auto mb-3" />}
         <p className="text-ink mb-2">
           {envoiEnCours ? "Lecture du document en cours…" : "Dépose ici un bulletin, une AEM, une notification ou un relevé (PDF)"}
         </p>

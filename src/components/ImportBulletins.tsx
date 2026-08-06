@@ -7,8 +7,10 @@ import { RAPPEL_AEM_FAIT_FOI } from "../content/rappelAEM";
 import { ContractForm } from "./ContractForm";
 import { obtenirClientAuth, obtenirClientDocuments, obtenirClientFichiers, type ClientAuth, type ClientDocuments, type ClientFichiers } from "../auth/supabaseClient";
 import { useSession } from "../auth/session";
-import { deposerDocument } from "../storage/documentsStorage";
+import { chercherDoublon, deposerDocument, type LigneDocument } from "../storage/documentsStorage";
 import { ConsentementConservationDocument } from "./ConsentementConservationDocument";
+import { AvertissementDoublonDocument } from "./AvertissementDoublonDocument";
+import { Spinner } from "./Spinner";
 
 interface ImportBulletinsProps {
   profil: Profil;
@@ -67,6 +69,9 @@ export function ImportBulletins({
   const [survole, setSurvole] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
   const [envoiEnCours, setEnvoiEnCours] = useState(false);
+  /** Non nul UNIQUEMENT quand `chercherDoublon` a trouvé un document du même nom/taille déjà déposé —
+   *  l'utilisateur doit alors trancher avant que quoi que ce soit ne parte (cf. `AvertissementDoublonDocument`). */
+  const [doublon, setDoublon] = useState<LigneDocument | null>(null);
 
   async function traiterFichier(fichier: File) {
     setEnCours(true);
@@ -81,6 +86,7 @@ export function ImportBulletins({
       // contrat, qui peut arriver bien plus tard voire jamais (annulation). Sans session, ce choix
       // n'existe pas : rien ne peut de toute façon partir nulle part.
       if (session.statut === "connecte") {
+        setDoublon(null);
         setEtape({ type: "consentement", fichier, extrait: resultat });
       } else {
         setEtape({ type: "revue", extrait: resultat, erreurConservation: null });
@@ -99,10 +105,17 @@ export function ImportBulletins({
     if (fichier) traiterFichier(fichier);
   }
 
-  async function conserverSurLeServeur() {
+  async function conserverSurLeServeur(ignorerDoublon = false) {
     if (etape.type !== "consentement" || session.statut !== "connecte" || !clientDocuments || !clientFichiers) return;
     setEnvoiEnCours(true);
     try {
+      if (!ignorerDoublon) {
+        const existant = await chercherDoublon(clientDocuments, session.utilisateurId, etape.fichier.name, etape.fichier.size);
+        if (existant) {
+          setDoublon(existant);
+          return;
+        }
+      }
       const resultat = await deposerDocument(clientFichiers, clientDocuments, {
         utilisateurId: session.utilisateurId,
         fichier: etape.fichier,
@@ -113,6 +126,7 @@ export function ImportBulletins({
       // informations déjà extraites localement restent utilisables — seule la copie du fichier sur
       // le serveur a échoué, et on le dit, sans plus.
       const erreurConservation = resultat.statut === "echec" || resultat.statut === "ficherEnvoyeLigneEchouee" ? resultat.message : null;
+      setDoublon(null);
       setEtape({ type: "revue", extrait: etape.extrait, erreurConservation });
     } finally {
       setEnvoiEnCours(false);
@@ -121,6 +135,7 @@ export function ImportBulletins({
 
   function passerLaConservation() {
     if (etape.type !== "consentement") return;
+    setDoublon(null);
     setEtape({ type: "revue", extrait: etape.extrait, erreurConservation: null });
   }
 
@@ -151,8 +166,18 @@ export function ImportBulletins({
         </p>
       )}
 
-      {etape.type === "consentement" && (
-        <ConsentementConservationDocument nomFichier={etape.fichier.name} enCours={envoiEnCours} onConserver={conserverSurLeServeur} onPasser={passerLaConservation} />
+      {etape.type === "consentement" && doublon && (
+        <AvertissementDoublonDocument
+          nomFichier={etape.fichier.name}
+          dateDepotExistant={doublon.creeLe}
+          enCours={envoiEnCours}
+          onConfirmer={() => conserverSurLeServeur(true)}
+          onIgnorer={passerLaConservation}
+        />
+      )}
+
+      {etape.type === "consentement" && !doublon && (
+        <ConsentementConservationDocument nomFichier={etape.fichier.name} enCours={envoiEnCours} onConserver={() => conserverSurLeServeur()} onPasser={passerLaConservation} />
       )}
 
       {etape.type === "attente" && (
@@ -165,6 +190,7 @@ export function ImportBulletins({
           onDrop={onDrop}
           className={`border-2 border-dashed rounded-card p-12 text-center transition-colors ${survole ? "border-mint bg-mint/5" : "border-line-strong"}`}
         >
+          {enCours && <Spinner className="h-6 w-6 mx-auto mb-3" />}
           <p className="text-ink mb-2">{enCours ? "Extraction en cours…" : "Dépose un bulletin de paie PDF ici"}</p>
           <p className="text-sm text-muted mb-4">ou</p>
           <label className="inline-block bg-surface-2 border border-line rounded-lg px-4 py-2 text-sm cursor-pointer hover:border-line-strong transition-colors">

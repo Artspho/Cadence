@@ -203,6 +203,24 @@ export async function listerDocuments(clientDocuments: ClientDocuments, utilisat
 }
 
 /**
+ * Cherche un document déjà déposé par CE même utilisateur, avec le même nom de fichier ET la même
+ * taille en octets — signal d'un import répété du même fichier (ex. l'utilisateur reclique après une
+ * longue lecture qu'il croyait plantée). Volontairement approximatif : deux fichiers réellement
+ * distincts qui partagent nom et taille par coïncidence pure produiraient un faux avertissement — mais
+ * l'appelant ne bloque jamais dessus, il PRÉVIENT puis laisse l'utilisateur confirmer (devoir n°1 : ne
+ * jamais empêcher un dépôt légitime). Aucun hash de contenu : pas de colonne dédiée en base
+ * aujourd'hui, et ce signal-là suffit au cas réel qu'il couvre.
+ *
+ * Repli sur `null` (« pas de doublon connu ») si la liste ne peut pas être récupérée : un avertissement
+ * de doublon qui empêcherait l'import à cause d'une PANNE DE LECTURE serait pire que le doublon lui-même.
+ */
+export async function chercherDoublon(clientDocuments: ClientDocuments, utilisateurId: string, nomFichier: string, tailleOctets: number): Promise<LigneDocument | null> {
+  const resultat = await listerDocuments(clientDocuments, utilisateurId);
+  if ("erreur" in resultat) return null;
+  return resultat.documents.find((d) => d.nomFichier === nomFichier && d.tailleOctets === tailleOctets) ?? null;
+}
+
+/**
  * Retrouve la ligne d'un document par son `id` — sert au lien « Voir » d'un justificatif de dépense
  * (phase 6, commit 6) : `Depense` ne porte que `documentId`, jamais le chemin de stockage (dérivé au
  * moment de l'affichage, jamais mis en cache) ; et au remplacement d'un justificatif, pour retrouver
