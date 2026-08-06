@@ -45,13 +45,17 @@ supprimer sa propre preuve. Benoît a effacé la ligne `TEST-VERIFICATION-%` dep
    l'affiliation aux 507 h ?) : si la réponse est non, Cadence **surcompte** aujourd'hui un mois très
    chargé et peut afficher un faux « Sécurité ». Aucun effet sur les données de Benoît (20 cachets
    maximum), mais ça ne vaut pas pour un autre testeur.
-2. ⬜ **Phase 7 — hors ligne : SON PÉRIMÈTRE N'EST ÉCRIT NULLE PART**, et il est documenté que Benoît
-   n'a jamais répondu sur ce point. Il n'y a pas de chantier à reprendre, il y a une question à
-   écrire. Le seul défaut concret trouvé (analyse du 06/08, **non arbitré avec lui**) : hors ligne avec
-   un jeton expiré (1 h par défaut), `useSession` rend `indetermine` et le mur rend Cadence
-   **inutilisable alors que les données sont dans le navigateur**. Trois options lui ont été
-   présentées, aucune choisie. Le cas « lecture seule hors ligne » est, lui, déjà traité par la
-   phase 5.
+2. ✅ **Phase 7 — le mur hors ligne est ARBITRÉ (06/08/2026) : ON NE CHANGE RIEN.** Trois options lui
+   ont été présentées, il a choisi **B** (statu quo). Cadence est donc **inutilisable hors ligne
+   au-delà d'une heure** — jeton expiré, rafraîchissement impossible faute de réseau, `useSession`
+   rend `indetermine`, le mur s'affiche alors que les données sont dans le navigateur. **C'est assumé,
+   ne pas le « réparer » spontanément.** Ce qui a été corrigé à la place, ce sont les trois endroits
+   qui affirmaient le contraire (décision 2 de la phase 5 dans `CLAUDE.md` citait le « jeton expiré »
+   comme cause de lecture seule ; un commentaire d'`App.tsx` prétendait que la bibliothèque rend
+   « déconnecté » hors ligne, alors qu'elle rend une **erreur** — vérifié dans
+   `@supabase/auth-js@2.112.0`). En dessous d'une heure, la lecture seule fonctionne et n'est pas
+   concernée. ⬜ **Le périmètre de la phase 7 dans son ENSEMBLE reste, lui, non écrit** : seul ce
+   défaut-là a été instruit et tranché.
 3. **Non vérifié à l'écran** : le regroupement de « Mon dossier » et le téléchargement groupé
    (`06d5190`, `289c8e1`) ne sont prouvés que par 35 tests et un banc d'essai JSZip en navigateur.
    Benoît devait le regarder. Le parcours frais réels (dépense + justificatif → « Mon dossier »), lui,

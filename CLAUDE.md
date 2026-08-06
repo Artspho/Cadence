@@ -300,7 +300,7 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 > | 4 | migration + vérification chiffrée | ✅ **PROUVÉE le 05/08/2026 à 01:05** — verdict `identique`, SHA-256 concordant sur **trois** sources |
 > | 5 | bascule, sur son feu vert écrit | ✅ **FAITE** — le serveur fait référence, VÉRIFIÉ EN VRAI (588 h, 62 contrats) ; commit D (section « Compte » trouvable, mot de passe, réserve PKCE) et E (cette doc) faits |
 > | 6 | documents (conserver, puis envoyer) | ✅ **FAITE** (06/08/2026) — commits 1 à 7 ; les 3 canaux (local, IA, frais réels) et les biens amortis déposent sur Supabase Storage, Drive supprimé. Prouvée contre le vrai serveur : `npm run verifier:documents`, `verifier:frais-reels`, `verifier:consentement` |
-> | 7 | hors ligne | ⬜ **optionnel, repoussé exprès** : il n'a jamais répondu sur ce point, la question est sortie du chemin critique pour ne pas le bloquer |
+> | 7 | hors ligne | ⬜ **son périmètre n'est toujours pas écrit** (il n'a jamais répondu sur la phase entière, sortie du chemin critique exprès). Le seul défaut concret jamais trouvé — mur hors ligne dès que le jeton est expiré — est **ARBITRÉ le 06/08/2026 : on ne change rien**, cf. décision 2 de la phase 5 ci-dessus |
 > | 8 | les 7 points réglementaires restants | ⬜ quand une source tombe |
 >
 > **Isolation prouvée le 04/08/2026**, et c'est le livrable de la phase 1 : `scripts/verifier-rls.mjs`
@@ -548,10 +548,22 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 > 1. **Palier GRATUIT** (arbitrage 4 enfin tranché, chiffres vérifiés à la source la veille) : pause
 >    après 7 jours d'inactivité, restaurable depuis le tableau de bord (indisponibilité, **pas** une
 >    perte) ; Pro = 25 $/mois si besoin plus tard ;
-> 2. ⚠️ **L'arbitrage « plus d'ouverture hors ligne » est ASSOUPLI** : serveur muet (pause, réseau,
->    jeton expiré) ⇒ Cadence **s'ouvre en LECTURE SEULE** depuis la dernière copie locale, bandeau
->    impossible à rater, aucune écriture possible. Décision plus récente que celle du 04/08, elle la
->    remplace — ne pas dire « l'app refuse de démarrer » ;
+> 2. ⚠️ **L'arbitrage « plus d'ouverture hors ligne » est ASSOUPLI** : serveur muet (pause, réseau)
+>    ⇒ Cadence **s'ouvre en LECTURE SEULE** depuis la dernière copie locale, bandeau impossible à
+>    rater, aucune écriture possible. Décision plus récente que celle du 04/08, elle la remplace —
+>    ne pas dire « l'app refuse de démarrer ».
+>    ⚠️ **SAUF LE JETON EXPIRÉ — cette phrase citait aussi le « jeton expiré », et c'était FAUX.**
+>    Écart trouvé le 06/08/2026 en instruisant la phase 7, vérifié dans le code ET dans
+>    `@supabase/auth-js@2.112.0` (`GoTrueClient.__loadSession` lu, pas supposé) : hors ligne depuis
+>    plus d'une heure (le jeton dure un peu moins que ça), le rafraîchissement échoue faute de réseau
+>    et la bibliothèque rend une **erreur** — donc `useSession` rend `indetermine`, donc le mur
+>    « compte obligatoire » (`1c685e6`, LE MÊME JOUR à 16h32, donc **plus récent** que cet
+>    arbitrage-ci) s'affiche à la place de toute l'app, alors que les données sont dans le navigateur.
+>    Le `lectureSeule` d'`App.tsx` s'exécute mais n'atteint jamais l'écran.
+>    **Benoît a tranché le 06/08/2026, trois options présentées : ON NE CHANGE RIEN** (option B). Le
+>    mur reste pour tous les cas, Cadence est inutilisable hors ligne au-delà d'une heure, et c'est
+>    assumé. **Ne pas le « corriger » spontanément** ; en dessous d'une heure, la lecture seule
+>    fonctionne et n'est pas concernée ;
 > 3. **Verrou entre appareils INCLUS** dans cette phase (pas repoussé) : toute écriture nomme la
 >    version qu'elle remplace (`maj_le`, tenu par le trigger serveur, jamais par l'horloge du
 >    navigateur) ; version différente ⇒ refus + écran de décision, jamais d'écrasement ni de fusion.

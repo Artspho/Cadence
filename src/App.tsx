@@ -233,8 +233,23 @@ export default function App() {
     // On ne SAIT PAS si une session existe (`getSession` a échoué). Le traiter comme « déconnecté »
     // autoriserait l'écriture alors que le serveur porte peut-être des données pour cet utilisateur :
     // on préfère dire l'ignorance et ne rien écrire (même principe que le statut « illisible » du
-    // `localStorage`). En pratique ce cas est rare — hors ligne sans session, la bibliothèque rend
-    // « déconnecté », pas une erreur.
+    // `localStorage`).
+    //
+    // ⚠️ CE `lectureSeule` N'ATTEINT JAMAIS L'ÉCRAN, C'EST ARBITRÉ — NE PAS LE « RÉPARER ». Cette
+    // branche s'exécute bel et bien (les hooks tournent tous avant le rendu), mais le mur
+    // `EcranConnexionObligatoire` rend l'écran de connexion À LA PLACE de toute l'app dès que la
+    // session n'est pas `connecte` : le bandeau de lecture seule n'est donc jamais affiché.
+    // Le cas réel qui y mène : hors ligne depuis plus d'une heure (durée du jeton), le
+    // rafraîchissement échoue faute de réseau et `@supabase/auth-js@2.112.0` rend une ERREUR — pas
+    // « déconnecté », contrairement à ce que ce commentaire affirmait jusqu'au 06/08/2026 (lu dans
+    // `GoTrueClient.__loadSession`, pas supposé).
+    // Benoît a tranché le 06/08/2026, trois options présentées : ON NE CHANGE RIEN. Le mur reste,
+    // Cadence est inutilisable hors ligne au-delà d'une heure, et c'est assumé (cf. décision 2 de la
+    // phase 5 dans `CLAUDE.md`).
+    // On garde quand même cet état, et ce n'est pas décoratif : lui seul FERME L'ÉCRITURE
+    // (`ecritureAutorisee` n'accepte que `active`), or l'effet de sauvegarde ci-dessus tourne même
+    // quand le mur est à l'écran. Le supprimer rouvrirait l'écriture pendant qu'on ignore ce que
+    // porte le serveur — exactement la divergence que la bascule interdit.
     if (clientSource && session.statut === "indetermine") {
       setEtatBascule({ statut: "lectureSeule", message: session.detail });
       return;
