@@ -32,6 +32,22 @@
 
 export const CONTACT_LEGAL = "cadence@lesartsphoceens.fr";
 
+/**
+ * VERSION DU TEXTE, telle qu'elle est conservée dans la preuve de consentement (table
+ * `consentements`, migration 0004). Sans elle, la preuve ne dirait pas à QUOI la personne a
+ * consenti — donc ne prouverait rien.
+ *
+ * ⚠️ À INCRÉMENTER DÈS QUE `POLITIQUE_CONFIDENTIALITE` CHANGE SUR LE FOND (ce qui est collecté, où
+ * c'est hébergé, qui peut le lire, à qui c'est transmis). Un consentement recueilli sur l'ancien
+ * texte ne vaut pas pour le nouveau : changer cette valeur fait redemander la case aux comptes déjà
+ * créés, ce qui est exactement l'effet voulu. Une correction de pure forme (faute de frappe,
+ * reformulation sans changement de sens) ne la touche PAS — sinon plus personne ne la ferait
+ * évoluer quand il le faut vraiment.
+ *
+ * Format : la date de la version, en ISO. Lisible dans la base sans avoir à consulter le code.
+ */
+export const VERSION_POLITIQUE = "2026-08-05";
+
 export interface SectionLegale {
   titre: string;
   paragraphes: string[];

@@ -17,19 +17,23 @@
  * politique avant d'y consentir. La case ci-dessous comble ce trou, et la modale `MentionsLegales`
  * est RÉUTILISÉE telle quelle (aucune seconde copie du texte, cf. l'en-tête de ce composant).
  *
- * ⚠️ POURQUOI LA CASE BRIDE AUSSI LE LIEN PAR E-MAIL, ET PAS SEULEMENT « CRÉER UN COMPTE ».
- * `demanderLienMagique` appelle `signInWithOtp` sans `shouldCreateUser: false` (auth/actions.ts) :
- * son défaut côté Supabase est `true`, donc CE BOUTON CRÉE UN COMPTE quand l'adresse est inconnue.
- * Le brider seulement sur « Créer un compte » laisserait grande ouverte la porte d'inscription la
- * plus utilisée — le trou serait à moitié bouché, ce qui est pire que visiblement ouvert. Rançon
- * assumée : quelqu'un qui possède déjà un compte doit cocher pour redemander un lien. « Se
- * connecter » (mot de passe), lui, N'EST PAS bridé : il ne peut rien créer.
+ * ⚠️ « UNE SEULE FOIS SUFFIT » (Benoît, 06/08/2026) — CE QUI LE REND VRAI, ET QU'IL NE FAUT PAS
+ * DÉFAIRE. La case ne vit que dans l'onglet MOT DE PASSE, parce que c'est le seul chemin de création
+ * de compte : `demanderLienMagique` passe désormais `shouldCreateUser: false` (auth/actions.ts), donc
+ * le lien par e-mail ne crée plus rien et ne demande plus jamais de cocher.
  *
- * ⚠️ CE QUE LA CASE NE FAIT PAS — À NE PAS PRENDRE POUR UNE CONFORMITÉ COMPLÈTE : rien n'est
- * enregistré côté serveur (ni date, ni version du texte accepté). Elle empêche de s'inscrire sans
- * avoir eu la politique sous les yeux ; elle ne constitue PAS une preuve de consentement opposable.
- * Une colonne `consentement_le` + une version de texte seraient nécessaires pour ça — pas fait,
- * jamais laissé croire.
+ * Cet équilibre tient à un fil : rétablir la création de comptes par lien magique (retirer
+ * `shouldCreateUser: false`) rouvrirait une porte d'inscription SANS case ET SANS preuve conservée.
+ * Les deux vont ensemble — ne toucher à l'un qu'en traitant l'autre.
+ *
+ * « Se connecter » (mot de passe) n'est pas bridé non plus : il ne peut rien créer, et qui possède
+ * déjà un compte a déjà consenti — sa preuve est en base.
+ *
+ * ⚠️ CE QUE LA CASE PROUVE, ET CE QU'ELLE NE PROUVE PAS. La preuve EST conservée depuis le
+ * 06/08/2026 : `creerCompte` transmet la version du texte et l'instant du clic à `signUp`, et
+ * `storage/consentementStorage.ts` les recopie dans la table `consentements` (migration 0004) à la
+ * première session. En revanche les comptes créés AVANT cette date n'ont aucune preuve, et il ne faut
+ * surtout pas en fabriquer une : `synchroniserConsentement` rend `aucuneMetadonnee` et n'écrit rien.
  *
  * ⚠️ CAS `nonConfigure` — FRAGILITÉ NOUVELLE, ASSUMÉE : avant cette décision, l'absence de
  * configuration Supabase faisait retomber Cadence sur le localStorage (utilisable quand même). Ce
@@ -224,39 +228,45 @@ export function EcranConnexionObligatoire({
         </div>
       )}
 
-      {/* Le consentement se trouve SOUS les champs et AU-DESSUS des boutons : à lire avant d'agir,
-          jamais découvert après coup. */}
-      <div className="rounded-lg border border-line bg-surface-2/40 px-3 py-2.5 space-y-2">
-        <label htmlFor="consentement-confidentialite" className="flex items-start gap-2 text-sm text-ink leading-relaxed cursor-pointer">
-          <input
-            id="consentement-confidentialite"
-            type="checkbox"
-            checked={consentement}
-            onChange={(e) => setConsentement(e.target.checked)}
-            className="mt-0.5 shrink-0 accent-mint"
-          />
-          <span>J'ai lu et j'accepte la politique de confidentialité de Cadence.</span>
-        </label>
-        <button type="button" onClick={() => setMentionsOuvertes(true)} className="text-xs text-mint underline">
-          Lire la politique de confidentialité
-        </button>
-        {!consentement && (
-          <p className="text-xs text-faint leading-relaxed">
-            Nécessaire pour créer un compte. Le lien par e-mail en crée un si cette adresse n'en a pas encore : il demande donc la même case.
-          </p>
-        )}
-      </div>
+      {/* LA CASE NE VIT QUE DANS L'ONGLET MOT DE PASSE, seul chemin de création de compte depuis que
+          le lien par e-mail ne crée plus rien (`shouldCreateUser: false`). C'est ce qui rend « une
+          seule fois suffit » vrai : se connecter ne demande plus jamais de cocher quoi que ce soit. */}
+      {mode === "motDePasse" && (
+        <div className="rounded-lg border border-line bg-surface-2/40 px-3 py-2.5 space-y-2">
+          <label htmlFor="consentement-confidentialite" className="flex items-start gap-2 text-sm text-ink leading-relaxed cursor-pointer">
+            <input
+              id="consentement-confidentialite"
+              type="checkbox"
+              checked={consentement}
+              onChange={(e) => setConsentement(e.target.checked)}
+              className="mt-0.5 shrink-0 accent-mint"
+            />
+            <span>J'ai lu et j'accepte la politique de confidentialité de Cadence.</span>
+          </label>
+          <button type="button" onClick={() => setMentionsOuvertes(true)} className="text-xs text-mint underline">
+            Lire la politique de confidentialité
+          </button>
+          {!consentement && (
+            <p className="text-xs text-faint leading-relaxed">
+              Nécessaire uniquement pour créer un compte — pas pour te connecter. Une seule fois : la date et la version du texte accepté sont conservées.
+            </p>
+          )}
+        </div>
+      )}
 
       {mode === "lienMagique" ? (
         <>
           <button
             type="button"
             onClick={() => lancer((c) => demanderLienMagique(c, email, origineEffective))}
-            disabled={enCours || !consentement}
+            disabled={enCours}
             className="w-full bg-mint text-bg font-medium rounded-lg py-2.5 disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {enCours ? "Envoi…" : "Recevoir un lien de connexion"}
           </button>
+          <p className="text-xs text-faint leading-relaxed">
+            Ce lien sert à te connecter à un compte existant : il n'en crée pas. Pour un premier compte, passe par « Mot de passe » puis « Créer un compte ».
+          </p>
           <p className="text-xs text-amber leading-relaxed">
             Le lien doit être ouvert depuis ce navigateur-ci : c'est lui qui détient la clé de la session, elle ne voyage pas dans l'e-mail. Si tu lis tes e-mails sur ton téléphone mais que tu as
             demandé le lien depuis un ordinateur (ou l'inverse), ouvre-le quand même depuis l'appareil qui a fait la demande — sinon la connexion échouera.

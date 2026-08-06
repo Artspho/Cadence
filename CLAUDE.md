@@ -148,17 +148,40 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 > `EcranConnexionObligatoire.tsx` porte désormais une case « J'ai lu et j'accepte… » + un bouton qui
 > ouvre la modale `MentionsLegales` RÉUTILISÉE telle quelle (toujours aucune seconde copie du texte).
 >
-> Trois points à ne pas défaire par mégarde :
->  · la case bride AUSSI « Recevoir un lien de connexion », pas seulement « Créer un compte » :
->    `demanderLienMagique` appelle `signInWithOtp` sans `shouldCreateUser: false`, dont le défaut
->    Supabase est `true` — ce bouton crée donc un compte. Ne le débrider qu'en passant
->    `shouldCreateUser: false`, jamais sans ;
->  · « Se connecter » (mot de passe) n'est PAS bridé, exprès : il ne peut rien créer, et quelqu'un qui
->    a déjà un compte a déjà consenti. Un test le verrouille explicitement ;
->  · ⚠️ RIEN N'EST ENREGISTRÉ CÔTÉ SERVEUR (ni date, ni version du texte accepté). La case empêche de
->    s'inscrire sans avoir eu la politique sous les yeux ; elle NE CONSTITUE PAS une preuve de
->    consentement opposable. Une colonne `consentement_le` + une version de texte seraient nécessaires
->    — pas fait, et jamais présenté comme fait.
+> **LA PREUVE EST DÉSORMAIS CONSERVÉE** (06/08/2026, second temps du même chantier — Benoît : « une
+> seule fois suffit. Je veux que cette preuve soit stockée »).
+>
+> ⚠️ LE PROBLÈME QUE TOUTE CETTE MÉCANIQUE RÉSOUT : à l'instant où la case est cochée, AUCUNE SESSION
+> N'EXISTE (`signUp` avec confirmation par e-mail n'en ouvre pas), donc RLS interdit d'écrire dans
+> `consentements`. Écrire la preuve « à l'inscription » est littéralement impossible. D'où deux temps :
+>  1. `creerCompte` transmet version du texte + instant du clic à `signUp(options.data)` — Supabase les
+>     écrit dans `raw_user_meta_data` AU MOMENT MÊME de la création, sans session ;
+>  2. `synchroniserConsentement` (`storage/consentementStorage.ts`, appelé par un `useEffect` d'App.tsx)
+>     les recopie dans `consentements` à la première session.
+> La métadonnée est un PORTEUR (l'utilisateur peut la réécrire via `updateUser`), la table est le
+> COFFRE. Ni l'une ni l'autre ne suffit seule — ne pas simplifier en n'en gardant qu'une.
+>
+> Cinq points à ne pas défaire par mégarde :
+>  · `demanderLienMagique` passe `shouldCreateUser: false` : le lien par e-mail ne crée PLUS de compte,
+>    c'est ce qui rend « une seule fois suffit » vrai (se connecter ne demande plus jamais de cocher).
+>    Le retirer rouvrirait une porte d'inscription sans case ET sans preuve — les deux vont ensemble ;
+>  · la case ne vit donc QUE dans l'onglet mot de passe, seul chemin de création ;
+>  · « Se connecter » n'est PAS bridé, exprès : il ne peut rien créer. Un test le verrouille ;
+>  · ⚠️ `consentements` EST LA SEULE TABLE DU SCHÉMA SANS POLITIQUE `update` NI `delete`, et
+>    `ClientConsentements` n'expose ni l'un ni l'autre : une preuve que son sujet peut réécrire ou
+>    effacer n'est pas une preuve. Ne pas « harmoniser » avec les autres tables ;
+>  · ⚠️ LES COMPTES CRÉÉS AVANT LE 06/08/2026 N'ONT AUCUNE PREUVE. `synchroniserConsentement` rend
+>    `aucuneMetadonnee` et n'écrit RIEN — écrire la date du jour fabriquerait une preuve fausse, pire
+>    que pas de preuve. Si la question se pose, c'est la vérité à dire.
+>
+> `VERSION_POLITIQUE` (`content/mentionsLegales.ts`) : à incrémenter dès que la politique change sur le
+> fond — ça fait redemander la case aux comptes existants, effet voulu. Pas pour une faute de frappe.
+>
+> ⚠️ ÉTAT AU 06/08/2026 : `supabase/migrations/0004_consentements.sql` N'A PAS ENCORE ÉTÉ APPLIQUÉE
+> (Benoît doit la coller dans l'éditeur SQL). Tant que ce n'est pas fait, la recopie échoue — SANS
+> conséquence pour l'utilisateur (l'effet n'est jamais bloquant, la métadonnée reste intacte, la
+> recopie est retentée à la session suivante). `npm run verifier:consentement` le dit explicitement, et
+> prouve ensuite l'essentiel : le sujet ne peut ni falsifier ni supprimer sa propre preuve.
 >
 > Si un jour une page publique du texte légal devient nécessaire, elle doit être GÉNÉRÉE depuis
 > `content/mentionsLegales.ts`, pas réécrite à la main (cf. la dérive de `public/confidentialite.html`).

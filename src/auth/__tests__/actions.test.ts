@@ -6,6 +6,8 @@
 import { describe, expect, it, vi } from "vitest";
 import { connexionMotDePasse, creerCompte, definirMotDePasse, demanderLienMagique, messageErreur, seDeconnecter } from "../actions";
 import type { ClientAuth, ErreurAuth, SessionMinimale } from "../supabaseClient";
+import { VERSION_POLITIQUE } from "../../content/mentionsLegales";
+import { CLE_METADONNEE_CONSENTEMENT } from "../../storage/consentementStorage";
 
 const SESSION: SessionMinimale = { user: { id: "u-1", email: "benoit@example.com" } };
 const ORIGINE = "https://cadence-git-master-benoit3.vercel.app";
@@ -20,6 +22,7 @@ function fauxClient(reponses: Partial<ClientAuth> = {}): ClientAuth {
     signUp: vi.fn(async () => ({ data: { session: null }, error: null })),
     signOut: vi.fn(async () => ({ error: null })),
     updateUser: vi.fn(async () => ({ error: null })),
+    getUser: vi.fn(async () => ({ data: { user: null }, error: null })),
     ...reponses,
   };
 }
@@ -72,7 +75,25 @@ describe("demanderLienMagique", () => {
   it("transmet l'origine de retour telle quelle", async () => {
     const client = fauxClient();
     await demanderLienMagique(client, "  benoit@example.com  ", ORIGINE);
-    expect(client.signInWithOtp).toHaveBeenCalledWith({ email: "benoit@example.com", options: { emailRedirectTo: ORIGINE } });
+    expect(client.signInWithOtp).toHaveBeenCalledWith({ email: "benoit@example.com", options: { emailRedirectTo: ORIGINE, shouldCreateUser: false } });
+  });
+
+  it("NE CRÉE JAMAIS DE COMPTE (shouldCreateUser: false) — sinon inscription sans case ni preuve", async () => {
+    // Le défaut de Supabase est `true`. Sans ce paramètre explicite, ce bouton devenait la porte
+    // d'inscription la plus utilisée, sans consentement recueilli ni conservé (06/08/2026).
+    const client = fauxClient();
+    await demanderLienMagique(client, "inconnu@example.com", ORIGINE);
+    const parametres = vi.mocked(client.signInWithOtp).mock.calls[0][0];
+    expect(parametres.options?.shouldCreateUser).toBe(false);
+  });
+
+  it("traduit le refus d'une adresse sans compte en indiquant où créer le compte", async () => {
+    // Conséquence directe de `shouldCreateUser: false` : Supabase refuse au lieu de créer en silence.
+    const client = fauxClient({ signInWithOtp: vi.fn(async () => ({ error: erreur("Signups not allowed for otp") })) });
+    const resultat = await demanderLienMagique(client, "inconnu@example.com", ORIGINE);
+    expect(resultat.ok).toBe(false);
+    expect(resultat.message).toMatch(/aucun compte n'existe pour cette adresse/i);
+    expect(resultat.message).toMatch(/créer un compte/i);
   });
 
   it("annonce une demande ACCEPTÉE, pas un e-mail arrivé, et prévient pour le navigateur", async () => {
@@ -134,6 +155,31 @@ describe("creerCompte", () => {
   it("ne dit rien de plus quand la session est immédiate (confirmation désactivée)", async () => {
     const client = fauxClient({ signUp: vi.fn(async () => ({ data: { session: SESSION }, error: null })) });
     expect(await creerCompte(client, "benoit@example.com", "motdepasse-solide", ORIGINE)).toEqual({ ok: true, message: null });
+  });
+
+  it("TRANSPORTE LA PREUVE DU CONSENTEMENT dans les métadonnées — seul instant où c'est possible", async () => {
+    // Aucune session n'existe encore, donc RLS interdit d'écrire dans `consentements`. Supabase écrit
+    // ces métadonnées au moment même de la création du compte ; `synchroniserConsentement` les
+    // recopiera dans la table à la première session (cf. storage/consentementStorage.ts).
+    const client = fauxClient();
+    const avant = Date.now();
+    await creerCompte(client, "nouveau@example.com", "motdepasse-solide", ORIGINE);
+    const parametres = vi.mocked(client.signUp).mock.calls[0][0];
+
+    const preuve = parametres.options?.data?.[CLE_METADONNEE_CONSENTEMENT] as { version: string; accepte_le: string };
+    expect(preuve).toBeDefined();
+    // La VERSION est indispensable : sans elle, la preuve ne dirait pas à quoi la personne a consenti.
+    expect(preuve.version).toBe(VERSION_POLITIQUE);
+    const instant = Date.parse(preuve.accepte_le);
+    expect(Number.isNaN(instant)).toBe(false);
+    expect(instant).toBeGreaterThanOrEqual(avant);
+  });
+
+  it("garde l'origine de retour EN PLUS des métadonnées — l'ajout de la preuve n'écrase rien", async () => {
+    const client = fauxClient();
+    await creerCompte(client, "nouveau@example.com", "motdepasse-solide", ORIGINE);
+    const parametres = vi.mocked(client.signUp).mock.calls[0][0];
+    expect(parametres.options?.emailRedirectTo).toBe(ORIGINE);
   });
 });
 

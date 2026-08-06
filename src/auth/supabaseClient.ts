@@ -31,12 +31,40 @@ export interface ClientAuth {
   onAuthStateChange(rappel: (evenement: string, session: SessionMinimale | null) => void): {
     data: { subscription: { unsubscribe: () => void } };
   };
-  signInWithOtp(parametres: { email: string; options?: { emailRedirectTo?: string } }): Promise<{ error: ErreurAuth | null }>;
+  /**
+   * `shouldCreateUser` est exposé EXPRÈS : Cadence le met à `false` (06/08/2026) pour que le lien
+   * par e-mail soit une pure CONNEXION. Sans lui, le défaut de Supabase est `true` et ce bouton
+   * créerait des comptes — donc une inscription sans case de consentement cochée ni preuve conservée.
+   */
+  signInWithOtp(parametres: { email: string; options?: { emailRedirectTo?: string; shouldCreateUser?: boolean } }): Promise<{ error: ErreurAuth | null }>;
   signInWithPassword(parametres: { email: string; password: string }): Promise<{ data: { session: SessionMinimale | null }; error: ErreurAuth | null }>;
-  signUp(parametres: { email: string; password: string; options?: { emailRedirectTo?: string } }): Promise<{ data: { session: SessionMinimale | null }; error: ErreurAuth | null }>;
+  /**
+   * `options.data` alimente `raw_user_meta_data`, écrit par Supabase AU MOMENT MÊME de la création du
+   * compte. C'est le seul endroit où le consentement peut voyager : à cet instant aucune session
+   * n'existe, donc RLS interdit d'écrire dans `public.consentements` (cf. migration 0004).
+   */
+  signUp(parametres: {
+    email: string;
+    password: string;
+    options?: { emailRedirectTo?: string; data?: Record<string, unknown> };
+  }): Promise<{ data: { session: SessionMinimale | null }; error: ErreurAuth | null }>;
   signOut(): Promise<{ error: ErreurAuth | null }>;
   /** Définit ou change le mot de passe d'une session déjà ouverte (lien magique ou mot de passe). */
   updateUser(attributs: { password: string }): Promise<{ error: ErreurAuth | null }>;
+  /**
+   * Lit l'utilisateur de la session en cours, métadonnées comprises — la seule façon de retrouver le
+   * consentement transmis à `signUp` pour le recopier dans `public.consentements` à la première
+   * session. Lecture seule : rien ici n'écrit de métadonnée.
+   */
+  getUser(): Promise<{ data: { user: UtilisateurMinimal | null }; error: ErreurAuth | null }>;
+}
+
+/** L'utilisateur tel que `getUser` le rend, réduit à ce que Cadence lit vraiment. */
+export interface UtilisateurMinimal {
+  id: string;
+  email?: string;
+  /** `raw_user_meta_data` côté SQL. Contient `consentement_politique` pour les comptes créés depuis le 06/08/2026. */
+  user_metadata?: Record<string, unknown>;
 }
 
 export interface SessionMinimale {
@@ -225,10 +253,29 @@ export function construireClientAuth(configuration: ConfigurationSupabase): Clie
   return construireClient(configuration)?.auth ?? null;
 }
 
+/**
+ * LA SURFACE DE LA PREUVE DE CONSENTEMENT — table `consentements` (migration 0004).
+ *
+ * ⚠️ NI `update` NI `delete`, ET CE N'EST PAS UN OUBLI. La migration 0004 ne crée aucune politique
+ * RLS de modification ou de suppression sur cette table, seule du schéma dans ce cas : une preuve que
+ * la personne concernée peut réécrire ou effacer n'est pas une preuve. Ce type dit la même chose au
+ * compilateur — écrire un jour `.update(...)` ici ne compilera pas, avant même de se heurter au
+ * serveur. Ne pas l'élargir « au cas où » ; s'il faut corriger une ligne, ça passe par le tableau de
+ * bord Supabase.
+ */
+export interface ClientConsentements {
+  from(table: string): {
+    select(colonnes: string): {
+      eq(colonne: string, valeur: string): PromiseLike<{ data: Record<string, unknown>[] | null; error: ErreurPostgrest | null }>;
+    };
+    insert(ligne: Record<string, unknown>): PromiseLike<{ data: Record<string, unknown>[] | null; error: ErreurPostgrest | null }>;
+  };
+}
+
 /** Le nom du bucket est fixé ici, une seule fois — jamais recopié en chaîne ailleurs. */
 export const BUCKET_JUSTIFICATIFS = "justificatifs";
 
-/** Les cinq surfaces exposées par Cadence, issues d'UN SEUL client Supabase. */
+/** Les six surfaces exposées par Cadence, issues d'UN SEUL client Supabase. */
 export interface ClientCadence {
   auth: ClientAuth;
   /** Phase 4 : la lecture, réservée à la vérification. Cf. `ClientLectureDonnees`. */
@@ -239,6 +286,8 @@ export interface ClientCadence {
   documents: ClientDocuments;
   /** Phase 6 : le bucket `justificatifs`, déjà lié — l'appelant ne choisit jamais le bucket. */
   fichiers: ClientFichiers;
+  /** 06/08/2026 : la table `consentements`. Lecture + insertion SEULEMENT. Cf. `ClientConsentements`. */
+  consentements: ClientConsentements;
 }
 
 /**
@@ -291,6 +340,7 @@ export function construireClient(configuration: ConfigurationSupabase): ClientCa
       // Lié au bucket UNE FOIS ici : aucun appelant ne passe `BUCKET_JUSTIFICATIFS` lui-même, donc
       // aucun risque d'un jour l'écrire à la main dans le mauvais bucket.
       fichiers: client.storage.from(BUCKET_JUSTIFICATIFS) as unknown as ClientFichiers,
+      consentements: client as unknown as ClientConsentements,
     };
   } catch {
     // `createClient` lève sur une URL malformée. Une variable d'environnement mal recopiée ne doit
@@ -338,6 +388,10 @@ export function obtenirClientDocuments(): ClientDocuments | null {
 
 export function obtenirClientFichiers(): ClientFichiers | null {
   return obtenirClient()?.fichiers ?? null;
+}
+
+export function obtenirClientConsentements(): ClientConsentements | null {
+  return obtenirClient()?.consentements ?? null;
 }
 
 /** Réservé aux tests : oublie le client mémorisé. */

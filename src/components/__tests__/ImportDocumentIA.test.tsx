@@ -43,6 +43,7 @@ function fauxClientAuth(reponses: Partial<ClientAuth> = {}): ClientAuth {
     signUp: vi.fn(async () => ({ data: { session: null }, error: null })),
     signOut: vi.fn(async () => ({ error: null })),
     updateUser: vi.fn(async () => ({ error: null })),
+    getUser: vi.fn(async () => ({ data: { user: null }, error: null })),
     ...reponses,
   };
 }

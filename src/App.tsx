@@ -17,8 +17,9 @@ import {
 import { ecrireEtatServeur, lireEtatServeur, type EtatEnregistrement, type Jeton } from "./storage/sourceSupabase";
 import { analyserBascule, type Bascule } from "./storage/bascule";
 import { texteCanonique } from "./storage/verificationMigration";
-import { obtenirClientAuth, obtenirClientSourceDonnees } from "./auth/supabaseClient";
+import { obtenirClientAuth, obtenirClientConsentements, obtenirClientSourceDonnees } from "./auth/supabaseClient";
 import { useSession } from "./auth/session";
+import { synchroniserConsentement } from "./storage/consentementStorage";
 import { EcranDonneesIllisibles } from "./components/EcranDonneesIllisibles";
 import { DecisionServeur, type BasculeADecider } from "./components/DecisionServeur";
 import { BandeauLectureSeule } from "./components/BandeauLectureSeule";
@@ -141,6 +142,7 @@ export default function App() {
   // donc sans condition, et aurait contourné le verrou installé ici (cf. auth/supabaseClient.ts).
   const clientAuth = obtenirClientAuth();
   const clientSource = obtenirClientSourceDonnees();
+  const clientConsentements = obtenirClientConsentements();
   const session = useSession(clientAuth);
   /**
    * ⚠️ L'ÉTAT INITIAL DÉPEND DE LA CONFIGURATION, ET CE N'EST PAS UN DÉTAIL. Une première version
@@ -165,6 +167,8 @@ export default function App() {
    * l'ordre des clés d'un JSONB.
    */
   const empreinteServeur = useRef<string | null>(null);
+  /** Utilisateur dont la preuve de consentement a déjà fait l'objet d'une tentative de recopie. */
+  const consentementRecopie = useRef<string | null>(null);
   /** Ce qui a déjà été interrogé, pour ne lire le serveur qu'une fois par session (et par relance). */
   const interrogationFaite = useRef<string | null>(null);
 
@@ -195,6 +199,28 @@ export default function App() {
     // n°2 de la critique — le sujet complet, quota plein et purge, reste ouvert).
     sauvegarderDonnees(donnees).then((resultat) => setErreurSauvegarde(resultat.ok ? null : resultat.message));
   }, [donnees, lectureSaine, ecritureAutorisee]);
+
+  // ── La preuve du consentement, recopiée à la PREMIÈRE session ──────────────────────────────────
+  //
+  // Pourquoi ici et pas à l'inscription : au moment où la case est cochée, aucune session n'existe,
+  // donc RLS interdit d'écrire dans `consentements` (cf. storage/consentementStorage.ts et la
+  // migration 0004). La métadonnée écrite par `signUp` attend donc la première session, et c'est cet
+  // effet qui la transforme en preuve durable.
+  //
+  // ⚠️ JAMAIS BLOQUANT, DANS AUCUN CAS. Un échec (réseau, migration 0004 pas encore appliquée) ne doit
+  // empêcher personne d'utiliser Cadence : le consentement a bien été donné et sa métadonnée reste
+  // intacte côté Supabase. Une tentative par session, puis on laisse tomber jusqu'à la suivante —
+  // réessayer à chaque rendu martèlerait le serveur pour un archivage qui n'est pas urgent.
+  useEffect(() => {
+    if (session.statut !== "connecte" || !clientAuth || !clientConsentements) return;
+    if (consentementRecopie.current === session.utilisateurId) return;
+    consentementRecopie.current = session.utilisateurId;
+    synchroniserConsentement(clientAuth, clientConsentements).then((resultat) => {
+      if (resultat.statut === "echec") {
+        console.error("Preuve de consentement non archivée (nouvelle tentative à la prochaine session).", resultat.message);
+      }
+    });
+  }, [session, clientAuth, clientConsentements]);
 
   // ── Ce que porte le serveur, et ce qu'on en conclut ─────────────────────────────────────────────
   useEffect(() => {

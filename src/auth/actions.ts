@@ -1,4 +1,6 @@
 import type { ClientAuth, ErreurAuth } from "./supabaseClient";
+import { VERSION_POLITIQUE } from "../content/mentionsLegales";
+import { metadonneeConsentement } from "../storage/consentementStorage";
 
 /**
  * Les quatre gestes possibles : demander un lien magique, se connecter par mot de passe, créer un
@@ -48,6 +50,16 @@ export function messageErreur(erreur: ErreurAuth): string {
   if (repere.includes("invalid login credentials")) {
     return "Adresse e-mail ou mot de passe incorrect.";
   }
+  // Conséquence directe de `shouldCreateUser: false` (06/08/2026) : Supabase refuse d'envoyer un lien
+  // à une adresse sans compte, au lieu d'en créer un en silence. Sans cette traduction, « Signups not
+  // allowed for otp » enverrait chercher une panne là où il n'y a qu'un compte à créer.
+  if (repere.includes("signups not allowed") || repere.includes("otp_disabled")) {
+    return (
+      "Aucun compte n'existe pour cette adresse. Le lien par e-mail sert à se connecter, pas à " +
+      "s'inscrire : passe par « Mot de passe » puis « Créer un compte », où la politique de " +
+      "confidentialité t'est présentée."
+    );
+  }
   if (repere.includes("email not confirmed")) {
     return "Ce compte existe, mais son adresse n'a pas encore été confirmée par e-mail.";
   }
@@ -80,7 +92,13 @@ function adresseValide(email: string): boolean {
 export async function demanderLienMagique(client: ClientAuth, email: string, origine: string): Promise<ResultatAuth> {
   if (!adresseValide(email)) return { ok: false, message: "Adresse e-mail incomplète." };
 
-  const { error } = await client.signInWithOtp({ email: email.trim(), options: { emailRedirectTo: origine } });
+  // ⚠️ `shouldCreateUser: false` — DÉCISION DE BENOÎT DU 06/08/2026, NE PAS RETIRER. Sans lui, le
+  // défaut de Supabase est `true` : ce bouton créait des comptes, donc des inscriptions sans case de
+  // consentement cochée ni preuve conservée (cf. storage/consentementStorage.ts). Le lien par e-mail
+  // est désormais une pure CONNEXION ; la création de compte passe uniquement par le mot de passe,
+  // seul endroit où la case et la preuve existent. C'est aussi ce qui rend « une seule fois suffit »
+  // possible : plus aucune case n'est demandée pour se connecter.
+  const { error } = await client.signInWithOtp({ email: email.trim(), options: { emailRedirectTo: origine, shouldCreateUser: false } });
   if (error) return { ok: false, message: messageErreur(error) };
 
   // Formulation prudente et exacte : Supabase confirme avoir ACCEPTÉ la demande, pas que le message
@@ -120,7 +138,15 @@ export async function creerCompte(client: ClientAuth, email: string, motDePasse:
     return { ok: false, message: `Mot de passe trop court : ${LONGUEUR_MINIMALE_MOT_DE_PASSE} caractères au minimum.` };
   }
 
-  const { data, error } = await client.signUp({ email: email.trim(), password: motDePasse, options: { emailRedirectTo: origine } });
+  // La preuve du consentement voyage ICI, et nulle part ailleurs : c'est le seul instant où elle peut
+  // être écrite de façon atomique avec la création du compte, sans session (cf.
+  // storage/consentementStorage.ts). L'appelant a déjà exigé la case cochée — cette fonction n'est
+  // jamais atteinte sans elle.
+  const { data, error } = await client.signUp({
+    email: email.trim(),
+    password: motDePasse,
+    options: { emailRedirectTo: origine, data: metadonneeConsentement(VERSION_POLITIQUE) },
+  });
   if (error) return { ok: false, message: messageErreur(error) };
 
   // Session immédiate = la confirmation par e-mail est désactivée sur le projet : la connexion est
