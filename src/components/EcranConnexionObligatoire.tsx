@@ -11,6 +11,26 @@
  * Seul le JSX est nouveau — plein écran, bloquant, au lieu d'une section imbriquée dans « Mon
  * profil ».
  *
+ * ⚠️ CONSENTEMENT À L'INSCRIPTION (06/08/2026, demandé par Benoît). `content/mentionsLegales.ts`
+ * déclare pour base légale « ton consentement, donné explicitement à l'inscription » — or ce texte
+ * n'était atteignable que depuis « Mon profil », donc APRÈS connexion : on ne pouvait pas lire la
+ * politique avant d'y consentir. La case ci-dessous comble ce trou, et la modale `MentionsLegales`
+ * est RÉUTILISÉE telle quelle (aucune seconde copie du texte, cf. l'en-tête de ce composant).
+ *
+ * ⚠️ POURQUOI LA CASE BRIDE AUSSI LE LIEN PAR E-MAIL, ET PAS SEULEMENT « CRÉER UN COMPTE ».
+ * `demanderLienMagique` appelle `signInWithOtp` sans `shouldCreateUser: false` (auth/actions.ts) :
+ * son défaut côté Supabase est `true`, donc CE BOUTON CRÉE UN COMPTE quand l'adresse est inconnue.
+ * Le brider seulement sur « Créer un compte » laisserait grande ouverte la porte d'inscription la
+ * plus utilisée — le trou serait à moitié bouché, ce qui est pire que visiblement ouvert. Rançon
+ * assumée : quelqu'un qui possède déjà un compte doit cocher pour redemander un lien. « Se
+ * connecter » (mot de passe), lui, N'EST PAS bridé : il ne peut rien créer.
+ *
+ * ⚠️ CE QUE LA CASE NE FAIT PAS — À NE PAS PRENDRE POUR UNE CONFORMITÉ COMPLÈTE : rien n'est
+ * enregistré côté serveur (ni date, ni version du texte accepté). Elle empêche de s'inscrire sans
+ * avoir eu la politique sous les yeux ; elle ne constitue PAS une preuve de consentement opposable.
+ * Une colonne `consentement_le` + une version de texte seraient nécessaires pour ça — pas fait,
+ * jamais laissé croire.
+ *
  * ⚠️ CAS `nonConfigure` — FRAGILITÉ NOUVELLE, ASSUMÉE : avant cette décision, l'absence de
  * configuration Supabase faisait retomber Cadence sur le localStorage (utilisable quand même). Ce
  * repli n'existe plus : sans configuration, plus personne ne peut ouvrir Cadence. C'est la
@@ -19,6 +39,7 @@
  * mode dégradé rassurant.
  */
 import { useState } from "react";
+import { MentionsLegales } from "./MentionsLegales";
 import { obtenirClientAuth, type ClientAuth } from "../auth/supabaseClient";
 import type { EtatSession } from "../auth/session";
 import { INDICE_RETOUR_LIEN, type IndiceRetourLien } from "../auth/retourLienMagique";
@@ -66,6 +87,8 @@ export function EcranConnexionObligatoire({
   const [enCours, setEnCours] = useState(false);
   const [information, setInformation] = useState<string | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
+  const [consentement, setConsentement] = useState(false);
+  const [mentionsOuvertes, setMentionsOuvertes] = useState(false);
 
   const origineEffective = origine ?? (typeof window === "undefined" ? "" : window.location.origin);
 
@@ -185,12 +208,51 @@ export function EcranConnexionObligatoire({
         <input id="connexion-email" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} className={CLASSE_CHAMP} />
       </div>
 
+      {mode === "motDePasse" && (
+        <div>
+          <label className={CLASSE_ETIQUETTE} htmlFor="connexion-mot-de-passe">
+            Mot de passe
+          </label>
+          <input
+            id="connexion-mot-de-passe"
+            type="password"
+            autoComplete="current-password"
+            value={motDePasse}
+            onChange={(e) => setMotDePasse(e.target.value)}
+            className={CLASSE_CHAMP}
+          />
+        </div>
+      )}
+
+      {/* Le consentement se trouve SOUS les champs et AU-DESSUS des boutons : à lire avant d'agir,
+          jamais découvert après coup. */}
+      <div className="rounded-lg border border-line bg-surface-2/40 px-3 py-2.5 space-y-2">
+        <label htmlFor="consentement-confidentialite" className="flex items-start gap-2 text-sm text-ink leading-relaxed cursor-pointer">
+          <input
+            id="consentement-confidentialite"
+            type="checkbox"
+            checked={consentement}
+            onChange={(e) => setConsentement(e.target.checked)}
+            className="mt-0.5 shrink-0 accent-mint"
+          />
+          <span>J'ai lu et j'accepte la politique de confidentialité de Cadence.</span>
+        </label>
+        <button type="button" onClick={() => setMentionsOuvertes(true)} className="text-xs text-mint underline">
+          Lire la politique de confidentialité
+        </button>
+        {!consentement && (
+          <p className="text-xs text-faint leading-relaxed">
+            Nécessaire pour créer un compte. Le lien par e-mail en crée un si cette adresse n'en a pas encore : il demande donc la même case.
+          </p>
+        )}
+      </div>
+
       {mode === "lienMagique" ? (
         <>
           <button
             type="button"
             onClick={() => lancer((c) => demanderLienMagique(c, email, origineEffective))}
-            disabled={enCours}
+            disabled={enCours || !consentement}
             className="w-full bg-mint text-bg font-medium rounded-lg py-2.5 disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {enCours ? "Envoi…" : "Recevoir un lien de connexion"}
@@ -202,20 +264,8 @@ export function EcranConnexionObligatoire({
         </>
       ) : (
         <>
-          <div>
-            <label className={CLASSE_ETIQUETTE} htmlFor="connexion-mot-de-passe">
-              Mot de passe
-            </label>
-            <input
-              id="connexion-mot-de-passe"
-              type="password"
-              autoComplete="current-password"
-              value={motDePasse}
-              onChange={(e) => setMotDePasse(e.target.value)}
-              className={CLASSE_CHAMP}
-            />
-          </div>
           <div className="flex gap-2">
+            {/* « Se connecter » n'est PAS bridé par la case : il ne peut créer aucun compte. */}
             <button
               type="button"
               onClick={() => lancer((c) => connexionMotDePasse(c, email, motDePasse))}
@@ -227,8 +277,8 @@ export function EcranConnexionObligatoire({
             <button
               type="button"
               onClick={() => lancer((c) => creerCompte(c, email, motDePasse, origineEffective))}
-              disabled={enCours}
-              className="px-4 rounded-lg border border-line text-muted disabled:opacity-40"
+              disabled={enCours || !consentement}
+              className="px-4 rounded-lg border border-line text-muted disabled:opacity-40 disabled:cursor-not-allowed"
             >
               Créer un compte
             </button>
@@ -247,6 +297,8 @@ export function EcranConnexionObligatoire({
           {erreur}
         </p>
       )}
+
+      {mentionsOuvertes && <MentionsLegales onFermer={() => setMentionsOuvertes(false)} />}
     </Cadre>
   );
 }

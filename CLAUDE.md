@@ -141,13 +141,27 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 > publiquement accessible. `content/mentionsLegales.ts` reste la SOURCE UNIQUE ; ne pas recréer de
 > doublon HTML écrit à la main — c'est cette duplication qui a produit la dérive.
 >
-> **Trouvé au passage, PAS corrigé (à arbitrer avec Benoît)** : le texte légal n'est atteignable QUE
-> depuis `MonProfil` (`MentionsLegales.tsx`), donc APRÈS connexion — alors que
+> **Trou du consentement à l'inscription — COMBLÉ le 06/08/2026, sur demande de Benoît.** Le texte
+> légal n'était atteignable que depuis `MonProfil`, donc APRÈS connexion, alors que
 > `content/mentionsLegales.ts` donne pour base légale « ton consentement, donné explicitement à
-> l'inscription ». `EcranConnexionObligatoire.tsx` ne contient aucun lien vers ce texte (vérifié : zéro
-> occurrence de « confidentialité »/« légal »/« consent »). Un futur visiteur consent donc sans pouvoir
-> lire la politique. Si un jour une page publique est nécessaire pour combler ça, elle doit être
-> GÉNÉRÉE depuis `content/mentionsLegales.ts`, pas réécrite à la main.
+> l'inscription » : on ne pouvait pas lire la politique avant d'y consentir.
+> `EcranConnexionObligatoire.tsx` porte désormais une case « J'ai lu et j'accepte… » + un bouton qui
+> ouvre la modale `MentionsLegales` RÉUTILISÉE telle quelle (toujours aucune seconde copie du texte).
+>
+> Trois points à ne pas défaire par mégarde :
+>  · la case bride AUSSI « Recevoir un lien de connexion », pas seulement « Créer un compte » :
+>    `demanderLienMagique` appelle `signInWithOtp` sans `shouldCreateUser: false`, dont le défaut
+>    Supabase est `true` — ce bouton crée donc un compte. Ne le débrider qu'en passant
+>    `shouldCreateUser: false`, jamais sans ;
+>  · « Se connecter » (mot de passe) n'est PAS bridé, exprès : il ne peut rien créer, et quelqu'un qui
+>    a déjà un compte a déjà consenti. Un test le verrouille explicitement ;
+>  · ⚠️ RIEN N'EST ENREGISTRÉ CÔTÉ SERVEUR (ni date, ni version du texte accepté). La case empêche de
+>    s'inscrire sans avoir eu la politique sous les yeux ; elle NE CONSTITUE PAS une preuve de
+>    consentement opposable. Une colonne `consentement_le` + une version de texte seraient nécessaires
+>    — pas fait, et jamais présenté comme fait.
+>
+> Si un jour une page publique du texte légal devient nécessaire, elle doit être GÉNÉRÉE depuis
+> `content/mentionsLegales.ts`, pas réécrite à la main (cf. la dérive de `public/confidentialite.html`).
 >
 > **Une fois ce commit validé et committé : reprendre le commit 6 de la phase 6** (frais réels —
 > bascule sur le canal unique Supabase Storage + retrait complet de Google Drive), inchangé dans son

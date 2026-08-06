@@ -29,6 +29,16 @@ function fauxClient(reponses: Partial<ClientAuth> = {}): ClientAuth {
 
 const DECONNECTE: EtatSession = { statut: "deconnecte" };
 
+/**
+ * Coche la case de consentement à la politique de confidentialité (06/08/2026). Nécessaire avant
+ * TOUT geste qui peut créer un compte — « Recevoir un lien de connexion » compris, cf. l'en-tête de
+ * `EcranConnexionObligatoire.tsx`. Les tests qui ne l'appellent pas prouvent, par leur échec
+ * attendu, que la bride existe.
+ */
+function accepterConfidentialite() {
+  fireEvent.click(screen.getByLabelText(/j'ai lu et j'accepte la politique de confidentialité/i));
+}
+
 describe("EcranConnexionObligatoire — configuration absente", () => {
   it("dit que la connexion est indisponible — jamais un mode dégradé rassurant", () => {
     render(<EcranConnexionObligatoire session={{ statut: "nonConfigure" }} client={null} origine={ORIGINE} />);
@@ -73,6 +83,7 @@ describe("EcranConnexionObligatoire — déconnecté : lien magique", () => {
     const client = fauxClient();
     render(<EcranConnexionObligatoire session={DECONNECTE} client={client} origine={ORIGINE} />);
     fireEvent.change(screen.getByLabelText(/adresse e-mail/i), { target: { value: "benoit@example.com" } });
+    accepterConfidentialite();
     fireEvent.click(screen.getByRole("button", { name: /recevoir un lien de connexion/i }));
     await waitFor(() => expect(client.signInWithOtp).toHaveBeenCalledWith({ email: "benoit@example.com", options: { emailRedirectTo: ORIGINE } }));
     expect(await screen.findByText(/si l'adresse correspond/i)).toBeInTheDocument();
@@ -82,6 +93,7 @@ describe("EcranConnexionObligatoire — déconnecté : lien magique", () => {
     const client = fauxClient({ signInWithOtp: vi.fn(async () => ({ error: { message: "Email address not authorized" } })) });
     render(<EcranConnexionObligatoire session={DECONNECTE} client={client} origine={ORIGINE} />);
     fireEvent.change(screen.getByLabelText(/adresse e-mail/i), { target: { value: "testeur@example.com" } });
+    accepterConfidentialite();
     fireEvent.click(screen.getByRole("button", { name: /recevoir un lien de connexion/i }));
     const alerte = await screen.findByRole("alert");
     expect(alerte).toHaveTextContent(/membres de l'organisation/i);
@@ -92,6 +104,7 @@ describe("EcranConnexionObligatoire — déconnecté : lien magique", () => {
     const client = fauxClient();
     render(<EcranConnexionObligatoire session={DECONNECTE} client={client} origine={ORIGINE} />);
     fireEvent.change(screen.getByLabelText(/adresse e-mail/i), { target: { value: "benoit" } });
+    accepterConfidentialite();
     fireEvent.click(screen.getByRole("button", { name: /recevoir un lien de connexion/i }));
     expect(await screen.findByRole("alert")).toHaveTextContent(/incomplète/i);
     expect(client.signInWithOtp).not.toHaveBeenCalled();
@@ -120,6 +133,7 @@ describe("EcranConnexionObligatoire — déconnecté : mot de passe (connexion E
     fireEvent.click(screen.getByRole("button", { name: /^mot de passe$/i }));
     fireEvent.change(screen.getByLabelText(/adresse e-mail/i), { target: { value: "nouveau@example.com" } });
     fireEvent.change(screen.getByLabelText(/^mot de passe$/i), { target: { value: "motdepasse-solide" } });
+    accepterConfidentialite();
     fireEvent.click(screen.getByRole("button", { name: /créer un compte/i }));
     await waitFor(() => expect(client.signUp).toHaveBeenCalledWith({ email: "nouveau@example.com", password: "motdepasse-solide", options: { emailRedirectTo: ORIGINE } }));
   });
@@ -130,6 +144,7 @@ describe("EcranConnexionObligatoire — déconnecté : mot de passe (connexion E
     fireEvent.click(screen.getByRole("button", { name: /^mot de passe$/i }));
     fireEvent.change(screen.getByLabelText(/adresse e-mail/i), { target: { value: "benoit@example.com" } });
     fireEvent.change(screen.getByLabelText(/^mot de passe$/i), { target: { value: "court12" } });
+    accepterConfidentialite();
     fireEvent.click(screen.getByRole("button", { name: /créer un compte/i }));
     expect(await screen.findByRole("alert")).toHaveTextContent(/8 caractères au minimum/);
     expect(client.signUp).not.toHaveBeenCalled();
@@ -163,5 +178,71 @@ describe("EcranConnexionObligatoire — retour d'un lien de connexion qui n'a pa
   it("ne dit rien quand rien dans l'URL n'évoque un lien de connexion", () => {
     render(<EcranConnexionObligatoire session={DECONNECTE} client={fauxClient()} origine={ORIGINE} indiceRetour={{ present: false, erreurTransmise: null }} />);
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+});
+
+describe("EcranConnexionObligatoire — consentement à la politique de confidentialité (06/08/2026)", () => {
+  it("la case est décochée au départ : rien n'est pré-accepté à la place de l'utilisateur", () => {
+    render(<EcranConnexionObligatoire session={DECONNECTE} client={fauxClient()} origine={ORIGINE} />);
+    expect(screen.getByLabelText(/j'ai lu et j'accepte la politique de confidentialité/i)).not.toBeChecked();
+  });
+
+  it("LA POLITIQUE EST LISIBLE AVANT DE CONSENTIR — c'est tout l'objet de ce chantier", () => {
+    render(<EcranConnexionObligatoire session={DECONNECTE} client={fauxClient()} origine={ORIGINE} />);
+    fireEvent.click(screen.getByRole("button", { name: /lire la politique de confidentialité/i }));
+    const modale = screen.getByRole("alertdialog");
+    // Titres venant de content/mentionsLegales.ts — le MÊME texte que « Mon profil », pas une copie.
+    expect(modale).toHaveTextContent(/qui est responsable de tes données/i);
+    expect(modale).toHaveTextContent(/qui peut techniquement voir quoi/i);
+    // Le passage qui doit rester lisible avant l'inscription : Benoît peut techniquement tout lire.
+    expect(modale).toHaveTextContent(/accéder à l'ensemble des données hébergées/i);
+  });
+
+  it("sans la case cochée, le LIEN PAR E-MAIL ne part pas — il créerait un compte (shouldCreateUser par défaut)", async () => {
+    const client = fauxClient();
+    render(<EcranConnexionObligatoire session={DECONNECTE} client={client} origine={ORIGINE} />);
+    fireEvent.change(screen.getByLabelText(/adresse e-mail/i), { target: { value: "nouveau@example.com" } });
+    const bouton = screen.getByRole("button", { name: /recevoir un lien de connexion/i });
+    expect(bouton).toBeDisabled();
+    fireEvent.click(bouton);
+    await waitFor(() => expect(client.signInWithOtp).not.toHaveBeenCalled());
+  });
+
+  it("sans la case cochée, « Créer un compte » ne part pas", async () => {
+    const client = fauxClient();
+    render(<EcranConnexionObligatoire session={DECONNECTE} client={client} origine={ORIGINE} />);
+    fireEvent.click(screen.getByRole("button", { name: /^mot de passe$/i }));
+    fireEvent.change(screen.getByLabelText(/adresse e-mail/i), { target: { value: "nouveau@example.com" } });
+    fireEvent.change(screen.getByLabelText(/^mot de passe$/i), { target: { value: "motdepasse-solide" } });
+    const bouton = screen.getByRole("button", { name: /créer un compte/i });
+    expect(bouton).toBeDisabled();
+    fireEvent.click(bouton);
+    await waitFor(() => expect(client.signUp).not.toHaveBeenCalled());
+  });
+
+  it("« SE CONNECTER » N'EST PAS BRIDÉ : il ne crée aucun compte, et quelqu'un qui a déjà un compte a déjà consenti", async () => {
+    const client = fauxClient();
+    render(<EcranConnexionObligatoire session={DECONNECTE} client={client} origine={ORIGINE} />);
+    fireEvent.click(screen.getByRole("button", { name: /^mot de passe$/i }));
+    fireEvent.change(screen.getByLabelText(/adresse e-mail/i), { target: { value: "ancien@example.com" } });
+    fireEvent.change(screen.getByLabelText(/^mot de passe$/i), { target: { value: "motdepasse-solide" } });
+    expect(screen.getByRole("button", { name: /se connecter/i })).not.toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: /se connecter/i }));
+    await waitFor(() => expect(client.signInWithPassword).toHaveBeenCalledWith({ email: "ancien@example.com", password: "motdepasse-solide" }));
+  });
+
+  it("cocher la case débride les deux gestes de création", () => {
+    render(<EcranConnexionObligatoire session={DECONNECTE} client={fauxClient()} origine={ORIGINE} />);
+    accepterConfidentialite();
+    expect(screen.getByRole("button", { name: /recevoir un lien de connexion/i })).not.toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: /^mot de passe$/i }));
+    expect(screen.getByRole("button", { name: /créer un compte/i })).not.toBeDisabled();
+  });
+
+  it("explique pourquoi le lien par e-mail est soumis à la même case, tant qu'elle est décochée", () => {
+    render(<EcranConnexionObligatoire session={DECONNECTE} client={fauxClient()} origine={ORIGINE} />);
+    expect(screen.getByText(/le lien par e-mail en crée un si cette adresse n'en a pas encore/i)).toBeInTheDocument();
+    accepterConfidentialite();
+    expect(screen.queryByText(/le lien par e-mail en crée un si cette adresse n'en a pas encore/i)).not.toBeInTheDocument();
   });
 });
