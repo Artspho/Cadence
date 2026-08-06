@@ -86,8 +86,20 @@ export default defineConfig(({ command, mode }) => {
       workbox: {
         skipWaiting: true,
         clientsClaim: true,
-        // Aucune API : tout est en localStorage. Précacher le bundle buildé suffit à rendre
-        // l'app 100 % fonctionnelle hors-ligne dès la première visite.
+        // ⚠️ CORRECTION DU 06/08/2026 — CE COMMENTAIRE AFFIRMAIT UNE CHOSE FAUSSE. Il disait
+        // « Aucune API : tout est en localStorage. Précacher le bundle buildé suffit à rendre l'app
+        // 100 % fonctionnelle hors-ligne dès la première visite. » C'était vrai avant la refonte
+        // Supabase ; ça ne l'est plus depuis la phase 5 (le serveur est la source de vérité) et la
+        // connexion obligatoire (commit `1c685e6`).
+        //
+        // CE QUE LE PRÉCACHE FAIT VRAIMENT : il rend la COQUILLE de l'app disponible hors ligne
+        // (bundle, styles, icônes). Ce qu'il ne fait pas : ouvrir Cadence sans serveur. Hors ligne,
+        // deux cas — session en cache encore valide => l'app s'ouvre en LECTURE SEULE sur la copie
+        // locale (arbitrage de la phase 5, cf. storage/bascule.ts, issue `serveurMuet`) ; jeton
+        // expiré (1 h par défaut côté Supabase) => le rafraîchissement échoue, `useSession` rend
+        // `indetermine`, et le mur de EcranConnexionObligatoire.tsx rend Cadence INUTILISABLE alors
+        // que les données sont là, dans le navigateur. C'est le trou connu de la « phase 7 » — non
+        // corrigé, non arbitré avec Benoît. Ne pas écrire ici que le hors-ligne fonctionne.
         globPatterns: ["**/*.{js,css,html,ico,png,svg,webmanifest}"],
         // Google Fonts n'est pas dans le bundle Vite (lien externe dans index.html) : sans ça,
         // l'app resterait utilisable hors-ligne mais retomberait sur la police système.

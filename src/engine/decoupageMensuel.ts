@@ -5,10 +5,21 @@
 // Réutilise heuresBrutesContrat (decompteHeures.ts) pour les heures totales du contrat — une seule
 // définition de "combien d'heures apporte ce contrat", jamais dupliquée ici.
 //
-// Pas de plafond mensuel appliqué ici (ex. 28 cachets/mois = 336 h) : ce plafond gouverne
-// l'affiliation aux 507 h (decompteHeures.ts), un compteur volontairement distinct (cf. CLAUDE.md,
-// "deux compteurs distincts, à ne jamais mélanger") — aucun des 4 mois certifiés (fév-mai 2026,
-// jusqu'à 153 h) ne l'approche, rien ne confirme qu'il s'applique aussi au calcul des JNI.
+// Pas de plafond mensuel appliqué ici (ex. 28 cachets/mois = 336 h). Aucun des 4 mois certifiés
+// (fév-mai 2026, jusqu'à 153 h) ne l'approche, et rien ne confirme qu'il s'applique au calcul des JNI.
+//
+// ⚠️ CORRECTION DU 06/08/2026 — CE COMMENTAIRE AFFIRMAIT UNE CHOSE FAUSSE. Il disait que ce plafond
+// « gouverne l'affiliation aux 507 h (decompteHeures.ts) ». VÉRIFIÉ : `decompteHeures.ts` ne lit
+// JAMAIS `config.plafondCachetsParMois` — zéro occurrence. Ce plafond n'est lu que par
+// `engine/alertes.ts` (une alerte), `components/ContractForm.tsx` (un avertissement de saisie) et
+// `engine/prediction.ts` (une borne d'atteignabilité) : il n'écrête AUCUN compteur, nulle part.
+//
+// La question réglementaire, elle, reste OUVERTE (point 26 de docs/critique_2026-08-03.md, non
+// sourcé) : si les cachets au-delà de 28 par mois ne comptent pas pour l'affiliation, alors l'app
+// surcompte et peut afficher un faux « Sécurité » (devoir sacré n°2). Ne pas « rétablir » un
+// écrêtement ici ou dans `decompteHeures.ts` sur la seule foi de l'ancien commentaire : il faut
+// d'abord la réponse de France Travail. Ne pas non plus conclure que le plafond est décoratif — on
+// ne sait pas, et c'est précisément ce qu'il faut dire.
 import type { Contrat } from "../types";
 import type { FranceTravailConfig } from "../config/franceTravailConfig";
 import { bornesDuMois, diffJours, joursChevauchement, moisEntre } from "./dateUtils";

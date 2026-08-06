@@ -69,7 +69,12 @@ src/
 Objet typé (`as const`) et validé Zod, avec métadonnées de version. Les valeurs marquées ✅ sont certifiées par le guide mars 2026 ; celles marquées 🔶 `TODO` sont volatiles (revalorisées régulièrement) et doivent être renseignées depuis la source officielle avant mise en production.
 
 > ⚠️ Extrait d'illustration figé à la rédaction du SPEC — **les valeurs réelles sont dans
-> `src/config/franceTravailConfig.ts`, seule source de vérité.** Le bloc `meta` a changé de forme le
+> `src/config/franceTravailConfig.ts`, seule source de vérité.** En particulier, les quatre valeurs de
+> `valeursDatees` que l'extrait ci-dessous montre encore à `null` / 🔶 `TODO` **ne le sont plus
+> toutes** (constaté le 06/08/2026) : `smicHoraireBrut` (12,31 €), `smicMensuelBrut` (1 867,02 €) et
+> `pmssMensuel` (4 005 €) sont renseignés et ✅ certifiés ; seul `smicJournalierBrut` reste 🔶 non
+> certifié (dérivé de `smicHoraireBrut × 7`, hypothèse du projet). Ne pas reconstruire depuis cet
+> extrait la liste de ce qui manque. Le bloc `meta` a changé de forme le
 > 03/08/2026 (point 14 de `docs/critique_2026-08-03.md`) : `dateEntreeVigueur` ne date plus que le
 > SMIC configuré et n'est plus affichée, un champ `dateDerniereVerification` a été ajouté — c'est lui
 > que le bandeau montre —, et `valableJusquau` a été supprimé. Ne pas recopier la forme ci-dessous.

@@ -994,11 +994,16 @@ vite.config.ts                    # + VitePWA (manifest, service worker, cf. Ét
 > **Critère de recette** : un test qui rend `Onboarding` avec un profil de forme invalide, clique
 > « Commencer », et vérifie qu'un message d'erreur s'affiche — jamais un bouton qui ne fait rien.
 >
-> ⚠️ **Point 26 ouvert, découvert en corrigeant le 7 — à instruire avant de coder** : le plafond de
-> 28 cachets/mois ne plafonne aucun décompte (il ne sert qu'à trois avertissements), alors que
-> `decoupageMensuel.ts:8-9` affirme qu'il « gouverne l'affiliation aux 507 h ». Si c'est le commentaire
-> qui a raison, l'app surcompte les heures d'un mois chargé et peut afficher un faux « Sécurité ».
-> Non sourcé. Même zone d'ombre que `docs/SPEC.md:534` (proratisation sur mois partiel).
+> ⚠️ **Point 26 ouvert — CONTRADICTION CONFIRMÉE le 06/08/2026, commentaire corrigé, question toujours
+> pendante.** Le plafond de 28 cachets/mois ne plafonne aucun décompte : vérifié en comptant les
+> occurrences, `decompteHeures.ts` ne lit **JAMAIS** `config.plafondCachetsParMois` (0 occurrence) ; il
+> n'est lu que par `engine/alertes.ts`, `components/ContractForm.tsx` et `engine/prediction.ts`, qui
+> n'écrêtent rien. Le commentaire de `decoupageMensuel.ts` qui affirmait qu'il « gouverne l'affiliation
+> aux 507 h » **était donc faux, et a été réécrit** — mais NE PAS en conclure que le plafond est
+> décoratif : si la règle réglementaire est bien que les cachets au-delà de 28 ne comptent pas, l'app
+> surcompte un mois chargé et peut afficher un faux « Sécurité » (devoir n°2). **Toujours non sourcé** :
+> question posée à France Travail le 06/08/2026 (courrier rédigé dans `docs/questions_france_travail.md`).
+> Même zone d'ombre que `docs/SPEC.md:534` (proratisation sur mois partiel).
 >
 > **⏸ Bloqués — pas par le code, ne pas les ouvrir en croyant coder** : **11** (contradiction Unédic /
 > France Travail sur le plafond ARE — « rien à faire dans le code d'ici là », il faut une réponse d'un
