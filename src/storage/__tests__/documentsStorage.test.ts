@@ -45,7 +45,19 @@ describe("construireCheminStockage", () => {
 
   it("nettoie les espaces et les séparateurs de chemin dans le nom de fichier", () => {
     const chemin = construireCheminStockage("u-42", 2026, "justificatif_frais", "mon fichier/étrange\\nom.pdf", () => "uuid-fixe");
-    expect(chemin).toBe("u-42/2026/justificatif_frais/uuid-fixe-mon_fichier_étrange_nom.pdf");
+    expect(chemin).toBe("u-42/2026/justificatif_frais/uuid-fixe-mon_fichier_etrange_nom.pdf");
+  });
+
+  it("retire les caractères accentués — Supabase Storage refuse les clés qui en portent (« Invalid key »)", () => {
+    // Cas réel du 06/08/2026 : un relevé de situation nommé ainsi faisait échouer le dépôt en silence
+    // côté utilisateur (seul le bandeau d'erreur, texte du message Supabase, le révélait).
+    const chemin = construireCheminStockage("u-42", 2026, "releve_situation", "Relevé_de_situation_20251125.pdf", () => "uuid-fixe");
+    expect(chemin).toBe("u-42/2026/releve_situation/uuid-fixe-Releve_de_situation_20251125.pdf");
+  });
+
+  it("ne vide jamais le nom : un accent devient sa lettre de base, jamais rien", () => {
+    const chemin = construireCheminStockage("u-42", 2026, "declaration_fiscale", "Déclaration_2025.pdf", () => "uuid-fixe");
+    expect(chemin).toBe("u-42/2026/declaration_fiscale/uuid-fixe-Declaration_2025.pdf");
   });
 
   it("appelle crypto.randomUUID() par défaut quand aucun générateur n'est injecté", () => {

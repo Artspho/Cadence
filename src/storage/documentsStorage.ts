@@ -77,8 +77,13 @@ export function typeDocumentDepuisDetection(typeDetecte: string): TypeDocument |
  * tests passent un générateur déterministe plutôt que de comparer une sortie qui changerait à
  * chaque exécution.
  *
- * `nomFichier` est nettoyé a minima (espaces et caractères de chemin) : un nom d'origine porteur de
- * `/` casserait la convention de dossier elle-même.
+ * `nomFichier` est nettoyé pour ne garder qu'un charset sûr — pas seulement les espaces et les
+ * caractères de chemin. TROUVÉ EN CONDITIONS RÉELLES LE 06/08/2026 : un relevé de situation nommé
+ * `Relevé_de_situation_20251125.pdf` faisait échouer le dépôt avec « Invalid key » — Supabase Storage
+ * refuse les clés porteuses de caractères accentués, et l'ancien nettoyage (espaces + `/`/`\`
+ * seulement) les laissait passer tels quels. Les accents sont d'abord retirés (`é` → `e`, jamais
+ * supprimé purement — un nom devenu vide serait pire), puis tout caractère restant hors
+ * alphanumérique/`.`/`-`/`_` (espaces, `/`, `\`, apostrophes, etc.) devient `_`.
  */
 export function construireCheminStockage(
   utilisateurId: string,
@@ -87,7 +92,15 @@ export function construireCheminStockage(
   nomFichier: string,
   genererId: () => string = () => crypto.randomUUID(),
 ): string {
-  const nomNettoye = nomFichier.trim().replace(/[/\\]/g, "_").replace(/\s+/g, "_");
+  const nomNettoye = nomFichier
+    .trim()
+    .normalize("NFD")
+    // \p{M} = tout caractère Unicode de catégorie « Mark » — c'est ce que devient un accent après la
+    // décomposition NFD ci-dessus (« é » → « e » + un diacritique combinant séparé). Écrit via une
+    // propriété Unicode plutôt qu'une plage de points de code en dur : plus lisible, et pas de risque
+    // de plage mal recopiée.
+    .replace(/\p{M}/gu, "")
+    .replace(/[^a-zA-Z0-9._-]/g, "_");
   return `${utilisateurId}/${anneeFiscale}/${typeDocument}/${genererId()}-${nomNettoye}`;
 }
 
