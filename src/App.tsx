@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import type { Contrat, PeriodeAssimilee, Profil, SoldeIndemnisationDepart } from "./types";
 import { franceTravailConfig } from "./config/franceTravailConfig";
 import {
@@ -25,6 +25,7 @@ import { DecisionServeur, type BasculeADecider } from "./components/DecisionServ
 import { BandeauLectureSeule } from "./components/BandeauLectureSeule";
 import { BandeauEchecEnregistrement } from "./components/BandeauEchecEnregistrement";
 import { telechargerTexte } from "./lib/telechargement";
+import { formaterMoisAnnee } from "./lib/dateLisible";
 import { calculerFenetreEnCours } from "./engine/periodeReference";
 import { calculerDecompteHeures } from "./engine/decompteHeures";
 import { calculerSalaireReference } from "./engine/salaireReference";
@@ -43,8 +44,12 @@ import { Dashboard } from "./components/Dashboard";
 import { ContractForm } from "./components/ContractForm";
 import { ContractList } from "./components/ContractList";
 import { ChecklistDocuments } from "./components/ChecklistDocuments";
-import { ImportBulletins } from "./components/ImportBulletins";
+// `pdfjs-dist` (extraction locale des bulletins) est une dépendance lourde qui n'a rien à faire dans
+// le bundle chargé par TOUT LE MONDE dès l'ouverture de l'app — chargée à la demande uniquement en
+// ouvrant l'onglet Import (07/08/2026, avertissement Vite « chunk > 500 kB »).
+const ImportBulletins = lazy(() => import("./components/ImportBulletins").then((m) => ({ default: m.ImportBulletins })));
 import { ImportDocumentIA } from "./components/ImportDocumentIA";
+import { Spinner } from "./components/Spinner";
 import type { TypeDocument } from "./storage/documentsStorage";
 import { OuvrirEspacePersonnelFT } from "./components/OuvrirEspacePersonnelFT";
 // Maquette de test de l'écran de revue IA (extractions simulées, bac à sable) — ne rend rien
@@ -58,7 +63,9 @@ import { AvertissementHorsPerimetre } from "./components/AvertissementHorsPerime
 import { ConfirmationImport } from "./components/ConfirmationImport";
 import { DashboardVide } from "./components/DashboardVide";
 import { RevenusMensuels } from "./components/RevenusMensuels";
-import { FraisReels } from "./components/fraisReels/FraisReels";
+// Même raison que `ImportBulletins` ci-dessus : `jspdf`/`html2canvas` (export PDF des frais réels)
+// ne doivent charger qu'à l'ouverture de l'onglet Frais pro, pas au démarrage de l'app.
+const FraisReels = lazy(() => import("./components/fraisReels/FraisReels").then((m) => ({ default: m.FraisReels })));
 import { dashboardEstVide } from "./lib/dashboardVide";
 import { perimetreBloquant, profilHorsPerimetre } from "./lib/profilHorsPerimetre";
 import { AvertissementContradictionHorsA10 } from "./components/AvertissementContradictionHorsA10";
@@ -916,7 +923,11 @@ export default function App() {
         <div className="flex-1 min-w-0 flex flex-col">
           <TopBar
             onChangerOnglet={setOnglet}
-            periodeLabel={profil.dateAnniversaire ? `Cycle → ${profil.dateAnniversaire}` : "Première admission"}
+            periodeLabel={
+              profil.dateAnniversaire && calculs.exercices[0]
+                ? `${formaterMoisAnnee(calculs.exercices[0].dateDebut)} → ${formaterMoisAnnee(profil.dateAnniversaire)}`
+                : "Première admission"
+            }
             ongletActif={onglet}
             session={session}
           />
@@ -1009,7 +1020,9 @@ export default function App() {
             <div className="border-t border-line pt-6">
               <h3 className="font-display text-base font-medium tracking-tight mb-3">2. Importer le document</h3>
               <div className="space-y-6">
-                <ImportBulletins profil={profil} config={franceTravailConfig} decompteActuel={calculs.decompte} onImporterContrat={ajouterContrat} />
+                <Suspense fallback={<Spinner />}>
+                  <ImportBulletins profil={profil} config={franceTravailConfig} decompteActuel={calculs.decompte} onImporterContrat={ajouterContrat} />
+                </Suspense>
 
                 {/* Deuxième canal, distinct du local ci-dessus : celui-ci envoie le document à un
                     serveur. Aucun état ni code partagé entre les deux — la seule chose commune est
@@ -1112,15 +1125,17 @@ export default function App() {
         )}
 
         {onglet === "fraisPro" && (
-          <FraisReels
-            profil={profil}
-            soldeIndemnisationDepart={donnees.soldeIndemnisationDepart}
-            contrats={donnees.contrats}
-            config={franceTravailConfig}
-            dateDuJour={dateDuJour}
-            onExporterSauvegarde={exporter}
-            session={session}
-          />
+          <Suspense fallback={<Spinner />}>
+            <FraisReels
+              profil={profil}
+              soldeIndemnisationDepart={donnees.soldeIndemnisationDepart}
+              contrats={donnees.contrats}
+              config={franceTravailConfig}
+              dateDuJour={dateDuJour}
+              onExporterSauvegarde={exporter}
+              session={session}
+            />
+          </Suspense>
         )}
 
         {onglet === "dossier" && <MonDossier />}

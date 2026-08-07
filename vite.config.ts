@@ -125,6 +125,16 @@ export default defineConfig(({ command, mode }) => {
       },
     }),
   ],
+  build: {
+    // `pdfjs-dist` (ImportBulletins) et `jspdf`/`html2canvas` (FraisReels) sont sortis du chunk
+    // principal le 07/08/2026 (`React.lazy`, cf. App.tsx) — ils ne pèsent plus que sur les deux
+    // écrans qui en ont vraiment besoin. Le chunk principal restant (~950 kB avant minification,
+    // ~275 kB gzip) porte React, Supabase et l'ensemble des écrans toujours visibles : c'est le poids
+    // normal de l'app, pas un oubli. Seuil relevé pour ne plus faire remonter l'avertissement Vite à
+    // chaque build (cf. logs Vercel) sur un chiffre qui ne bougera plus sans un chantier de
+    // découpage par onglet nettement plus lourd.
+    chunkSizeWarningLimit: 1000,
+  },
   test: {
     // "node" reste le défaut : la quasi-totalité des tests sont des fonctions pures du moteur, sans
     // DOM. Les rares tests de composant (jsdom) déclarent leur propre environnement via le pragma
