@@ -2,7 +2,7 @@
  * Coordonnées de contact pour la bêta (§11.A — bouton de feedback). Pas une
  * valeur réglementaire, mais même discipline que `franceTravailConfig.valeursDatees` :
  * `null` tant que non renseigné, jamais un placeholder qui ressemble à une
- * vraie adresse. Le feedback ne s'affiche NULLE PART (TopBar, Mon profil) tant
+ * vraie adresse. Le feedback ne s'affiche NULLE PART (`PiedDePage.tsx`, Mon profil) tant
  * que cette valeur est `null` — maintenant comme plus tard.
  *
  * Rappel de contexte (cf. `franceTravailConfig.meta.avertissement`) : ce lien ne sert qu'à
@@ -10,7 +10,7 @@
  * substitue jamais à une notification officielle de France Travail, et ne couvre que le régime
  * Annexe 10 — pour une question sur ses droits, direction France Travail, pas ce mail.
  */
-export const EMAIL_FEEDBACK: string | null = "benoit.zahra@orange.fr";
+export const EMAIL_FEEDBACK: string | null = "cadence@lesartsphoceens.fr";
 
 const SUJET_FEEDBACK = "Retour sur Cadence";
 const CORPS_FEEDBACK = "Ce que je faisais : \n\nCe que j'attendais : \n\nCe qui s'est passé : \n";

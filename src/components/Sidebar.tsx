@@ -1,6 +1,7 @@
 /**
- * Sidebar rétractable desktop (refonte UI, étape 6 — 07/08/2026). Remplace la nav horizontale qui
- * vivait dans `TopBar.tsx` : celui-ci ne porte plus que le logo, le badge de période et l'avatar.
+ * Sidebar rétractable desktop (refonte UI, étape 6 — 07/08/2026 ; logo remonté depuis `TopBar.tsx`
+ * le 07/08/2026 pour ne plus laisser un bandeau quasi vide en haut de l'écran). Remplace la nav
+ * horizontale qui vivait dans `TopBar.tsx` : celui-ci ne porte plus que le badge de période.
  *
  * Repliée par défaut (icônes seules), s'ouvre au survol OU au focus clavier (jamais hover seul —
  * exclurait le clavier et le tactile), et peut être épinglée ouverte (préférence persistée dans
@@ -47,7 +48,11 @@ export function Sidebar({ ongletActif, onChangerOnglet, onExporter, onImporter, 
       onMouseEnter={() => setSurvolee(true)}
       onMouseLeave={() => setSurvolee(false)}
     >
-      <nav className="flex-1 py-3 space-y-0.5 overflow-y-auto" aria-label="Navigation principale">
+      <div className="flex items-center gap-3 px-[18px] py-4 border-b border-line">
+        <span className="w-7 h-7 rounded-lg bg-gradient-to-br from-mint to-teal shrink-0" aria-hidden />
+        {ouverte && <span className="font-display font-semibold text-lg tracking-tight whitespace-nowrap">Cadence</span>}
+      </div>
+      <nav className="flex-1 pt-5 pb-3 space-y-0.5 overflow-y-auto" aria-label="Navigation principale">
         {ONGLETS.map((o) => {
           const Icone = ICONE_ONGLET[o.id];
           return (

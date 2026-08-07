@@ -36,6 +36,7 @@ import { decouperExercices, fusionnerExercicesGeles } from "./engine/cycles";
 import { diffJours } from "./engine/dateUtils";
 import { TopBar, type Onglet } from "./components/TopBar";
 import { Sidebar } from "./components/Sidebar";
+import { PiedDePage } from "./components/PiedDePage";
 import { BottomTabBar } from "./components/BottomTabBar";
 import { Onboarding } from "./components/Onboarding";
 import { Dashboard } from "./components/Dashboard";
@@ -913,9 +914,14 @@ export default function App() {
         <Sidebar ongletActif={onglet} onChangerOnglet={setOnglet} onExporter={exporter} onImporter={() => inputImportRef.current?.click()} session={session} />
 
         <div className="flex-1 min-w-0 flex flex-col">
-          <TopBar onChangerOnglet={setOnglet} periodeLabel={profil.dateAnniversaire ? `Cycle → ${profil.dateAnniversaire}` : "Première admission"} session={session} />
+          <TopBar
+            onChangerOnglet={setOnglet}
+            periodeLabel={profil.dateAnniversaire ? `Cycle → ${profil.dateAnniversaire}` : "Première admission"}
+            ongletActif={onglet}
+            session={session}
+          />
 
-          <main className="max-w-[1040px] mx-auto px-6 py-8 space-y-6 w-full pb-24 md:pb-8">
+          <main className="max-w-[1040px] mx-auto px-6 py-8 space-y-6 w-full">
             <div className="flex items-center justify-between flex-wrap gap-2">
               {/* Même correction que DashboardVide, l'autre bout du faux signal : sans contrat, les
                   alertes prédictives (ex. "rythme insuffisant") ne veulent rien dire pour un compte
@@ -1121,6 +1127,7 @@ export default function App() {
 
             {onglet === "parametres" && <ParametresSourcesEtMentions />}
           </main>
+          <PiedDePage />
         </div>
       </div>
 

@@ -9,6 +9,7 @@ import "@testing-library/jest-dom/vitest";
 import { describe, expect, it, vi } from "vitest";
 import { render } from "@testing-library/react";
 import { TopBar } from "../TopBar";
+import { PiedDePage } from "../PiedDePage";
 import { MonProfil } from "../MonProfil";
 import { franceTravailConfig } from "../../config/franceTravailConfig";
 import { formaterDateLisible } from "../../lib/dateLisible";
@@ -27,9 +28,17 @@ function rendreTopBar(): string {
     <TopBar
       onChangerOnglet={vi.fn()}
       periodeLabel="Première admission"
+      ongletActif="dashboard"
       session={{ statut: "connecte", utilisateurId: "u-test", email: "test@example.com" }}
     />,
   );
+  return container.textContent ?? "";
+}
+
+/** Le bandeau réglementaire vit dans `PiedDePage.tsx` depuis le 07/08/2026 (retiré de `TopBar`, qui
+ * n'en a plus que le badge de cycle). */
+function rendrePiedDePage(): string {
+  const { container } = render(<PiedDePage />);
   return container.textContent ?? "";
 }
 
@@ -59,12 +68,12 @@ function verificationPlus(n: number): string {
 
 describe("bandeau des règles — ce qu'il affiche (point 14)", () => {
   it("nomme la date comme une date de VÉRIFICATION, et l'écrit en français lisible", () => {
-    const texte = rendreTopBar();
+    const texte = rendrePiedDePage();
     expect(texte).toContain(`Règles vérifiées le ${DATE_VERIFICATION_LISIBLE}`);
   });
 
   it("cite l'édition du guide réellement utilisée", () => {
-    const texte = rendreTopBar();
+    const texte = rendrePiedDePage();
     expect(texte).toContain(source);
     expect(texte).toContain("juillet 2026");
     // L'édition qui était citée à tort jusqu'au 03/08/2026.
@@ -74,7 +83,7 @@ describe("bandeau des règles — ce qu'il affiche (point 14)", () => {
   // Le cœur du point 14 : cette date-là datait l'entrée en vigueur du SMIC, et s'affichait pourtant
   // derrière le libellé « Règles vérifiées au ». Elle ne doit plus apparaître du tout.
   it("n'affiche jamais l'entrée en vigueur du SMIC, ni aucune date en format machine", () => {
-    const texte = rendreTopBar();
+    const texte = rendrePiedDePage();
     expect(texte).not.toContain(dateEntreeVigueur);
     expect(texte).not.toContain(dateDerniereVerification);
   });
@@ -109,6 +118,12 @@ describe("compteur de jours du bandeau détaillé", () => {
 describe("plus aucune bannière de péremption (point 13)", () => {
   it("la barre du haut ne porte plus d'avertissement de péremption", () => {
     const texte = rendreTopBar();
+    expect(texte).not.toContain("Règles à vérifier");
+    expect(texte).not.toContain("⚠");
+  });
+
+  it("le pied de page non plus", () => {
+    const texte = rendrePiedDePage();
     expect(texte).not.toContain("Règles à vérifier");
     expect(texte).not.toContain("⚠");
   });
