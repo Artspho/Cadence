@@ -8,6 +8,7 @@ import { calculerAJBrutePourFenetre } from "../engine/areBrute";
 import { calculerAJNette, calculerSJM } from "../engine/areNette";
 import { calculerStatutPrediction } from "../engine/prediction";
 import { ContractForm } from "./ContractForm";
+import { formaterDateLisible } from "../lib/dateLisible";
 
 interface SimulateurProps {
   profil: Profil;
@@ -79,7 +80,7 @@ export function Simulateur({ profil, contrats, periodes, config, dateDuJour, dec
                 {Math.round(deltaHeures)} h
               </p>
               {apres.prediction.dateFranchissementProjetee && (
-                <p className="text-xs text-faint mt-1">Franchissement projeté des {apres.prediction.seuilHeures} h : {apres.prediction.dateFranchissementProjetee}</p>
+                <p className="text-xs text-faint mt-1">Franchissement projeté des {apres.prediction.seuilHeures} h : {formaterDateLisible(apres.prediction.dateFranchissementProjetee)}</p>
               )}
             </div>
 

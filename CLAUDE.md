@@ -3051,6 +3051,11 @@ de situation ✅ — l'échec semble propre à ce format de bulletin, pas au can
   `docs/validation.md` comme **raisonnement, pas source qui tranche**. Ne bloque rien tant qu'aucun
   montant n'est câblé.
 - ⬜ Module congés spectacle
+- ⬜ **Combien d'années d'historique garder ?** Question ouverte le 07/08/2026, dans le cadre de
+  l'idée d'un sélecteur de cycle en haut (dernières N années) qui remplacerait l'onglet
+  « Historique » actuel — cf. `engine/cycles.ts` (`CYCLES_MAX = 10`, profondeur déjà reconstruite
+  aujourd'hui). Reste à trancher : combien d'années afficher dans ce sélecteur, et si ça diffère de
+  la profondeur réellement conservée en storage.
 
 ---
 

@@ -39,6 +39,46 @@ describe("validerCoherenceProfil", () => {
     expect(resultat.coherent).toBe(false);
   });
 
+  it("dateAnniversaire antérieure à dateAnniversairePrecedente : incohérent (cycle en cours de durée négative)", () => {
+    const resultat = validerCoherenceProfil({
+      dateNaissance: "1990-01-01",
+      situation: "readmission",
+      dateAnniversaire: "2024-06-01",
+      dateAnniversairePrecedente: "2026-12-31",
+    });
+    expect(resultat.coherent).toBe(false);
+    expect(resultat.raison).toMatch(/postérieure/i);
+  });
+
+  it("dateAnniversaire égale à dateAnniversairePrecedente : incohérent aussi (cycle de durée nulle)", () => {
+    const resultat = validerCoherenceProfil({
+      dateNaissance: "1990-01-01",
+      situation: "readmission",
+      dateAnniversaire: "2026-12-31",
+      dateAnniversairePrecedente: "2026-12-31",
+    });
+    expect(resultat.coherent).toBe(false);
+  });
+
+  it("dateAnniversaire postérieure à dateAnniversairePrecedente : cohérent (cas normal)", () => {
+    const resultat = validerCoherenceProfil({
+      dateNaissance: "1990-01-01",
+      situation: "readmission",
+      dateAnniversaire: "2026-12-31",
+      dateAnniversairePrecedente: "2024-06-01",
+    });
+    expect(resultat.coherent).toBe(true);
+  });
+
+  it("dateAnniversairePrecedente absente : cohérent (champ optionnel, non-régression)", () => {
+    const resultat = validerCoherenceProfil({
+      dateNaissance: "1990-01-01",
+      situation: "readmission",
+      dateAnniversaire: "2026-12-31",
+    });
+    expect(resultat.coherent).toBe(true);
+  });
+
   it("dateLimiteIndemnisation antérieure à dateOuverture : incohérent (cas réel — faute de frappe sur l'année)", () => {
     const resultat = validerCoherenceProfil({
       dateNaissance: "1990-01-01",
@@ -132,6 +172,13 @@ describe("validerProfilPourEcriture", () => {
     const resultat = validerProfilPourEcriture(candidat);
     expect(resultat.ok).toBe(true);
     if (resultat.ok) expect(resultat.profil.dateAnniversairePrecedente).toBeUndefined();
+  });
+
+  it("dateAnniversaire antérieure ou égale à dateAnniversairePrecedente : refusé à l'écriture (cas réel signalé le 2026-08-07)", () => {
+    const candidat = profil({ situation: "readmission", dateAnniversaire: "2024-06-01", dateAnniversairePrecedente: "2026-12-31" });
+    const resultat = validerProfilPourEcriture(candidat);
+    expect(resultat.ok).toBe(false);
+    if (!resultat.ok) expect(resultat.erreur).toMatch(/postérieure/i);
   });
 
   it("dateLimiteIndemnisation avant dateOuverture : refusé à l'écriture (cas réel signalé le 2026-07-26)", () => {

@@ -1,4 +1,5 @@
 import type { PeriodeAssimilee, TypePeriode } from "../types";
+import { formaterDateLisible } from "../lib/dateLisible";
 
 interface PeriodeListProps {
   periodes: PeriodeAssimilee[];
@@ -26,7 +27,7 @@ export function PeriodeList({ periodes, onSupprimer }: PeriodeListProps) {
   const triees = [...periodes].sort((a, b) => (a.dateDebut < b.dateDebut ? 1 : -1));
 
   function supprimerAvecConfirmation(periode: PeriodeAssimilee) {
-    if (window.confirm(`Supprimer la période "${LABELS_TYPE_PERIODE[periode.type]}" du ${periode.dateDebut} au ${periode.dateFin} ? Cette action ne peut pas être annulée depuis l'application (seul un import JSON de sauvegarde le permettrait).`)) {
+    if (window.confirm(`Supprimer la période "${LABELS_TYPE_PERIODE[periode.type]}" du ${formaterDateLisible(periode.dateDebut)} au ${formaterDateLisible(periode.dateFin)} ? Cette action ne peut pas être annulée depuis l'application (seul un import JSON de sauvegarde le permettrait).`)) {
       onSupprimer(periode.id);
     }
   }
@@ -38,7 +39,7 @@ export function PeriodeList({ periodes, onSupprimer }: PeriodeListProps) {
           <span className="text-xs font-medium px-2 py-1 rounded-full shrink-0 bg-violet/15 text-violet">{LABELS_TYPE_PERIODE[periode.type]}</span>
           <div className="flex-1 min-w-0">
             <p className="text-sm text-ink truncate">
-              {periode.dateDebut} → {periode.dateFin}
+              {formaterDateLisible(periode.dateDebut)} → {formaterDateLisible(periode.dateFin)}
             </p>
           </div>
           <button onClick={() => supprimerAvecConfirmation(periode)} aria-label={`Supprimer la période ${LABELS_TYPE_PERIODE[periode.type]}`} className="shrink-0 text-faint hover:text-red transition-colors px-2">

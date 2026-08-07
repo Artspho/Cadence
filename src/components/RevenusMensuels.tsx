@@ -8,6 +8,7 @@ import { calculerFenetreEnCours } from "../engine/periodeReference";
 import { calculerSalaireReference } from "../engine/salaireReference";
 import { calculerSJM } from "../engine/areNette";
 import { descriptionMoisOuverturePartielle } from "../content/moisOuverturePartielle";
+import { formaterDateLisible, formaterMoisAnnee } from "../lib/dateLisible";
 
 interface RevenusMensuelsProps {
   profil: Profil;
@@ -145,7 +146,7 @@ function SoldeRecap({ solde, onConfigurer }: { solde: SoldeIndemnisationDepart; 
   return (
     <div className="bg-surface border border-line rounded-card p-4 text-sm text-muted flex flex-wrap items-center gap-3">
       <span>
-        Tableau affiché à partir de : <span className="text-ink">{solde.dateDepart}</span>
+        Tableau affiché à partir de : <span className="text-ink">{formaterDateLisible(solde.dateDepart)}</span>
       </span>
       <button
         onClick={() => {
@@ -302,7 +303,7 @@ function TableauResultats({
                 <tr key={l.moisLabel} className="border-b border-line last:border-0">
                   <td className="px-4 py-3">
                     <span className="inline-flex items-center gap-1.5">
-                      {l.moisLabel}
+                      {formaterMoisAnnee(`${l.moisLabel}-01`)}
                       {l.messageOuverturePartielle && (
                         <span title={l.messageOuverturePartielle} aria-label={l.messageOuverturePartielle} className="cursor-help">
                           ℹ️

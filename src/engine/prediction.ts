@@ -9,6 +9,7 @@ import { ajouterJours, dansIntervalle, diffJours } from "./dateUtils";
 import { calculerDecompteHeures } from "./decompteHeures";
 import type { Fenetre } from "./decompteHeures";
 import { calculerFenetreEnCours } from "./periodeReference";
+import { formaterDateLisible } from "../lib/dateLisible";
 
 const JOURS_PAR_MOIS = 30; // approximation volontaire pour un rythme "h/mois" lisible, pas une constante réglementaire
 const SEUIL_JOURS_ANNIVERSAIRE_IMMINENT = 30;
@@ -183,12 +184,6 @@ export function calculerStatutPrediction(
   };
 }
 
-function formatDateCourte(iso: string): string {
-  const [annee, mois, jour] = iso.split("-");
-  const mois_labels = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."];
-  return `${parseInt(jour, 10)} ${mois_labels[parseInt(mois, 10) - 1]}`;
-}
-
 // Exhaustif par construction (`_exhaustif: never`) : ajouter un état à NiveauStatut sans écrire son
 // message ici casse la compilation, plutôt que d'afficher silencieusement un texte d'un autre état.
 function construireMessage(
@@ -213,7 +208,7 @@ function construireMessage(
       // Jamais une promesse : la réserve « rien n'est encore acquis » n'est pas une politesse, c'est
       // le fond du point 5 — cette date ne vaut que si le rythme passé se prolonge à l'identique.
       if (dateFranchissement) {
-        return `À ton rythme actuel, tu atteindrais ${seuil} h autour du ${formatDateCourte(dateFranchissement)} — rien n'est encore acquis : il te manque ${Math.ceil(heuresRestantesApresCertain)} h.`;
+        return `À ton rythme actuel, tu atteindrais ${seuil} h autour du ${formaterDateLisible(dateFranchissement)} — rien n'est encore acquis : il te manque ${Math.ceil(heuresRestantesApresCertain)} h.`;
       }
       return `Ta trajectoire actuelle suffirait à atteindre ${seuil} h, mais rien n'est encore acquis : il te manque ${Math.ceil(heuresRestantesApresCertain)} h.`;
 

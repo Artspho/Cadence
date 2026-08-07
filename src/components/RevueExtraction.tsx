@@ -31,6 +31,7 @@ import {
   type StatutProposition,
 } from "../lib/routageExtraction";
 import type { DiagnosticAbsenceCorrespondance } from "../lib/correspondanceContrat";
+import { formaterDateLisible } from "../lib/dateLisible";
 import { ContractForm } from "./ContractForm";
 import { PeriodeForm } from "./PeriodeForm";
 import { TableauComparaison } from "./TableauComparaison";
@@ -171,10 +172,15 @@ export function humaniserCle(cle: string): string {
   return mots.charAt(0).toUpperCase() + mots.slice(1);
 }
 
+const RE_DATE_ISO = /^\d{4}-\d{2}-\d{2}$/;
+
 export function formaterValeur(valeur: unknown): { texte: string; nonLu: boolean } {
   if (valeur === null || valeur === undefined || valeur === "") return { texte: "non lu dans le document", nonLu: true };
   if (typeof valeur === "boolean") return { texte: valeur ? "Oui" : "Non", nonLu: false };
-  if (typeof valeur === "string") return { texte: LABELS_VALEURS[valeur] ?? valeur, nonLu: false };
+  if (typeof valeur === "string") {
+    if (RE_DATE_ISO.test(valeur)) return { texte: formaterDateLisible(valeur), nonLu: false };
+    return { texte: LABELS_VALEURS[valeur] ?? valeur, nonLu: false };
+  }
   return { texte: String(valeur), nonLu: false };
 }
 
@@ -187,7 +193,7 @@ export function formaterValeur(valeur: unknown): { texte: string; nonLu: boolean
 function texteDiagnosticAbsence(diagnostic: DiagnosticAbsenceCorrespondance): string {
   switch (diagnostic.type) {
     case "deja_confirme":
-      return `Un contrat du même employeur et de la même période existe déjà, mais il est déjà confirmé par un document (${diagnostic.contratExistant.employeur} · ${diagnostic.contratExistant.dateDebut} → ${diagnostic.contratExistant.date}) — c'est pour ça qu'il n'est pas reproposé ici.`;
+      return `Un contrat du même employeur et de la même période existe déjà, mais il est déjà confirmé par un document (${diagnostic.contratExistant.employeur} · ${formaterDateLisible(diagnostic.contratExistant.dateDebut)} → ${formaterDateLisible(diagnostic.contratExistant.date)}) — c'est pour ça qu'il n'est pas reproposé ici.`;
     case "nom_different_meme_mois":
       return `Un contrat de la même période existe déjà, mais sous un autre nom d'employeur : « ${diagnostic.contratExistant.employeur} » dans ton profil, « ${diagnostic.employeurDocument} » sur ce document — vérifie qu'il ne s'agit pas du même employeur écrit différemment.`;
     case "aucune_piste":
@@ -449,7 +455,7 @@ function CarteProposition({
             return (
               <div key={candidat.id} className="border border-line rounded-lg p-3 space-y-2.5">
                 <p className="text-sm text-ink">
-                  {candidat.employeur} · {candidat.dateDebut} → {candidat.date} · {candidat.salaireBrut.toFixed(0)} € brut
+                  {candidat.employeur} · {formaterDateLisible(candidat.dateDebut)} → {formaterDateLisible(candidat.date)} · {candidat.salaireBrut.toFixed(0)} € brut
                   <span className="ml-2 text-xs font-normal px-2 py-0.5 rounded-full bg-surface-2 text-muted border border-line align-middle">AEM/bulletin en attente</span>
                 </p>
                 <TableauComparaison comparaisons={comparaisons} />

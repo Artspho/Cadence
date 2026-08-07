@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import type { NiveauStatut } from "../types";
 import type { PointSerie } from "../engine/prediction";
+import { formaterDateLisible } from "../lib/dateLisible";
 
 interface ProjectionChartProps {
   fenetreDebut: string;
@@ -36,12 +37,6 @@ const LABELS_STATUT: Record<NiveauStatut, { texte: string; classeFond: string; c
   a_rattraper: { texte: "À rattraper", classeFond: "bg-amber/15", classeTexte: "text-amber", classeCourbe: "#F5C46B" },
   bloque: { texte: "Bloqué", classeFond: "bg-red/15", classeTexte: "text-red", classeCourbe: "#F2726B" },
 };
-
-function formatDateCourte(iso: string): string {
-  const [, mois, jour] = iso.split("-");
-  const labels = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."];
-  return `${parseInt(jour, 10)} ${labels[parseInt(mois, 10) - 1]}`;
-}
 
 const TEAL = "#57A9F0"; // segment "confirmé à venir" — même couleur que "heures scène" (charte §8.1)
 
@@ -112,7 +107,7 @@ export function ProjectionChart({
     for (let i = 0; i <= nbMois; i += Math.max(1, Math.round(nbMois / 6))) {
       const t = debutMs + (dureeMs * i) / nbMois;
       const iso = new Date(t).toISOString().slice(0, 10);
-      ticksMois.push({ x: x(iso), label: formatDateCourte(iso) });
+      ticksMois.push({ x: x(iso), label: formaterDateLisible(iso) });
     }
 
     return {
@@ -207,7 +202,7 @@ export function ProjectionChart({
           <g>
             <circle cx={xFranchissement} cy={yFranchissement} r={4} fill={statut.classeCourbe} />
             <text x={xFranchissement} y={yFranchissement - 10} textAnchor="middle" className="fill-ink text-[11px] font-medium">
-              {seuilHeures} h · ~{formatDateCourte(dateFranchissementProjetee)}
+              {seuilHeures} h · ~{formaterDateLisible(dateFranchissementProjetee)}
             </text>
           </g>
         )}

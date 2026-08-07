@@ -72,7 +72,7 @@ describe("MonProfil — historique des ouvertures de droits précédentes", () =
       }),
     );
     const lignes = screen.getAllByRole("row").slice(1); // exclut la ligne d'en-tête
-    expect(lignes.map((l) => l.textContent)).toEqual([expect.stringContaining("2025-12-31"), expect.stringContaining("2024-12-31"), expect.stringContaining("2023-12-31")]);
+    expect(lignes.map((l) => l.textContent)).toEqual([expect.stringContaining("31/12/2025"), expect.stringContaining("31/12/2024"), expect.stringContaining("31/12/2023")]);
   });
 
   it("« Supprimer » retire l'entrée exacte, sans toucher aux autres", () => {

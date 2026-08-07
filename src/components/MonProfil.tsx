@@ -79,7 +79,12 @@ export function MonProfil({
   const [erreurEcriture, setErreurEcriture] = useState<string | null>(null);
 
   const dateAnniversaireCandidate = dateAnniversaireConnue ? dateAnniversaire : "";
-  const coherence = validerCoherenceProfil({ dateNaissance, situation, dateAnniversaire: dateAnniversaireCandidate });
+  const coherence = validerCoherenceProfil({
+    dateNaissance,
+    situation,
+    dateAnniversaire: dateAnniversaireCandidate,
+    dateAnniversairePrecedente: dateAnniversairePrecedente || undefined,
+  });
   const formulaireComplet = dateNaissance.length > 0 && (!dateAnniversaireConnue || dateAnniversaire.length > 0);
   const peutEnregistrer = coherence.coherent && formulaireComplet;
   const dateAnniversaireModifiee = dateAnniversaireCandidate !== profil.dateAnniversaire;
@@ -713,7 +718,7 @@ function GestionAjReelle({ profil, onModifierProfil }: { profil: Profil; onModif
           <tbody>
             {historique.map((h, i) => (
               <tr key={`${h.dateEffet}-${i}`} className="border-b border-line last:border-0">
-                <td className="py-2">{h.dateEffet}</td>
+                <td className="py-2">{formaterDateLisible(h.dateEffet)}</td>
                 <td className="text-right py-2">{h.valeur.toFixed(2)}</td>
                 <td className="text-right py-2">
                   <button onClick={() => supprimer(i)} className="text-xs text-muted hover:text-red transition-colors">
@@ -824,7 +829,7 @@ function GestionTauxPAS({ profil, onModifierProfil }: { profil: Profil; onModifi
           <tbody>
             {historique.map((h, i) => (
               <tr key={`${h.dateEffet}-${i}`} className="border-b border-line last:border-0">
-                <td className="py-2">{h.dateEffet}</td>
+                <td className="py-2">{formaterDateLisible(h.dateEffet)}</td>
                 <td className="text-right py-2">{h.valeur.toFixed(2)}</td>
                 <td className="text-right py-2">
                   <button onClick={() => supprimer(i)} className="text-xs text-muted hover:text-red transition-colors">
@@ -930,8 +935,8 @@ function GestionHistoriqueOuvertureDroits({ profil, onModifierProfil }: { profil
           <tbody>
             {historiqueAffiche.map((h) => (
               <tr key={`${h.dateOuverture}-${h.dateEcheance}`} className="border-b border-line last:border-0">
-                <td className="py-2">{h.dateOuverture}</td>
-                <td className="py-2">{h.dateEcheance}</td>
+                <td className="py-2">{formaterDateLisible(h.dateOuverture)}</td>
+                <td className="py-2">{formaterDateLisible(h.dateEcheance)}</td>
                 <td className="text-right py-2">
                   <button onClick={() => supprimer(h)} className="text-xs text-muted hover:text-red transition-colors">
                     Supprimer

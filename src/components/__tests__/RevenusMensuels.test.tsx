@@ -43,7 +43,7 @@ function rendreEcran(soldeDepart: SoldeIndemnisationDepart, onConfigurerSolde = 
 describe("SoldeRecap — bouton Modifier (RevenusMensuels.tsx, jamais vérifié qu'à la main jusqu'ici, cf. commit 2edb88e)", () => {
   it("affiche la date de départ courante et bascule en édition au clic sur Modifier", () => {
     rendreEcran({ dateDepart: "2026-01-01" });
-    expect(screen.getByText("2026-01-01")).toBeInTheDocument();
+    expect(screen.getByText("01/01/2026")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Modifier" }));
 
@@ -67,7 +67,7 @@ describe("SoldeRecap — bouton Modifier (RevenusMensuels.tsx, jamais vérifié 
   });
 
   it("une fois la nouvelle date reçue en prop (comme après un vrai aller-retour App.tsx), le tableau ne montre plus les mois antérieurs", () => {
-    // Les libellés de mois ("2026-01") partagent parfois leur <span> avec le badge "ESTIMATION" —
+    // Les libellés de mois ("janvier 2026") partagent parfois leur <span> avec le badge "ESTIMATION" —
     // getByText matcherait le texte concaténé des deux. On lit donc directement le texte de chaque
     // ligne du tableau plutôt que de chercher un nœud isolé.
     function moisAffiches() {
@@ -86,8 +86,8 @@ describe("SoldeRecap — bouton Modifier (RevenusMensuels.tsx, jamais vérifié 
         dateDuJour="2026-08-01"
       />,
     );
-    expect(moisAffiches().some((t) => t.startsWith("2026-01"))).toBe(true);
-    expect(moisAffiches().some((t) => t.startsWith("2026-03"))).toBe(true);
+    expect(moisAffiches().some((t) => t.startsWith("janvier 2026"))).toBe(true);
+    expect(moisAffiches().some((t) => t.startsWith("mars 2026"))).toBe(true);
 
     rerender(
       <RevenusMensuels
@@ -101,9 +101,9 @@ describe("SoldeRecap — bouton Modifier (RevenusMensuels.tsx, jamais vérifié 
         dateDuJour="2026-08-01"
       />,
     );
-    expect(moisAffiches().some((t) => t.startsWith("2026-01"))).toBe(false);
-    expect(moisAffiches().some((t) => t.startsWith("2026-03"))).toBe(false);
-    expect(moisAffiches().some((t) => t.startsWith("2026-04"))).toBe(true);
+    expect(moisAffiches().some((t) => t.startsWith("janvier 2026"))).toBe(false);
+    expect(moisAffiches().some((t) => t.startsWith("mars 2026"))).toBe(false);
+    expect(moisAffiches().some((t) => t.startsWith("avril 2026"))).toBe(true);
   });
 
   it("Annuler ne transmet rien et restaure la date affichée d'origine", () => {
@@ -115,7 +115,7 @@ describe("SoldeRecap — bouton Modifier (RevenusMensuels.tsx, jamais vérifié 
     fireEvent.click(screen.getByRole("button", { name: "Annuler" }));
 
     expect(onConfigurerSolde).not.toHaveBeenCalled();
-    expect(screen.getByText("2026-01-01")).toBeInTheDocument();
+    expect(screen.getByText("01/01/2026")).toBeInTheDocument();
   });
 
   it("Enregistrer reste sans effet si la date est vidée (garde-fou déjà présent, jamais une date vide transmise)", () => {

@@ -1,4 +1,5 @@
 import type { Exercice } from "../types";
+import { formaterDateLisible } from "../lib/dateLisible";
 
 interface HistoriqueProps {
   exercices: Exercice[];
@@ -32,7 +33,7 @@ export function Historique({ exercices, onEffacerGel, montantsNonFiables = false
   function effacerAvecConfirmation(exercice: Exercice) {
     if (
       window.confirm(
-        `Recalculer l'exercice ${exercice.dateDebut} → ${exercice.dateAnniversaire} ? À faire uniquement si ses chiffres ne correspondent pas à la réalité (ex. cycle passé mal reconstitué). Il sera recalculé depuis tes contrats actuels puis regelé automatiquement.`,
+        `Recalculer l'exercice ${formaterDateLisible(exercice.dateDebut)} → ${formaterDateLisible(exercice.dateAnniversaire)} ? À faire uniquement si ses chiffres ne correspondent pas à la réalité (ex. cycle passé mal reconstitué). Il sera recalculé depuis tes contrats actuels puis regelé automatiquement.`,
       )
     ) {
       onEffacerGel?.(exercice.id);
@@ -46,7 +47,7 @@ export function Historique({ exercices, onEffacerGel, montantsNonFiables = false
           <div className={`w-2 h-2 rounded-full shrink-0 ${exercice.objectifAtteint ? "bg-mint" : exercice.cloture ? "bg-red" : "bg-faint"}`} aria-hidden />
           <div className="flex-1 min-w-0">
             <p className="text-sm text-ink">
-              {exercice.dateDebut} → {exercice.dateAnniversaire}
+              {formaterDateLisible(exercice.dateDebut)} → {formaterDateLisible(exercice.dateAnniversaire)}
             </p>
             <p className="text-xs text-muted">
               {exercice.cloture ? "Exercice clos" : "Exercice en cours"}
@@ -81,7 +82,7 @@ export function Historique({ exercices, onEffacerGel, montantsNonFiables = false
               type="button"
               onClick={() => effacerAvecConfirmation(exercice)}
               title="Recalculer cet exercice depuis les contrats actuels"
-              aria-label={`Recalculer l'exercice ${exercice.dateDebut} → ${exercice.dateAnniversaire}`}
+              aria-label={`Recalculer l'exercice ${formaterDateLisible(exercice.dateDebut)} → ${formaterDateLisible(exercice.dateAnniversaire)}`}
               className="shrink-0 text-faint hover:text-ink transition-colors px-2 text-sm"
             >
               ↻

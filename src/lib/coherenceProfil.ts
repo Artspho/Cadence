@@ -7,7 +7,7 @@ export interface ResultatCoherenceProfil {
   raison?: string;
 }
 
-type ChampsCoherence = Pick<Profil, "dateNaissance" | "situation" | "dateAnniversaire" | "ouvertureDroits">;
+type ChampsCoherence = Pick<Profil, "dateNaissance" | "situation" | "dateAnniversaire" | "dateAnniversairePrecedente" | "ouvertureDroits">;
 
 /**
  * Règle de cohérence transversale entre les champs modifiables du profil (Onboarding + édition
@@ -18,6 +18,11 @@ type ChampsCoherence = Pick<Profil, "dateNaissance" | "situation" | "dateAnniver
  *   déjà géré par le moteur) ; une première admission AVEC une date renseignée l'est aussi (le
  *   moteur se fie à la présence de la date, pas à `situation`) — aucune autre combinaison n'est
  *   donc bloquée ici.
+ * - `dateAnniversaire` antérieure ou égale à `dateAnniversairePrecedente` — signalé par Benoît le
+ *   07/08/2026 : cycles.ts calcule le cycle en cours par soustraction calendaire depuis
+ *   `dateAnniversaire`, sans jamais comparer ses bornes à `dateAnniversairePrecedente` ; une
+ *   inversion des deux dates (typo, ou champs remplis dans le mauvais ordre) produirait un cycle en
+ *   cours de durée négative ou nulle, jamais détecté avant ce garde-fou.
  * - `ouvertureDroits.dateLimiteIndemnisation` antérieure ou égale à `dateOuverture` — signalé par
  *   un cas réel (2026-07-26) : une faute de frappe sur l'année de l'une ou l'autre date
  *   (ex. "2017" au lieu de "2027") fait s'effondrer silencieusement toute la série mensuelle
@@ -44,6 +49,12 @@ export function validerCoherenceProfil(profil: ChampsCoherence): ResultatCoheren
     return {
       coherent: false,
       raison: "Une réadmission nécessite une date anniversaire connue. Renseigne-la, ou repasse en « Première admission » si tu ne la connais pas encore.",
+    };
+  }
+  if (profil.dateAnniversaire && profil.dateAnniversairePrecedente && profil.dateAnniversaire <= profil.dateAnniversairePrecedente) {
+    return {
+      coherent: false,
+      raison: "Ta date anniversaire (fin de tes derniers droits ouverts) doit être postérieure à la date de fin de ta période de droits précédente — vérifie qu'aucune des deux années n'a été mal saisie.",
     };
   }
   const ouverture = profil.ouvertureDroits;

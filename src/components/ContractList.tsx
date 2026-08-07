@@ -3,6 +3,7 @@ import type { Contrat, DecompteHeuresResultat, Profil } from "../types";
 import type { FranceTravailConfig } from "../config/franceTravailConfig";
 import { heuresBrutesContrat } from "../engine/decompteHeures";
 import { ContractForm } from "./ContractForm";
+import { formaterDateLisible, formaterMoisAnnee } from "../lib/dateLisible";
 
 interface ContractListProps {
   profil: Profil;
@@ -85,7 +86,7 @@ export function ContractList({
   if (contratEnEdition) {
     return (
       <div className="space-y-3">
-        <p className="text-sm text-muted">Modifier le contrat — {contratEnEdition.employeur || "Sans nom"}, {contratEnEdition.date}</p>
+        <p className="text-sm text-muted">Modifier le contrat — {contratEnEdition.employeur || "Sans nom"}, {formaterDateLisible(contratEnEdition.date)}</p>
         <ContractForm
           profil={profil}
           config={config}
@@ -179,7 +180,7 @@ export function ContractList({
                       )}
                     </p>
                     <p className="text-xs text-muted">
-                      {contrat.date}
+                      {formaterDateLisible(contrat.date)}
                       {contrat.source === "import_pdf" ? " · importé PDF" : ""}
                     </p>
                   </div>
@@ -201,8 +202,8 @@ export function ContractList({
             const ouverte = seriesOuvertes.has(recurrenceId);
             const employeur = contratsSerie[0].employeur;
             const type = contratsSerie[0].type;
-            const premierMois = contratsSerie[contratsSerie.length - 1].date.slice(0, 7);
-            const dernierMois = contratsSerie[0].date.slice(0, 7);
+            const premierMois = formaterMoisAnnee(contratsSerie[contratsSerie.length - 1].date);
+            const dernierMois = formaterMoisAnnee(contratsSerie[0].date);
             const totalHeures = contratsSerie.reduce((somme, c) => somme + heuresBrutesContrat(c, config).heures, 0);
             const totalSalaire = contratsSerie.reduce((somme, c) => somme + c.salaireBrut, 0);
 
@@ -243,10 +244,10 @@ export function ContractList({
                       const { heures } = heuresBrutesContrat(contrat, config);
                       return (
                         <div key={contrat.id} className="flex items-center gap-3 text-sm">
-                          <span className="text-muted flex-1">{contrat.date}</span>
+                          <span className="text-muted flex-1">{formaterDateLisible(contrat.date)}</span>
                           <span className="tabular-nums text-ink">{heures.toFixed(1)} h</span>
                           <span className="tabular-nums text-muted w-20 text-right">{contrat.salaireBrut.toFixed(0)} €</span>
-                          <button onClick={() => onSupprimer(contrat.id)} aria-label={`Supprimer le contrat du ${contrat.date}`} className="shrink-0 text-faint hover:text-red transition-colors px-2">
+                          <button onClick={() => onSupprimer(contrat.id)} aria-label={`Supprimer le contrat du ${formaterDateLisible(contrat.date)}`} className="shrink-0 text-faint hover:text-red transition-colors px-2">
                             ✕
                           </button>
                         </div>

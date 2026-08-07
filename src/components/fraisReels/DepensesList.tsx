@@ -5,6 +5,7 @@ import { DepenseForm, StatutBadge } from "./DepenseForm";
 import { calculerAffichageJustificatif } from "../../lib/justificatifAffichage";
 import { obtenirDocument, obtenirUrlTelechargement } from "../../storage/documentsStorage";
 import type { ClientDocuments, ClientFichiers } from "../../auth/supabaseClient";
+import { formaterDateLisible } from "../../lib/dateLisible";
 
 interface DepensesListProps {
   anneeFiscale: number;
@@ -137,7 +138,7 @@ export function DepensesList({ anneeFiscale, depenses, ratioLocalPro, nombreRepa
             <tbody>
               {depensesTriees.map((d) => (
                 <tr key={d.id} className="border-b border-line last:border-0 hover:bg-surface-2/50 cursor-pointer" onClick={() => setDepenseEnEdition(d)}>
-                  <td className="px-3 py-2.5 text-muted whitespace-nowrap">{d.date}</td>
+                  <td className="px-3 py-2.5 text-muted whitespace-nowrap">{formaterDateLisible(d.date)}</td>
                   <td className="px-3 py-2.5">
                     <span className={`inline-flex items-center text-xs font-medium px-2 py-0.5 rounded-full whitespace-nowrap ${COULEUR_BADGE_CATEGORIE[d.categorie]}`}>{d.categorie}</span>
                   </td>

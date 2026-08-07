@@ -55,9 +55,9 @@ describe("RevueExtraction — écraser une valeur de profil déjà saisie exige 
     // L'ancienne valeur ET la nouvelle sont affichées côte à côte dans le tableau de comparaison —
     // jamais l'une sans l'autre (la nouvelle apparaît aussi une fois dans la carte de proposition
     // elle-même, d'où getAllByText).
-    expect(screen.getByText("2026-02-01")).toBeInTheDocument();
-    expect(screen.getByText("→ 2025-06-01")).toBeInTheDocument();
-    expect(screen.getAllByText(/2025-06-01/).length).toBeGreaterThan(0);
+    expect(screen.getByText("01/02/2026")).toBeInTheDocument();
+    expect(screen.getByText("→ 01/06/2025")).toBeInTheDocument();
+    expect(screen.getAllByText(/01\/06\/2025/).length).toBeGreaterThan(0);
     expect(screen.queryByRole("button", { name: /^enregistrer dans mon profil$/i })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /remplacer par les valeurs du document/i })).toBeInTheDocument();
   });

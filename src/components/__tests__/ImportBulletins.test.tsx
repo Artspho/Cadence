@@ -169,7 +169,7 @@ describe("ImportBulletins — doublon détecté (même nom, même taille, déjà
     deposerFichier();
     fireEvent.click(await screen.findByRole("button", { name: /conserver sur le serveur/i }));
     expect(await screen.findByText(/semble déjà dans « Mon dossier »/i)).toBeInTheDocument();
-    expect(screen.getByText(/1er août 2026/)).toBeInTheDocument();
+    expect(screen.getByText(/01\/08\/2026/)).toBeInTheDocument();
     expect(upload).not.toHaveBeenCalled();
   });
 

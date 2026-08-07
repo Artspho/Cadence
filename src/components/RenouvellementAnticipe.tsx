@@ -15,6 +15,7 @@ import type { FranceTravailConfig } from "../config/franceTravailConfig";
 import { calculerRenouvellementAnticipe, type AncienDroit } from "../engine/renouvellementAnticipe";
 import { deriverFctRetenueActuelle } from "../engine/periodeReference";
 import { RENOUVELLEMENT_ANTICIPE } from "../content/renouvellementAnticipe";
+import { formaterDateLisible } from "../lib/dateLisible";
 
 interface RenouvellementAnticipeProps {
   profil: Profil;
@@ -120,7 +121,7 @@ export function RenouvellementAnticipe({ profil, contrats, periodes, config }: R
                   </p>
 
                   <ul className="text-sm text-muted space-y-1">
-                    <li>Nouvelle date anniversaire : {comparaison.nouveau.dateAnniversaire}</li>
+                    <li>Nouvelle date anniversaire : {formaterDateLisible(comparaison.nouveau.dateAnniversaire)}</li>
                     <li>Nouvelle franchise congés payés : {comparaison.nouveau.franchiseCPTotale} j</li>
                     <li>
                       Délai d'attente :{" "}
