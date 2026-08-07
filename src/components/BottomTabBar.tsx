@@ -12,7 +12,7 @@
 
 import { useState } from "react";
 import type { Onglet } from "./TopBar";
-import { ONGLETS, ONGLETS_PRINCIPAUX_MOBILE, INITIALE_ONGLET } from "./onglets";
+import { ONGLETS, ONGLETS_PRINCIPAUX_MOBILE, ICONE_ONGLET } from "./onglets";
 import { FeuillePlusOnglets } from "./FeuillePlusOnglets";
 
 interface BottomTabBarProps {
@@ -36,20 +36,23 @@ export function BottomTabBar({ ongletActif, onChangerOnglet, onExporter, onImpor
         className="md:hidden fixed bottom-0 inset-x-0 z-20 bg-surface border-t border-line flex items-stretch"
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       >
-        {principaux.map((o) => (
-          <button
-            key={o.id}
-            type="button"
-            onClick={() => onChangerOnglet(o.id)}
-            aria-current={ongletActif === o.id ? "page" : undefined}
-            className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2 text-[10px] transition-colors ${ongletActif === o.id ? "text-mint" : "text-muted"}`}
-          >
-            <span className="text-sm" aria-hidden>
-              {INITIALE_ONGLET[o.id]}
-            </span>
-            {o.label}
-          </button>
-        ))}
+        {principaux.map((o) => {
+          const Icone = ICONE_ONGLET[o.id];
+          return (
+            <button
+              key={o.id}
+              type="button"
+              onClick={() => onChangerOnglet(o.id)}
+              aria-current={ongletActif === o.id ? "page" : undefined}
+              className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2 text-[10px] transition-colors ${ongletActif === o.id ? "text-mint" : "text-muted"}`}
+            >
+              <span aria-hidden>
+                <Icone className="w-[18px] h-[18px]" />
+              </span>
+              {o.label}
+            </button>
+          );
+        })}
         <button
           type="button"
           onClick={() => setPlusOuvert(true)}

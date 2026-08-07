@@ -16,7 +16,9 @@
 
 import { useEffect, useState } from "react";
 import type { Onglet } from "./TopBar";
-import { ONGLETS, INITIALE_ONGLET } from "./onglets";
+import { ONGLETS, ICONE_ONGLET } from "./onglets";
+import { AvatarMenu } from "./AvatarMenu";
+import type { SessionConnectee } from "../auth/session";
 
 const CLE_SIDEBAR_EPINGLEE = "cadence:ui:sidebarEpinglee";
 
@@ -25,9 +27,12 @@ interface SidebarProps {
   onChangerOnglet: (onglet: Onglet) => void;
   onExporter: () => void;
   onImporter: () => void;
+  /** Optionnelle : seul `App.tsx` la fournit (une fois le mur de connexion passé). Sans elle, la
+   * ligne « compte » ne se rend pas — évite d'imposer une session à chaque test de `Sidebar`. */
+  session?: SessionConnectee;
 }
 
-export function Sidebar({ ongletActif, onChangerOnglet, onExporter, onImporter }: SidebarProps) {
+export function Sidebar({ ongletActif, onChangerOnglet, onExporter, onImporter, session }: SidebarProps) {
   const [epinglee, setEpinglee] = useState(() => typeof window !== "undefined" && window.localStorage.getItem(CLE_SIDEBAR_EPINGLEE) === "1");
   const [survolee, setSurvolee] = useState(false);
   const ouverte = epinglee || survolee;
@@ -38,30 +43,33 @@ export function Sidebar({ ongletActif, onChangerOnglet, onExporter, onImporter }
 
   return (
     <aside
-      className={`hidden md:flex flex-col shrink-0 border-r border-line bg-surface transition-[width] duration-150 overflow-hidden ${ouverte ? "w-64" : "w-16"}`}
+      className={`hidden md:flex md:sticky md:top-0 md:self-start md:h-screen flex-col shrink-0 border-r border-line bg-surface transition-[width] duration-500 ease-in-out overflow-hidden ${ouverte ? "w-64" : "w-16"}`}
       onMouseEnter={() => setSurvolee(true)}
       onMouseLeave={() => setSurvolee(false)}
     >
       <nav className="flex-1 py-3 space-y-0.5 overflow-y-auto" aria-label="Navigation principale">
-        {ONGLETS.map((o) => (
-          <button
-            key={o.id}
-            type="button"
-            onClick={() => onChangerOnglet(o.id)}
-            onFocus={() => setSurvolee(true)}
-            aria-current={ongletActif === o.id ? "page" : undefined}
-            aria-label={o.label}
-            title={o.label}
-            className={`w-full flex items-center gap-3 px-[18px] py-2 text-sm whitespace-nowrap transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-mint ${
-              ongletActif === o.id ? "bg-surface-2 text-ink" : "text-muted hover:text-ink"
-            }`}
-          >
-            <span className="w-5 shrink-0 text-center text-xs text-faint" aria-hidden>
-              {INITIALE_ONGLET[o.id]}
-            </span>
-            {ouverte && <span>{o.label}</span>}
-          </button>
-        ))}
+        {ONGLETS.map((o) => {
+          const Icone = ICONE_ONGLET[o.id];
+          return (
+            <button
+              key={o.id}
+              type="button"
+              onClick={() => onChangerOnglet(o.id)}
+              onFocus={() => setSurvolee(true)}
+              aria-current={ongletActif === o.id ? "page" : undefined}
+              aria-label={o.label}
+              title={o.label}
+              className={`w-full flex items-center gap-3 px-[18px] py-2 text-sm whitespace-nowrap transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-mint ${
+                ongletActif === o.id ? "bg-surface-2 text-ink" : "text-muted hover:text-ink"
+              }`}
+            >
+              <span className="w-5 h-5 shrink-0 text-faint" aria-hidden>
+                <Icone className="w-5 h-5" />
+              </span>
+              {ouverte && <span>{o.label}</span>}
+            </button>
+          );
+        })}
       </nav>
       <div className="border-t border-line py-3 space-y-0.5">
         <button
@@ -72,7 +80,7 @@ export function Sidebar({ ongletActif, onChangerOnglet, onExporter, onImporter }
           title="Exporter mes données (JSON)"
           className="w-full flex items-center gap-3 px-[18px] py-2 text-xs text-muted hover:text-ink transition-colors"
         >
-          <span className="w-5 shrink-0 text-center" aria-hidden>
+          <span className="w-5 h-5 shrink-0 flex items-center justify-center" aria-hidden>
             ↓
           </span>
           {ouverte && <span>Exporter mes données (JSON)</span>}
@@ -85,7 +93,7 @@ export function Sidebar({ ongletActif, onChangerOnglet, onExporter, onImporter }
           title="Importer"
           className="w-full flex items-center gap-3 px-[18px] py-2 text-xs text-muted hover:text-ink transition-colors"
         >
-          <span className="w-5 shrink-0 text-center" aria-hidden>
+          <span className="w-5 h-5 shrink-0 flex items-center justify-center" aria-hidden>
             ↑
           </span>
           {ouverte && <span>Importer</span>}
@@ -99,11 +107,14 @@ export function Sidebar({ ongletActif, onChangerOnglet, onExporter, onImporter }
           title={epinglee ? "Détacher" : "Épingler"}
           className="w-full flex items-center gap-3 px-[18px] py-2 text-xs text-faint hover:text-muted transition-colors"
         >
-          <span className="w-5 shrink-0 text-center" aria-hidden>
+          <span className="w-5 h-5 shrink-0 flex items-center justify-center" aria-hidden>
             {epinglee ? "◉" : "○"}
           </span>
           {ouverte && <span>{epinglee ? "Détacher" : "Épingler"}</span>}
         </button>
+        {session && (
+          <AvatarMenu session={session} onChangerOnglet={onChangerOnglet} variante="sidebar" ouverte={ouverte} onFocusRow={() => setSurvolee(true)} />
+        )}
       </div>
     </aside>
   );

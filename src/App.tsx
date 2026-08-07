@@ -910,7 +910,7 @@ export default function App() {
         </div>
       )}
       <div className="flex-1 md:flex min-h-0">
-        <Sidebar ongletActif={onglet} onChangerOnglet={setOnglet} onExporter={exporter} onImporter={() => inputImportRef.current?.click()} />
+        <Sidebar ongletActif={onglet} onChangerOnglet={setOnglet} onExporter={exporter} onImporter={() => inputImportRef.current?.click()} session={session} />
 
         <div className="flex-1 min-w-0 flex flex-col">
           <TopBar onChangerOnglet={setOnglet} periodeLabel={profil.dateAnniversaire ? `Cycle → ${profil.dateAnniversaire}` : "Première admission"} session={session} />

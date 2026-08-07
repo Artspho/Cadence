@@ -17,9 +17,10 @@ interface TopBarProps {
 }
 
 // Nav horizontale retirée à l'étape « sidebar » de la refonte UI (07/08/2026) — remplacée par
-// `Sidebar.tsx` (desktop) et `BottomTabBar.tsx` (mobile), toutes deux dans `onglets.ts` pour la
-// liste des onglets. `TopBar` ne porte plus que le logo, le badge de période et l'avatar
-// (`onChangerOnglet` reste utile : c'est lui que consomme `AvatarMenu` pour aller aux Paramètres).
+// `Sidebar.tsx` (desktop) et `BottomTabBar.tsx` (mobile), toutes deux dans `onglets.tsx` pour la
+// liste des onglets. `TopBar` ne porte plus que le logo, le badge de période et — sur mobile
+// seulement — l'avatar : sur desktop, il vit désormais en bas de `Sidebar.tsx` (`onChangerOnglet`
+// reste utile ici : c'est lui que consomme `AvatarMenu` pour aller aux Paramètres).
 export function TopBar({ onChangerOnglet, periodeLabel, session }: TopBarProps) {
   return (
     <header className="border-b border-line bg-bg/80 backdrop-blur sticky top-0 z-10">
@@ -29,7 +30,7 @@ export function TopBar({ onChangerOnglet, periodeLabel, session }: TopBarProps) 
           <span className="font-display font-semibold text-lg tracking-tight">Cadence</span>
         </div>
         <span className="text-xs uppercase tracking-[.03em] text-muted bg-surface-2 border border-line rounded-full px-3 py-1">{periodeLabel}</span>
-        <div className="ml-auto">
+        <div className="ml-auto md:hidden">
           <AvatarMenu session={session} onChangerOnglet={onChangerOnglet} />
         </div>
       </div>
