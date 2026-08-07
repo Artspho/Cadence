@@ -12,6 +12,7 @@ import {
   evaluerProposition,
   fusionnerContratsDupliques,
   periodeDepuisProposition,
+  profilAvecEntreeHistorique,
   profilAvecProposition,
 } from "../routageExtraction";
 import {
@@ -399,6 +400,61 @@ describe("profil_ouverture_droits / profil_infos — écraser une valeur DIFFÉR
     };
     const resultat = profilAvecProposition(profilAvecOuverture, proposition);
     expect(resultat.ouvertureDroits?.dateOuverture).toBe("2025-06-01");
+  });
+
+  // 07/08/2026 (idée de Benoît) — candidatHistorique : quand l'écart dépasse 12 mois, le document
+  // décrit probablement une admission DIFFÉRENTE, pas une correction. profilAvecOuverture ci-dessus :
+  // ouvertureDroits.dateOuverture = "2026-02-01".
+  it("profil_ouverture_droits : candidatHistorique renseigné quand l'écart dépasse 365 jours ET que dateLimiteIndemnisation est connue", () => {
+    const proposition: Proposition = {
+      cible: "profil_ouverture_droits",
+      donnees: { dateOuverture: "2023-02-01", franchiseCPTotale: 12, delaiAttenteInitial: 7, dateLimiteIndemnisation: "2024-01-31" }, // 3 ans avant, écart > 365j
+      confiance: {},
+      justification: "test",
+    };
+    const evaluee = evaluerProposition(proposition, profilAvecOuverture);
+    expect(evaluee.statut).toBe("confirmation_ecrasement");
+    expect(evaluee.candidatHistorique).toEqual({ dateOuverture: "2023-02-01", dateEcheance: "2024-01-31" });
+  });
+
+  it("profil_ouverture_droits : PAS de candidatHistorique quand l'écart reste sous 365 jours (probablement une correction, pas une autre admission)", () => {
+    const proposition: Proposition = {
+      cible: "profil_ouverture_droits",
+      donnees: { dateOuverture: "2025-06-01", franchiseCPTotale: 12, delaiAttenteInitial: 7, dateLimiteIndemnisation: "2026-05-31" }, // ~8 mois avant
+      confiance: {},
+      justification: "test",
+    };
+    const evaluee = evaluerProposition(proposition, profilAvecOuverture);
+    expect(evaluee.statut).toBe("confirmation_ecrasement");
+    expect(evaluee.candidatHistorique).toBeUndefined();
+  });
+
+  it("profil_ouverture_droits : PAS de candidatHistorique sans dateLimiteIndemnisation connue, même avec un grand écart (une entrée sans fin de cycle ne servirait à rien)", () => {
+    const proposition: Proposition = {
+      cible: "profil_ouverture_droits",
+      donnees: { dateOuverture: "2023-02-01", franchiseCPTotale: 12, delaiAttenteInitial: 7, dateLimiteIndemnisation: null },
+      confiance: {},
+      justification: "test",
+    };
+    const evaluee = evaluerProposition(proposition, profilAvecOuverture);
+    expect(evaluee.statut).toBe("confirmation_ecrasement");
+    expect(evaluee.candidatHistorique).toBeUndefined();
+  });
+
+  it("profilAvecEntreeHistorique : ajoute l'entrée triée, sans toucher à ouvertureDroits ni dateAnniversaire", () => {
+    const resultat = profilAvecEntreeHistorique(profilAvecOuverture, { dateOuverture: "2023-02-01", dateEcheance: "2024-01-31" });
+    expect(resultat.historiqueOuvertureDroits).toEqual([{ dateOuverture: "2023-02-01", dateEcheance: "2024-01-31" }]);
+    expect(resultat.ouvertureDroits).toEqual(profilAvecOuverture.ouvertureDroits);
+    expect(resultat.dateAnniversaire).toBe(profilAvecOuverture.dateAnniversaire);
+  });
+
+  it("profilAvecEntreeHistorique : trie par dateEcheance croissante, quel que soit l'ordre d'ajout", () => {
+    const avecUne = profilAvecEntreeHistorique(profilAvecOuverture, { dateOuverture: "2024-02-01", dateEcheance: "2025-01-31" });
+    const avecDeux = profilAvecEntreeHistorique(avecUne, { dateOuverture: "2023-02-01", dateEcheance: "2024-01-31" });
+    expect(avecDeux.historiqueOuvertureDroits).toEqual([
+      { dateOuverture: "2023-02-01", dateEcheance: "2024-01-31" },
+      { dateOuverture: "2024-02-01", dateEcheance: "2025-01-31" },
+    ]);
   });
 
   it("profil_infos : confirmation_ecrasement quand dateAnniversaire diffère, SEULEMENT si une ouverture de droits existe déjà", () => {

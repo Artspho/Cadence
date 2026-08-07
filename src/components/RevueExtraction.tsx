@@ -25,6 +25,7 @@ import {
   detecterMergeAmbiguHeuresCachets,
   evaluerExtraction,
   periodeDepuisProposition,
+  profilAvecEntreeHistorique,
   profilAvecProposition,
   type PropositionEvaluee,
   type StatutProposition,
@@ -229,6 +230,27 @@ export function RevueExtraction({
     setEtats((s) => ({ ...s, [index]: "applique" }));
   }
 
+  /**
+   * 07/08/2026 (idée de Benoît) — troisième option sur une proposition `confirmation_ecrasement` de
+   * `cible: "profil_ouverture_droits"` dont `candidatHistorique` est renseigné : ajoute l'entrée à
+   * `Profil.historiqueOuvertureDroits` (profilAvecEntreeHistorique, lib/routageExtraction.ts) au lieu
+   * de remplacer l'ouverture EN COURS. Même gestion d'erreur/état que `appliquerAuProfil` ci-dessus.
+   */
+  function ajouterHistorique(index: number, entree: { dateOuverture: string; dateEcheance: string }) {
+    const candidat = profilAvecEntreeHistorique(profil, entree);
+    const ecriture = onModifierProfil(candidat);
+    if (!ecriture.ok) {
+      setErreurs((e) => ({ ...e, [index]: ecriture.erreur }));
+      return;
+    }
+    setErreurs((e) => {
+      const suite = { ...e };
+      delete suite[index];
+      return suite;
+    });
+    setEtats((s) => ({ ...s, [index]: "applique" }));
+  }
+
   function enregistrerContrat(index: number, contrat: Omit<Contrat, "id">) {
     onAjouterContrat(contrat);
     setFormulaireOuvert(null);
@@ -301,6 +323,9 @@ export function RevueExtraction({
           config={config}
           decompteActuel={decompteActuel}
           onAppliquer={() => appliquerAuProfil(index, evaluee.proposition)}
+          onAjouterHistorique={() => {
+            if (evaluee.candidatHistorique) ajouterHistorique(index, evaluee.candidatHistorique);
+          }}
           onOuvrirFormulaire={() => setFormulaireOuvert(index)}
           onFermerFormulaire={() => setFormulaireOuvert(null)}
           onEnregistrerContrat={(contrat) => enregistrerContrat(index, contrat)}
@@ -324,6 +349,7 @@ interface CartePropositionProps {
   config: FranceTravailConfig;
   decompteActuel: DecompteHeuresResultat;
   onAppliquer: () => void;
+  onAjouterHistorique: () => void;
   onOuvrirFormulaire: () => void;
   onFermerFormulaire: () => void;
   onEnregistrerContrat: (contrat: Omit<Contrat, "id">) => void;
@@ -341,6 +367,7 @@ function CarteProposition({
   config,
   decompteActuel,
   onAppliquer,
+  onAjouterHistorique,
   onOuvrirFormulaire,
   onFermerFormulaire,
   onEnregistrerContrat,
@@ -348,7 +375,7 @@ function CarteProposition({
   onConfirmerCorrespondance,
   onEcarter,
 }: CartePropositionProps) {
-  const { proposition, titre, statut, motif, avertissements, correspondances, diagnosticAbsence, champsEcrases } = evaluee;
+  const { proposition, titre, statut, motif, avertissements, correspondances, diagnosticAbsence, champsEcrases, candidatHistorique } = evaluee;
   const labels = LABELS_CHAMPS[proposition.cible];
   const style = STYLE_STATUT[statut];
   const traitee = etat !== "en_attente";
@@ -462,6 +489,15 @@ function CarteProposition({
         <div className="space-y-2">
           <p className="text-sm text-amber">Ce document remplacerait des valeurs déjà enregistrées :</p>
           <TableauComparaison comparaisons={champsEcrases} labels={labels} />
+          {/* 07/08/2026 (idée de Benoît) : l'écart de dates rend une admission DIFFÉRENTE plausible
+              (cf. ECART_ADMISSION_DIFFERENTE_JOURS, lib/routageExtraction.ts) — troisième option, à
+              côté de « Remplacer »/« Garder », qui n'écrit jamais sur l'ouverture EN COURS. */}
+          {candidatHistorique && (
+            <p className="text-xs text-muted leading-relaxed rounded-lg px-3 py-2.5 bg-surface-2">
+              Ce document semble décrire une admission différente de celle en cours (plus de 12 mois d'écart) — tu peux l'ajouter à ton historique sans toucher à ton ouverture actuelle, ou
+              remplacer si c'est en fait une correction de la même admission.
+            </p>
+          )}
         </div>
       )}
 
@@ -475,6 +511,11 @@ function CarteProposition({
           {statut === "confirmation_ecrasement" && (
             <button onClick={onAppliquer} className="bg-amber text-bg font-medium rounded-lg px-4 py-2 text-sm transition-opacity hover:opacity-90">
               Remplacer par les valeurs du document
+            </button>
+          )}
+          {statut === "confirmation_ecrasement" && candidatHistorique && (
+            <button onClick={onAjouterHistorique} className="px-4 py-2 rounded-lg border border-mint/40 text-mint text-sm hover:bg-mint/10 transition-colors">
+              Ajouter à l'historique des ouvertures précédentes
             </button>
           )}
           {statut === "revue_formulaire" && !estDoublonContratNonConfirme && (
