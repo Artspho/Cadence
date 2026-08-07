@@ -18,6 +18,8 @@ import type { SessionConnectee } from "../auth/session";
 import { RenouvellementAnticipe } from "./RenouvellementAnticipe";
 import { DateNaissanceInput } from "./DateNaissanceInput";
 import { MentionsLegales } from "./MentionsLegales";
+import { LIMITES_STRUCTURELLES, PERIMETRE_MVP } from "../content/perimetreEtLimites";
+import { InfoPopover } from "./InfoPopover";
 
 type OnModifierProfil = (profil: Profil) => ResultatEcritureProfil;
 
@@ -40,9 +42,27 @@ interface MonProfilProps {
    * n'aurait aucune raison d'avoir la même empreinte.
    */
   donnees?: DonneesApp | null;
+  /**
+   * Vers l'onglet « Paramètres, sources & mentions » (refonte UI, 07/08/2026), où le texte complet du
+   * périmètre/des limites vit désormais aussi — absent : les liens « En savoir plus » des info-bulles
+   * ne font rien (ne devrait pas arriver en pratique, `App.tsx` la fournit toujours).
+   */
+  onNaviguerVersParametres?: () => void;
 }
 
-export function MonProfil({ dateDuJour, profil, onModifierProfil, contrats, periodes, onAjouterPeriode, onSupprimerPeriode, session, etatEnregistrement, donnees }: MonProfilProps) {
+export function MonProfil({
+  dateDuJour,
+  profil,
+  onModifierProfil,
+  contrats,
+  periodes,
+  onAjouterPeriode,
+  onSupprimerPeriode,
+  session,
+  etatEnregistrement,
+  donnees,
+  onNaviguerVersParametres = () => {},
+}: MonProfilProps) {
   const [formPeriodeOuvert, setFormPeriodeOuvert] = useState(false);
   const [mentionsLegalesOuvertes, setMentionsLegalesOuvertes] = useState(false);
   // Compté depuis la dernière VÉRIFICATION des constantes, pas depuis l'entrée en vigueur du SMIC
@@ -294,33 +314,32 @@ export function MonProfil({ dateDuJour, profil, onModifierProfil, contrats, peri
 
       <DocumentsUtiles />
 
-      <section>
-        <h2 className="font-display text-lg font-medium mb-2">Périmètre du MVP</h2>
-        <ul className="text-sm text-muted space-y-1.5 list-disc list-inside">
-          <li>Annexe 10 uniquement. Pas d'arbitrage Annexe 8 ni régime général (article 65).</li>
-          <li>Estimation, pas décision. Les montants sont indicatifs ; France Travail seul fait foi.</li>
-          <li>
-            Le suivi des jours réellement indemnisés mois par mois est disponible (onglet « Revenus mensuels »), calculé automatiquement depuis tes contrats et l'ouverture de tes droits
-            (renseignée ci-dessus, section « Mon indemnisation en cours »). La franchise salaires et le plafond de cumul (118&nbsp;% du PMSS) ne sont pas calculés.
-          </li>
-          <li>Import PDF assisté, pas magique : extraction locale, revue avant enregistrement, non garantie exacte.</li>
-        </ul>
-      </section>
-
-      <section>
-        <h2 className="font-display text-lg font-medium mb-2">Limites structurelles à garder en tête</h2>
-        <ul className="text-sm text-muted space-y-1.5 list-disc list-inside">
-          <li>Toutes les données sont en localStorage : cache vidé ou changement d'appareil = perte de la saisie. Utilise l'export JSON régulièrement.</li>
-          <li>La projection est linéaire : elle ignore la saisonnalité (festivals l'été, creux ensuite) et peut rassurer à tort.</li>
-          <li>Risque de faux « feu vert » : des heures oubliées ou un cas hors périmètre peuvent afficher un statut rassurant à tort.</li>
-          <li>Les profils mixtes (Annexe 10 + Annexe 8 + régime général) reposent sur ton propre signalement (ci-dessus) : rien n'est déduit automatiquement de tes contrats.</li>
-          <li>Les alertes sont calculées à l'ouverture de l'app, pas envoyées de façon proactive (pas de backend).</li>
-          <li>
-            La franchise salaires est calculée selon la formule officielle (guide France Travail, page 14). Si tu n'as eu que des contrats Annexe 10, le calcul est complet. Si tu avais aussi des
-            contrats hors spectacle, renseigne le champ «&nbsp;Salaires hors Annexe 10 sur la période de référence&nbsp;» ci-dessus pour affiner.
-          </li>
-        </ul>
-      </section>
+      {/* Les deux sections en pleine page ont été remplacées par ces info-bulles (refonte UI,
+          07/08/2026) : le texte complet ne bouge pas (content/perimetreEtLimites.ts, une seule
+          source avec l'onglet Paramètres), seul son point d'entrée change — plus lisible pour qui ne
+          veut pas le lire à chaque visite, toujours accessible pour qui le veut. */}
+      <div className="flex items-center gap-5 flex-wrap text-sm text-muted">
+        <span className="inline-flex items-center gap-1.5">
+          Périmètre du MVP
+          <InfoPopover titre="Périmètre du MVP" onEnSavoirPlus={onNaviguerVersParametres}>
+            <ul className="list-disc list-inside space-y-1">
+              {PERIMETRE_MVP.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          </InfoPopover>
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          Limites structurelles à garder en tête
+          <InfoPopover titre="Limites structurelles à garder en tête" onEnSavoirPlus={onNaviguerVersParametres}>
+            <ul className="list-disc list-inside space-y-1">
+              {LIMITES_STRUCTURELLES.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          </InfoPopover>
+        </span>
+      </div>
 
       {EMAIL_FEEDBACK && (
         <div>
