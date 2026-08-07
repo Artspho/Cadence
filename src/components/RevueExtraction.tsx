@@ -32,7 +32,7 @@ import {
 import type { DiagnosticAbsenceCorrespondance } from "../lib/correspondanceContrat";
 import { ContractForm } from "./ContractForm";
 import { PeriodeForm } from "./PeriodeForm";
-import { TableauComparaisonContrat } from "./TableauComparaisonContrat";
+import { TableauComparaison } from "./TableauComparaison";
 
 interface RevueExtractionProps {
   resultat: ExtractionResult;
@@ -153,6 +153,7 @@ export const LABELS_VALEURS: Record<string, string> = {
 const STYLE_STATUT: Record<StatutProposition, { libelle: string; classe: string }> = {
   revue_formulaire: { libelle: "À vérifier dans le formulaire", classe: "bg-mint/15 text-mint" },
   applicable: { libelle: "Applicable", classe: "bg-mint/15 text-mint" },
+  confirmation_ecrasement: { libelle: "Remplacerait une valeur existante", classe: "bg-amber/15 text-amber" },
   information: { libelle: "Information", classe: "bg-surface-2 text-muted" },
   non_applicable: { libelle: "Non applicable", classe: "bg-amber/15 text-amber" },
 };
@@ -347,7 +348,7 @@ function CarteProposition({
   onConfirmerCorrespondance,
   onEcarter,
 }: CartePropositionProps) {
-  const { proposition, titre, statut, motif, avertissements, correspondances, diagnosticAbsence } = evaluee;
+  const { proposition, titre, statut, motif, avertissements, correspondances, diagnosticAbsence, champsEcrases } = evaluee;
   const labels = LABELS_CHAMPS[proposition.cible];
   const style = STYLE_STATUT[statut];
   const traitee = etat !== "en_attente";
@@ -356,6 +357,13 @@ function CarteProposition({
   // la carte — ne fait rien tant que rien n'est validé, donc pas besoin d'être suivi par le parent.
   const [traiterCommeNouveau, setTraiterCommeNouveau] = useState(false);
   const aDesCorrespondances = proposition.cible === "contrat" && (correspondances?.length ?? 0) > 0 && !traiterCommeNouveau;
+  // 07/08/2026 : un contrat déjà confirmé par un document n'est plus proposé en correspondance
+  // (diagnosticAbsence.type === "deja_confirme"), mais rien n'empêchait jusqu'ici de cliquer quand
+  // même « Vérifier et enregistrer » et de créer un second contrat identique. Même principe que
+  // `traiterCommeNouveau` ci-dessus : un choix explicite, jamais automatique, avant d'ouvrir le
+  // formulaire dans ce cas précis.
+  const [doublonContratConfirme, setDoublonContratConfirme] = useState(false);
+  const estDoublonContratNonConfirme = proposition.cible === "contrat" && diagnosticAbsence?.type === "deja_confirme" && !doublonContratConfirme;
 
   return (
     <section className={`bg-surface border rounded-card p-5 space-y-4 transition-opacity ${traitee ? "border-line opacity-60" : "border-line"}`}>
@@ -417,7 +425,7 @@ function CarteProposition({
                   {candidat.employeur} · {candidat.dateDebut} → {candidat.date} · {candidat.salaireBrut.toFixed(0)} € brut
                   <span className="ml-2 text-xs font-normal px-2 py-0.5 rounded-full bg-surface-2 text-muted border border-line align-middle">AEM/bulletin en attente</span>
                 </p>
-                <TableauComparaisonContrat comparaisons={comparaisons} />
+                <TableauComparaison comparaisons={comparaisons} />
                 {mergeAmbigu ? (
                   // Purement informatif — jamais un bouton qui fusionnerait ou réinitialiserait quoi
                   // que ce soit ici (cf. detecterMergeAmbiguHeuresCachets, lib/routageExtraction.ts).
@@ -447,6 +455,16 @@ function CarteProposition({
         <p className="text-xs text-muted leading-relaxed rounded-lg px-3 py-2.5 bg-surface-2">{texteDiagnosticAbsence(diagnosticAbsence)}</p>
       )}
 
+      {/* 07/08/2026 : ce que cette proposition remplacerait, avant tout clic — jamais un écrasement
+          en un clic aveugle (cf. statutSelonEcrasement, lib/routageExtraction.ts). Même principe que
+          le tableau de comparaison de contrat ci-dessus, appliqué à profil_ouverture_droits/profil_infos. */}
+      {!traitee && !formulaireOuvert && statut === "confirmation_ecrasement" && champsEcrases && (
+        <div className="space-y-2">
+          <p className="text-sm text-amber">Ce document remplacerait des valeurs déjà enregistrées :</p>
+          <TableauComparaison comparaisons={champsEcrases} labels={labels} />
+        </div>
+      )}
+
       {!traitee && !formulaireOuvert && !aDesCorrespondances && (
         <div className="flex items-center gap-2 flex-wrap">
           {statut === "applicable" && (
@@ -454,13 +472,26 @@ function CarteProposition({
               Enregistrer dans mon profil
             </button>
           )}
-          {statut === "revue_formulaire" && (
+          {statut === "confirmation_ecrasement" && (
+            <button onClick={onAppliquer} className="bg-amber text-bg font-medium rounded-lg px-4 py-2 text-sm transition-opacity hover:opacity-90">
+              Remplacer par les valeurs du document
+            </button>
+          )}
+          {statut === "revue_formulaire" && !estDoublonContratNonConfirme && (
             <button onClick={onOuvrirFormulaire} className="bg-mint text-bg font-medium rounded-lg px-4 py-2 text-sm transition-opacity hover:opacity-90">
               Vérifier et enregistrer
             </button>
           )}
+          {statut === "revue_formulaire" && estDoublonContratNonConfirme && (
+            <button
+              onClick={() => setDoublonContratConfirme(true)}
+              className="px-4 py-2 rounded-lg border border-amber/40 text-amber text-sm hover:bg-amber/10 transition-colors"
+            >
+              Créer quand même un nouveau contrat
+            </button>
+          )}
           <button onClick={onEcarter} className="px-4 py-2 rounded-lg border border-line text-muted text-sm hover:text-ink transition-colors">
-            {statut === "applicable" || statut === "revue_formulaire" ? "Ignorer" : "J'ai noté"}
+            {statut === "applicable" || statut === "revue_formulaire" || statut === "confirmation_ecrasement" ? (statut === "confirmation_ecrasement" ? "Garder mes valeurs actuelles" : "Ignorer") : "J'ai noté"}
           </button>
         </div>
       )}

@@ -41,6 +41,15 @@ export type StatutProposition =
   | "revue_formulaire"
   /** Peut être appliqué au profil en un clic (modifierProfil revalide derrière, cf. App.tsx). */
   | "applicable"
+  /**
+   * 07/08/2026 — bug réel : réimporter une notification différente écrasait silencieusement
+   * `dateOuverture`/`dateLimiteIndemnisation`/`dateAnniversaire`/… déjà saisis, décalant la fenêtre
+   * qui borne le moteur (cf. `champsEcrases` sur `PropositionEvaluee`, et le commentaire de
+   * `statutSelonEcrasement` ci-dessous). Comme `applicable`, mais seulement après que
+   * `RevueExtraction.tsx` a montré ancien → nouveau et que l'utilisateur a cliqué quand même —
+   * jamais en un clic aveugle.
+   */
+  | "confirmation_ecrasement"
   /** Information utile à vérifier/recopier : c'est sa nature, pas un problème. */
   | "information"
   /** L'app n'a pas de case d'arrivée sûre : on n'écrit rien et on dit pourquoi. */
@@ -72,6 +81,57 @@ export interface PropositionEvaluee {
    * seconde correspondance. Purement informatif : RevueExtraction.tsx l'affiche, ne décide rien.
    */
   diagnosticAbsence?: DiagnosticAbsenceCorrespondance;
+  /**
+   * Renseigné UNIQUEMENT quand `statut === "confirmation_ecrasement"` — les champs que cette
+   * proposition remplacerait par une valeur DIFFÉRENTE de celle déjà connue (`cible:
+   * "profil_ouverture_droits"` ou `"profil_infos"`). Toujours la liste complète des champs
+   * comparables, jamais seulement ceux qui diffèrent (même principe que `comparerContratExistant` :
+   * un champ identique masqué serait indiscernable d'un champ jamais comparé).
+   */
+  champsEcrases?: ChampComparaison[];
+}
+
+/**
+ * Compare chaque champ RENSEIGNÉ par le document à la valeur déjà connue — même principe que
+ * `comparerContratExistant` plus bas, généralisé à `profil_ouverture_droits`/`profil_infos`
+ * (07/08/2026). Un champ non lu par le document (`null`) ou jamais renseigné dans le profil
+ * (`undefined`) n'est jamais comparé : remplir un blanc n'est pas écraser une valeur, ces deux cas
+ * doivent rester "applicable" en un clic.
+ */
+function comparerChampsProfil(existant: Record<string, unknown>, nouveau: Record<string, unknown>): ChampComparaison[] {
+  // `""` compte comme « non lu », au même titre que `null`/`undefined` — les champs texte de ces
+  // deux cibles utilisent `||` (falsy) pour le repli sur l'existant, pas `??` (cf.
+  // profilAvecProposition) : une chaîne vide n'est jamais une VALEUR à comparer, seuls les champs
+  // numériques (`franchiseCPTotale`/`delaiAttenteInitial`) autorisent `0` comme valeur réelle.
+  return Object.keys(nouveau)
+    .filter((champ) => nouveau[champ] !== null && nouveau[champ] !== undefined && nouveau[champ] !== "" && existant[champ] !== undefined)
+    .map((champ) => ({ champ, existant: existant[champ], document: nouveau[champ], identique: existant[champ] === nouveau[champ] }));
+}
+
+/**
+ * Décide si une proposition `profil_ouverture_droits`/`profil_infos` peut s'appliquer en un clic,
+ * ou doit d'abord montrer ce qu'elle écraserait.
+ *
+ * BUG RÉEL CORRIGÉ ICI (07/08/2026, signalé par Benoît) : `profilAvecProposition` ci-dessous écrit
+ * la valeur du document dès qu'elle est présente, quelle que soit la valeur déjà enregistrée —
+ * alors que son propre commentaire affirme le contraire (« n'efface jamais une donnée déjà
+ * saisie »). `evaluerProposition` marquait ces deux cibles « applicable » (un clic, sans montrer
+ * l'ancienne valeur) dès que le profil avait déjà une base. Cas réel : réimporter une notification
+ * d'admission PASSÉE a réécrit `dateOuverture` ET (via `profil_infos`, même document)
+ * `dateAnniversaire`/`dateAnniversairePrecedente` avec des valeurs périmées — la fenêtre qui borne
+ * `calculerSerieDepuisContrats` et celle de `calculerFenetreReference` (periodeReference.ts) se
+ * sont décalées d'un coup, produisant une période de référence de plus de 12 mois et des montants
+ * mensuels incohérents. Ce correctif ne touche PAS `profilAvecProposition` (l'écriture reste la
+ * même une fois confirmée) : il intercale une étape de confirmation AVANT, exactement comme
+ * `comparerContratExistant`/`TableauComparaisonContrat` le font déjà pour les contrats.
+ */
+function statutSelonEcrasement(proposition: Proposition, titre: string, existant: Record<string, unknown> | undefined, nouveau: Record<string, unknown>): PropositionEvaluee {
+  if (!existant) return { proposition, titre, statut: "applicable", avertissements: [] };
+  const champsEcrases = comparerChampsProfil(existant, nouveau);
+  if (champsEcrases.some((c) => !c.identique)) {
+    return { proposition, titre, statut: "confirmation_ecrasement", avertissements: [], champsEcrases };
+  }
+  return { proposition, titre, statut: "applicable", avertissements: [] };
 }
 
 const TITRES: Record<Proposition["cible"], string> = {
@@ -118,12 +178,13 @@ export function evaluerProposition(proposition: Proposition, profil: Profil, con
 
     case "profil_ouverture_droits": {
       const { dateOuverture, franchiseCPTotale, delaiAttenteInitial, dateLimiteIndemnisation } = proposition.donnees;
-      const baseDejaConnue = profil.ouvertureDroits !== undefined;
+      const existant = profil.ouvertureDroits as unknown as Record<string, unknown> | undefined;
+      const baseDejaConnue = existant !== undefined;
       // Le taux ne fait plus partie de cette cible depuis le 02/08/2026 (cf. types/extraction.ts,
       // Cible 2) : seule dateLimiteIndemnisation reste un champ "utile seul".
       const champUtileSeul = dateLimiteIndemnisation !== null;
       if (baseDejaConnue && champUtileSeul) {
-        return { proposition, titre, statut: "applicable", avertissements: [] };
+        return statutSelonEcrasement(proposition, titre, existant, { dateOuverture, franchiseCPTotale, delaiAttenteInitial, dateLimiteIndemnisation });
       }
       const manquants: string[] = [];
       if (!dateOuverture) manquants.push("la date d'ouverture des droits");
@@ -142,7 +203,7 @@ export function evaluerProposition(proposition: Proposition, profil: Profil, con
           avertissements: [],
         };
       }
-      return { proposition, titre, statut: "applicable", avertissements: [] };
+      return statutSelonEcrasement(proposition, titre, existant, { dateOuverture, franchiseCPTotale, delaiAttenteInitial, dateLimiteIndemnisation });
     }
 
     case "profil_infos": {
@@ -156,7 +217,13 @@ export function evaluerProposition(proposition: Proposition, profil: Profil, con
           avertissements: [],
         };
       }
-      return { proposition, titre, statut: "applicable", avertissements: [] };
+      // Protégé seulement si une ouverture de droits est DÉJÀ connue : avant ça, dateAnniversaire
+      // etc. ne sont que des valeurs d'onboarding provisoires (cf. Profil, toujours renseignées avec
+      // un défaut) — un premier vrai document doit pouvoir les combler librement. Une fois
+      // l'ouverture de droits confirmée une première fois, ces champs deviennent la donnée réelle
+      // qu'un réimport ne doit plus écraser sans le dire (même signal que profil_ouverture_droits).
+      const existant = profil.ouvertureDroits !== undefined ? (profil as unknown as Record<string, unknown>) : undefined;
+      return statutSelonEcrasement(proposition, titre, existant, proposition.donnees);
     }
 
     case "aj_reelle_historique": {
@@ -372,7 +439,9 @@ const CHAMPS_COMPARABLES: (keyof Contrat)[] = [
 ];
 
 export interface ChampComparaison {
-  champ: keyof Contrat;
+  /** `keyof Contrat` pour une comparaison de contrat ; une clé de `donnees` pour un profil (07/08/2026,
+   * cf. `comparerChampsProfil` plus bas) — élargi à `string` pour couvrir les deux sans dupliquer le type. */
+  champ: string;
   existant: unknown;
   document: unknown;
   /** `true` si les deux valeurs sont égales — sert à l'affichage neutre (pas masqué, cf.

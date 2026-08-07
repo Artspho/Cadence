@@ -340,6 +340,91 @@ describe("profil_infos — un champ non lu n'efface jamais une valeur déjà sai
   });
 });
 
+describe("profil_ouverture_droits / profil_infos — écraser une valeur DIFFÉRENTE déjà saisie exige confirmation (07/08/2026)", () => {
+  // Bug réel signalé par Benoît : réimporter une notification d'admission PASSÉE a réécrit
+  // dateOuverture ET dateAnniversaire/dateAnniversairePrecedente en un clic, sans jamais montrer les
+  // anciennes valeurs — décalant la fenêtre qui borne le moteur (calculerSerieDepuisContrats) et la
+  // période de référence (calculerFenetreReference), pour un résultat >12 mois et des chiffres
+  // incohérents. `evaluerProposition` disait pourtant déjà « n'efface jamais une donnée déjà saisie »
+  // en commentaire (devoir n°1) — sans le faire pour CES deux cibles.
+  const profilAvecOuverture: Profil = {
+    ...profilBase,
+    ouvertureDroits: { dateOuverture: "2026-02-01", franchiseCPTotale: 12, delaiAttenteInitial: 7, dateLimiteIndemnisation: "2027-01-31" },
+  };
+
+  it("profil_ouverture_droits : confirmation_ecrasement quand dateOuverture proposée diffère de l'existante", () => {
+    const proposition: Proposition = {
+      cible: "profil_ouverture_droits",
+      donnees: { dateOuverture: "2025-06-01", franchiseCPTotale: 12, delaiAttenteInitial: 7, dateLimiteIndemnisation: null },
+      confiance: {},
+      justification: "test",
+    };
+    const evaluee = evaluerProposition(proposition, profilAvecOuverture);
+    expect(evaluee.statut).toBe("confirmation_ecrasement");
+    // La liste COMPLÈTE des champs comparables, identiques ou pas (même principe que
+    // comparerContratExistant) — jamais seulement ceux qui diffèrent.
+    expect(evaluee.champsEcrases).toEqual([
+      { champ: "dateOuverture", existant: "2026-02-01", document: "2025-06-01", identique: false },
+      { champ: "franchiseCPTotale", existant: 12, document: 12, identique: true },
+      { champ: "delaiAttenteInitial", existant: 7, document: 7, identique: true },
+    ]);
+  });
+
+  it("profil_ouverture_droits : reste 'applicable' quand la proposition confirme les MÊMES valeurs", () => {
+    const proposition: Proposition = {
+      cible: "profil_ouverture_droits",
+      donnees: { dateOuverture: "2026-02-01", franchiseCPTotale: 12, delaiAttenteInitial: 7, dateLimiteIndemnisation: null },
+      confiance: {},
+      justification: "test",
+    };
+    expect(evaluerProposition(proposition, profilAvecOuverture).statut).toBe("applicable");
+  });
+
+  it("profil_ouverture_droits : reste 'applicable' pour un premier import (aucune ouverture de droits existante)", () => {
+    const proposition: Proposition = {
+      cible: "profil_ouverture_droits",
+      donnees: { dateOuverture: "2026-02-01", franchiseCPTotale: 12, delaiAttenteInitial: 7, dateLimiteIndemnisation: null },
+      confiance: {},
+      justification: "test",
+    };
+    expect(evaluerProposition(proposition, profilBase).statut).toBe("applicable");
+  });
+
+  it("profil_ouverture_droits : profilAvecProposition écrit bien la nouvelle valeur UNE FOIS confirmé — la garde ne change que l'évaluation, pas l'écriture", () => {
+    const proposition: Proposition = {
+      cible: "profil_ouverture_droits",
+      donnees: { dateOuverture: "2025-06-01", franchiseCPTotale: 12, delaiAttenteInitial: 7, dateLimiteIndemnisation: null },
+      confiance: {},
+      justification: "test",
+    };
+    const resultat = profilAvecProposition(profilAvecOuverture, proposition);
+    expect(resultat.ouvertureDroits?.dateOuverture).toBe("2025-06-01");
+  });
+
+  it("profil_infos : confirmation_ecrasement quand dateAnniversaire diffère, SEULEMENT si une ouverture de droits existe déjà", () => {
+    const proposition: Proposition = {
+      cible: "profil_infos",
+      donnees: { dateAnniversaire: "2025-01-01", dateNaissance: null, dateAnniversairePrecedente: null, situation: null, dureeDroitsMois: null },
+      confiance: {},
+      justification: "test",
+    };
+    expect(evaluerProposition(proposition, profilAvecOuverture).statut).toBe("confirmation_ecrasement");
+  });
+
+  it("profil_infos : reste 'applicable' avant toute ouverture de droits — l'onboarding doit pouvoir combler les valeurs par défaut librement", () => {
+    const proposition: Proposition = {
+      cible: "profil_infos",
+      donnees: { dateAnniversaire: "2025-01-01", dateNaissance: null, dateAnniversairePrecedente: null, situation: null, dureeDroitsMois: null },
+      confiance: {},
+      justification: "test",
+    };
+    // profilBase.dateAnniversaire ("2025-11-30") diffère bien de la proposition — sans ouvertureDroits,
+    // ça reste pourtant 'applicable' : c'est la fixture profilBase de tout ce fichier, pas une
+    // valeur réelle confirmée par un document.
+    expect(evaluerProposition(proposition, profilBase).statut).toBe("applicable");
+  });
+});
+
 describe("periode_assimilee — toujours relue dans PeriodeForm, jamais appliquée directement (CRUD + routage construits le 31/07/2026)", () => {
   const proposition: Proposition = {
     cible: "periode_assimilee",

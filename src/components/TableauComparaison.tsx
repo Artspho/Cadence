@@ -1,19 +1,22 @@
-// Tableau comparatif Existant/Document pour une correspondance proposée (RevueExtraction.tsx).
-// Remplace l'ancienne liste "champ : ancien → nouveau" qui ne montrait QUE les champs différents
-// (01/08/2026) : un champ identique restait invisible, ce qui ne distinguait pas "identique" de
-// "je n'ai pas vérifié ce champ" — même piège que le silence corrigé par diagnosticAbsence.
-// Purement informatif : aucune case à cocher, aucune action ici — la décision reste le bouton
-// "Confirmer la correspondance" affiché par l'appelant.
+// Tableau comparatif Existant/Document — pour une correspondance de contrat proposée, ou (depuis le
+// 07/08/2026) pour un champ de profil qu'une proposition remplacerait (cf. lib/routageExtraction.ts,
+// statutSelonEcrasement). Remplace l'ancienne liste "champ : ancien → nouveau" qui ne montrait QUE
+// les champs différents (01/08/2026) : un champ identique restait invisible, ce qui ne distinguait
+// pas "identique" de "je n'ai pas vérifié ce champ" — même piège que le silence corrigé par
+// diagnosticAbsence. Purement informatif : aucune case à cocher, aucune action ici — la décision
+// reste le bouton affiché par l'appelant ("Confirmer la correspondance", "Remplacer quand même"...).
 import type { ChampComparaison } from "../lib/routageExtraction";
 import { formaterValeur, humaniserCle, LABELS_CHAMPS } from "./RevueExtraction";
 
-interface TableauComparaisonContratProps {
+interface TableauComparaisonProps {
   comparaisons: ChampComparaison[];
+  /** Dictionnaire de libellés à utiliser (`LABELS_CHAMPS.contrat` par défaut, pour ne rien changer
+   * au seul appelant existant avant le 07/08/2026). */
+  labels?: Record<string, string>;
 }
 
-export function TableauComparaisonContrat({ comparaisons }: TableauComparaisonContratProps) {
+export function TableauComparaison({ comparaisons, labels = LABELS_CHAMPS.contrat }: TableauComparaisonProps) {
   if (comparaisons.length === 0) return null;
-  const labels = LABELS_CHAMPS.contrat;
 
   return (
     <table className="w-full text-xs">
