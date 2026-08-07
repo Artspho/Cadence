@@ -16,7 +16,6 @@ describe("MonProfil — lien mentions légales & confidentialité", () => {
         periodes={[]}
         onAjouterPeriode={vi.fn()}
         onSupprimerPeriode={vi.fn()}
-        session={{ statut: "connecte", utilisateurId: "u-test", email: "test@example.com" }}
       />,
     );
 

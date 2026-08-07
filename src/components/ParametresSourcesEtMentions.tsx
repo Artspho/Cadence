@@ -19,11 +19,28 @@ import { franceTravailConfig } from "../config/franceTravailConfig";
 import { formaterDateLisible } from "../lib/dateLisible";
 import { CONTACT_LEGAL, MENTIONS_LEGALES, POLITIQUE_CONFIDENTIALITE, type SectionLegale } from "../content/mentionsLegales";
 import { LIMITES_STRUCTURELLES, PERIMETRE_MVP } from "../content/perimetreEtLimites";
+import { Compte } from "./Compte";
+import type { SessionConnectee } from "../auth/session";
+import type { EtatEnregistrement } from "../storage/sourceSupabase";
+import type { DonneesApp } from "../storage/localStorageAdapter";
 
 interface Onglet {
   id: string;
   titre: string;
   contenu: React.ReactNode;
+  /** "Mon compte" fournit déjà sa propre carte (`Compte.tsx`, `<Cadre>`) : lui donner AUSSI la carte
+   * générique ci-dessous créerait une carte dans une carte, unique aux quatre autres onglets qui,
+   * eux, comptent sur elle pour tout habillage. */
+  sansCadreGenerique?: boolean;
+}
+
+interface ParametresSourcesEtMentionsProps {
+  /** Résolue par le mur (connexion obligatoire, 05/08/2026) — App.tsx ne rend cet onglet qu'une fois connecté. */
+  session: SessionConnectee;
+  /** État de la copie vers Supabase (phase 3). Calculé dans App, affiché par l'onglet Mon compte. */
+  etatEnregistrement?: EtatEnregistrement;
+  /** Phase 4 : l'état local COMPLET, pour la vérification chiffrée de l'onglet Mon compte. */
+  donnees?: DonneesApp | null;
 }
 
 function SectionLegaleAffichee({ section }: { section: SectionLegale }) {
@@ -173,15 +190,19 @@ function ContenuContact() {
   );
 }
 
-const ONGLETS: Onglet[] = [
-  { id: "perimetre", titre: "Périmètre & Limites", contenu: <ContenuPerimetre /> },
-  { id: "sources", titre: "Sources réglementaires", contenu: <ContenuSources /> },
-  { id: "mentions", titre: "Mentions légales & Confidentialité", contenu: <ContenuMentionsLegales /> },
-  { id: "contact", titre: "Support & Contact", contenu: <ContenuContact /> },
-];
-
-export function ParametresSourcesEtMentions() {
+export function ParametresSourcesEtMentions({ session, etatEnregistrement, donnees }: ParametresSourcesEtMentionsProps) {
   const [actif, setActif] = useState(0);
+
+  // Onglet "Mon compte" en tête (07/08/2026, à la demande de Benoît) : remonté depuis « Mon profil »,
+  // où il était devenu introuvable au milieu du reste (cf. l'historique de Compte.tsx) — cette fois
+  // dans un onglet à part plutôt qu'en pleine page, pour ne pas reproduire le même fouillis ici.
+  const ONGLETS: Onglet[] = [
+    { id: "compte", titre: "Mon compte", contenu: <Compte session={session} etatEnregistrement={etatEnregistrement} donnees={donnees} />, sansCadreGenerique: true },
+    { id: "perimetre", titre: "Périmètre & Limites", contenu: <ContenuPerimetre /> },
+    { id: "sources", titre: "Sources réglementaires", contenu: <ContenuSources /> },
+    { id: "mentions", titre: "Mentions légales & Confidentialité", contenu: <ContenuMentionsLegales /> },
+    { id: "contact", titre: "Support & Contact", contenu: <ContenuContact /> },
+  ];
 
   return (
     <div className="space-y-4">
@@ -203,10 +224,13 @@ export function ParametresSourcesEtMentions() {
             </button>
           ))}
         </nav>
-        <div className="bg-surface border border-line rounded-card p-5">{ONGLETS[actif].contenu}</div>
+        {ONGLETS[actif].sansCadreGenerique ? ONGLETS[actif].contenu : <div className="bg-surface border border-line rounded-card p-5">{ONGLETS[actif].contenu}</div>}
       </div>
 
-      {/* Mobile : accordéon, toutes les sections listées et repliées (même pattern que ChecklistDocuments.tsx). */}
+      {/* Mobile : accordéon, toutes les sections listées et repliées (même pattern que ChecklistDocuments.tsx).
+          "Mon compte" y garde sa propre carte imbriquée (bordure double, mineure) plutôt que de casser
+          l'uniformité des cinq accordéons — contrairement au panneau desktop, toujours visible, où le
+          doublon était plus gênant. */}
       <div className="sm:hidden space-y-3">
         {ONGLETS.map((o) => (
           <details key={o.id} className="bg-surface border border-line rounded-card overflow-hidden group">

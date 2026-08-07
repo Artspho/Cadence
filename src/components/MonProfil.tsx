@@ -11,10 +11,6 @@ import type { Contrat, PeriodeAssimilee, Profil } from "../types";
 import { PeriodeForm } from "./PeriodeForm";
 import { PeriodeList } from "./PeriodeList";
 import { DocumentsUtiles } from "./DocumentsUtiles";
-import { Compte } from "./Compte";
-import type { EtatEnregistrement } from "../storage/sourceSupabase";
-import type { DonneesApp } from "../storage/localStorageAdapter";
-import type { SessionConnectee } from "../auth/session";
 import { RenouvellementAnticipe } from "./RenouvellementAnticipe";
 import { DateNaissanceInput } from "./DateNaissanceInput";
 import { MentionsLegales } from "./MentionsLegales";
@@ -31,17 +27,6 @@ interface MonProfilProps {
   periodes: PeriodeAssimilee[];
   onAjouterPeriode: (periode: Omit<PeriodeAssimilee, "id">) => void;
   onSupprimerPeriode: (id: string) => void;
-  /** Résolue par le mur (connexion obligatoire, 05/08/2026) — App.tsx ne rend `MonProfil` qu'une fois connecté. */
-  session: SessionConnectee;
-  /** État de la copie vers Supabase (phase 3). Calculé dans App, affiché par la section Compte. */
-  etatEnregistrement?: EtatEnregistrement;
-  /**
-   * Phase 4 : l'état local COMPLET, pour la vérification chiffrée de la section Compte.
-   * Transmis en entier (et non reconstruit ici à partir de `profil`/`contrats`/`periodes`) parce que
-   * la comparaison doit porter sur exactement ce qui a été copié — un objet recomposé au passage
-   * n'aurait aucune raison d'avoir la même empreinte.
-   */
-  donnees?: DonneesApp | null;
   /**
    * Vers l'onglet « Paramètres, sources & mentions » (refonte UI, 07/08/2026), où le texte complet du
    * périmètre/des limites vit désormais aussi — absent : les liens « En savoir plus » des info-bulles
@@ -58,9 +43,6 @@ export function MonProfil({
   periodes,
   onAjouterPeriode,
   onSupprimerPeriode,
-  session,
-  etatEnregistrement,
-  donnees,
   onNaviguerVersParametres = () => {},
 }: MonProfilProps) {
   const [formPeriodeOuvert, setFormPeriodeOuvert] = useState(false);
@@ -127,116 +109,129 @@ export function MonProfil({
   }
 
   return (
-    <div className="space-y-6 max-w-[720px]">
+    <div className="space-y-6 max-w-[900px]">
       <section>
         <h2 className="font-display text-lg font-medium mb-2">Ton profil</h2>
 
-        <div className="bg-surface border border-line rounded-card p-5 space-y-5 mb-4">
-          <div>
-            <span className="block text-xs uppercase tracking-[.03em] text-muted mb-2">Date de naissance</span>
-            <DateNaissanceInput
-              value={dateNaissance}
-              onChange={(v) => {
-                setDateNaissance(v);
-                reinitialiserConfirmation();
-              }}
-              idPrefix="profil-date-naissance"
-            />
-          </div>
-
-          <div>
-            <span className="block text-xs uppercase tracking-[.03em] text-muted mb-2">Ta situation</span>
-            <div className="flex gap-2">
-              <button
-                onClick={() => {
-                  setSituation("premiere_admission");
-                  reinitialiserConfirmation();
-                }}
-                className={`flex-1 rounded-lg border px-3 py-2 text-sm text-left transition-colors ${situation === "premiere_admission" ? "border-mint bg-mint/10" : "border-line bg-surface-2"}`}
-              >
-                Première admission
-              </button>
-              <button
-                onClick={() => {
-                  setSituation("readmission");
-                  reinitialiserConfirmation();
-                }}
-                className={`flex-1 rounded-lg border px-3 py-2 text-sm text-left transition-colors ${situation === "readmission" ? "border-mint bg-mint/10" : "border-line bg-surface-2"}`}
-              >
-                Réadmission
-              </button>
-            </div>
-          </div>
-
-          <div>
-            <span className="block text-xs uppercase tracking-[.03em] text-muted mb-2">Date anniversaire (fin de tes derniers droits ouverts)</span>
-            <label className="flex items-center gap-2 text-sm text-muted mb-2">
-              <input
-                type="checkbox"
-                checked={!dateAnniversaireConnue}
-                onChange={(e) => {
-                  setDateAnniversaireConnue(!e.target.checked);
-                  reinitialiserConfirmation();
-                }}
-              />
-              Je ne connais pas ma date anniversaire
-            </label>
-            {dateAnniversaireConnue && (
-              <input
-                type="date"
-                value={dateAnniversaire}
-                onChange={(e) => {
-                  setDateAnniversaire(e.target.value);
-                  reinitialiserConfirmation();
-                }}
-                className="w-full bg-surface-2 border border-line rounded-lg px-3 py-2 text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-mint"
-              />
-            )}
-            {dateAnniversaireModifiee && coherence.coherent && (
-              <p className="text-xs text-amber mt-2">Modifier ta date anniversaire recalcule toute ta fenêtre de référence et ton statut.</p>
-            )}
-          </div>
-
-          {situation === "readmission" && (
+        {/* Deux cartes côte à côte (07/08/2026, demande de Benoît) : ce qui t'identifie et ce qui suit
+            tes 507 h sont deux sujets différents, jusqu'ici fondus dans une seule carte au point de se
+            confondre. Un seul bouton "Enregistrer" en dessous écrit toujours les deux d'un coup — la
+            séparation est seulement visuelle, la donnée reste validée ensemble (cf. validerCoherenceProfil). */}
+        <div className="grid md:grid-cols-2 gap-4 mb-4">
+          <div className="bg-surface border border-line rounded-card p-5 space-y-5">
+            <h3 className="font-display text-sm font-medium tracking-tight text-muted">Ton identité</h3>
             <div>
-              <label className="block text-xs uppercase tracking-[.03em] text-muted mb-2" htmlFor="profil-date-anniversaire-precedente">
-                Date de fin de ta période de droits précédente (optionnel)
-              </label>
-              <input
-                id="profil-date-anniversaire-precedente"
-                type="date"
-                value={dateAnniversairePrecedente}
-                onChange={(e) => {
-                  setDateAnniversairePrecedente(e.target.value);
+              <span className="block text-xs uppercase tracking-[.03em] text-muted mb-2">Date de naissance</span>
+              <DateNaissanceInput
+                value={dateNaissance}
+                onChange={(v) => {
+                  setDateNaissance(v);
                   reinitialiserConfirmation();
                 }}
-                className="w-full bg-surface-2 border border-line rounded-lg px-3 py-2 text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-mint"
+                idPrefix="profil-date-naissance"
               />
-              <p className="text-xs text-faint mt-1">
-                Si tu as déjà eu des droits Annexe 10 ouverts avant cette période, indique la date à laquelle ils se sont terminés — elle figure sur ta précédente notification France Travail.
-                Cadence s'en sert pour borner correctement la recherche d'heures si tu dois remonter loin. Si tu ne l'as pas sous la main, laisse vide : Cadence te le signalera dans le tableau de
-                bord.
-              </p>
             </div>
-          )}
 
-          {!coherence.coherent && <p className="text-xs text-red">{coherence.raison}</p>}
-          {erreurEcriture && <p className="text-xs text-red">{erreurEcriture}</p>}
+            <div>
+              <span className="block text-xs uppercase tracking-[.03em] text-muted mb-2">Ta situation</span>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    setSituation("premiere_admission");
+                    reinitialiserConfirmation();
+                  }}
+                  className={`flex-1 rounded-lg border px-3 py-2 text-sm text-left transition-colors ${situation === "premiere_admission" ? "border-mint bg-mint/10" : "border-line bg-surface-2"}`}
+                >
+                  Première admission
+                </button>
+                <button
+                  onClick={() => {
+                    setSituation("readmission");
+                    reinitialiserConfirmation();
+                  }}
+                  className={`flex-1 rounded-lg border px-3 py-2 text-sm text-left transition-colors ${situation === "readmission" ? "border-mint bg-mint/10" : "border-line bg-surface-2"}`}
+                >
+                  Réadmission
+                </button>
+              </div>
+            </div>
+          </div>
 
-          <div className="flex gap-2">
-            <button
-              onClick={enregistrer}
-              disabled={!peutEnregistrer}
-              className="flex-1 bg-mint text-bg font-medium rounded-lg py-2 disabled:opacity-40 disabled:cursor-not-allowed transition-opacity"
-            >
-              {confirmationRequise ? "Confirmer le changement" : "Enregistrer"}
-            </button>
-            {confirmationRequise && (
-              <button onClick={reinitialiserConfirmation} className="px-4 rounded-lg border border-line text-muted">
-                Annuler
-              </button>
+          <div className="bg-surface border border-line rounded-card p-5 space-y-5">
+            <div>
+              <h3 className="font-display text-sm font-medium tracking-tight text-muted">Suivi des 507 heures</h3>
+              <p className="text-xs text-faint mt-1">Détermine quand ton compteur de 507 h repart à zéro — sans rapport avec le montant de ton allocation, ci-dessous.</p>
+            </div>
+            <div>
+              <span className="block text-xs uppercase tracking-[.03em] text-muted mb-2">Date anniversaire (fin de tes derniers droits ouverts)</span>
+              <label className="flex items-center gap-2 text-sm text-muted mb-2">
+                <input
+                  type="checkbox"
+                  checked={!dateAnniversaireConnue}
+                  onChange={(e) => {
+                    setDateAnniversaireConnue(!e.target.checked);
+                    reinitialiserConfirmation();
+                  }}
+                />
+                Je ne connais pas ma date anniversaire
+              </label>
+              {dateAnniversaireConnue && (
+                <input
+                  type="date"
+                  value={dateAnniversaire}
+                  onChange={(e) => {
+                    setDateAnniversaire(e.target.value);
+                    reinitialiserConfirmation();
+                  }}
+                  className="w-full bg-surface-2 border border-line rounded-lg px-3 py-2 text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-mint"
+                />
+              )}
+              {dateAnniversaireModifiee && coherence.coherent && (
+                <p className="text-xs text-amber mt-2">Modifier ta date anniversaire recalcule toute ta fenêtre de référence et ton statut.</p>
+              )}
+            </div>
+
+            {situation === "readmission" && (
+              <div>
+                <label className="block text-xs uppercase tracking-[.03em] text-muted mb-2" htmlFor="profil-date-anniversaire-precedente">
+                  Date de fin de ta période de droits précédente (optionnel)
+                </label>
+                <input
+                  id="profil-date-anniversaire-precedente"
+                  type="date"
+                  value={dateAnniversairePrecedente}
+                  onChange={(e) => {
+                    setDateAnniversairePrecedente(e.target.value);
+                    reinitialiserConfirmation();
+                  }}
+                  className="w-full bg-surface-2 border border-line rounded-lg px-3 py-2 text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-mint"
+                />
+                <p className="text-xs text-faint mt-1">
+                  Si tu as déjà eu des droits Annexe 10 ouverts avant cette période, indique la date à laquelle ils se sont terminés — elle figure sur ta précédente notification France Travail.
+                  Cadence s'en sert pour borner correctement la recherche d'heures si tu dois remonter loin. Si tu ne l'as pas sous la main, laisse vide : Cadence te le signalera dans le tableau de
+                  bord.
+                </p>
+              </div>
             )}
           </div>
+        </div>
+
+        {!coherence.coherent && <p className="text-xs text-red mb-2">{coherence.raison}</p>}
+        {erreurEcriture && <p className="text-xs text-red mb-2">{erreurEcriture}</p>}
+
+        <div className="flex gap-2 mb-4">
+          <button
+            onClick={enregistrer}
+            disabled={!peutEnregistrer}
+            className="flex-1 md:flex-none md:px-8 bg-mint text-bg font-medium rounded-lg py-2 disabled:opacity-40 disabled:cursor-not-allowed transition-opacity"
+          >
+            {confirmationRequise ? "Confirmer le changement" : "Enregistrer"}
+          </button>
+          {confirmationRequise && (
+            <button onClick={reinitialiserConfirmation} className="px-4 rounded-lg border border-line text-muted">
+              Annuler
+            </button>
+          )}
         </div>
 
         <div className="bg-surface border border-line rounded-card p-5">
@@ -272,41 +267,39 @@ export function MonProfil({
         </div>
       </section>
 
-      {/* Commit D (phase 5, 05/08/2026) : remontée depuis le bas de l'onglet, où elle était devenue
-          introuvable (constat en conditions réelles le 05/08/2026 — Benoît a conclu « ça ne marche
-          pas » alors que tout fonctionnait). Placée volontairement ici, juste après l'identité, plutôt
-          que tout en bas : la raison de la phase 2 pour la reléguer — « la connexion est facultative
-          et ne sert encore à rien » — s'est inversée depuis la bascule (phase 5), où c'est le serveur
-          qui fait référence dès qu'on est connecté. */}
-      <Compte session={session} etatEnregistrement={etatEnregistrement} donnees={donnees} />
-
       <MonIndemnisationEnCours profil={profil} onModifierProfil={onModifierProfil} onSuggestionDateAnniversaire={suggererDateAnniversaire} />
 
       <RenouvellementAnticipe profil={profil} contrats={contrats} periodes={periodes} config={franceTravailConfig} />
 
-      <section>
-        <div className="flex items-center justify-between mb-2">
-          <h2 className="font-display text-lg font-medium">Périodes particulières</h2>
-          {!formPeriodeOuvert && (
-            <button type="button" onClick={() => setFormPeriodeOuvert(true)} className="text-sm bg-mint text-bg font-medium rounded-lg px-4 py-2">
-              Ajouter une période
-            </button>
-          )}
-        </div>
-        <p className="text-sm text-muted mb-3">Maternité, adoption, accident du travail, ALD, suspension de contrat ou maladie inter-contrat pendant la période de référence.</p>
-        {formPeriodeOuvert && (
-          <div className="mb-3">
-            <PeriodeForm
-              onValider={(periode) => {
-                onAjouterPeriode(periode);
-                setFormPeriodeOuvert(false);
-              }}
-              onAnnuler={() => setFormPeriodeOuvert(false)}
-            />
+      {/* Côte à côte (07/08/2026, demande de Benoît) : deux blocs indépendants, de taille comparable,
+          sans état ni bouton partagé entre eux — le pairage le plus sûr de la page. */}
+      <div className="grid md:grid-cols-2 gap-4 items-start">
+        <section>
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="font-display text-lg font-medium">Périodes particulières</h2>
+            {!formPeriodeOuvert && (
+              <button type="button" onClick={() => setFormPeriodeOuvert(true)} className="text-sm bg-mint text-bg font-medium rounded-lg px-4 py-2">
+                Ajouter une période
+              </button>
+            )}
           </div>
-        )}
-        <PeriodeList periodes={periodes} onSupprimer={onSupprimerPeriode} />
-      </section>
+          <p className="text-sm text-muted mb-3">Maternité, adoption, accident du travail, ALD, suspension de contrat ou maladie inter-contrat pendant la période de référence.</p>
+          {formPeriodeOuvert && (
+            <div className="mb-3">
+              <PeriodeForm
+                onValider={(periode) => {
+                  onAjouterPeriode(periode);
+                  setFormPeriodeOuvert(false);
+                }}
+                onAnnuler={() => setFormPeriodeOuvert(false)}
+              />
+            </div>
+          )}
+          <PeriodeList periodes={periodes} onSupprimer={onSupprimerPeriode} />
+        </section>
+
+        <DocumentsUtiles />
+      </div>
 
       {/* Bandeau neutre : il énonce une date de vérification et ses sources, il ne porte plus aucun
           jugement de péremption (point 13 — la bannière « Règles à vérifier » ne pouvait jamais
@@ -316,8 +309,6 @@ export function MonProfil({
         Règles vérifiées le {formaterDateLisible(franceTravailConfig.meta.dateDerniereVerification)}
         {jours >= 1 && ` (il y a ${jours} jour${jours > 1 ? "s" : ""})`} — {franceTravailConfig.meta.source}.
       </div>
-
-      <DocumentsUtiles />
 
       {/* Les deux sections en pleine page ont été remplacées par ces info-bulles (refonte UI,
           07/08/2026) : le texte complet ne bouge pas (content/perimetreEtLimites.ts, une seule
@@ -654,7 +645,9 @@ function MonIndemnisationEnCours({
           Enregistrer
         </button>
 
-          <GestionAjReelle profil={profil} onModifierProfil={onModifierProfil} />
+          {/* Allocation journalière réelle (GestionAjReelle) déménagée dans RevenusMensuels.tsx le
+              07/08/2026 (idée de Benoît) : c'est là qu'elle est réellement consommée mois par mois,
+              pas ici. */}
           <GestionTauxPAS profil={profil} onModifierProfil={onModifierProfil} />
           <GestionHistoriqueOuvertureDroits profil={profil} onModifierProfil={onModifierProfil} />
         </div>
@@ -663,129 +656,11 @@ function MonIndemnisationEnCours({
   );
 }
 
-// Historique des taux d'AJ nette successifs (un utilisateur peut connaître plusieurs taux sur une
-// même période d'indemnisation, cf. types/index.ts). Aucun repli sur une AJ estimée : sans entrée
-// couvrant un mois donné, RevenusMensuels.tsx affiche honnêtement l'absence de montant pour ce mois.
-// Seuil de plausibilité pour le champ "AJ nette" ci-dessous : une AJ nette réelle ne peut pas
-// s'approcher du plafond de l'AJ BRUTE (config.are.plafond, 181,18 €) — au-delà de 60 €/j, la
-// CSG/CRDS s'ajoute toujours à la retraite complémentaire (cf. engine/areNette.ts), donc un net
-// est structurellement inférieur au brut dont il découle. Avertissement de plausibilité seulement
-// (pas un blocage, pas un champ `natureMontant` déclaratif qui déplacerait le risque sans le
-// réduire, cf. docs/reprise.md) : la valeur la plus probable en cas de dépassement est que
-// l'utilisateur a recopié la ligne « allocation brute » d'un relevé de situation au lieu de la
-// ligne « allocation journalière nette » de sa notification.
-const SEUIL_PLAUSIBILITE_AJ_NETTE = franceTravailConfig.are.plafond * 0.9;
-
-function GestionAjReelle({ profil, onModifierProfil }: { profil: Profil; onModifierProfil: OnModifierProfil }) {
-  const historique = profil.ajReelleHistorique ?? [];
-  const [dateEffet, setDateEffet] = useState("");
-  const [valeur, setValeur] = useState("");
-  const valeurImplausible = valeur.trim() !== "" && Number(valeur) >= SEUIL_PLAUSIBILITE_AJ_NETTE;
-
-  function ajouter() {
-    if (!dateEffet || valeur.trim() === "") return;
-    const nouveau = [...historique, { dateEffet, valeur: Number(valeur) }].sort((a, b) => a.dateEffet.localeCompare(b.dateEffet));
-    onModifierProfil({ ...profil, ajReelleHistorique: nouveau });
-    setDateEffet("");
-    setValeur("");
-  }
-
-  function supprimer(index: number) {
-    onModifierProfil({ ...profil, ajReelleHistorique: historique.filter((_, i) => i !== index) });
-  }
-
-  return (
-    <div className="border-t border-line pt-5 space-y-4">
-      <div>
-        <h3 className="font-display text-base font-medium">Allocation journalière réelle</h3>
-        <p className="text-xs text-faint mt-1">
-          Indique l'allocation journalière nette figurant sur ta notification d'ouverture de droits France Travail (ligne « Allocation journalière nette »).
-        </p>
-        <p className="text-xs text-faint mt-1">Si ton allocation journalière a été revalorisée en cours de droits, ajoute une nouvelle ligne avec la date d'effet — visible sur tes relevés de situation.</p>
-      </div>
-
-      {historique.length === 0 ? (
-        <p className="text-xs rounded-lg px-3 py-2 bg-amber/10 text-amber">Sans ce chiffre, le montant mensuel ne peut pas être calculé.</p>
-      ) : (
-        <table className="w-full text-sm">
-          <thead className="text-xs uppercase tracking-[.03em] text-muted border-b border-line">
-            <tr>
-              <th className="text-left py-2">Date d'effet</th>
-              <th className="text-right py-2">AJ nette (€)</th>
-              <th className="py-2" />
-            </tr>
-          </thead>
-          <tbody>
-            {historique.map((h, i) => (
-              <tr key={`${h.dateEffet}-${i}`} className="border-b border-line last:border-0">
-                <td className="py-2">{formaterDateLisible(h.dateEffet)}</td>
-                <td className="text-right py-2">{h.valeur.toFixed(2)}</td>
-                <td className="text-right py-2">
-                  <button onClick={() => supprimer(i)} className="text-xs text-muted hover:text-red transition-colors">
-                    Supprimer
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-
-      <div className="grid grid-cols-[1fr_1fr_auto] gap-3 items-end">
-        <div>
-          <label className="block text-xs uppercase tracking-[.03em] text-muted mb-2" htmlFor="profil-aj-date-effet">
-            Date d'effet
-          </label>
-          <input
-            id="profil-aj-date-effet"
-            type="date"
-            value={dateEffet}
-            onChange={(e) => setDateEffet(e.target.value)}
-            className="w-full bg-surface-2 border border-line rounded-lg px-3 py-2 text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-mint"
-          />
-        </div>
-        <div>
-          <label className="block text-xs uppercase tracking-[.03em] text-muted mb-2" htmlFor="profil-aj-valeur">
-            AJ nette (€)
-          </label>
-          <input
-            id="profil-aj-valeur"
-            type="number"
-            min={0}
-            step="0.01"
-            value={valeur}
-            onChange={(e) => {
-              if (estSaisieNegative(e.target.value)) return;
-              setValeur(e.target.value);
-            }}
-            className="w-full bg-surface-2 border border-line rounded-lg px-3 py-2 text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-mint"
-          />
-        </div>
-        <button
-          onClick={ajouter}
-          disabled={!dateEffet || valeur.trim() === ""}
-          className="bg-mint text-bg font-medium rounded-lg px-4 py-2 disabled:opacity-40 disabled:cursor-not-allowed transition-opacity whitespace-nowrap"
-        >
-          + Ajouter une période
-        </button>
-      </div>
-
-      {valeurImplausible && (
-        <p className="text-xs rounded-lg px-3 py-2 bg-amber/10 text-amber">
-          Ce montant semble élevé pour une allocation <strong>nette</strong> — vérifie que tu n'as
-          pas recopié la ligne « allocation brute » d'un relevé de situation au lieu de la ligne
-          « allocation journalière nette » de ta notification d'ouverture de droits.
-        </p>
-      )}
-    </div>
-  );
-}
-
 // Historique des taux de prélèvement à la source successifs (la DGFIP peut le revaloriser plusieurs
 // fois sur une même période d'indemnisation, ex. réel : 3,30 % mi-2025 puis 3,10 % dès fin
-// 2025/2026 — pas seulement une fois par an, cf. types/index.ts). Même pattern que
-// GestionAjReelle ci-dessus. Aucun repli sur un taux estimé : sans entrée couvrant un mois donné,
-// RevenusMensuels.tsx affiche honnêtement le montant brut pour ce mois (pas de net).
+// 2025/2026 — pas seulement une fois par an, cf. types/index.ts). Même pattern que GestionAjReelle
+// (RevenusMensuels.tsx, depuis le 07/08/2026). Aucun repli sur un taux estimé : sans entrée
+// couvrant un mois donné, RevenusMensuels.tsx affiche honnêtement le montant brut pour ce mois (pas de net).
 function GestionTauxPAS({ profil, onModifierProfil }: { profil: Profil; onModifierProfil: OnModifierProfil }) {
   const ouverture = profil.ouvertureDroits;
   const historique = ouverture?.tauxPrelevementSourceHistorique ?? [];

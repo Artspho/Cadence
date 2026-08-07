@@ -33,6 +33,7 @@ function rendreEcran(soldeDepart: SoldeIndemnisationDepart, onConfigurerSolde = 
       periodes={[]}
       config={franceTravailConfig}
       onConfigurerSolde={onConfigurerSolde}
+      onModifierProfil={vi.fn(() => ({ ok: true }) as never)}
       onAllerVersProfil={() => {}}
       dateDuJour="2026-08-01"
     />,
@@ -43,7 +44,10 @@ function rendreEcran(soldeDepart: SoldeIndemnisationDepart, onConfigurerSolde = 
 describe("SoldeRecap — bouton Modifier (RevenusMensuels.tsx, jamais vérifié qu'à la main jusqu'ici, cf. commit 2edb88e)", () => {
   it("affiche la date de départ courante et bascule en édition au clic sur Modifier", () => {
     rendreEcran({ dateDepart: "2026-01-01" });
-    expect(screen.getByText("01/01/2026")).toBeInTheDocument();
+    // getAllByText, pas getByText : le profil de test a aussi une entrée d'AJ réelle datée du même
+    // jour (GestionAjReelle, remontée ici le 07/08/2026), qui affiche la même date "01/01/2026" —
+    // le SoldeRecap est toujours le premier des deux dans l'ordre du DOM.
+    expect(screen.getAllByText("01/01/2026")[0]).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Modifier" }));
 
@@ -82,6 +86,7 @@ describe("SoldeRecap — bouton Modifier (RevenusMensuels.tsx, jamais vérifié 
         periodes={[]}
         config={franceTravailConfig}
         onConfigurerSolde={() => {}}
+        onModifierProfil={vi.fn(() => ({ ok: true }) as never)}
         onAllerVersProfil={() => {}}
         dateDuJour="2026-08-01"
       />,
@@ -97,6 +102,7 @@ describe("SoldeRecap — bouton Modifier (RevenusMensuels.tsx, jamais vérifié 
         periodes={[]}
         config={franceTravailConfig}
         onConfigurerSolde={() => {}}
+        onModifierProfil={vi.fn(() => ({ ok: true }) as never)}
         onAllerVersProfil={() => {}}
         dateDuJour="2026-08-01"
       />,
@@ -115,7 +121,7 @@ describe("SoldeRecap — bouton Modifier (RevenusMensuels.tsx, jamais vérifié 
     fireEvent.click(screen.getByRole("button", { name: "Annuler" }));
 
     expect(onConfigurerSolde).not.toHaveBeenCalled();
-    expect(screen.getByText("01/01/2026")).toBeInTheDocument();
+    expect(screen.getAllByText("01/01/2026")[0]).toBeInTheDocument();
   });
 
   it("Enregistrer reste sans effet si la date est vidée (garde-fou déjà présent, jamais une date vide transmise)", () => {
@@ -153,6 +159,7 @@ describe("franchise salaires déclarée — ne rien annoncer que le tableau ne d
         periodes={[]}
         config={franceTravailConfig}
         onConfigurerSolde={vi.fn()}
+        onModifierProfil={vi.fn(() => ({ ok: true }) as never)}
         onAllerVersProfil={() => {}}
         dateDuJour="2026-08-01"
       />,

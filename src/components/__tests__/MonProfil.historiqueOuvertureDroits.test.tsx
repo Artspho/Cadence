@@ -29,7 +29,6 @@ function rendre(profilInitial: Profil, onModifierProfil = vi.fn((_p: Profil) => 
       periodes={[]}
       onAjouterPeriode={vi.fn()}
       onSupprimerPeriode={vi.fn()}
-      session={{ statut: "connecte", utilisateurId: "u-test", email: "test@example.com" }}
     />,
   );
   return onModifierProfil;

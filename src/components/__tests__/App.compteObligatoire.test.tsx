@@ -15,6 +15,16 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { CLE_STOCKAGE } from "../../storage/localStorageAdapter";
 
+// jsdom ne fournit pas ResizeObserver, que Headless UI utilise en interne pour le menu de l'avatar
+// (cf. le même polyfill dans AvatarMenu.test.tsx) — nécessaire ici depuis que ce fichier ouvre ce
+// menu pour atteindre l'onglet Paramètres (07/08/2026, déplacement de la section Compte).
+class ResizeObserverPolyfill {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+vi.stubGlobal("ResizeObserver", ResizeObserverPolyfill);
+
 /**
  * ⚠️ DATES RELATIVES AU JOUR COURANT, INDISPENSABLE (même piège que documenté dans
  * `App.bascule.test.tsx`) : des dates fixes finissent par tomber dans un exercice CLOS, que l'app
@@ -150,12 +160,18 @@ describe("App — une fois connecté, l'app entière redevient accessible", () =
     }
   });
 
-  it("la section Compte affiche l'e-mail connecté", async () => {
+  it("l'onglet Mon compte (dans Paramètres, atteint depuis le menu de l'avatar) affiche l'e-mail connecté", async () => {
     render(<App />);
-    const nav = await screen.findByRole("navigation", { name: /navigation principale/i });
-    fireEvent.click(within(nav).getByRole("button", { name: "Mon profil" }));
-    expect(await screen.findByRole("heading", { name: "Compte" })).toBeInTheDocument();
-    expect(screen.getByText("benoit@example.com")).toBeInTheDocument();
+    await screen.findByRole("navigation", { name: /navigation principale/i });
+    // Deux instances d'AvatarMenu coexistent dans le DOM (variante sidebar desktop + variante topbar
+    // mobile, cachée en CSS seulement — cf. AvatarMenu.tsx) : la première suffit, les deux appellent
+    // le même onChangerOnglet("parametres").
+    fireEvent.click(screen.getAllByRole("button", { name: /menu du compte/i })[0]);
+    fireEvent.click((await screen.findAllByRole("menuitem", { name: /paramètres/i }))[0]);
+    // Desktop (panneau actif) ET mobile (accordéon) rendent chacun leur propre "Compte" — même
+    // écueil que documenté dans ParametresSourcesEtMentions.test.tsx, d'où `getAllByRole`.
+    expect((await screen.findAllByRole("heading", { name: "Compte" }))[0]).toBeInTheDocument();
+    expect(screen.getAllByText("benoit@example.com")[0]).toBeInTheDocument();
   });
 });
 

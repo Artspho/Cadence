@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import type { Contrat, PeriodeAssimilee, Profil, SoldeIndemnisationDepart } from "../types";
 import type { FranceTravailConfig } from "../config/franceTravailConfig";
+import { franceTravailConfig } from "../config/franceTravailConfig";
 import { calculerSerieDepuisContrats } from "../engine/indemnisationMensuelle";
 import { construireLignesAffichage, type LigneAffichage } from "../lib/lignesRevenusMensuels";
 import { calculerNetEstime } from "../engine/estimationPaie";
@@ -9,6 +10,10 @@ import { calculerSalaireReference } from "../engine/salaireReference";
 import { calculerSJM } from "../engine/areNette";
 import { descriptionMoisOuverturePartielle } from "../content/moisOuverturePartielle";
 import { formaterDateLisible, formaterMoisAnnee } from "../lib/dateLisible";
+import { estSaisieNegative } from "../lib/saisieNombrePositif";
+import type { ResultatEcritureProfil } from "../lib/coherenceProfil";
+
+type OnModifierProfil = (profil: Profil) => ResultatEcritureProfil;
 
 interface RevenusMensuelsProps {
   profil: Profil;
@@ -17,11 +22,12 @@ interface RevenusMensuelsProps {
   periodes: PeriodeAssimilee[];
   config: FranceTravailConfig;
   onConfigurerSolde: (solde: SoldeIndemnisationDepart) => void;
+  onModifierProfil: OnModifierProfil;
   onAllerVersProfil: () => void;
   dateDuJour: string;
 }
 
-export function RevenusMensuels({ profil, soldeDepart, contrats, periodes, config, onConfigurerSolde, onAllerVersProfil, dateDuJour }: RevenusMensuelsProps) {
+export function RevenusMensuels({ profil, soldeDepart, contrats, periodes, config, onConfigurerSolde, onModifierProfil, onAllerVersProfil, dateDuJour }: RevenusMensuelsProps) {
   // Le seul vrai prérequis est `ouvertureDroits` — les paramètres de la notification France Travail.
   // Ce module était auparavant fermé à tout profil `situation === "premiere_admission"` : un proxy de
   // « pas encore indemnisé » qui excluait aussi le premier admis venant d'ouvrir ses PREMIERS droits,
@@ -40,6 +46,11 @@ export function RevenusMensuels({ profil, soldeDepart, contrats, periodes, confi
   return (
     <div className="space-y-6 max-w-[900px]">
       <SoldeRecap solde={soldeDepart} onConfigurer={onConfigurerSolde} />
+      {/* Remontée depuis « Mon profil » le 07/08/2026 (idée de Benoît) : c'est la donnée qui alimente
+          directement cette simulation, éditable sans changer d'onglet plutôt qu'à distance. */}
+      <div className="bg-surface border border-line rounded-card p-5">
+        <GestionAjReelle profil={profil} onModifierProfil={onModifierProfil} />
+      </div>
       <TableauResultats profil={profil} soldeDepart={soldeDepart} contrats={contrats} periodes={periodes} config={config} dateDuJour={dateDuJour} />
     </div>
   );
@@ -165,6 +176,126 @@ function SoldeRecap({ solde, onConfigurer }: { solde: SoldeIndemnisationDepart; 
   );
 }
 
+// Historique des taux d'AJ nette successifs (un utilisateur peut connaître plusieurs taux sur une
+// même période d'indemnisation, cf. types/index.ts). Aucun repli sur une AJ estimée : sans entrée
+// couvrant un mois donné, ce module affiche honnêtement l'absence de montant pour ce mois.
+// Remontée depuis MonProfil.tsx le 07/08/2026 (idée de Benoît) : c'est ici, pas dans « Mon profil »,
+// que cette donnée est réellement consommée mois par mois.
+//
+// Seuil de plausibilité pour le champ "AJ nette" ci-dessous : une AJ nette réelle ne peut pas
+// s'approcher du plafond de l'AJ BRUTE (config.are.plafond, 181,18 €) — au-delà de 60 €/j, la
+// CSG/CRDS s'ajoute toujours à la retraite complémentaire (cf. engine/areNette.ts), donc un net
+// est structurellement inférieur au brut dont il découle. Avertissement de plausibilité seulement
+// (pas un blocage, pas un champ `natureMontant` déclaratif qui déplacerait le risque sans le
+// réduire, cf. docs/reprise.md) : la valeur la plus probable en cas de dépassement est que
+// l'utilisateur a recopié la ligne « allocation brute » d'un relevé de situation au lieu de la
+// ligne « allocation journalière nette » de sa notification.
+const SEUIL_PLAUSIBILITE_AJ_NETTE = franceTravailConfig.are.plafond * 0.9;
+
+function GestionAjReelle({ profil, onModifierProfil }: { profil: Profil; onModifierProfil: OnModifierProfil }) {
+  const historique = profil.ajReelleHistorique ?? [];
+  const [dateEffet, setDateEffet] = useState("");
+  const [valeur, setValeur] = useState("");
+  const valeurImplausible = valeur.trim() !== "" && Number(valeur) >= SEUIL_PLAUSIBILITE_AJ_NETTE;
+
+  function ajouter() {
+    if (!dateEffet || valeur.trim() === "") return;
+    const nouveau = [...historique, { dateEffet, valeur: Number(valeur) }].sort((a, b) => a.dateEffet.localeCompare(b.dateEffet));
+    onModifierProfil({ ...profil, ajReelleHistorique: nouveau });
+    setDateEffet("");
+    setValeur("");
+  }
+
+  function supprimer(index: number) {
+    onModifierProfil({ ...profil, ajReelleHistorique: historique.filter((_, i) => i !== index) });
+  }
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <h3 className="font-display text-base font-medium">Allocation journalière réelle</h3>
+        <p className="text-xs text-faint mt-1">
+          Indique l'allocation journalière nette figurant sur ta notification d'ouverture de droits France Travail (ligne « Allocation journalière nette »).
+        </p>
+        <p className="text-xs text-faint mt-1">Si ton allocation journalière a été revalorisée en cours de droits, ajoute une nouvelle ligne avec la date d'effet — visible sur tes relevés de situation.</p>
+      </div>
+
+      {historique.length === 0 ? (
+        <p className="text-xs rounded-lg px-3 py-2 bg-amber/10 text-amber">Sans ce chiffre, le montant mensuel ne peut pas être calculé.</p>
+      ) : (
+        <table className="w-full text-sm">
+          <thead className="text-xs uppercase tracking-[.03em] text-muted border-b border-line">
+            <tr>
+              <th className="text-left py-2">Date d'effet</th>
+              <th className="text-right py-2">AJ nette (€)</th>
+              <th className="py-2" />
+            </tr>
+          </thead>
+          <tbody>
+            {historique.map((h, i) => (
+              <tr key={`${h.dateEffet}-${i}`} className="border-b border-line last:border-0">
+                <td className="py-2">{formaterDateLisible(h.dateEffet)}</td>
+                <td className="text-right py-2">{h.valeur.toFixed(2)}</td>
+                <td className="text-right py-2">
+                  <button onClick={() => supprimer(i)} className="text-xs text-muted hover:text-red transition-colors">
+                    Supprimer
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+
+      <div className="grid grid-cols-[1fr_1fr_auto] gap-3 items-end">
+        <div>
+          <label className="block text-xs uppercase tracking-[.03em] text-muted mb-2" htmlFor="revenus-aj-date-effet">
+            Date d'effet
+          </label>
+          <input
+            id="revenus-aj-date-effet"
+            type="date"
+            value={dateEffet}
+            onChange={(e) => setDateEffet(e.target.value)}
+            className="w-full bg-surface-2 border border-line rounded-lg px-3 py-2 text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-mint"
+          />
+        </div>
+        <div>
+          <label className="block text-xs uppercase tracking-[.03em] text-muted mb-2" htmlFor="revenus-aj-valeur">
+            AJ nette (€)
+          </label>
+          <input
+            id="revenus-aj-valeur"
+            type="number"
+            min={0}
+            step="0.01"
+            value={valeur}
+            onChange={(e) => {
+              if (estSaisieNegative(e.target.value)) return;
+              setValeur(e.target.value);
+            }}
+            className="w-full bg-surface-2 border border-line rounded-lg px-3 py-2 text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-mint"
+          />
+        </div>
+        <button
+          onClick={ajouter}
+          disabled={!dateEffet || valeur.trim() === ""}
+          className="bg-mint text-bg font-medium rounded-lg px-4 py-2 disabled:opacity-40 disabled:cursor-not-allowed transition-opacity whitespace-nowrap"
+        >
+          + Ajouter une période
+        </button>
+      </div>
+
+      {valeurImplausible && (
+        <p className="text-xs rounded-lg px-3 py-2 bg-amber/10 text-amber">
+          Ce montant semble élevé pour une allocation <strong>nette</strong> — vérifie que tu n'as
+          pas recopié la ligne « allocation brute » d'un relevé de situation au lieu de la ligne
+          « allocation journalière nette » de ta notification d'ouverture de droits.
+        </p>
+      )}
+    </div>
+  );
+}
 
 function TableauResultats({
   profil,
@@ -220,12 +351,13 @@ function TableauResultats({
   }
 
   // Aucune AJ réelle renseignée du tout : pas de repli sur une estimation (devoir n°2), la
-  // simulation entière est bloquée plutôt que d'afficher un chiffre deviné.
+  // simulation entière est bloquée plutôt que d'afficher un chiffre deviné. Le formulaire pour la
+  // renseigner est juste au-dessus (GestionAjReelle) depuis le 07/08/2026 — plus besoin de changer
+  // d'onglet.
   if ((profil.ajReelleHistorique ?? []).length === 0) {
     return (
       <div className="bg-amber/10 border border-amber/30 rounded-card p-4 text-sm text-amber">
-        Renseigne l'allocation journalière indiquée sur ta notification France Travail (« Mon profil » → « Mon indemnisation en cours ») pour activer cette simulation. Sans cette donnée, Cadence
-        ne peut pas calculer tes montants mensuels.
+        Ajoute l'allocation journalière indiquée sur ta notification France Travail ci-dessus pour activer cette simulation. Sans cette donnée, Cadence ne peut pas calculer tes montants mensuels.
       </div>
     );
   }

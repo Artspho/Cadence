@@ -1102,6 +1102,7 @@ export default function App() {
               periodes={donnees.periodes}
               config={franceTravailConfig}
               onConfigurerSolde={configurerSoldeIndemnisation}
+              onModifierProfil={modifierProfil}
               onAllerVersProfil={() => setOnglet("profil")}
                 dateDuJour={dateDuJour}
               />
@@ -1117,9 +1118,6 @@ export default function App() {
             periodes={donnees.periodes}
             onAjouterPeriode={ajouterPeriode}
             onSupprimerPeriode={supprimerPeriode}
-            session={session}
-            etatEnregistrement={etatEnregistrement}
-            donnees={donnees}
             onNaviguerVersParametres={() => setOnglet("parametres")}
           />
         )}
@@ -1140,7 +1138,7 @@ export default function App() {
 
         {onglet === "dossier" && <MonDossier />}
 
-            {onglet === "parametres" && <ParametresSourcesEtMentions />}
+            {onglet === "parametres" && <ParametresSourcesEtMentions session={session} etatEnregistrement={etatEnregistrement} donnees={donnees} />}
           </main>
           <PiedDePage />
         </div>
