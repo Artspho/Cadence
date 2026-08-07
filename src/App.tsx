@@ -25,7 +25,6 @@ import { DecisionServeur, type BasculeADecider } from "./components/DecisionServ
 import { BandeauLectureSeule } from "./components/BandeauLectureSeule";
 import { BandeauEchecEnregistrement } from "./components/BandeauEchecEnregistrement";
 import { telechargerTexte } from "./lib/telechargement";
-import { formaterMoisAnnee } from "./lib/dateLisible";
 import { calculerFenetreEnCours } from "./engine/periodeReference";
 import { calculerDecompteHeures } from "./engine/decompteHeures";
 import { calculerSalaireReference } from "./engine/salaireReference";
@@ -923,11 +922,7 @@ export default function App() {
         <div className="flex-1 min-w-0 flex flex-col">
           <TopBar
             onChangerOnglet={setOnglet}
-            periodeLabel={
-              profil.dateAnniversaire && calculs.exercices[0]
-                ? `${formaterMoisAnnee(calculs.exercices[0].dateDebut)} → ${formaterMoisAnnee(profil.dateAnniversaire)}`
-                : "Première admission"
-            }
+            periodeLabel={profil.dateAnniversaire ? `Cycle → ${profil.dateAnniversaire}` : "Première admission"}
             ongletActif={onglet}
             session={session}
           />
