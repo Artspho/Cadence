@@ -108,6 +108,15 @@ export interface LigneDocument {
   manques: ManqueDonnee[];
   /** Sert au libellé « incomplète (N informations manquent) » — bloquants SEULEMENT. */
   nbManquesBloquants: number;
+  /**
+   * Combien de manques BLOQUANTS cette ligne peut structurellement porter pour ce profil (déduit,
+   * jamais un total écrit en dur — même principe que `nbManquesBloquants`). `undefined` sur une
+   * ligne dont le statut est TOUJOURS `non_evaluable` (relevé, CPAM, attestation de taux) : elle ne
+   * porte aucun manque calculable, ce n'est pas la même chose qu'un manque déjà comblé. Sert de base
+   * à `progressionDocuments` — jamais un dénominateur fixe comme « /9 », qui mentirait dès que la
+   * situation change (première admission vs réadmission, avant/après ouverture de droits).
+   */
+  nbBloquantsApplicables?: number;
   /** Nombre de contrats enregistrés — uniquement sur la ligne bulletins/AEM. */
   nbContrats?: number;
   /** Limite assumée à afficher telle quelle. Ce n'est pas un manque. */
@@ -231,6 +240,7 @@ function ligneNotification(profil: Profil | null): LigneDocument {
   const aEvaluer = verifications.filter((v) => v.applicable);
   const manquantes = aEvaluer.filter((v) => !v.present);
   const bloquants = manquantes.filter((m) => m.poids === "bloquant");
+  const bloquantsApplicables = aEvaluer.filter((v) => v.poids === "bloquant");
 
   // « rien de renseigné » = AUCUNE donnée bloquante présente. Déduit des vérifications elles-mêmes,
   // jamais d'un total écrit à la main. `profil === null` (tout premier lancement) y tombe
@@ -245,6 +255,7 @@ function ligneNotification(profil: Profil | null): LigneDocument {
     // Bloquants d'abord : ce qu'il faut aller chercher avant tout le reste.
     manques: [...bloquants, ...manquantes.filter((m) => m.poids === "precision")].map(({ libelle, poids, consequence }) => ({ libelle, poids, consequence })),
     nbManquesBloquants: bloquants.length,
+    nbBloquantsApplicables: bloquantsApplicables.length,
   };
 }
 
@@ -269,6 +280,8 @@ function ligneBulletins(contrats: Contrat[]): LigneDocument {
         ]
       : [],
     nbManquesBloquants: aucun ? 1 : 0,
+    // Un seul manque bloquant possible sur cette ligne : « au moins un contrat ».
+    nbBloquantsApplicables: 1,
     // Le NOMBRE DE CONTRATS, pas un nombre de mois : un contrat peut chevaucher plusieurs mois
     // (une année scolaire d'enseignement en couvre dix). Recompter les mois ici dupliquerait
     // `engine/decoupageMensuel.ts` et risquerait d'en diverger silencieusement — on n'affiche que
@@ -341,4 +354,21 @@ export function documentsRequis(profil: Profil | null, contrats: Contrat[]): Lig
  */
 export function aDesManquesBloquants(lignes: LigneDocument[]): boolean {
   return lignes.some((l) => l.nbManquesBloquants > 0);
+}
+
+/**
+ * Jauge de progression de la checklist — SOMME des `nbBloquantsApplicables`/manques comblés déjà
+ * calculés par ligne, jamais un dénominateur écrit en dur. Les lignes sans `nbBloquantsApplicables`
+ * (relevé, CPAM, attestation de taux — structurellement `non_evaluable`) ne comptent ni au
+ * numérateur ni au dénominateur : les compter à zéro donnerait la même somme, mais l'absence
+ * explicite dit pourquoi, ce qu'un zéro ne dirait pas.
+ */
+export function progressionDocuments(lignes: LigneDocument[]): { combles: number; total: number } {
+  return lignes.reduce(
+    (acc, ligne) =>
+      ligne.nbBloquantsApplicables === undefined
+        ? acc
+        : { combles: acc.combles + (ligne.nbBloquantsApplicables - ligne.nbManquesBloquants), total: acc.total + ligne.nbBloquantsApplicables },
+    { combles: 0, total: 0 },
+  );
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { aDesManquesBloquants, documentsRequis, type IdDocument, type LigneDocument } from "../documentsRequis";
+import { aDesManquesBloquants, documentsRequis, progressionDocuments, type IdDocument, type LigneDocument } from "../documentsRequis";
 import { contrat, profil } from "../../engine/__tests__/testUtils";
 import type { Profil } from "../../types";
 
@@ -247,5 +247,43 @@ describe("aDesManquesBloquants", () => {
 
   it("un contrat manquant suffit à déclencher la mise en avant", () => {
     expect(aDesManquesBloquants(documentsRequis(profilComplet, []))).toBe(true);
+  });
+});
+
+describe("progressionDocuments — dénominateur dynamique, jamais un total fixe", () => {
+  // Le nombre de bloquants applicables dépend de la situation (première admission vs réadmission) et
+  // de ce qui est déjà renseigné (dateLimiteIndemnisation n'est applicable que si ouvertureDroits
+  // existe) — un « /9 » écrit en dur mentirait dans les deux cas.
+  it("profil null, aucun contrat -> rien de comblé, sur le total applicable en première admission", () => {
+    // notification : ouverture, AJ nette, naissance = 3 bloquants applicables (dateAnniversaire et
+    // dateLimite ne le sont pas sans réadmission/ouverture). bulletins : 1 (aucun contrat).
+    const { combles, total } = progressionDocuments(documentsRequis(null, []));
+    expect(total).toBe(4);
+    expect(combles).toBe(0);
+  });
+
+  it("profil complet + un contrat, première admission -> tout comblé", () => {
+    // + dateLimiteIndemnisation, applicable puisque ouvertureDroits existe désormais = 4 bloquants
+    // applicables sur la notification, + 1 sur bulletins.
+    const { combles, total } = progressionDocuments(documentsRequis(profilComplet, [contrat({ date: "2026-03-15" })]));
+    expect(total).toBe(5);
+    expect(combles).toBe(5);
+  });
+
+  it("réadmission : le dénominateur grandit d'un cran (date anniversaire redevient bloquante)", () => {
+    const p = profil({ ...profilComplet, situation: "readmission" });
+    const { combles, total } = progressionDocuments(documentsRequis(p, [contrat({ date: "2026-03-15" })]));
+    expect(total).toBe(6);
+    expect(combles).toBe(6);
+  });
+
+  it("les lignes non évaluables (relevé, CPAM, attestation de taux) ne gonflent jamais le total", () => {
+    // profil() (donc taux absent) fait apparaître la ligne « attestation_taux » en plus des lignes
+    // relevé/CPAM déjà toujours présentes — aucune des trois ne doit peser dans la somme.
+    const lignes = documentsRequis(profil(), []);
+    expect(lignes.map((l) => l.id)).toContain("attestation_taux");
+    const { total } = progressionDocuments(lignes);
+    const totalNotificationEtBulletins = (lignes.find((l) => l.id === "notification_admission")?.nbBloquantsApplicables ?? 0) + 1;
+    expect(total).toBe(totalNotificationEtBulletins);
   });
 });

@@ -20,12 +20,25 @@
  */
 
 import type { Contrat, Profil } from "../types";
-import { documentsRequis, type LigneDocument } from "../lib/documentsRequis";
+import { documentsRequis, progressionDocuments, type IdDocument, type LigneDocument } from "../lib/documentsRequis";
+import type { TypeDocument } from "../storage/documentsStorage";
 
 interface ChecklistDocumentsProps {
   profil: Profil | null;
   contrats: Contrat[];
+  /** Bascule sur l'onglet import avec ce type suggéré. Absent : pas de bouton d'action par ligne. */
+  onDemanderImport?: (type: TypeDocument) => void;
 }
+
+/**
+ * Les deux seules lignes qui portent un vrai manque bloquant importable (cf. `documentsRequis.ts`) :
+ * les trois autres (relevé, CPAM, attestation de taux) sont des compléments jamais « manquants » au
+ * sens bloquant, donc jamais concernées par ce bouton — pas la peine de les faire figurer ici.
+ */
+const TYPE_DOCUMENT_PAR_LIGNE: Partial<Record<IdDocument, TypeDocument>> = {
+  notification_admission: "notification_are",
+  bulletins_aem: "aem_bulletin",
+};
 
 interface Etiquette {
   texte: string;
@@ -62,18 +75,41 @@ function etiquetteDe(ligne: LigneDocument): Etiquette {
 }
 
 /** Une ligne dépliable. `open` jamais forcé : tout est replié à l'arrivée. */
-function LigneChecklist({ ligne }: { ligne: LigneDocument }) {
+function LigneChecklist({ ligne, onDemanderImport }: { ligne: LigneDocument; onDemanderImport?: (type: TypeDocument) => void }) {
   const etiquette = etiquetteDe(ligne);
   const bloquants = ligne.manques.filter((m) => m.poids === "bloquant");
   const precisions = ligne.manques.filter((m) => m.poids === "precision");
-  // Rien à déplier : ni manque, ni limite à expliquer. On rend alors une ligne inerte plutôt qu'un
-  // chevron qui ouvre sur du vide.
-  const rienADeplier = ligne.manques.length === 0 && !ligne.note;
+  // Le bouton n'a de sens que s'il reste un vrai manque bloquant à combler ET que ce document se
+  // dépose par le canal import — jamais sur les lignes de complément (relevé, CPAM, attestation de
+  // taux), qui n'ont structurellement aucun manque bloquant (cf. TYPE_DOCUMENT_PAR_LIGNE).
+  const typeImportable = TYPE_DOCUMENT_PAR_LIGNE[ligne.id];
+  const bouton =
+    onDemanderImport && typeImportable && ligne.nbManquesBloquants > 0 ? (
+      <button
+        type="button"
+        onClick={(e) => {
+          // `entete` est rendu à l'intérieur d'un `<summary>` : sans ceci, le clic ouvrirait/fermerait
+          // aussi le détail de la ligne en plus de déclencher l'action.
+          e.preventDefault();
+          e.stopPropagation();
+          onDemanderImport(typeImportable);
+        }}
+        className="text-xs text-mint hover:text-mint/80 transition-colors whitespace-nowrap underline underline-offset-2"
+      >
+        Importer ce document
+      </button>
+    ) : null;
+  // Rien à déplier : ni manque, ni limite à expliquer, ni bouton. On rend alors une ligne inerte
+  // plutôt qu'un chevron qui ouvre sur du vide.
+  const rienADeplier = ligne.manques.length === 0 && !ligne.note && !bouton;
 
   const entete = (
     <span className="flex items-center justify-between gap-3 flex-wrap w-full">
       <span className="text-ink">{ligne.document}</span>
-      <span className={`text-xs rounded-full border px-2.5 py-0.5 whitespace-nowrap ${etiquette.classes}`}>{etiquette.texte}</span>
+      <span className="flex items-center gap-2 flex-wrap justify-end">
+        {bouton}
+        <span className={`text-xs rounded-full border px-2.5 py-0.5 whitespace-nowrap ${etiquette.classes}`}>{etiquette.texte}</span>
+      </span>
     </span>
   );
 
@@ -126,8 +162,9 @@ function LigneChecklist({ ligne }: { ligne: LigneDocument }) {
   );
 }
 
-export function ChecklistDocuments({ profil, contrats }: ChecklistDocumentsProps) {
+export function ChecklistDocuments({ profil, contrats, onDemanderImport }: ChecklistDocumentsProps) {
   const lignes = documentsRequis(profil, contrats);
+  const { combles, total } = progressionDocuments(lignes);
 
   return (
     <section className="bg-surface border border-line rounded-card overflow-hidden">
@@ -142,10 +179,24 @@ export function ChecklistDocuments({ profil, contrats }: ChecklistDocumentsProps
           Calculé d'après les informations déjà enregistrées, pas d'après les fichiers déposés — remplir un champ à la main compte donc autant qu'un import. Si tu conserves un
           document sur le serveur (une fois connecté), tu le retrouveras dans « Mon dossier » — ce statut-ci ne s'appuie jamais sur ça.
         </p>
+        {/* `total` dépend de la situation (première admission vs réadmission) et de ce qui est déjà
+            renseigné — jamais un chiffre fixe du genre « X/9 », qui mentirait dès que l'un des deux
+            change (cf. `progressionDocuments`). Absent si `total` est nul (ne devrait pas arriver en
+            pratique, mais une jauge 0/0 affirmerait une complétude qu'aucune donnée ne soutient). */}
+        {total > 0 && (
+          <div className="mt-3">
+            <div className="h-1.5 rounded-full bg-surface-2 overflow-hidden">
+              <div className="h-full rounded-full bg-mint transition-[width]" style={{ width: `${(combles / total) * 100}%` }} />
+            </div>
+            <p className="text-xs text-faint mt-1.5">
+              {combles}/{total} informations bloquantes renseignées
+            </p>
+          </div>
+        )}
       </div>
       <div className="border-t border-line">
         {lignes.map((ligne) => (
-          <LigneChecklist key={ligne.id} ligne={ligne} />
+          <LigneChecklist key={ligne.id} ligne={ligne} onDemanderImport={onDemanderImport} />
         ))}
       </div>
     </section>

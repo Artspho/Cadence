@@ -49,6 +49,13 @@ interface ImportDocumentIAProps {
   clientAuth?: ClientAuth | null;
   clientDocuments?: ClientDocuments | null;
   clientFichiers?: ClientFichiers | null;
+  /**
+   * Type suggéré depuis la checklist de l'espace dépôt (« Importer ce document »). N'affiche qu'un
+   * bandeau de contexte et préremplit `SelecteurTypeNonReconnu` — l'IA détecte le type par elle-même,
+   * ce champ ne le force jamais : promettre plus serait un comportement deviné que ce composant ne
+   * tient pas (elle peut très bien détecter autre chose que ce qui était suggéré).
+   */
+  typeSuggere?: TypeDocument | null;
 }
 
 const ECHEC_INATTENDU = "L'envoi a échoué pour une raison inattendue. Réessaie, ou saisis les informations à la main.";
@@ -59,8 +66,19 @@ const ECHEC_INATTENDU = "L'envoi a échoué pour une raison inattendue. Réessai
  * « Ne pas conserver » n'annule rien d'autre que la conservation : les propositions extraites
  * s'affichent dans les deux cas.
  */
-function SelecteurTypeNonReconnu({ enCours, onConserver, onIgnorer }: { enCours: boolean; onConserver: (type: (typeof TYPES_DOCUMENT_ORDONNES)[number]) => void; onIgnorer: () => void }) {
-  const [type, setType] = useState<(typeof TYPES_DOCUMENT_ORDONNES)[number]>("document_non_classe");
+function SelecteurTypeNonReconnu({
+  enCours,
+  onConserver,
+  onIgnorer,
+  typeInitial = "document_non_classe",
+}: {
+  enCours: boolean;
+  onConserver: (type: (typeof TYPES_DOCUMENT_ORDONNES)[number]) => void;
+  onIgnorer: () => void;
+  /** Vient de la checklist (`typeSuggere`) — une aide au choix, pas une valeur imposée. */
+  typeInitial?: (typeof TYPES_DOCUMENT_ORDONNES)[number];
+}) {
+  const [type, setType] = useState<(typeof TYPES_DOCUMENT_ORDONNES)[number]>(typeInitial);
   return (
     <div className="fixed inset-0 z-50 bg-bg/80 backdrop-blur-sm flex items-center justify-center p-6" role="alertdialog" aria-modal="true" aria-labelledby="titre-type-non-reconnu">
       <div className="bg-surface border border-line rounded-hero p-6 max-w-[480px] space-y-4">
@@ -104,6 +122,7 @@ export function ImportDocumentIA({
   clientAuth = obtenirClientAuth(),
   clientDocuments = obtenirClientDocuments(),
   clientFichiers = obtenirClientFichiers(),
+  typeSuggere = null,
 }: ImportDocumentIAProps) {
   const session = useSession(clientAuth);
   /** Fichier choisi et validé, en attente du consentement. Non nul ⇒ la modale est ouverte. */
@@ -305,7 +324,9 @@ export function ImportDocumentIA({
         <ConsentementEnvoiIA nomFichier={fichierEnAttente.name} enCours={envoiEnCours} onAnnuler={annuler} onConfirmer={envoyer} />
       )}
 
-      {choixTypeEnAttente && <SelecteurTypeNonReconnu enCours={envoiEnCours} onConserver={validerChoixType} onIgnorer={ignorerConservation} />}
+      {choixTypeEnAttente && (
+        <SelecteurTypeNonReconnu enCours={envoiEnCours} onConserver={validerChoixType} onIgnorer={ignorerConservation} typeInitial={typeSuggere ?? undefined} />
+      )}
 
       {doublonEnAttente && (
         <AvertissementDoublonDocument
@@ -322,6 +343,13 @@ export function ImportDocumentIA({
         {/* Annonce permanente : ce que fait ce bouton, su avant de cliquer. Le détail complet reste
             dans la modale, au moment de décider. */}
         <p className="text-xs text-faint leading-relaxed mt-1">{ANNONCE_CANAL_IA}</p>
+        {/* Vient de la checklist (« Importer ce document ») — une aide, jamais une promesse : l'IA
+            détecte le type par elle-même, elle peut très bien reconnaître autre chose. */}
+        {typeSuggere && (
+          <p className="text-xs text-mint leading-relaxed mt-2 bg-mint/10 border border-mint/30 rounded-lg px-3 py-2">
+            Tu es venu importer : <strong className="font-medium">{LIBELLES_TYPE_DOCUMENT[typeSuggere]}</strong>
+          </p>
+        )}
       </div>
 
       <div className="bg-surface-2 border border-line rounded-lg px-4 py-3">
