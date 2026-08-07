@@ -3051,11 +3051,20 @@ de situation ✅ — l'échec semble propre à ce format de bulletin, pas au can
   `docs/validation.md` comme **raisonnement, pas source qui tranche**. Ne bloque rien tant qu'aucun
   montant n'est câblé.
 - ⬜ Module congés spectacle
-- ⬜ **Combien d'années d'historique garder ?** Question ouverte le 07/08/2026, dans le cadre de
-  l'idée d'un sélecteur de cycle en haut (dernières N années) qui remplacerait l'onglet
-  « Historique » actuel — cf. `engine/cycles.ts` (`CYCLES_MAX = 10`, profondeur déjà reconstruite
-  aujourd'hui). Reste à trancher : combien d'années afficher dans ce sélecteur, et si ça diffère de
-  la profondeur réellement conservée en storage.
+- ✅ **Vue unifiée des cycles (en cours + passés) — faite le 07/08/2026, dans l'onglet
+  « Historique » lui-même.** Partie de l'idée ci-dessous effectivement construite : le badge de
+  cycle de `TopBar.tsx` (qui dupliquait en résumé ce que l'onglet disait déjà) a été retiré ;
+  `Historique.tsx` affiche maintenant le cycle en cours (carte avec barre de progression vers
+  `seuilHeures`) directement au-dessus de la ligne chronologique des cycles clos, même vocabulaire
+  partout (« cycle », plus « exercice » à l'écran). `TopBar` ne porte plus que l'avatar mobile
+  (`md:hidden`) — `Sidebar.tsx` gérait déjà l'avatar desktop, il n'avait plus rien d'autre à montrer.
+- ⬜ **Sélecteur de cycle en haut qui recharge TOUS les onglets par année — reste une question
+  ouverte, non construite.** L'idée plus large discutée le 07/08/2026 (onglets « scopés » par année
+  choisie en haut vs onglets globaux comme Profil/Contrats) n'a pas été retenue pour l'instant — la
+  vue unifiée ci-dessus répond au besoin immédiat (« l'affichage des cycles doit être clair et
+  instinctif ») sans exiger ce chantier plus lourd. Si l'idée revient : combien d'années remonter
+  reste à trancher (`engine/cycles.ts`, `CYCLES_MAX = 10`, profondeur déjà reconstruite aujourd'hui),
+  et quels onglets seraient réellement scopés par cycle vs globaux.
 
 ---
 
