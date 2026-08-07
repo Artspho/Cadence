@@ -20,6 +20,7 @@
     "verifier:consentement": "node --env-file=.env scripts/verifier-consentement.mjs"
   },
   "dependencies": {
+    "@headlessui/react": "^2.2.10",
     "@supabase/supabase-js": "^2.112.0",
     "date-fns": "^3.6.0",
     "jspdf": "^4.2.1",
