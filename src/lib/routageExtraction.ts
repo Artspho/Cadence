@@ -90,18 +90,6 @@ export interface PropositionEvaluee {
    * un champ identique masqué serait indiscernable d'un champ jamais comparé).
    */
   champsEcrases?: ChampComparaison[];
-  /**
-   * 07/08/2026 (idée de Benoît) — renseigné UNIQUEMENT sur `cible: "profil_ouverture_droits"` quand
-   * `statut === "confirmation_ecrasement"` ET que l'écart entre la date d'ouverture existante et
-   * celle du document dépasse `ECART_ADMISSION_DIFFERENTE_JOURS` : le document décrit probablement
-   * une admission DIFFÉRENTE (pas une correction de l'admission en cours). RevueExtraction.tsx
-   * propose alors une troisième option, « Ajouter à l'historique », à côté de « Remplacer »/« Garder »
-   * — écrit dans `Profil.historiqueOuvertureDroits` (profilAvecEntreeHistorique ci-dessous), jamais
-   * dans `ouvertureDroits`. `dateEcheance` vient de `dateLimiteIndemnisation` : sans cette date, pas
-   * de `candidatHistorique` — une entrée sans fin de cycle ne servirait à rien à
-   * `engine/cycles.ts::decouperExercices`.
-   */
-  candidatHistorique?: { dateOuverture: string; dateEcheance: string };
 }
 
 /**
@@ -110,8 +98,32 @@ export interface PropositionEvaluee {
  * documentée comme telle (même style que `TRANCHES_MAX`, `periodeReference.ts`), pas une valeur
  * réglementaire. Une vraie ouverture de droits dure toujours ~12 mois ; un écart plus grand ne peut
  * pas être une simple correction de quelques jours/semaines sur la même admission.
+ *
+ * Fiabilité plutôt que commodité (07/08/2026, revu avec Benoît) : ce cas ne propose plus de
+ * "Remplacer"/"Garder" NI de troisième option "Ajouter à l'historique" — l'ancienne troisième option
+ * ajoutait toujours une entrée NEUVE à `historiqueOuvertureDroits` sans jamais la comparer aux
+ * entrées déjà présentes, un vrai risque de doublon si le même vieux document était réimporté deux
+ * fois. Toute admission qui semble différente devient directement `non_applicable` : ni la mauvaise
+ * option (« Remplacer » écraserait l'ouverture EN COURS avec les données d'une AUTRE admission) ni
+ * la fragile n'est plus proposée — seule la saisie manuelle dans « Mon profil » reste possible.
  */
 const ECART_ADMISSION_DIFFERENTE_JOURS = 365;
+
+/**
+ * `null` si le document décrit probablement la MÊME admission (correction plausible, laisse
+ * `statutSelonEcrasement` décider) ; sinon le motif à renvoyer tel quel en `non_applicable`.
+ */
+function motifSiAdmissionDifferente(existant: Record<string, unknown> | undefined, dateOuverture: string | null): string | null {
+  if (!existant || !dateOuverture) return null;
+  const dateOuvertureExistante = existant.dateOuverture;
+  if (typeof dateOuvertureExistante !== "string" || !dateOuvertureExistante) return null;
+  if (Math.abs(diffJours(dateOuvertureExistante, dateOuverture)) <= ECART_ADMISSION_DIFFERENTE_JOURS) return null;
+  return (
+    "Ce document décrit une admission qui semble différente de celle en cours (plus de 12 mois d'écart avec ta date d'ouverture actuelle) — il n'est pas proposé ici, pour éviter " +
+    "d'écraser ton ouverture EN COURS avec les données d'une autre admission. Si tu veux garder trace de cette ancienne admission, ajoute-la à la main dans « Mon profil » → " +
+    "« Historique de tes ouvertures de droits précédentes »."
+  );
+}
 
 /**
  * Compare chaque champ RENSEIGNÉ par le document à la valeur déjà connue — même principe que
@@ -154,21 +166,6 @@ function statutSelonEcrasement(proposition: Proposition, titre: string, existant
     return { proposition, titre, statut: "confirmation_ecrasement", avertissements: [], champsEcrases };
   }
   return { proposition, titre, statut: "applicable", avertissements: [] };
-}
-
-/**
- * Ajoute `candidatHistorique` (cf. sa doc sur `PropositionEvaluee`) à une évaluation déjà produite
- * par `statutSelonEcrasement`, UNIQUEMENT pour `cible: "profil_ouverture_droits"` — jamais appelée
- * pour `profil_infos`, qui n'a pas de quoi former une entrée complète (pas de `dateLimiteIndemnisation`).
- * `dateOuverture` peut être `null` ici (cas « champ utile seul » d'`evaluerProposition` ci-dessous,
- * où seule `dateLimiteIndemnisation` est garantie) — sans elle, pas de comparaison possible.
- */
-function avecCandidatHistorique(evaluee: PropositionEvaluee, existant: Record<string, unknown> | undefined, dateOuverture: string | null, dateLimiteIndemnisation: string | null): PropositionEvaluee {
-  if (evaluee.statut !== "confirmation_ecrasement" || !existant || !dateOuverture || !dateLimiteIndemnisation) return evaluee;
-  const dateOuvertureExistante = existant.dateOuverture;
-  if (typeof dateOuvertureExistante !== "string" || !dateOuvertureExistante) return evaluee;
-  if (Math.abs(diffJours(dateOuvertureExistante, dateOuverture)) <= ECART_ADMISSION_DIFFERENTE_JOURS) return evaluee;
-  return { ...evaluee, candidatHistorique: { dateOuverture, dateEcheance: dateLimiteIndemnisation } };
 }
 
 const TITRES: Record<Proposition["cible"], string> = {
@@ -216,12 +213,21 @@ export function evaluerProposition(proposition: Proposition, profil: Profil, con
     case "profil_ouverture_droits": {
       const { dateOuverture, franchiseCPTotale, delaiAttenteInitial, dateLimiteIndemnisation } = proposition.donnees;
       const existant = profil.ouvertureDroits as unknown as Record<string, unknown> | undefined;
+
+      // Vérifié AVANT tout le reste : une admission qui semble différente ne doit jamais atteindre
+      // "confirmation_ecrasement" — "Remplacer" écraserait l'ouverture EN COURS avec les données
+      // d'une autre admission, peu importe si d'autres champs sont par ailleurs manquants.
+      const motifAdmissionDifferente = motifSiAdmissionDifferente(existant, dateOuverture);
+      if (motifAdmissionDifferente) {
+        return { proposition, titre, statut: "non_applicable", motif: motifAdmissionDifferente, avertissements: [] };
+      }
+
       const baseDejaConnue = existant !== undefined;
       // Le taux ne fait plus partie de cette cible depuis le 02/08/2026 (cf. types/extraction.ts,
       // Cible 2) : seule dateLimiteIndemnisation reste un champ "utile seul".
       const champUtileSeul = dateLimiteIndemnisation !== null;
       if (baseDejaConnue && champUtileSeul) {
-        return avecCandidatHistorique(statutSelonEcrasement(proposition, titre, existant, { dateOuverture, franchiseCPTotale, delaiAttenteInitial, dateLimiteIndemnisation }), existant, dateOuverture, dateLimiteIndemnisation);
+        return statutSelonEcrasement(proposition, titre, existant, { dateOuverture, franchiseCPTotale, delaiAttenteInitial, dateLimiteIndemnisation });
       }
       const manquants: string[] = [];
       if (!dateOuverture) manquants.push("la date d'ouverture des droits");
@@ -240,7 +246,7 @@ export function evaluerProposition(proposition: Proposition, profil: Profil, con
           avertissements: [],
         };
       }
-      return avecCandidatHistorique(statutSelonEcrasement(proposition, titre, existant, { dateOuverture, franchiseCPTotale, delaiAttenteInitial, dateLimiteIndemnisation }), existant, dateOuverture, dateLimiteIndemnisation);
+      return statutSelonEcrasement(proposition, titre, existant, { dateOuverture, franchiseCPTotale, delaiAttenteInitial, dateLimiteIndemnisation });
     }
 
     case "profil_infos": {
@@ -680,21 +686,4 @@ export function profilAvecProposition(profil: Profil, proposition: Proposition):
     default:
       throw new Error(`La cible « ${proposition.cible} » ne s'applique pas au profil.`);
   }
-}
-
-/**
- * 07/08/2026 (idée de Benoît) — ajoute une entrée à `Profil.historiqueOuvertureDroits`, appelée
- * depuis RevueExtraction.tsx quand l'utilisateur choisit « Ajouter à l'historique » plutôt que
- * « Remplacer »/« Garder mes valeurs actuelles » sur une proposition `confirmation_ecrasement` dont
- * `candidatHistorique` est renseigné (cf. `evaluerProposition`/`avecCandidatHistorique` ci-dessus).
- *
- * Ne touche À RIEN d'autre : ni `ouvertureDroits`, ni `dateAnniversaire` — c'est tout le sens de
- * cette troisième option par rapport à « Remplacer » (qui écrit sur l'ouverture EN COURS). Même
- * convention de tri que la saisie manuelle (`MonProfil.tsx`, `GestionHistoriqueOuvertureDroits`) :
- * croissant par `dateEcheance`, consommé par `engine/cycles.ts::decouperExercices` du plus récent au
- * moins récent.
- */
-export function profilAvecEntreeHistorique(profil: Profil, entree: { dateOuverture: string; dateEcheance: string }): Profil {
-  const historique = [...(profil.historiqueOuvertureDroits ?? []), entree].sort((a, b) => a.dateEcheance.localeCompare(b.dateEcheance));
-  return { ...profil, historiqueOuvertureDroits: historique };
 }

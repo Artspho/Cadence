@@ -74,6 +74,34 @@ describe("MonProfil — historique des ouvertures de droits précédentes", () =
     expect(lignes.map((l) => l.textContent)).toEqual([expect.stringContaining("31/12/2025"), expect.stringContaining("31/12/2024"), expect.stringContaining("31/12/2023")]);
   });
 
+  it("pré-remplit la date d'échéance avec dateAnniversairePrecedente quand aucun cycle n'est encore saisi (07/08/2026, toujours enchaîné)", () => {
+    rendre(profilAvecOuverture({ dateAnniversairePrecedente: "2025-12-31" }));
+    expect((screen.getByLabelText(/^date d'échéance$/i) as HTMLInputElement).value).toBe("2025-12-31");
+  });
+
+  it("pré-remplit la date d'échéance avec (ouverture du plus ancien cycle connu − 1 jour) quand un cycle existe déjà", () => {
+    rendre(
+      profilAvecOuverture({
+        dateAnniversairePrecedente: "2025-12-31",
+        historiqueOuvertureDroits: [{ dateOuverture: "2025-01-01", dateEcheance: "2025-12-31" }],
+      }),
+    );
+    expect((screen.getByLabelText(/^date d'échéance$/i) as HTMLInputElement).value).toBe("2024-12-31");
+  });
+
+  it("ne pré-remplit rien sans dateAnniversairePrecedente ni historique (champ vide, pas une date inventée)", () => {
+    rendre(profilAvecOuverture());
+    expect((screen.getByLabelText(/^date d'échéance$/i) as HTMLInputElement).value).toBe("");
+  });
+
+  it("n'écrase pas une saisie déjà en cours dans le champ date d'échéance", () => {
+    rendre(profilAvecOuverture({ dateAnniversairePrecedente: "2025-12-31" }));
+    const champEcheance = screen.getByLabelText(/^date d'échéance$/i) as HTMLInputElement;
+    expect(champEcheance.value).toBe("2025-12-31"); // la suggestion s'est bien posée au départ
+    fireEvent.change(champEcheance, { target: { value: "2025-06-15" } });
+    expect(champEcheance.value).toBe("2025-06-15"); // la saisie manuelle prime, aucune reprise de la suggestion
+  });
+
   it("« Supprimer » retire l'entrée exacte, sans toucher aux autres", () => {
     const onModifierProfil = rendre(
       profilAvecOuverture({

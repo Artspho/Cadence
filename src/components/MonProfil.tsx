@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { franceTravailConfig, joursDepuisDerniereVerification } from "../config/franceTravailConfig";
 import { formaterDateLisible } from "../lib/dateLisible";
 import { EMAIL_FEEDBACK, construireLienFeedback } from "../config/contact";
@@ -6,6 +6,7 @@ import { profilHorsPerimetre, regimeEffectif } from "../lib/profilHorsPerimetre"
 import { CONTRADICTION_HORS_A10 } from "../content/contradictionHorsA10";
 import { validerCoherenceProfil } from "../lib/coherenceProfil";
 import { estSaisieNegative } from "../lib/saisieNombrePositif";
+import { ajouterJours } from "../engine/dateUtils";
 import type { ResultatEcritureProfil } from "../lib/coherenceProfil";
 import type { Contrat, PeriodeAssimilee, Profil } from "../types";
 import { PeriodeForm } from "./PeriodeForm";
@@ -147,6 +148,11 @@ export function MonProfil({
                 <button
                   onClick={() => {
                     setSituation("readmission");
+                    // Une réadmission SANS date anniversaire connue est bloquée à la validation
+                    // (validerCoherenceProfil) — la case "je ne sais pas" ci-contre n'est donc jamais
+                    // proposée dans ce cas. Reforcer `true` ici évite l'impasse pour qui l'avait
+                    // cochée en "Première admission" avant de changer d'avis.
+                    setDateAnniversaireConnue(true);
                     reinitialiserConfirmation();
                   }}
                   className={`flex-1 rounded-lg border px-3 py-2 text-sm text-left transition-colors ${situation === "readmission" ? "border-mint bg-mint/10" : "border-line bg-surface-2"}`}
@@ -164,17 +170,22 @@ export function MonProfil({
             </div>
             <div>
               <span className="block text-xs uppercase tracking-[.03em] text-muted mb-2">Date anniversaire (fin de tes derniers droits ouverts)</span>
-              <label className="flex items-center gap-2 text-sm text-muted mb-2">
-                <input
-                  type="checkbox"
-                  checked={!dateAnniversaireConnue}
-                  onChange={(e) => {
-                    setDateAnniversaireConnue(!e.target.checked);
-                    reinitialiserConfirmation();
-                  }}
-                />
-                Je ne connais pas ma date anniversaire
-              </label>
+              {/* Case masquée en réadmission, pas seulement désactivée : une réadmission sans cette
+                  date est bloquée à la validation (coherenceProfil.ts) — autant ne jamais montrer un
+                  choix qui mène droit à une impasse. */}
+              {situation !== "readmission" && (
+                <label className="flex items-center gap-2 text-sm text-muted mb-2">
+                  <input
+                    type="checkbox"
+                    checked={!dateAnniversaireConnue}
+                    onChange={(e) => {
+                      setDateAnniversaireConnue(!e.target.checked);
+                      reinitialiserConfirmation();
+                    }}
+                  />
+                  Je ne connais pas ma date anniversaire
+                </label>
+              )}
               {dateAnniversaireConnue && (
                 <input
                   type="date"
@@ -761,6 +772,24 @@ function GestionTauxPAS({ profil, onModifierProfil }: { profil: Profil; onModifi
   );
 }
 
+/**
+ * Suggère la date d'échéance du PROCHAIN cycle passé à saisir (le plus ancien pas encore connu) —
+ * jamais imposée, juste pré-remplie dans un champ qui reste modifiable (devoir n°2 : une suggestion
+ * n'est pas un fait). Toujours enchaîné (confirmé par Benoît le 07/08/2026) : un cycle se termine la
+ * veille du jour où le suivant commence, donc l'échéance du cycle qu'on s'apprête à ajouter est
+ * l'ouverture du plus ancien cycle déjà connu, moins un jour — ou `dateAnniversairePrecedente`
+ * elle-même si aucun cycle n'est encore saisi (elle EST déjà cette échéance, par définition).
+ *
+ * Ne déduit jamais la date d'OUVERTURE : elle dépend de la durée réelle du cycle (12 mois ? clause de
+ * rattrapage à 6 mois ?), que rien ici ne permet de connaître — c'est justement ce que cet historique
+ * existe pour capturer plutôt que d'approximer.
+ */
+function suggererDateEcheanceHistorique(historique: { dateOuverture: string; dateEcheance: string }[], dateAnniversairePrecedente: string | undefined): string {
+  if (historique.length === 0) return dateAnniversairePrecedente ?? "";
+  const plusAncienneOuverture = historique.reduce((min, h) => (h.dateOuverture < min ? h.dateOuverture : min), historique[0].dateOuverture);
+  return ajouterJours(plusAncienneOuverture, -1);
+}
+
 // Historique des ouvertures de droits ANTÉRIEURES à celle en cours (07/08/2026, idée de Benoît) —
 // même pattern que GestionAjReelle/GestionTauxPAS ci-dessus, mais purement optionnel : sans lui,
 // `engine/cycles.ts` reconstruit les vieux cycles par soustraction calendaire de 12 mois comme avant
@@ -773,8 +802,15 @@ function GestionHistoriqueOuvertureDroits({ profil, onModifierProfil }: { profil
   // Le plus récent d'abord à l'écran (demande explicite de Benoît) — le stockage, lui, reste trié
   // croissant par `dateEcheance` (même convention que ajReelleHistorique/tauxPrelevementSourceHistorique).
   const historiqueAffiche = [...historique].sort((a, b) => b.dateEcheance.localeCompare(a.dateEcheance));
+  const suggestionEcheance = suggererDateEcheanceHistorique(historique, profil.dateAnniversairePrecedente);
   const [dateOuverture, setDateOuverture] = useState("");
-  const [dateEcheance, setDateEcheance] = useState("");
+  const [dateEcheance, setDateEcheance] = useState(suggestionEcheance);
+  // Repropose la suggestion après chaque ajout (le champ vient d'être vidé) ou si l'historique change
+  // sous nos pieds (import IA, suppression) — jamais si l'utilisateur est déjà en train d'y taper autre
+  // chose, pour ne pas écraser une saisie en cours.
+  useEffect(() => {
+    setDateEcheance((actuelle) => (actuelle === "" ? suggestionEcheance : actuelle));
+  }, [suggestionEcheance]);
 
   function ajouter() {
     if (!dateOuverture || !dateEcheance) return;
@@ -795,6 +831,9 @@ function GestionHistoriqueOuvertureDroits({ profil, onModifierProfil }: { profil
         <p className="text-xs text-faint mt-1">
           Optionnel : ajoute une ancienne notification d'admission (date d'ouverture et date d'échéance) pour que l'onglet « Historique » reconstruise ce cycle avec ses vraies dates plutôt qu'une
           approximation.
+        </p>
+        <p className="text-xs text-faint mt-1">
+          Ajoute-les en partant du plus récent : la date d'échéance se pré-remplit toute seule (un cycle se termine la veille du suivant) — vérifie-la, elle reste modifiable.
         </p>
       </div>
 

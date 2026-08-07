@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { validerCoherenceProfil } from "../lib/coherenceProfil";
 import { DateNaissanceInput } from "./DateNaissanceInput";
+import { ouvrirMesCourriers } from "./OuvrirEspacePersonnelFT";
 import type { Profil } from "../types";
 
 interface OnboardingProps {
@@ -61,7 +62,10 @@ export function Onboarding({ onTerminer, onRestaurerSauvegarde, erreurImport, se
       <div className="mb-8 text-center">
         <span className="inline-block w-10 h-10 rounded-xl bg-gradient-to-br from-mint to-teal mb-4" aria-hidden />
         <h1 className="font-display text-2xl font-semibold tracking-tight">Bienvenue sur Cadence</h1>
-        <p className="text-muted mt-2">Quelques informations pour estimer où tu en es dans tes droits Annexe 10.</p>
+        <p className="text-muted mt-2">
+          Pour bien suivre tes heures et savoir où tu en es de tes 507 h, Cadence a besoin de deux repères : ta date anniversaire, et si tu as déjà eu des droits, la date à laquelle ils se sont
+          terminés.
+        </p>
       </div>
 
       {/* Chemin de récupération (devoir sacré n°1), point 23 de docs/critique_2026-08-03.md. Placé
@@ -104,7 +108,14 @@ export function Onboarding({ onTerminer, onRestaurerSauvegarde, erreurImport, se
               Première admission
             </button>
             <button
-              onClick={() => setSituation("readmission")}
+              onClick={() => {
+                setSituation("readmission");
+                // Une réadmission SANS date anniversaire connue est bloquée à la validation
+                // (validerCoherenceProfil) — la case "je ne sais pas" ci-dessous n'est donc jamais
+                // proposée dans ce cas (cf. juste en dessous). Reforcer `true` ici évite l'impasse
+                // pour qui l'avait cochée en "Première admission" avant de changer d'avis.
+                setDateAnniversaireConnue(true);
+              }}
               className={`flex-1 rounded-lg border px-3 py-2 text-sm text-left transition-colors ${situation === "readmission" ? "border-mint bg-mint/10" : "border-line bg-surface-2"}`}
             >
               Réadmission
@@ -112,12 +123,34 @@ export function Onboarding({ onTerminer, onRestaurerSauvegarde, erreurImport, se
           </div>
         </div>
 
+        {/* Petit lien de commodité (07/08/2026, demande de Benoît) : pas un import IA en direct — ce
+            pipeline a besoin d'un profil et d'une session déjà en place, ni l'un ni l'autre n'existe
+            encore à ce stade. Juste de quoi retrouver la notification papier sans quitter l'app avant
+            même d'avoir un compte, cf. OuvrirEspacePersonnelFT.tsx pour la même règle FranceConnect
+            (jamais d'iframe, un vrai nouvel onglet). */}
+        <div className="bg-surface-2 border border-line rounded-lg px-4 py-3">
+          <p className="text-xs text-faint leading-relaxed">
+            Ces dates figurent sur ta notification d'admission France Travail. Si tu ne l'as plus sous la main,{" "}
+            <button type="button" onClick={ouvrirMesCourriers} className="text-mint hover:underline">
+              retrouve-la dans tes courriers France Travail (nouvel onglet)
+            </button>
+            . L'import automatique par IA, lui, se fait plus tard, une fois connecté (onglet « Import PDF »).
+          </p>
+        </div>
+
         <div>
           <span className="block text-xs uppercase tracking-[.03em] text-muted mb-2">Date anniversaire (fin de tes derniers droits ouverts)</span>
-          <label className="flex items-center gap-2 text-sm text-muted mb-2">
-            <input type="checkbox" checked={!dateAnniversaireConnue} onChange={(e) => setDateAnniversaireConnue(!e.target.checked)} />
-            Je ne connais pas encore ma date anniversaire
-          </label>
+          <p className="text-xs text-faint mb-2">C'est la date à laquelle ton compteur de 507 h repart à zéro — le repère dont Cadence a besoin pour suivre tes heures correctement.</p>
+          {/* Case masquée en réadmission, pas seulement désactivée : une réadmission sans cette date
+              est bloquée à la validation (coherenceProfil.ts) — autant ne jamais montrer un choix qui
+              mène droit à une impasse. Reste proposée en première admission, cas sain où l'anniversaire
+              n'existe simplement pas encore. */}
+          {situation !== "readmission" && (
+            <label className="flex items-center gap-2 text-sm text-muted mb-2">
+              <input type="checkbox" checked={!dateAnniversaireConnue} onChange={(e) => setDateAnniversaireConnue(!e.target.checked)} />
+              Je ne connais pas encore ma date anniversaire
+            </label>
+          )}
           {dateAnniversaireConnue && (
             <input
               type="date"

@@ -114,10 +114,14 @@ describe("RevueExtraction — écraser une valeur de profil déjà saisie exige 
   });
 });
 
-// 07/08/2026 (idée de Benoît) : quand le document décrit une admission probablement DIFFÉRENTE
-// (écart de dates > 12 mois) plutôt qu'une correction de l'admission en cours, une troisième option
-// apparaît à côté de « Remplacer »/« Garder mes valeurs actuelles ».
-describe("RevueExtraction — proposer d'ajouter à l'historique quand l'admission semble différente", () => {
+// 07/08/2026, revu le même jour (fiabilité plutôt que commodité, à la demande de Benoît) : quand le
+// document décrit une admission probablement DIFFÉRENTE (écart de dates > 12 mois), l'écran ne
+// propose plus RIEN à appliquer en un clic — ni « Remplacer » (écraserait l'ouverture EN COURS avec
+// les données d'une autre admission), ni la troisième option « Ajouter à l'historique » qui existait
+// avant ce correctif (elle ajoutait toujours une entrée NEUVE sans la comparer à l'historique déjà
+// présent — un risque de doublon en cas de réimport du même document). Seule la saisie manuelle dans
+// « Mon profil » reste possible pour ces cas.
+describe("RevueExtraction — admission qui semble différente : non_applicable, jamais un écrasement en un clic", () => {
   const resultat: ExtractionResult = {
     typeDocumentDetecte: "notification_admission",
     propositions: [
@@ -133,7 +137,7 @@ describe("RevueExtraction — proposer d'ajouter à l'historique quand l'admissi
   };
   const profilAvecOuverture = profil({ ouvertureDroits: { dateOuverture: "2026-02-01", franchiseCPTotale: 12, delaiAttenteInitial: 7 } });
 
-  it("affiche les trois options : Remplacer, Ajouter à l'historique, Garder mes valeurs actuelles", () => {
+  it("n'affiche ni « Remplacer » ni « Ajouter à l'historique », seulement un renvoi vers la saisie manuelle", () => {
     render(
       <RevueExtraction
         resultat={resultat}
@@ -145,30 +149,10 @@ describe("RevueExtraction — proposer d'ajouter à l'historique quand l'admissi
         onModifierProfil={vi.fn(() => ({ ok: true, profil: profilAvecOuverture }))}
       />
     );
-    expect(screen.getByRole("button", { name: /remplacer par les valeurs du document/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /ajouter à l'historique des ouvertures précédentes/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /garder mes valeurs actuelles/i })).toBeInTheDocument();
-  });
-
-  it("« Ajouter à l'historique » écrit historiqueOuvertureDroits SANS toucher à ouvertureDroits (l'ouverture en cours reste intacte)", () => {
-    const onModifierProfil = vi.fn((_candidat: Profil) => ({ ok: true as const, profil: profilAvecOuverture }));
-    render(
-      <RevueExtraction
-        resultat={resultat}
-        profil={profilAvecOuverture}
-        config={franceTravailConfig}
-        decompteActuel={DECOMPTE}
-        onAjouterContrat={vi.fn()}
-        onAjouterPeriode={vi.fn()}
-        onModifierProfil={onModifierProfil}
-      />
-    );
-    fireEvent.click(screen.getByRole("button", { name: /ajouter à l'historique des ouvertures précédentes/i }));
-
-    expect(onModifierProfil).toHaveBeenCalledTimes(1);
-    const candidat = onModifierProfil.mock.calls[0][0];
-    expect(candidat.historiqueOuvertureDroits).toEqual([{ dateOuverture: "2023-02-01", dateEcheance: "2024-01-31" }]);
-    expect(candidat.ouvertureDroits).toEqual(profilAvecOuverture.ouvertureDroits); // inchangé
+    expect(screen.queryByRole("button", { name: /remplacer par les valeurs du document/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /ajouter à l'historique/i })).not.toBeInTheDocument();
+    expect(screen.getByText(/admission.*différente/i)).toBeInTheDocument();
+    expect(screen.getByText(/mon profil/i)).toBeInTheDocument();
   });
 });
 
