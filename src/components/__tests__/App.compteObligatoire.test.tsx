@@ -12,7 +12,7 @@
 // avant ce chantier.
 import "@testing-library/jest-dom/vitest";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { CLE_STOCKAGE } from "../../storage/localStorageAdapter";
 
 /**
@@ -135,16 +135,16 @@ describe("App — une fois connecté, l'app entière redevient accessible", () =
 
   it("s'ouvre et affiche les données locales", async () => {
     render(<App />);
-    expect(await screen.findByRole("navigation", { name: /navigation principale/i })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Contrats" }));
+    const nav = await screen.findByRole("navigation", { name: /navigation principale/i });
+    fireEvent.click(within(nav).getByRole("button", { name: "Contrats" }));
     expect(await screen.findByText(/Orchestre Sous Compte/)).toBeInTheDocument();
   });
 
   it("tous les onglets restent atteignables, aucun mur résiduel à l'intérieur", async () => {
     render(<App />);
-    await screen.findByRole("navigation", { name: /navigation principale/i });
+    const nav = await screen.findByRole("navigation", { name: /navigation principale/i });
     for (const onglet of ["Tableau de bord", "Mon profil", "Contrats", "Import PDF", "Historique", "Simulateur", "Revenus mensuels", "Frais pro"]) {
-      fireEvent.click(screen.getByRole("button", { name: onglet }));
+      fireEvent.click(within(nav).getByRole("button", { name: onglet }));
       expect(screen.queryByLabelText(/adresse e-mail/i)).not.toBeInTheDocument();
       await act(async () => {});
     }
@@ -152,8 +152,8 @@ describe("App — une fois connecté, l'app entière redevient accessible", () =
 
   it("la section Compte affiche l'e-mail connecté", async () => {
     render(<App />);
-    await screen.findByRole("navigation", { name: /navigation principale/i });
-    fireEvent.click(screen.getByRole("button", { name: "Mon profil" }));
+    const nav = await screen.findByRole("navigation", { name: /navigation principale/i });
+    fireEvent.click(within(nav).getByRole("button", { name: "Mon profil" }));
     expect(await screen.findByRole("heading", { name: "Compte" })).toBeInTheDocument();
     expect(screen.getByText("benoit@example.com")).toBeInTheDocument();
   });

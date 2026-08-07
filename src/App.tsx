@@ -35,6 +35,8 @@ import { detecterAlertes } from "./engine/alertes";
 import { decouperExercices, fusionnerExercicesGeles } from "./engine/cycles";
 import { diffJours } from "./engine/dateUtils";
 import { TopBar, type Onglet } from "./components/TopBar";
+import { Sidebar } from "./components/Sidebar";
+import { BottomTabBar } from "./components/BottomTabBar";
 import { Onboarding } from "./components/Onboarding";
 import { Dashboard } from "./components/Dashboard";
 import { ContractForm } from "./components/ContractForm";
@@ -42,11 +44,12 @@ import { ContractList } from "./components/ContractList";
 import { ChecklistDocuments } from "./components/ChecklistDocuments";
 import { ImportBulletins } from "./components/ImportBulletins";
 import { ImportDocumentIA } from "./components/ImportDocumentIA";
+import type { TypeDocument } from "./storage/documentsStorage";
 import { OuvrirEspacePersonnelFT } from "./components/OuvrirEspacePersonnelFT";
 // Maquette de test de l'écran de revue IA (extractions simulées, bac à sable) — ne rend rien
 // hors développement, cf. RevueExtractionDemo.tsx.
 import { RevueExtractionDemo } from "./components/RevueExtractionDemo";
-import { AlertCenter } from "./components/AlertCenter";
+import { TiroirAlertes } from "./components/TiroirAlertes";
 import { Historique } from "./components/Historique";
 import { Simulateur } from "./components/Simulateur";
 import { MonProfil } from "./components/MonProfil";
@@ -64,6 +67,7 @@ import { validerContratsPourEcriture } from "./lib/contratUnSeulMois";
 import { validerContratsEEEPourEcriture } from "./lib/contratTerritoireEEE";
 import { BandeauStockagePlein } from "./components/BandeauStockagePlein";
 import { MonDossier } from "./components/MonDossier";
+import { ParametresSourcesEtMentions } from "./components/ParametresSourcesEtMentions";
 import { EcranConnexionObligatoire } from "./components/EcranConnexionObligatoire";
 import { EcranNouveauMotDePasse } from "./components/EcranNouveauMotDePasse";
 import { INDICE_RETOUR_LIEN, marquerReinitialisationReussie, texteAvertissementLienConnecte } from "./auth/retourLienMagique";
@@ -104,6 +108,15 @@ export default function App() {
   // serveur ne permet pas d'enregistrer.
   const [donnees, setDonneesBrut] = useState<DonneesApp | null>(null);
   const [onglet, setOnglet] = useState<Onglet>("dashboard");
+  /**
+   * Type de document suggéré depuis la checklist (« Importer ce document »), pour préremplir le
+   * bandeau contextuel et le sélecteur de type de `ImportDocumentIA`. État purement UI — jamais
+   * `setDonnees` — remis à zéro dès qu'on quitte l'onglet import, pour ne pas afficher un contexte
+   * périmé au retour.
+   */
+  const [typeDocumentSuggere, setTypeDocumentSuggere] = useState<TypeDocument | null>(null);
+  /** État purement UI, jamais lié à `donnees`/`ecritureAutorisee` (cf. TiroirAlertes.tsx). */
+  const [tiroirAlertesOuvert, setTiroirAlertesOuvert] = useState(false);
   const [erreurImport, setErreurImport] = useState<string | null>(null);
   const [fichierEnAttenteImport, setFichierEnAttenteImport] = useState<File | null>(null);
   const [importEnCours, setImportEnCours] = useState(false);
@@ -161,6 +174,13 @@ export default function App() {
   // `auth/retourLienMagique.ts` — `indiceRetour.present` reste vrai même quand tout a fonctionné).
   const avertissementLien = reinitialisationFaite ? null : texteAvertissementLienConnecte(indiceRetour);
   const inputImportRef = useRef<HTMLInputElement>(null);
+
+  // Contexte périmé sinon : rester correct quel que soit le chemin de sortie de l'onglet import
+  // (bouton de nav, redirection depuis un bandeau, etc.), sans avoir à le remettre à zéro à chaque
+  // site d'appel de `setOnglet`.
+  useEffect(() => {
+    if (onglet !== "import") setTypeDocumentSuggere(null);
+  }, [onglet]);
 
   useEffect(() => {
     chargerDonnees().then((resultat) => {
@@ -829,13 +849,20 @@ export default function App() {
   const perimetre = profilHorsPerimetre(profil);
   const contradictionHorsA10 = perimetre.motif === "salaires_hors_a10_contradictoires";
   const bandeauContradiction = contradictionHorsA10 ? <AvertissementContradictionHorsA10 onAllerVersProfil={() => setOnglet("profil")} /> : null;
-  // Le tableau de bord est le seul écran où le centre d'alertes et le bandeau coexistent : sans ce
-  // filtrage, la contradiction y serait écrite deux fois de suite (cf. lib/alertesAffichage.ts).
-  // L'alerte reste comptée par AlertCenterResume ci-dessous, sur tous les onglets.
-  const centreAlertes = centreAlertesPourEcran(calculs?.alertes ?? [], contradictionHorsA10);
+  // Même correction que DashboardVide, l'autre bout du faux signal : sans contrat, les alertes
+  // prédictives (ex. « rythme insuffisant ») ne veulent rien dire pour un compte neuf. Alimente à la
+  // fois le badge-résumé et le tiroir — une seule liste, jamais recalculée différemment pour l'un ou
+  // l'autre.
+  const alertesPourResume = dashboardEstVide(donnees.contrats) && !profilHorsPerimetre(profil).horsPerimetre ? [] : (calculs?.alertes ?? []);
+  // `bandeauContradiction` est rendu sur quatre onglets (dashboard, historique, simulateur, revenus)
+  // — le tiroir s'ouvrant lui depuis N'IMPORTE LEQUEL, le dédoublonnage doit suivre l'onglet courant,
+  // pas rester câblé sur le seul dashboard comme à l'époque de l'affichage en ligne (cf.
+  // lib/alertesAffichage.ts, dont la doc décrit le cas d'origine, ici généralisé).
+  const bandeauContradictionVisibleIci = contradictionHorsA10 && ["dashboard", "historique", "simulateur", "revenus"].includes(onglet);
+  const centreAlertesPourTiroir = centreAlertesPourEcran(alertesPourResume, bandeauContradictionVisibleIci);
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen flex flex-col">
       {/* Point n°2 de la critique : une écriture qui échoue (stockage plein, navigation privée) ne
           disparaît plus dans la console — et depuis le 04/08/2026 le bandeau permet d'AGIR sans quitter
           l'écran : export immédiat, occupation réelle mesurée clé par clé, suppression de la copie de
@@ -882,32 +909,24 @@ export default function App() {
           </button>
         </div>
       )}
-      <TopBar
-        ongletActif={onglet}
-        onChangerOnglet={setOnglet}
-        periodeLabel={profil.dateAnniversaire ? `Cycle → ${profil.dateAnniversaire}` : "Première admission"}
-      />
+      <div className="flex-1 md:flex min-h-0">
+        <Sidebar ongletActif={onglet} onChangerOnglet={setOnglet} onExporter={exporter} onImporter={() => inputImportRef.current?.click()} />
 
-      <main className="max-w-[1040px] mx-auto px-6 py-8 space-y-6">
-        <div className="flex items-center justify-between flex-wrap gap-2">
-          {/* Même correction que DashboardVide, l'autre bout du faux signal : sans contrat, les
-              alertes prédictives (ex. "rythme insuffisant") ne veulent rien dire pour un compte
-              neuf. On ne les fait pas fuiter via ce chip, visible sur tous les onglets. L'alerte
-              "situation_mixte" reste affichée dans tous les cas : elle est vraie indépendamment
-              du nombre de contrats. */}
-          <AlertCenterResume alertes={dashboardEstVide(donnees.contrats) && !profilHorsPerimetre(profil).horsPerimetre ? [] : (calculs?.alertes ?? [])} />
-          <div className="flex items-center gap-2 text-xs">
-            <button onClick={exporter} className="px-3 py-1.5 rounded-full border border-line text-muted hover:text-ink transition-colors">
-              Exporter mes données (JSON)
-            </button>
-            <button onClick={() => inputImportRef.current?.click()} className="px-3 py-1.5 rounded-full border border-line text-muted hover:text-ink transition-colors">
-              Importer
-            </button>
-          </div>
-        </div>
-        {erreurImport && <p className="text-sm text-red">{erreurImport}</p>}
+        <div className="flex-1 min-w-0 flex flex-col">
+          <TopBar onChangerOnglet={setOnglet} periodeLabel={profil.dateAnniversaire ? `Cycle → ${profil.dateAnniversaire}` : "Première admission"} session={session} />
 
-        {machinerieImport}
+          <main className="max-w-[1040px] mx-auto px-6 py-8 space-y-6 w-full pb-24 md:pb-8">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              {/* Même correction que DashboardVide, l'autre bout du faux signal : sans contrat, les
+                  alertes prédictives (ex. "rythme insuffisant") ne veulent rien dire pour un compte
+                  neuf. On ne les fait pas fuiter via ce chip, visible sur tous les onglets. L'alerte
+                  "situation_mixte" reste affichée dans tous les cas : elle est vraie indépendamment
+                  du nombre de contrats. Cliquable : ouvre le tiroir d'alertes (TiroirAlertes.tsx). */}
+              <AlertCenterResume alertes={alertesPourResume} onClick={() => setTiroirAlertesOuvert(true)} />
+            </div>
+            {erreurImport && <p className="text-sm text-red">{erreurImport}</p>}
+
+            {machinerieImport}
 
         {onglet === "dashboard" &&
           calculs &&
@@ -917,7 +936,6 @@ export default function App() {
             <DashboardVide onAllerVersContrats={() => setOnglet("contrats")} />
           ) : (
             <>
-              {centreAlertes.afficherCentre && <AlertCenter alertes={centreAlertes.alertes} />}
               {bandeauContradiction}
               <Dashboard
                 montantsNonFiables={contradictionHorsA10}
@@ -963,7 +981,14 @@ export default function App() {
                 quel document aller chercher précède le fait d'en déposer un, et cette information
                 est NEUTRE au canal — une saisie manuelle éteint un manque exactement comme un import
                 (cf. lib/documentsRequis.ts, qui ne lit que les données enregistrées). */}
-            <ChecklistDocuments profil={profil} contrats={donnees.contrats} />
+            <ChecklistDocuments
+              profil={profil}
+              contrats={donnees.contrats}
+              onDemanderImport={(type) => {
+                setOnglet("import");
+                setTypeDocumentSuggere(type);
+              }}
+            />
 
             {/* Parcours en deux temps, rendu explicite par la numérotation des deux titres : avec
                 l'arrivée d'un second bouton de redirection (§ci-dessous), un bloc unique aurait mêlé
@@ -994,6 +1019,7 @@ export default function App() {
                     onAjouterPeriode={ajouterPeriode}
                     onModifierProfil={modifierProfil}
                     onModifierContrat={modifierContrat}
+                    typeSuggere={typeDocumentSuggere}
                   />
                 </div>
               </div>
@@ -1075,6 +1101,7 @@ export default function App() {
             session={session}
             etatEnregistrement={etatEnregistrement}
             donnees={donnees}
+            onNaviguerVersParametres={() => setOnglet("parametres")}
           />
         )}
 
@@ -1091,19 +1118,33 @@ export default function App() {
         )}
 
         {onglet === "dossier" && <MonDossier />}
-      </main>
+
+            {onglet === "parametres" && <ParametresSourcesEtMentions />}
+          </main>
+        </div>
+      </div>
+
+      <BottomTabBar ongletActif={onglet} onChangerOnglet={setOnglet} onExporter={exporter} onImporter={() => inputImportRef.current?.click()} />
+
+      <TiroirAlertes
+        ouvert={tiroirAlertesOuvert}
+        onFermer={() => setTiroirAlertesOuvert(false)}
+        alertes={centreAlertesPourTiroir.alertes}
+        masqueeParBandeauContradiction={!centreAlertesPourTiroir.afficherCentre}
+      />
     </div>
   );
 }
 
-function AlertCenterResume({ alertes }: { alertes: { niveau: string }[] }) {
+/** Rien à ouvrir sans alerte : reste un `<span>` inerte, jamais un bouton qui ouvrirait un tiroir vide. */
+function AlertCenterResume({ alertes, onClick }: { alertes: { niveau: string }[]; onClick: () => void }) {
   if (alertes.length === 0) return <span />;
   const critiques = alertes.filter((a) => a.niveau === "critique").length;
   const attentions = alertes.filter((a) => a.niveau === "attention").length;
   return (
-    <div className="flex items-center gap-2 text-xs text-muted">
+    <button type="button" onClick={onClick} className="flex items-center gap-2 text-xs text-muted hover:text-ink transition-colors" aria-haspopup="dialog" aria-label="Voir le détail des alertes">
       {critiques > 0 && <span className="text-red">{critiques} alerte(s) critique(s)</span>}
       {attentions > 0 && <span className="text-amber">{attentions} à surveiller</span>}
-    </div>
+    </button>
   );
 }
