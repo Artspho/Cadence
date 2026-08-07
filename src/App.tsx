@@ -25,7 +25,6 @@ import { DecisionServeur, type BasculeADecider } from "./components/DecisionServ
 import { BandeauLectureSeule } from "./components/BandeauLectureSeule";
 import { BandeauEchecEnregistrement } from "./components/BandeauEchecEnregistrement";
 import { telechargerTexte } from "./lib/telechargement";
-import { formaterMoisAnnee } from "./lib/dateLisible";
 import { calculerFenetreEnCours } from "./engine/periodeReference";
 import { calculerDecompteHeures } from "./engine/decompteHeures";
 import { calculerSalaireReference } from "./engine/salaireReference";
@@ -921,16 +920,7 @@ export default function App() {
         <Sidebar ongletActif={onglet} onChangerOnglet={setOnglet} onExporter={exporter} onImporter={() => inputImportRef.current?.click()} session={session} />
 
         <div className="flex-1 min-w-0 flex flex-col">
-          <TopBar
-            onChangerOnglet={setOnglet}
-            periodeLabel={
-              profil.dateAnniversaire && calculs?.exercices[0]
-                ? `${formaterMoisAnnee(calculs.exercices[0].dateDebut)} → ${formaterMoisAnnee(profil.dateAnniversaire)}`
-                : "Première admission"
-            }
-            ongletActif={onglet}
-            session={session}
-          />
+          <TopBar onChangerOnglet={setOnglet} session={session} />
 
           <main className="max-w-[1040px] mx-auto px-6 py-8 space-y-6 w-full">
             <div className="flex items-center justify-between flex-wrap gap-2">
@@ -1065,7 +1055,7 @@ export default function App() {
           ) : (
             <div className="space-y-6">
               {bandeauContradiction}
-              <Historique exercices={calculs.exercices} onEffacerGel={viderExerciceGele} montantsNonFiables={contradictionHorsA10} />
+              <Historique exercices={calculs.exercices} seuilHeures={franceTravailConfig.seuilHeures} onEffacerGel={viderExerciceGele} montantsNonFiables={contradictionHorsA10} />
             </div>
           ))}
 

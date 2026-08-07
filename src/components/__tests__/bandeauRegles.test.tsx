@@ -24,19 +24,13 @@ const DATE_VERIFICATION_LISIBLE = formaterDateLisible(dateDerniereVerification);
 // plus rien — elles passeraient sans rien vérifier. Lire le conteneur du rendu courant supprime
 // cette dépendance.
 function rendreTopBar(): string {
-  const { container } = render(
-    <TopBar
-      onChangerOnglet={vi.fn()}
-      periodeLabel="Première admission"
-      ongletActif="dashboard"
-      session={{ statut: "connecte", utilisateurId: "u-test", email: "test@example.com" }}
-    />,
-  );
+  const { container } = render(<TopBar onChangerOnglet={vi.fn()} session={{ statut: "connecte", utilisateurId: "u-test", email: "test@example.com" }} />);
   return container.textContent ?? "";
 }
 
 /** Le bandeau réglementaire vit dans `PiedDePage.tsx` depuis le 07/08/2026 (retiré de `TopBar`, qui
- * n'en a plus que le badge de cycle). */
+ * n'a plus que l'avatar mobile depuis que le badge de cycle a lui aussi déménagé, dans l'onglet
+ * Historique). */
 function rendrePiedDePage(): string {
   const { container } = render(<PiedDePage />);
   return container.textContent ?? "";
