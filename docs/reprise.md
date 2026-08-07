@@ -8,11 +8,20 @@ Mémoire durable à consulter au démarrage : `CLAUDE.md`, `docs/SPEC.md`, `docs
 
 Deux devoirs sacrés : (1) ne jamais perdre les données ; (2) ne jamais afficher un chiffre faux (ni faux « feu vert » rassurant, ni faux « Bloqué », ni faux montant, ni fausse alerte, ni valeur sentinelle brute).
 
-État (mis à jour le **07/08/2026**) : les deux devoirs sacrés sont tenus. **1188 tests verts (91
+État (mis à jour le **07/08/2026**) : les deux devoirs sacrés sont tenus. **1199 tests verts (92
 fichiers), `tsc -b` propre sur les deux tsconfig, `tsc -p tsconfig.api.json` propre, `npm run build`
-propre.** Dernier commit : `6cd46ac`. `master` est la seule branche, working tree **propre**, et
+propre.** Dernier commit : `4c749fa`. `master` est la seule branche, working tree **propre**, et
 **tout est poussé sur `origin/master`** — poussé sur demande explicite de Benoît, jamais spontanément
 (mémoire `cadence_push_credentials.md`).
+
+🔴 **DETTE DE TEST OUVERTE (07/08/2026)** : le correctif du commit `4c749fa` (cf. juste en dessous)
+n'a été vérifié que par des tests automatisés (logique pure + composant, mocks) — **jamais dans le
+vrai navigateur avec de vraies données**. L'outil Claude in Chrome n'était pas connecté ce fil ; je
+n'ai donc pas pu reproduire moi-même le scénario réel de Benoît après correctif. **À tester avant de
+considérer ce point clos** : réimporter un document dont une date diffère de l'existant (le nouvel
+écran de confirmation ancien/nouveau doit s'afficher, jamais un écrasement direct) et réimporter un
+document sur un contrat déjà confirmé (le bouton « Vérifier et enregistrer » ne doit plus apparaître
+avant un clic explicite sur « Créer quand même un nouveau contrat »).
 
 ⚠️ **La pile technique de l'en-tête ci-dessus n'est plus exacte** : « localStorage » n'est plus la
 source de vérité depuis la phase 5 de la refonte Supabase. **Supabase (Paris, `eu-west-3`) est la
@@ -111,28 +120,35 @@ supprimer sa propre preuve. Benoît a effacé la ligne `TEST-VERIFICATION-%` dep
 
 **Ce qui reste, par ordre d'importance :**
 
-1. ⏸ **Phase 8 — 16 questions à France Travail, courrier rédigé et prêt** :
+1. 🔴 **DETTE DE TEST — vérifier en vrai le correctif « écrasement silencieux du profil » (`4c749fa`,
+   07/08/2026).** Testé uniquement en automatisé (logique pure + composant, mocks) — jamais dans le
+   vrai navigateur, faute de Claude in Chrome connecté ce fil. À faire par Benoît (ou moi une fois
+   l'outil connecté) avant de considérer le point clos : (a) réimporter un document dont une date
+   diffère de l'existant → l'écran doit montrer ancien/nouveau et attendre un clic explicite, jamais
+   écraser directement ; (b) réimporter un document sur un contrat déjà confirmé → « Vérifier et
+   enregistrer » ne doit plus apparaître avant un clic sur « Créer quand même un nouveau contrat ».
+2. ⏸ **Phase 8 — 16 questions à France Travail, courrier rédigé et prêt** :
    `docs/questions_france_travail.md`. Benoît va les poser à son conseiller. **NE RIEN CODER de
    réglementaire avant ses réponses écrites**, et les citer avec leur date — une réponse orale n'est
    pas une source. La plus grave est la question 5 (les cachets au-delà de 28 comptent-ils pour
    l'affiliation aux 507 h ?) : si la réponse est non, Cadence **surcompte** aujourd'hui un mois très
    chargé et peut afficher un faux « Sécurité ». Aucun effet sur les données de Benoît (20 cachets
    maximum), mais ça ne vaut pas pour un autre testeur.
-2. 🔴 **SMTP OVH** — cf. ci-dessus, bloqué sur l'accès de Benoît à OVH.
-3. ✅ **Réglage `Site URL`/`Redirect URLs` sur Supabase, et parcours de réinitialisation — FAITS et
+3. 🔴 **SMTP OVH** — cf. ci-dessus, bloqué sur l'accès de Benoît à OVH.
+4. ✅ **Réglage `Site URL`/`Redirect URLs` sur Supabase, et parcours de réinitialisation — FAITS et
    VÉRIFIÉS le 07/08/2026.** Cf. ci-dessus, plus rien à faire ici sauf régression.
-4. ✅ **Phase 7 — le mur hors ligne est ARBITRÉ (06/08/2026) : ON NE CHANGE RIEN.** Trois options lui
+5. ✅ **Phase 7 — le mur hors ligne est ARBITRÉ (06/08/2026) : ON NE CHANGE RIEN.** Trois options lui
    ont été présentées, il a choisi **B** (statu quo). Cadence est donc **inutilisable hors ligne
    au-delà d'une heure** — jeton expiré, rafraîchissement impossible faute de réseau, `useSession`
    rend `indetermine`, le mur s'affiche alors que les données sont dans le navigateur. **C'est assumé,
    ne pas le « réparer » spontanément.** ⬜ **Le périmètre de la phase 7 dans son ENSEMBLE reste, lui,
    non écrit** : seul ce défaut-là a été instruit et tranché.
-5. ⏸ **Point 8 — le quota par utilisateur reste à faire.** Le volet authentification est fermé
+6. ⏸ **Point 8 — le quota par utilisateur reste à faire.** Le volet authentification est fermé
    (`6cd46ac`, 07/08/2026) ; le quota, adossé à la base Supabase, est reporté sur demande explicite de
    Benoît — pas oublié, juste pas prioritaire une fois la vraie serrure posée.
-6. ⬜ **Reprendre le design** (ajouté le 07/08/2026, à préciser avec Benoît — aucun brief détaillé
+7. ⬜ **Reprendre le design** (ajouté le 07/08/2026, à préciser avec Benoît — aucun brief détaillé
    encore donné : quel écran, quel défaut, quelle inspiration).
-7. ⬜ **Définir le tarif de l'API** (ajouté le 07/08/2026) — probablement lié au point « Monétisation
+8. ⬜ **Définir le tarif de l'API** (ajouté le 07/08/2026) — probablement lié au point « Monétisation
    envisagée » déjà au backlog (`docs/SPEC.md` §11.B : 2 mois d'essai gratuit puis app payante,
    architecture délibérément non tranchée) et aux chiffres Mistral mesurés ce fil (10 $/mois inclus,
    4 $/1000 pages OCR au-delà, plafond de dépense configurable en payant) — à relier explicitement
@@ -162,7 +178,7 @@ supprimer sa propre preuve. Benoît a effacé la ligne `TEST-VERIFICATION-%` dep
 
 ---
 
-**Résumé de la session du 07/08/2026 (3 commits, `5bfa256` → `6cd46ac`, tous poussés)** :
+**Résumé de la session du 07/08/2026 (5 commits, `5bfa256` → `4c749fa`, tous poussés)** :
 1. `5bfa256` — fix : un bandeau annonçait un faux échec juste après une réinitialisation de mot de
    passe réussie (« un lien reçu par e-mail a été ouvert, mais il n'a pas modifié/ouvert de session »),
    sur le tableau de bord puis sur le mur après déconnexion. Trouvé en testant le parcours de bout en
@@ -187,8 +203,21 @@ supprimer sa propre preuve. Benoît a effacé la ligne `TEST-VERIFICATION-%` dep
    (en-têtes de débit mesurés par un appel réel, sans coût — aucune carte enregistrée) : 625 pages
    OCR/minute, budget mensuel inclus 10 $ partagé entre Studio/Vibe/API. Comptes multiples écartés
    (interdits par les CGU Mistral, risque de bannissement).
+4. `0ea3326` — docs : to do à jour (design, tarif API) et chiffres de session rattrapés.
+5. `4c749fa` — fix : **bug réel signalé par Benoît** — réimporter une notification d'admission PASSÉE
+   avait écrasé silencieusement `dateOuverture` ET `dateAnniversaire`/`dateAnniversairePrecedente`,
+   décalant la fenêtre qui borne le moteur et la période de référence (>12 mois observés), pour des
+   montants mensuels incohérents. Nouvelle fonction `statutSelonEcrasement`
+   (`lib/routageExtraction.ts`) : un écrasement de valeur DIFFÉRENTE (pas un simple remplissage de
+   champ vide) exige désormais une confirmation explicite, avec ancien/nouveau affiché
+   (`RevueExtraction.tsx`, `TableauComparaisonContrat.tsx` généralisé en `TableauComparaison.tsx`).
+   Second bug corrigé dans le même commit : réimporter un document sur un contrat déjà confirmé
+   pouvait créer un doublon (double comptage des heures/salaire) — un clic de dérogation explicite
+   est désormais requis avant que « Vérifier et enregistrer » n'apparaisse. 16 tests ajoutés. **Testé
+   uniquement en automatisé, PAS encore dans le vrai navigateur** (Claude in Chrome non connecté ce
+   fil) — dette de test tracée en tête de la section « Ce qui reste ».
 
-Au total ce fil : 9 tests ajoutés (1179 → 1188), `tsc -b`/`tsc -p tsconfig.api.json`/`npm run build`
+Au total ce fil : 25 tests ajoutés (1174 → 1199), `tsc -b`/`tsc -p tsconfig.api.json`/`npm run build`
 propres à chaque commit.
 
 Méthode de ce fil : test manuel guidé du parcours réel (changer `Site URL`, demander un e-mail de
