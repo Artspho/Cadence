@@ -24,7 +24,11 @@ const DATE_VERIFICATION_LISIBLE = formaterDateLisible(dateDerniereVerification);
 // cette dépendance.
 function rendreTopBar(): string {
   const { container } = render(
-    <TopBar ongletActif="dashboard" onChangerOnglet={vi.fn()} periodeLabel="Première admission" />,
+    <TopBar
+      onChangerOnglet={vi.fn()}
+      periodeLabel="Première admission"
+      session={{ statut: "connecte", utilisateurId: "u-test", email: "test@example.com" }}
+    />,
   );
   return container.textContent ?? "";
 }
