@@ -74,12 +74,14 @@ const DOC_FRAIS_A = {
   cree_le: "2026-08-06T10:00:00.000Z",
 };
 
-function fauxClientDocuments(lignes: Record<string, unknown>[] = [DOC_A]): ClientDocuments {
+/** `erreurSuppression` : injecte un échec sur `.delete().eq(...)`, sans toucher aux autres chaînes. */
+function fauxClientDocuments(lignes: Record<string, unknown>[] = [DOC_A], erreurSuppression: { message: string } | null = null): ClientDocuments {
   const order = vi.fn(async () => ({ data: lignes, error: null }));
   const eq = vi.fn(() => ({ order }));
   const select = vi.fn(() => ({ eq }));
   const update = vi.fn(() => ({ eq: vi.fn(async () => ({ data: [{ id: "doc-1" }], error: null })) }));
-  return { from: vi.fn(() => ({ select, insert: vi.fn(), update })) } as unknown as ClientDocuments;
+  const deleteFn = vi.fn(() => ({ eq: vi.fn(async () => ({ data: null, error: erreurSuppression })) }));
+  return { from: vi.fn(() => ({ select, insert: vi.fn(), update, delete: deleteFn })) } as unknown as ClientDocuments;
 }
 
 function fauxClientFichiers(): ClientFichiers {
@@ -152,6 +154,51 @@ describe("MonDossier — connecté", () => {
     // repliable — le cibler par son rôle évite de confondre avec les <option> du sélecteur, qui
     // portent aussi le mot « Attestation ».
     expect(screen.getByRole("button", { name: /Attestation CPAM/ })).toBeInTheDocument();
+  });
+});
+
+describe("MonDossier — supprimer un document (07/08/2026)", () => {
+  it("un seul clic ne supprime rien : demande d'abord confirmation", async () => {
+    const fichiers = fauxClientFichiers();
+    render(<MonDossier clientAuth={CONNECTE} clientDocuments={fauxClientDocuments()} clientFichiers={fichiers} />);
+    fireEvent.click(await screen.findByRole("button", { name: /supprimer « bulletin\.pdf »/i }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(/supprimer définitivement ce document/i);
+    expect(fichiers.remove).not.toHaveBeenCalled();
+    expect(screen.getByText("bulletin.pdf")).toBeInTheDocument();
+  });
+
+  it("« Annuler » referme la confirmation sans rien supprimer", async () => {
+    const fichiers = fauxClientFichiers();
+    render(<MonDossier clientAuth={CONNECTE} clientDocuments={fauxClientDocuments()} clientFichiers={fichiers} />);
+    fireEvent.click(await screen.findByRole("button", { name: /supprimer « bulletin\.pdf »/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /^annuler$/i }));
+    expect(screen.queryByText(/supprimer définitivement ce document/i)).not.toBeInTheDocument();
+    expect(fichiers.remove).not.toHaveBeenCalled();
+    expect(screen.getByText("bulletin.pdf")).toBeInTheDocument();
+  });
+
+  it("confirmer supprime la LIGNE puis le FICHIER, et retire le document de l'écran", async () => {
+    const documents = fauxClientDocuments();
+    const fichiers = fauxClientFichiers();
+    render(<MonDossier clientAuth={CONNECTE} clientDocuments={documents} clientFichiers={fichiers} />);
+    fireEvent.click(await screen.findByRole("button", { name: /supprimer « bulletin\.pdf »/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /confirmer la suppression/i }));
+
+    await waitFor(() => expect(fichiers.remove).toHaveBeenCalledWith(["u-42/2026/aem_bulletin/x-bulletin.pdf"]));
+    expect(screen.queryByText("bulletin.pdf")).not.toBeInTheDocument();
+    expect(screen.getByText(/aucun document pour l'instant/i)).toBeInTheDocument();
+  });
+
+  it("un échec de suppression le DIT, et garde le document affiché — jamais un succès muet", async () => {
+    const documents = fauxClientDocuments([DOC_A], { message: "réseau interrompu" });
+    const fichiers = fauxClientFichiers();
+    render(<MonDossier clientAuth={CONNECTE} clientDocuments={documents} clientFichiers={fichiers} />);
+    fireEvent.click(await screen.findByRole("button", { name: /supprimer « bulletin\.pdf »/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /confirmer la suppression/i }));
+
+    expect(await screen.findByText(/réseau interrompu/i)).toBeInTheDocument();
+    expect(fichiers.remove).not.toHaveBeenCalled();
+    expect(screen.getByText("bulletin.pdf")).toBeInTheDocument();
   });
 });
 

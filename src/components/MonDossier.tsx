@@ -6,14 +6,17 @@
  * d'import (commits 4 et 5) et des frais réels (commit 6). Ce commit-ci construit l'écran qui les
  * rendra visibles, et sert de preuve à l'écran pour la fondation du commit 2.
  *
- * Le SEUL geste d'écriture de cet écran : « corriger le type » — le filet promis à Benoît si l'IA
- * se trompe sur un type rarement testé (ex. `attestation_cpam`, sans spécimen réel pour l'instant).
+ * Deux gestes d'écriture sur cet écran : « corriger le type » — le filet promis à Benoît si l'IA se
+ * trompe sur un type rarement testé (ex. `attestation_cpam`, sans spécimen réel pour l'instant) — et
+ * « supprimer » (07/08/2026, `supprimerDocument` existait déjà dans `documentsStorage.ts` mais
+ * n'était branché à aucun bouton). Suppression à deux clics, jamais en un clic : ce document est une
+ * source, pas une donnée re-saisissable comme un contrat.
  */
 
 import { useEffect, useMemo, useState } from "react";
 import { obtenirClientAuth, obtenirClientDocuments, obtenirClientFichiers, type ClientAuth, type ClientDocuments, type ClientFichiers } from "../auth/supabaseClient";
 import { useSession } from "../auth/session";
-import { corrigerTypeDocument, listerDocuments, obtenirUrlTelechargement, type LigneDocument, type TypeDocument } from "../storage/documentsStorage";
+import { corrigerTypeDocument, listerDocuments, obtenirUrlTelechargement, supprimerDocument, type LigneDocument, type TypeDocument } from "../storage/documentsStorage";
 import { formaterTaille } from "../lib/capaciteStockage";
 import { horodatagePourNomFichier, telechargerBlob, telechargerDepuisUrl } from "../lib/telechargement";
 import { LIBELLES_TYPE_DOCUMENT, TYPES_DOCUMENT_ORDONNES } from "../content/typeDocumentLabels";
@@ -151,16 +154,38 @@ function LigneDocumentAffichee({
   clientFichiers,
   clientDocuments,
   onTypeCorrige,
+  onSupprime,
 }: {
   document: LigneDocument;
   clientFichiers: ClientFichiers;
   clientDocuments: ClientDocuments;
   onTypeCorrige: (id: string, nouveauType: TypeDocument) => void;
+  onSupprime: (id: string) => void;
 }) {
   const [telechargementEnCours, setTelechargementEnCours] = useState(false);
   const [erreurTelechargement, setErreurTelechargement] = useState<string | null>(null);
   const [correctionEnCours, setCorrectionEnCours] = useState(false);
   const [erreurCorrection, setErreurCorrection] = useState<string | null>(null);
+  // Premier clic : demande confirmation, jamais une suppression en un clic (devoir n°1 — ce document
+  // est une source, pas une donnée re-saisissable comme un contrat). Second clic : supprime pour de bon.
+  const [confirmationSuppression, setConfirmationSuppression] = useState(false);
+  const [suppressionEnCours, setSuppressionEnCours] = useState(false);
+  const [erreurSuppression, setErreurSuppression] = useState<string | null>(null);
+
+  async function supprimer() {
+    setSuppressionEnCours(true);
+    setErreurSuppression(null);
+    try {
+      const resultat = await supprimerDocument(clientFichiers, clientDocuments, { id: document.id, cheminStockage: document.cheminStockage });
+      if (resultat.ok) onSupprime(document.id);
+      else {
+        setErreurSuppression(resultat.message);
+        setConfirmationSuppression(false);
+      }
+    } finally {
+      setSuppressionEnCours(false);
+    }
+  }
 
   async function telecharger() {
     setTelechargementEnCours(true);
@@ -196,6 +221,24 @@ function LigneDocumentAffichee({
             {erreurCorrection}
           </p>
         )}
+        {erreurSuppression !== null && (
+          <p className="text-xs text-red mt-1" role="alert">
+            {erreurSuppression}
+          </p>
+        )}
+        {confirmationSuppression && (
+          <div className="text-xs text-amber leading-relaxed mt-1" role="alert">
+            <p>Supprimer définitivement ce document ? Le fichier et sa ligne dans « Mon dossier » seront effacés — ça ne touche à rien d'autre (profil, contrats).</p>
+            <div className="flex items-center gap-3 mt-1">
+              <button type="button" onClick={supprimer} disabled={suppressionEnCours} className="underline text-red disabled:opacity-40">
+                {suppressionEnCours ? "Suppression…" : "Confirmer la suppression"}
+              </button>
+              <button type="button" onClick={() => setConfirmationSuppression(false)} disabled={suppressionEnCours} className="underline disabled:opacity-40">
+                Annuler
+              </button>
+            </div>
+          </div>
+        )}
       </div>
       <div className="flex items-center gap-2 shrink-0">
         <select
@@ -225,6 +268,15 @@ function LigneDocumentAffichee({
         <button type="button" onClick={telecharger} disabled={telechargementEnCours} className="text-xs px-3 py-1.5 rounded-lg border border-line text-muted disabled:opacity-40 whitespace-nowrap">
           {telechargementEnCours ? "…" : "Télécharger"}
         </button>
+        <button
+          type="button"
+          onClick={() => setConfirmationSuppression(true)}
+          disabled={suppressionEnCours || confirmationSuppression}
+          aria-label={`Supprimer « ${document.nomFichier} »`}
+          className="text-xs px-3 py-1.5 rounded-lg border border-line text-muted hover:text-red hover:border-red/40 disabled:opacity-40 whitespace-nowrap transition-colors"
+        >
+          Supprimer
+        </button>
       </div>
     </div>
   );
@@ -240,11 +292,13 @@ function SousGroupeAffiche({
   clientFichiers,
   clientDocuments,
   onTypeCorrige,
+  onSupprime,
 }: {
   sousGroupe: SousGroupeDossier;
   clientFichiers: ClientFichiers;
   clientDocuments: ClientDocuments;
   onTypeCorrige: (id: string, nouveauType: TypeDocument) => void;
+  onSupprime: (id: string) => void;
 }) {
   return (
     <div className="border-t border-line">
@@ -256,7 +310,7 @@ function SousGroupeAffiche({
         <BoutonArchive documents={sousGroupe.documents} clientFichiers={clientFichiers} libelleGroupe={sousGroupe.categorie ?? "sans-categorie"} intitule="Tout télécharger" />
       </div>
       {sousGroupe.documents.map((document) => (
-        <LigneDocumentAffichee key={document.id} document={document} clientFichiers={clientFichiers} clientDocuments={clientDocuments} onTypeCorrige={onTypeCorrige} />
+        <LigneDocumentAffichee key={document.id} document={document} clientFichiers={clientFichiers} clientDocuments={clientDocuments} onTypeCorrige={onTypeCorrige} onSupprime={onSupprime} />
       ))}
     </div>
   );
@@ -271,11 +325,13 @@ function GroupeAffiche({
   clientFichiers,
   clientDocuments,
   onTypeCorrige,
+  onSupprime,
 }: {
   groupe: GroupeDossier;
   clientFichiers: ClientFichiers;
   clientDocuments: ClientDocuments;
   onTypeCorrige: (id: string, nouveauType: TypeDocument) => void;
+  onSupprime: (id: string) => void;
 }) {
   const [ouvert, setOuvert] = useState(true);
 
@@ -303,10 +359,11 @@ function GroupeAffiche({
                 clientFichiers={clientFichiers}
                 clientDocuments={clientDocuments}
                 onTypeCorrige={onTypeCorrige}
+                onSupprime={onSupprime}
               />
             ))
           : groupe.documents.map((document) => (
-              <LigneDocumentAffichee key={document.id} document={document} clientFichiers={clientFichiers} clientDocuments={clientDocuments} onTypeCorrige={onTypeCorrige} />
+              <LigneDocumentAffichee key={document.id} document={document} clientFichiers={clientFichiers} clientDocuments={clientDocuments} onTypeCorrige={onTypeCorrige} onSupprime={onSupprime} />
             )))}
     </div>
   );
@@ -341,6 +398,10 @@ export function MonDossier({
 
   function corriger(id: string, nouveauType: TypeDocument) {
     setEtatListe((etat) => (etat.statut === "charge" ? { statut: "charge", documents: etat.documents.map((d) => (d.id === id ? { ...d, typeDocument: nouveauType } : d)) } : etat));
+  }
+
+  function retirer(id: string) {
+    setEtatListe((etat) => (etat.statut === "charge" ? { statut: "charge", documents: etat.documents.filter((d) => d.id !== id) } : etat));
   }
 
   if (session.statut === "nonConfigure") {
@@ -411,7 +472,7 @@ export function MonDossier({
             <BoutonArchive documents={etatListe.documents} clientFichiers={clientFichiers} intitule="Tout télécharger (dossier entier)" />
           </div>
           {groupes.map((groupe) => (
-            <GroupeAffiche key={groupe.type} groupe={groupe} clientFichiers={clientFichiers} clientDocuments={clientDocuments} onTypeCorrige={corriger} />
+            <GroupeAffiche key={groupe.type} groupe={groupe} clientFichiers={clientFichiers} clientDocuments={clientDocuments} onTypeCorrige={corriger} onSupprime={retirer} />
           ))}
         </>
       )}
