@@ -69,6 +69,73 @@ describe("decouperExercices", () => {
   });
 });
 
+// historiqueOuvertureDroits (07/08/2026, idée de Benoît) : reconstruire N'IMPORTE QUEL cycle passé
+// avec de vraies bornes, pas seulement le précédent — additif, comportement inchangé sans lui.
+describe("decouperExercices — historiqueOuvertureDroits", () => {
+  it("borneReelle vrai pour le cycle en cours (i=0), même sans aucun historique", () => {
+    const p = profil({ dateAnniversaire: "2026-12-31", dateNaissance: "1990-01-01" });
+    const [enCours] = decouperExercices(p, [], [], franceTravailConfig, "2026-06-01");
+    expect(enCours.borneReelle).toBe(true);
+  });
+
+  it("sans historique : borneReelle faux dès i=1 (reconstruction calendaire, comportement d'avant ce champ)", () => {
+    const p = profil({ dateAnniversaire: "2026-12-31", dateNaissance: "1990-01-01" });
+    const contrats = [contrat({ date: "2025-06-01", nbCachets: 50 })];
+    const [, precedent] = decouperExercices(p, contrats, [], franceTravailConfig, "2026-06-01");
+    expect(precedent.borneReelle).toBe(false);
+  });
+
+  it("une entrée d'historique couvrant i=1 REMPLACE dateAnniversairePrecedente quand les deux sont présents (plus précise : deux bornes réelles, pas une borne + une soustraction d'un an)", () => {
+    const p = profil({
+      dateAnniversaire: "2027-01-17",
+      dateAnniversairePrecedente: "2025-03-23", // repli legacy — devrait être ignoré ici
+      situation: "readmission",
+      dateNaissance: "1990-01-01",
+      historiqueOuvertureDroits: [{ dateOuverture: "2025-02-01", dateEcheance: "2026-01-17" }], // vraie borne, différente du legacy
+    });
+    const contrats = [contrat({ date: "2025-06-01", nbCachets: 50 })]; // 600 h, dans les deux cas
+    const exercices = decouperExercices(p, contrats, [], franceTravailConfig, "2026-07-31");
+    const precedent = exercices.find((e) => e.dateAnniversaire === "2026-01-17")!;
+
+    expect(precedent.dateDebut).toBe("2025-02-01"); // l'entrée d'historique, PAS "2025-03-24" (legacy+1j)
+    expect(precedent.borneReelle).toBe(true);
+  });
+
+  it("plusieurs entrées couvrent i=1..3 avec de vraies bornes ; au-delà, repli calendaire signalé comme tel", () => {
+    const p = profil({
+      dateAnniversaire: "2026-12-31",
+      dateNaissance: "1990-01-01",
+      historiqueOuvertureDroits: [
+        // Volontairement PAS triées par date ici : decouperExercices doit trier lui-même (tri
+        // d'entrée non garanti, cf. saisie manuelle où l'ordre d'ajout n'est pas forcément
+        // chronologique).
+        { dateOuverture: "2023-01-01", dateEcheance: "2023-12-31" }, // i=3
+        { dateOuverture: "2025-01-01", dateEcheance: "2025-12-31" }, // i=1
+        { dateOuverture: "2024-01-01", dateEcheance: "2024-12-31" }, // i=2
+      ],
+    });
+    // Un contrat assez ancien : sans lui, `earliestISO` vaudrait `dateAnniversaire` lui-même et la
+    // boucle s'arrêterait dès i=1 (cf. `decouperExercices`, garde-fou "plus de données pertinentes
+    // au-delà" — aucun rapport avec `historiqueOuvertureDroits`, juste une condition d'arrêt commune).
+    const contrats = [contrat({ date: "2022-06-01", nbCachets: 1 })];
+    const exercices = decouperExercices(p, contrats, [], franceTravailConfig, "2026-06-01");
+
+    const i1 = exercices.find((e) => e.dateAnniversaire === "2025-12-31")!;
+    const i2 = exercices.find((e) => e.dateAnniversaire === "2024-12-31")!;
+    const i3 = exercices.find((e) => e.dateAnniversaire === "2023-12-31")!;
+    const i4 = exercices.find((e) => e.dateAnniversaire === "2022-12-31")!; // au-delà du dernier connu
+
+    expect(i1.dateDebut).toBe("2025-01-01");
+    expect(i1.borneReelle).toBe(true);
+    expect(i2.dateDebut).toBe("2024-01-01");
+    expect(i2.borneReelle).toBe(true);
+    expect(i3.dateDebut).toBe("2023-01-01");
+    expect(i3.borneReelle).toBe(true);
+    expect(i4).toBeDefined();
+    expect(i4.borneReelle).toBe(false); // reconstruction calendaire, faute de 4e entrée
+  });
+});
+
 // Bug réel corrigé le 31/07/2026 : decouperExercices seul recalcule TOUT à chaque appel, y compris
 // les cycles déjà clos — un contrat ajouté après coup dans une période déjà close (import tardif)
 // ou une nouvelle FCT (réadmission) changeait silencieusement l'AJ affichée pour un cycle passé.

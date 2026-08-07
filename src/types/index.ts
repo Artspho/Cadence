@@ -162,6 +162,20 @@ export interface Profil {
     // franchise salaires — `0` est donc un cas courant, pas théorique.
     franchiseSalairesTotale?: number;
   };
+  // Historique des ouvertures de droits ANTÉRIEURES à celle en cours (07/08/2026, idée de Benoît) —
+  // sert UNIQUEMENT à `engine/cycles.ts` (decouperExercices, onglet « Historique ») pour reconstruire
+  // les vieux cycles avec de vraies bornes plutôt qu'une soustraction calendaire de 12 mois
+  // (« backlog V3 » documenté dans cycles.ts/periodeReference.ts). Ne touche JAMAIS au cycle EN COURS
+  // ni à un calcul du devoir n°2 (AJ, 507 h, montants mensuels) — ceux-ci restent bornés par
+  // `dateAnniversaire`/`dateAnniversairePrecedente` exactement comme avant ce champ.
+  // `dateEcheance`, pas `dateAnniversaire` : nom délibérément différent pour ne pas reproduire la
+  // confusion déjà documentée entre `Profil.dateAnniversaire` (échéance du droit EN COURS) et le
+  // champ de même nom côté extraction IA (FCT qui a OUVERT un droit, cf. types/extraction.ts) — ici,
+  // chaque entrée porte ses DEUX bornes explicitement, aucune n'est déduite de l'autre.
+  // Additif et 100% optionnel : absent (tous les profils déjà enregistrés) = comportement inchangé.
+  // Trié croissant par `dateEcheance` en stockage, même convention que `ajReelleHistorique` /
+  // `tauxPrelevementSourceHistorique` ci-dessus — l'écran l'affiche du plus récent au moins récent.
+  historiqueOuvertureDroits?: { dateOuverture: string; dateEcheance: string }[];
 }
 
 // ── Historique : un exercice = un cycle de 12 mois entre deux dates anniversaire ──
@@ -174,6 +188,12 @@ export interface Exercice {
   ajBrute?: number; // allocation obtenue sur le cycle
   ajNette?: number;
   cloture: boolean; // exercice passé (true) vs en cours (false)
+  // 07/08/2026 : vrai si dateDebut/dateAnniversaire viennent d'une vraie donnée (le cycle en cours,
+  // une entrée de `Profil.historiqueOuvertureDroits`, ou le repli legacy `dateAnniversairePrecedente`
+  // pour le cycle immédiatement précédent) ; faux si reconstruites par soustraction calendaire de 12
+  // mois (« backlog V3 ») — Historique.tsx affiche un avertissement explicite dans ce second cas,
+  // là où c'était jusqu'ici approximé SANS le dire à l'écran (devoir n°2).
+  borneReelle: boolean;
 }
 
 // ── Alertes : problèmes détectés par le moteur ──

@@ -80,6 +80,7 @@ export const profilSchemaForme = z.object({
   dureeDroitsMois: z.union([z.literal(12), z.literal(6)]).optional(), // connue à l'ouverture, jamais déduite de l'historique — franchise salaires
   salairesHorsAnnexe10PRA: z.number().nullable().optional(), // franchise salaires, cf. engine/indemnisationMensuelle.ts
   ajReelleHistorique: z.array(z.object({ dateEffet: z.string(), valeur: z.number() })).optional(), // cf. types/index.ts
+  historiqueOuvertureDroits: z.array(z.object({ dateOuverture: z.string(), dateEcheance: z.string() })).optional(), // cf. types/index.ts
   ouvertureDroits: z
     .object({
       dateOuverture: z.string(),

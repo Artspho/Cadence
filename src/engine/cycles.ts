@@ -2,12 +2,12 @@
 // deux dates anniversaire (cf. Historique.tsx). Sert aussi de base au suivi
 // de l'ancienneté 5 ans / 2535 h utile à la clause de rattrapage.
 //
-// Simplification MVP : seule la date anniversaire ACTUELLE est connue (le
-// modèle Profil ne conserve pas l'historique COMPLET des ouvertures de droits
-// précédentes — seule la toute dernière, `dateAnniversairePrecedente`, l'est).
-// Les cycles PLUS anciens que celui-là (i >= 2) sont donc encore reconstruits
-// par soustraction calendaire de 12 mois successifs, et non à partir des
-// vraies dates d'ouverture de droits historiques (cf. §10, backlog V3).
+// Simplification MVP historique (allégée le 07/08/2026, cf. juste en dessous) :
+// à l'origine, seule la date anniversaire ACTUELLE était connue, et les cycles
+// plus anciens (i >= 2) étaient TOUJOURS reconstruits par soustraction
+// calendaire de 12 mois successifs plutôt qu'à partir des vraies dates
+// d'ouverture de droits historiques (« backlog V3 »). Reste vrai pour tout
+// profil sans `historiqueOuvertureDroits` renseigné.
 //
 // Bug réel corrigé le 31/07/2026 : pour le cycle immédiatement précédent
 // (i===1), cette reconstruction calendaire fabriquait un cycle qui n'a parfois
@@ -22,6 +22,18 @@
 // reconstruction calendaire pour ce seul cycle ; sinon, comportement inchangé
 // (reconstruction calendaire, cas le plus courant où le cycle précédent a
 // bien duré 12 mois pleins).
+//
+// Élargi le 07/08/2026 (idée de Benoît) : `Profil.historiqueOuvertureDroits`
+// (tableau optionnel, additif) peut désormais couvrir N'IMPORTE QUEL cycle
+// passé, pas seulement le précédent — chaque entrée porte SES DEUX bornes
+// (`dateOuverture`/`dateEcheance`), jamais déduites d'une soustraction. Une
+// entrée qui couvre le même cycle que `dateAnniversairePrecedente` prend le
+// pas sur ce repli legacy (plus précise : deux bornes réelles au lieu d'une
+// borne + une soustraction d'un an). Absent = comportement bit-à-bit
+// identique à avant ce champ (`entreeReelle` toujours `undefined`).
+// `Exercice.borneReelle` distingue les deux cas pour l'écran (Historique.tsx),
+// qui doit le dire plutôt que de laisser un chiffre approximé sans réserve
+// (devoir n°2).
 import { addYears } from "date-fns";
 import type { Contrat, Exercice, PeriodeAssimilee, Profil } from "../types";
 import type { FranceTravailConfig } from "../config/franceTravailConfig";
@@ -39,14 +51,23 @@ export function decouperExercices(profil: Profil, contrats: Contrat[], periodes:
   const toutesLesDates = [...contrats.map((c) => c.date), ...periodes.map((p) => p.dateDebut)];
   const earliestISO = toutesLesDates.length > 0 ? toutesLesDates.reduce((min, d) => (d < min ? d : min)) : profil.dateAnniversaire;
 
+  // Le plus récent d'abord (i=1 = le cycle juste avant l'actuel = la 1ère entrée), cf. commentaire
+  // de tête. `.sort` sur une copie : jamais de mutation du tableau du profil.
+  const historique = [...(profil.historiqueOuvertureDroits ?? [])].sort((a, b) => b.dateEcheance.localeCompare(a.dateEcheance));
+
   const exercices: Exercice[] = [];
 
   for (let i = 0; i < CYCLES_MAX; i++) {
-    const dateFin = toISO(addYears(toDate(profil.dateAnniversaire), -i));
-    const borneReelleConnue = i === 1 && Boolean(profil.dateAnniversairePrecedente);
-    const dateDebut = borneReelleConnue
-      ? ajouterJours(profil.dateAnniversairePrecedente!, 1)
-      : ajouterJours(toISO(addYears(toDate(profil.dateAnniversaire), -(i + 1))), 1);
+    const entreeReelle = i >= 1 ? historique[i - 1] : undefined;
+    const repliLegacyConnu = i === 1 && Boolean(profil.dateAnniversairePrecedente);
+    const borneReelle = i === 0 || entreeReelle !== undefined || repliLegacyConnu;
+
+    const dateFin = entreeReelle ? entreeReelle.dateEcheance : toISO(addYears(toDate(profil.dateAnniversaire), -i));
+    const dateDebut = entreeReelle
+      ? entreeReelle.dateOuverture
+      : repliLegacyConnu
+        ? ajouterJours(profil.dateAnniversairePrecedente!, 1)
+        : ajouterJours(toISO(addYears(toDate(profil.dateAnniversaire), -(i + 1))), 1);
 
     if (i > 0 && dateFin < earliestISO) break; // plus de données pertinentes au-delà
 
@@ -76,6 +97,7 @@ export function decouperExercices(profil: Profil, contrats: Contrat[], periodes:
       ajBrute,
       ajNette,
       cloture,
+      borneReelle,
     });
   }
 

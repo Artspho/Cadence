@@ -15,7 +15,7 @@ describe("exporterJSON / importerJSON — round-trip", () => {
       contrats: [contrat({ date: "2026-06-01", nbCachets: 10 })],
       periodes: [periode({ type: "maternite", dateDebut: "2026-01-01", dateFin: "2026-02-01" })],
       soldeIndemnisationDepart: { dateDepart: "2026-02-01" },
-      exercicesGeles: { "exercice-2025-01-01-2025-12-31": { id: "exercice-2025-01-01-2025-12-31", dateDebut: "2025-01-01", dateAnniversaire: "2025-12-31", heuresAtteintes: 600, objectifAtteint: true, ajBrute: 55, ajNette: 53, cloture: true } },
+      exercicesGeles: { "exercice-2025-01-01-2025-12-31": { id: "exercice-2025-01-01-2025-12-31", dateDebut: "2025-01-01", dateAnniversaire: "2025-12-31", heuresAtteintes: 600, objectifAtteint: true, ajBrute: 55, ajNette: 53, cloture: true, borneReelle: true } },
     };
 
     const exporte = exporterJSON(donnees, DATE_EXPORT_FIXE);

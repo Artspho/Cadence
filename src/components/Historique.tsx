@@ -48,7 +48,14 @@ export function Historique({ exercices, onEffacerGel, montantsNonFiables = false
             <p className="text-sm text-ink">
               {exercice.dateDebut} → {exercice.dateAnniversaire}
             </p>
-            <p className="text-xs text-muted">{exercice.cloture ? "Exercice clos" : "Exercice en cours"}</p>
+            <p className="text-xs text-muted">
+              {exercice.cloture ? "Exercice clos" : "Exercice en cours"}
+              {!exercice.borneReelle && (
+                <span className="text-amber ml-1.5" title="Reconstruit par soustraction calendaire de 12 mois, faute de notification d'admission connue pour ce cycle — ajoute-la dans « Mon profil » pour des dates exactes.">
+                  · Dates estimées — notification manquante
+                </span>
+              )}
+            </p>
           </div>
           <div className="text-right">
             <p className="text-sm tabular-nums text-ink">{Math.round(exercice.heuresAtteintes)} h</p>

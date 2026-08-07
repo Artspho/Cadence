@@ -632,6 +632,7 @@ function MonIndemnisationEnCours({
 
           <GestionAjReelle profil={profil} onModifierProfil={onModifierProfil} />
           <GestionTauxPAS profil={profil} onModifierProfil={onModifierProfil} />
+          <GestionHistoriqueOuvertureDroits profil={profil} onModifierProfil={onModifierProfil} />
         </div>
       </details>
     </section>
@@ -855,6 +856,105 @@ function GestionTauxPAS({ profil, onModifierProfil }: { profil: Profil; onModifi
           className="bg-mint text-bg font-medium rounded-lg px-4 py-2 disabled:opacity-40 disabled:cursor-not-allowed transition-opacity whitespace-nowrap"
         >
           + Ajouter un taux
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Historique des ouvertures de droits ANTÉRIEURES à celle en cours (07/08/2026, idée de Benoît) —
+// même pattern que GestionAjReelle/GestionTauxPAS ci-dessus, mais purement optionnel : sans lui,
+// `engine/cycles.ts` reconstruit les vieux cycles par soustraction calendaire de 12 mois comme avant
+// (jamais bloquant, contrairement à l'AJ nette ou au taux PAS — un onglet Historique reste utilisable
+// sans ce champ, juste avec des dates approximées et signalées comme telles). Deux dates par entrée
+// (`dateOuverture`/`dateEcheance`) : `decouperExercices` n'a besoin de rien d'autre pour ce cycle-là
+// (pas de franchise/délai — ceux-ci ne concernent que le droit EN COURS, cf. types/index.ts).
+function GestionHistoriqueOuvertureDroits({ profil, onModifierProfil }: { profil: Profil; onModifierProfil: OnModifierProfil }) {
+  const historique = profil.historiqueOuvertureDroits ?? [];
+  // Le plus récent d'abord à l'écran (demande explicite de Benoît) — le stockage, lui, reste trié
+  // croissant par `dateEcheance` (même convention que ajReelleHistorique/tauxPrelevementSourceHistorique).
+  const historiqueAffiche = [...historique].sort((a, b) => b.dateEcheance.localeCompare(a.dateEcheance));
+  const [dateOuverture, setDateOuverture] = useState("");
+  const [dateEcheance, setDateEcheance] = useState("");
+
+  function ajouter() {
+    if (!dateOuverture || !dateEcheance) return;
+    const nouveau = [...historique, { dateOuverture, dateEcheance }].sort((a, b) => a.dateEcheance.localeCompare(b.dateEcheance));
+    onModifierProfil({ ...profil, historiqueOuvertureDroits: nouveau });
+    setDateOuverture("");
+    setDateEcheance("");
+  }
+
+  function supprimer(entree: { dateOuverture: string; dateEcheance: string }) {
+    onModifierProfil({ ...profil, historiqueOuvertureDroits: historique.filter((h) => h !== entree) });
+  }
+
+  return (
+    <div className="border-t border-line pt-5 space-y-4">
+      <div>
+        <h3 className="font-display text-base font-medium">Historique de tes ouvertures de droits précédentes</h3>
+        <p className="text-xs text-faint mt-1">
+          Optionnel : ajoute une ancienne notification d'admission (date d'ouverture et date d'échéance) pour que l'onglet « Historique » reconstruise ce cycle avec ses vraies dates plutôt qu'une
+          approximation.
+        </p>
+      </div>
+
+      {historiqueAffiche.length > 0 && (
+        <table className="w-full text-sm">
+          <thead className="text-xs uppercase tracking-[.03em] text-muted border-b border-line">
+            <tr>
+              <th className="text-left py-2">Date d'ouverture</th>
+              <th className="text-left py-2">Date d'échéance</th>
+              <th className="py-2" />
+            </tr>
+          </thead>
+          <tbody>
+            {historiqueAffiche.map((h) => (
+              <tr key={`${h.dateOuverture}-${h.dateEcheance}`} className="border-b border-line last:border-0">
+                <td className="py-2">{h.dateOuverture}</td>
+                <td className="py-2">{h.dateEcheance}</td>
+                <td className="text-right py-2">
+                  <button onClick={() => supprimer(h)} className="text-xs text-muted hover:text-red transition-colors">
+                    Supprimer
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+
+      <div className="grid grid-cols-[1fr_1fr_auto] gap-3 items-end">
+        <div>
+          <label className="block text-xs uppercase tracking-[.03em] text-muted mb-2" htmlFor="profil-historique-date-ouverture">
+            Date d'ouverture
+          </label>
+          <input
+            id="profil-historique-date-ouverture"
+            type="date"
+            value={dateOuverture}
+            onChange={(e) => setDateOuverture(e.target.value)}
+            className="w-full bg-surface-2 border border-line rounded-lg px-3 py-2 text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-mint"
+          />
+        </div>
+        <div>
+          <label className="block text-xs uppercase tracking-[.03em] text-muted mb-2" htmlFor="profil-historique-date-echeance">
+            Date d'échéance
+          </label>
+          <input
+            id="profil-historique-date-echeance"
+            type="date"
+            value={dateEcheance}
+            onChange={(e) => setDateEcheance(e.target.value)}
+            className="w-full bg-surface-2 border border-line rounded-lg px-3 py-2 text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-mint"
+          />
+        </div>
+        <button
+          onClick={ajouter}
+          disabled={!dateOuverture || !dateEcheance}
+          className="bg-mint text-bg font-medium rounded-lg px-4 py-2 disabled:opacity-40 disabled:cursor-not-allowed transition-opacity whitespace-nowrap"
+        >
+          + Ajouter une ouverture de droits
         </button>
       </div>
     </div>

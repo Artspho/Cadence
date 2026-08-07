@@ -87,6 +87,12 @@ const exerciceSchema = z.object({
   ajBrute: z.number().optional(),
   ajNette: z.number().optional(),
   cloture: z.boolean(),
+  // `.default(false)` (pas `.optional()`) : un exercice figé AVANT le 07/08/2026 (ce champ n'existait
+  // pas encore) ne porte pas cette clé — la lire comme "non confirmé réel" est le choix honnête
+  // (Cadence ne SAIT PAS, à cette date, si ses bornes venaient d'une vraie notification ou d'une
+  // reconstruction calendaire), jamais un faux "réel" par défaut (devoir n°2). Cosmétique seulement
+  // (une puce d'avertissement dans Historique.tsx) : aucune conséquence sur un montant affiché.
+  borneReelle: z.boolean().default(false),
 });
 
 // Migration silencieuse (2026-07-24) : un solde de départ configuré avant le passage de
