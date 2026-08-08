@@ -8,11 +8,19 @@ Mémoire durable à consulter au démarrage : `CLAUDE.md`, `docs/SPEC.md`, `docs
 
 Deux devoirs sacrés : (1) ne jamais perdre les données ; (2) ne jamais afficher un chiffre faux (ni faux « feu vert » rassurant, ni faux « Bloqué », ni faux montant, ni fausse alerte, ni valeur sentinelle brute).
 
-État (mis à jour le **07/08/2026**) : les deux devoirs sacrés sont tenus. **1199 tests verts (92
-fichiers), `tsc -b` propre sur les deux tsconfig, `tsc -p tsconfig.api.json` propre, `npm run build`
-propre.** Dernier commit : `4c749fa`. `master` est la seule branche, working tree **propre**, et
-**tout est poussé sur `origin/master`** — poussé sur demande explicite de Benoît, jamais spontanément
-(mémoire `cadence_push_credentials.md`).
+État (mis à jour le **08/08/2026**) : les deux devoirs sacrés sont tenus. **1303 tests verts (105
+fichiers), `npm run typecheck` (`tsc -b` + `tsc -p tsconfig.api.json`) propre.** Dernier commit :
+`0b37305`. `master` est la seule branche, working tree **propre**, et **tout est poussé sur
+`origin/master`** — poussé sur demande explicite de Benoît, jamais spontanément (mémoire
+`cadence_push_credentials.md`).
+
+⚠️ **Trou de documentation constaté ce fil, non comblé** : 22 commits (`5d53000` → `c96d1ff`) ont eu
+lieu entre le dernier commit alors documenté ici (`4c749fa`, 07/08/2026) et le début de cette session,
+sans qu'aucun résumé de session ne soit venu les tracer dans ce fichier — l'« État » ci-dessus restait
+sur des chiffres périmés (1199 tests/92 fichiers) malgré ces 22 commits. Je ne reconstitue pas leur
+résumé ici : je n'ai pas assisté à ces sessions et n'écris jamais une narration que je n'ai pas
+vérifiée (mémoire `cadence_preuve_vs_affirmation.md`). `git log --oneline 4c749fa..0b37305` en donne
+la liste brute si besoin de la reconstituer plus tard.
 
 🔴 **DETTE DE TEST OUVERTE (07/08/2026)** : le correctif du commit `4c749fa` (cf. juste en dessous)
 n'a été vérifié que par des tests automatisés (logique pure + composant, mocks) — **jamais dans le
@@ -31,11 +39,11 @@ plus que de copie locale (lecture seule si le serveur est muet). Dépendances aj
 
 ## ▶ BLOC DE REPRISE — à lire en premier au prochain fil
 
-**Où on en est :** la phase 6 est terminée depuis deux sessions. La session précédente (la SECONDE du
-06/08) avait refondu l'authentification (lien magique supprimé). **Cette troisième session a fait
-passer l'import IA de « jamais reconfirmé fonctionnel » à « vérifié par Benoît sur ses 9 types de
-documents réels »**, en trouvant et corrigeant deux vrais bugs de stockage au passage — détail dans le
-résumé de session plus bas.
+**Où on en est :** **cette session (08/08/2026) a fait des retouches de design ciblées**, demandées au
+fil de la conversation plutôt que planifiées à l'avance — détail dans le résumé de session plus bas
+(commit `0b37305`). Le « trou de documentation » noté juste au-dessus (22 commits `5d53000`→`c96d1ff`
+non résumés ici) précède cette session ; je n'ai pas cherché à le combler, seulement à ne pas
+l'aggraver.
 
 **Les 4 migrations SQL 0001 à 0004 sont toutes appliquées** sur le vrai projet Supabase.
 
@@ -146,8 +154,10 @@ supprimer sa propre preuve. Benoît a effacé la ligne `TEST-VERIFICATION-%` dep
 6. ⏸ **Point 8 — le quota par utilisateur reste à faire.** Le volet authentification est fermé
    (`6cd46ac`, 07/08/2026) ; le quota, adossé à la base Supabase, est reporté sur demande explicite de
    Benoît — pas oublié, juste pas prioritaire une fois la vraie serrure posée.
-7. ⬜ **Reprendre le design** (ajouté le 07/08/2026, à préciser avec Benoît — aucun brief détaillé
-   encore donné : quel écran, quel défaut, quelle inspiration).
+7. 🔶 **Reprendre le design** (ajouté le 07/08/2026) — **entamé le 08/08/2026** (`0b37305`, cf. résumé
+   de session ci-dessous) : onglet Contrats, tableau de bord, Mon profil, retouches demandées une à
+   une dans la conversation. Toujours ouvert pour le reste : aucun autre écran/défaut précisé par
+   Benoît à ce jour.
 8. ⬜ **Définir le tarif de l'API** (ajouté le 07/08/2026) — probablement lié au point « Monétisation
    envisagée » déjà au backlog (`docs/SPEC.md` §11.B : 2 mois d'essai gratuit puis app payante,
    architecture délibérément non tranchée) et aux chiffres Mistral mesurés ce fil (10 $/mois inclus,
@@ -175,6 +185,53 @@ supprimer sa propre preuve. Benoît a effacé la ligne `TEST-VERIFICATION-%` dep
 - **`Justificatif après inscription`** (nom donné par Benoît) est en réalité une lettre France Travail
   de demande de pièces complémentaires — pas un type que l'IA de Cadence reconnaît, et ce n'est pas un
   bug qu'elle ne le reconnaisse pas.
+
+---
+
+**Résumé de la session du 08/08/2026 (1 commit, `0b37305`, poussé)** :
+
+Session de retouches design demandées une à une dans la conversation, sans brief préalable — répond
+partiellement au point backlog « Reprendre le design » (ajouté le 07/08/2026, cf. « Ce qui reste »
+ci-dessus), toujours ouvert pour le reste (aucun autre écran/défaut précisé par Benoît ce fil).
+
+1. `0b37305` — feat : quatre retouches indépendantes, un seul commit (aucune n'appelait de migration
+   ni de changement de logique métier, seulement de la mise en page/style) :
+   - **Onglet Contrats** : titre « Ajouter un nouveau contrat » au-dessus du formulaire, et bascule
+     manuel/import (bouton « Importer un bulletin ou une AEM → ») qui remplace le formulaire par
+     `ImportDocumentIA` (déjà existant, canal IA) en mode compact. Bascule EXCLUSIVE (jamais les deux
+     montés en même temps) : le résultat d'une extraction IA affiche lui aussi un `<ContractForm>`
+     (via `RevueExtraction`) — le monter en même temps que le formulaire manuel aurait reproduit le
+     bug déjà connu de doublons d'`id` de champs (`ContractList.tsx`, cf. plus haut dans ce fichier).
+   - **Tableau de bord** : l'encadré « Vers une baisse du prix de l'abonnement »
+     (`BarreProgressionAbonnes.tsx`) réduit (padding, tailles de texte) et aligné à droite (pleine
+     largeur sur mobile, `max-w-xs` au-delà). Titre « Heures de ma période en cours » ajouté
+     au-dessus du cadre du graphique (`Dashboard.tsx`) — demande initiale de le mettre DANS le cadre,
+     corrigée en cours de session sur retour explicite de Benoît (« vu qu'il y a la place, met le
+     texte au-dessus du cadre »), puis agrandi (`text-xl font-semibold`) sur demande suivante.
+   - **Mon profil** : titre « Ton profil » agrandi (`text-2xl font-semibold`, contre `text-lg
+     font-medium` avant) et repositionné — le checklist « Informations à compléter »
+     (`ProgressionProfil`) est désormais affiché SOUS ce titre, DANS la section « Ton profil » (avant
+     le cadre « Ton identité »/« Suivi des 507 heures »), plutôt qu'au-dessus de toute la page. Un
+     test (`MonProfil.progression.test.tsx`) ciblait `within(section).getByTitle("À compléter")` en
+     supposant une seule coche dans la section « Ton profil » — devenu ambigu puisque le checklist
+     imbriqué en affiche désormais plusieurs (une par étape) ; corrigé pour cibler la rangée du titre
+     précisément (`closest("div")`, pas `closest("section")`).
+   - **`ContractForm`** : le champ « Nombre de cachets » est grisé (`disabled`, pas masqué) pour les
+     contrats de type enseignement, qui se paient toujours en heures d'après Benoît — jamais en
+     cachets. Grisé plutôt que masqué : une valeur déjà saisie avant un changement de type reste
+     visible, jamais effacée en silence (devoir n°1). ⚠️ **Note technique non résolue par ce
+     correctif, seulement documentée** : `heuresBrutesContrat` (`engine/decompteHeures.ts`) additionne
+     encore `nbCachets` à `nbHeures` pour un contrat enseignement SI le champ est rempli (hérité d'un
+     contrat existant, ou saisi avant de changer le type) — le calcul n'ignore pas la valeur, seule la
+     SAISIE est désormais bloquée pour les nouveaux contrats. Aucune incohérence pratique connue
+     (Benoît confirme que ce cas ne se présente jamais réellement), mais à garder en tête si un contrat
+     enseignement affichait un jour des heures inattendues.
+   Vérifié par aperçu jetable (`preview-devcheck.html`/`previewDevCheck.tsx`, supprimés après coup) :
+   le mur de connexion obligatoire empêchait d'atteindre ces écrans avec de vraies données sans saisir
+   de mot de passe, ce que je ne fais jamais (cf. `cadence_preuve_serveur_reel_scripts.md`) — styles
+   calculés (alignement, largeur) vérifiés via `getBoundingClientRect`/`getComputedStyle` en desktop
+   et mobile, plutôt qu'une simple lecture du code. 1303 tests verts (105 fichiers, +1 test modifié,
+   0 ajouté), `npm run typecheck` propre.
 
 ---
 
