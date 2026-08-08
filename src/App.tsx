@@ -131,6 +131,10 @@ export default function App() {
   // ci-dessous doit disparaître pendant une édition, sinon deux <ContractForm> coexistent avec les
   // mêmes `id` de champs (bug trouvé en vérifiant dans le navigateur, 01/08/2026).
   const [contratEnEdition, setContratEnEdition] = useState<Contrat | null>(null);
+  // Bascule manuel/import au-dessus de ContractList (même onglet « Contrats ») : une extraction IA
+  // réussie affiche elle aussi un <ContractForm> (via RevueExtraction) — les deux chemins ne sont
+  // donc jamais montés en même temps, pour la même raison que `contratEnEdition` ci-dessus.
+  const [modeAjoutContrat, setModeAjoutContrat] = useState<"manuel" | "import">("manuel");
   // Issue de la lecture initiale — `null` tant qu'elle n'a pas répondu. C'est CET état, et non un
   // `useRef`, qui autorise ou interdit l'écriture (correctif du 03/08/2026, point 🔴 n°1 de
   // docs/critique_2026-08-03.md) : l'ancien drapeau `chargementTermine` passait à `true` même après
@@ -967,9 +971,41 @@ export default function App() {
         {onglet === "contrats" && calculs && (
           <div className="space-y-6">
             {/* Masqué pendant une édition (cf. le commentaire sur contratEnEdition ci-dessus) : deux
-                <ContractForm> montés en même temps partageraient les mêmes `id` de champs. */}
+                <ContractForm> montés en même temps partageraient les mêmes `id` de champs. La bascule
+                manuel/import (cf. modeAjoutContrat ci-dessus) répond au même impératif : le résultat
+                d'une extraction IA affiche lui aussi un <ContractForm>. */}
             {!contratEnEdition && (
-              <ContractForm profil={profil} config={franceTravailConfig} decompteActuel={calculs.decompte} onValider={ajouterContrat} onValiderRecurrent={ajouterContratsRecurrents} />
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <h2 className="font-display text-base font-medium tracking-tight">Ajouter un nouveau contrat</h2>
+                  <button
+                    type="button"
+                    onClick={() => setModeAjoutContrat(modeAjoutContrat === "manuel" ? "import" : "manuel")}
+                    className="text-sm text-mint hover:underline shrink-0"
+                  >
+                    {modeAjoutContrat === "manuel" ? "Importer un bulletin ou une AEM →" : "← Saisie manuelle"}
+                  </button>
+                </div>
+
+                {modeAjoutContrat === "manuel" ? (
+                  <ContractForm profil={profil} config={franceTravailConfig} decompteActuel={calculs.decompte} onValider={ajouterContrat} onValiderRecurrent={ajouterContratsRecurrents} />
+                ) : (
+                  <div className="bg-surface border border-line rounded-card p-6">
+                    <ImportDocumentIA
+                      profil={profil}
+                      config={franceTravailConfig}
+                      decompteActuel={calculs.decompte}
+                      contrats={donnees.contrats}
+                      onAjouterContrat={ajouterContrat}
+                      onAjouterPeriode={ajouterPeriode}
+                      onModifierProfil={modifierProfil}
+                      onModifierContrat={modifierContrat}
+                      typeSuggere="aem_bulletin"
+                      compact
+                    />
+                  </div>
+                )}
+              </div>
             )}
             <ContractList
               profil={profil}

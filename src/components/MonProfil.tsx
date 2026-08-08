@@ -287,13 +287,13 @@ export function MonProfil({
 
   return (
     <div className="space-y-6 max-w-[900px]">
-      <ProgressionProfil profil={profil} />
-
       <section id="section-ton-profil" className="scroll-mt-20">
         <div className="flex items-center justify-between gap-2 mb-2">
-          <h2 className="font-display text-lg font-medium">Ton profil</h2>
+          <h2 className="font-display text-2xl font-semibold tracking-tight">Ton profil</h2>
           <BadgeEtapeComplete complete={tonProfilComplet(profil)} />
         </div>
+
+        <ProgressionProfil profil={profil} />
 
         {/* Deux cartes côte à côte (07/08/2026, demande de Benoît) : ce qui t'identifie et ce qui suit
             tes 507 h sont deux sujets différents, jusqu'ici fondus dans une seule carte au point de se

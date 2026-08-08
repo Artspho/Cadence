@@ -104,6 +104,7 @@ export function Dashboard({
       <BarreProgressionAbonnes />
 
       <div>
+        <h2 className="font-display text-xl font-semibold tracking-tight mb-3">Heures de ma période en cours</h2>
         <ProjectionChart
           fenetreDebut={fenetreDebut}
           fenetreFin={prediction.dateAnniversaire}

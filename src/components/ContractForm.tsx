@@ -295,7 +295,11 @@ export function ContractForm({ profil, config, decompteActuel, valeurInitiale, o
                 placeholder="Si applicable"
                 value={nbCachets}
                 onChange={(e) => changerNbCachets(e.target.value)}
-                className="w-full bg-surface-2 border border-line rounded-lg px-3 py-2"
+                // Un contrat d'enseignement se paie en heures, jamais en cachets (demande de Benoît,
+                // 08/08/2026) — grisé plutôt que masqué : une valeur déjà saisie avant un changement
+                // de type reste visible, jamais effacée en silence (devoir n°1).
+                disabled={type === "enseignement"}
+                className="w-full bg-surface-2 border border-line rounded-lg px-3 py-2 disabled:opacity-40 disabled:cursor-not-allowed"
               />
             </div>
             <div>

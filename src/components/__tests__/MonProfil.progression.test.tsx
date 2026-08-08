@@ -101,8 +101,13 @@ describe("MonProfil — gestionnaire de tâches « Informations à compléter »
 describe("MonProfil — pastille de complétion sur chaque section", () => {
   it("« Ton profil » porte sa propre coche, cohérente avec le compteur du haut", () => {
     rendre(profil({ dateAnniversaire: "" }));
-    const section = screen.getByRole("heading", { name: /^ton profil$/i }).closest("section")!;
-    expect(within(section).getByTitle("À compléter")).toBeInTheDocument();
+    // `closest("div")`, pas `closest("section")` : la section porte aussi désormais le checklist
+    // « Informations à compléter » (08/08/2026, demande de Benoît — repositionné entre le titre et le
+    // cadre « Ton identité »), qui affiche lui-même des coches « À compléter » pour chaque étape —
+    // `within(section)` en trouverait donc plusieurs. Seule la coche DANS LA MÊME RANGÉE que le titre
+    // est celle testée ici.
+    const ligneTitre = screen.getByRole("heading", { name: /^ton profil$/i }).closest("div")!;
+    expect(within(ligneTitre).getByTitle("À compléter")).toBeInTheDocument();
   });
 
   it("« Mon indemnisation en cours » passe à « Complété » une fois des droits ouverts", () => {
