@@ -4,6 +4,7 @@ import { franceTravailConfig } from "../config/franceTravailConfig";
 import { ProjectionChart } from "./ProjectionChart";
 import { DetailCalcul } from "./DetailCalcul";
 import { RenouvellementAnticipe } from "./RenouvellementAnticipe";
+import { BarreProgressionAbonnes } from "./BarreProgressionAbonnes";
 
 interface DashboardProps {
   prediction: StatutPrediction;
@@ -100,6 +101,8 @@ export function Dashboard({
 
   return (
     <div className="space-y-6">
+      <BarreProgressionAbonnes />
+
       <div>
         <ProjectionChart
           fenetreDebut={fenetreDebut}
