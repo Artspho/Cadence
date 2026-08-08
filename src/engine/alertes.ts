@@ -54,7 +54,7 @@ export function detecterAlertes(
   // Textes lus dans content/contradictionHorsA10.ts, partagés avec le bandeau dédié : le même fait
   // n'est plus rédigé deux fois. L'alerte reste produite ici même quand le bandeau est affiché —
   // elle alimente le compteur d'alertes critiques visible sur TOUS les onglets, y compris ceux sans
-  // bandeau (Contrats, Import PDF, Frais pro). C'est l'affichage du centre d'alertes qui évite la
+  // bandeau (Contrats, Déposer un document, Frais pro). C'est l'affichage du centre d'alertes qui évite la
   // redite, pas la détection (cf. lib/alertesAffichage.ts).
   if (perimetre.motif === "salaires_hors_a10_contradictoires") {
     alertes.push({

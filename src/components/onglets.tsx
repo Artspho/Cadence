@@ -20,7 +20,7 @@ export const ONGLETS: DefinitionOnglet[] = [
   { id: "dashboard", label: "Tableau de bord" },
   { id: "profil", label: "Mon profil" },
   { id: "contrats", label: "Contrats" },
-  { id: "import", label: "Import PDF" },
+  { id: "import", label: "Déposer un document" },
   { id: "historique", label: "Historique" },
   { id: "simulateur", label: "Simulateur" },
   { id: "revenus", label: "Revenus mensuels" },

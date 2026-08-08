@@ -134,7 +134,7 @@ export function Onboarding({ onTerminer, onRestaurerSauvegarde, erreurImport, se
             <button type="button" onClick={ouvrirMesCourriers} className="text-mint hover:underline">
               retrouve-la dans tes courriers France Travail (nouvel onglet)
             </button>
-            . L'import automatique par IA, lui, se fait plus tard, une fois connecté (onglet « Import PDF »).
+            . L'import automatique par IA, lui, se fait plus tard, une fois connecté (onglet « Déposer un document »).
           </p>
         </div>
 

@@ -42,7 +42,7 @@ import { Onboarding } from "./components/Onboarding";
 import { Dashboard } from "./components/Dashboard";
 import { ContractForm } from "./components/ContractForm";
 import { ContractList } from "./components/ContractList";
-import { ChecklistDocuments } from "./components/ChecklistDocuments";
+import { DocumentsARassembler } from "./components/DocumentsARassembler";
 // `pdfjs-dist` (extraction locale des bulletins) est une dépendance lourde qui n'a rien à faire dans
 // le bundle chargé par TOUT LE MONDE dès l'ouverture de l'app — chargée à la demande uniquement en
 // ouvrant l'onglet Import (07/08/2026, avertissement Vite « chunk > 500 kB »).
@@ -957,6 +957,9 @@ export default function App() {
                 sr={calculs.sr}
                 nht={calculs.nht}
                 sar={calculs.sar}
+                profil={profil}
+                contrats={donnees.contrats}
+                periodes={donnees.periodes}
               />
             </>
           ))}
@@ -988,7 +991,7 @@ export default function App() {
                 quel document aller chercher précède le fait d'en déposer un, et cette information
                 est NEUTRE au canal — une saisie manuelle éteint un manque exactement comme un import
                 (cf. lib/documentsRequis.ts, qui ne lit que les données enregistrées). */}
-            <ChecklistDocuments
+            <DocumentsARassembler
               profil={profil}
               contrats={donnees.contrats}
               onDemanderImport={(type) => {
@@ -1099,7 +1102,7 @@ export default function App() {
             </div>
           ))}
 
-        {onglet === "profil" && (
+        {onglet === "profil" && calculs && (
           <MonProfil
             dateDuJour={dateDuJour}
             profil={profil}
@@ -1108,6 +1111,9 @@ export default function App() {
             periodes={donnees.periodes}
             onAjouterPeriode={ajouterPeriode}
             onSupprimerPeriode={supprimerPeriode}
+            decompteActuel={calculs.decompte}
+            onAjouterContrat={ajouterContrat}
+            onModifierContrat={modifierContrat}
             onNaviguerVersParametres={() => setOnglet("parametres")}
           />
         )}

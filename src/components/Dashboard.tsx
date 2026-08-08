@@ -1,8 +1,9 @@
-import type { AJBruteResultat, AJNetteResultat, DecompteHeuresResultat, RythmeRequis, SeuilReadmission, StatutPrediction } from "../types";
+import type { AJBruteResultat, AJNetteResultat, Contrat, DecompteHeuresResultat, PeriodeAssimilee, Profil, RythmeRequis, SeuilReadmission, StatutPrediction } from "../types";
 import type { PointSerie } from "../engine/prediction";
 import { franceTravailConfig } from "../config/franceTravailConfig";
 import { ProjectionChart } from "./ProjectionChart";
 import { DetailCalcul } from "./DetailCalcul";
+import { RenouvellementAnticipe } from "./RenouvellementAnticipe";
 
 interface DashboardProps {
   prediction: StatutPrediction;
@@ -16,6 +17,9 @@ interface DashboardProps {
   sr: number;
   nht: number;
   sar: number | null;
+  profil: Profil;
+  contrats: Contrat[];
+  periodes: PeriodeAssimilee[];
   /**
    * Contradiction de périmètre non tranchée (cf. lib/profilHorsPerimetre.ts, motif
    * `salaires_hors_a10_contradictoires`) : les montants ARE seraient calculés avec les mauvaises
@@ -70,7 +74,23 @@ function bandeauSeuilReadmission(seuilReadmission: SeuilReadmission, seuilHeures
   }
 }
 
-export function Dashboard({ prediction, serie, serieAVenir, fenetreDebut, dateCap, decompte, ajBrute, ajNette, sr, nht, sar, montantsNonFiables = false }: DashboardProps) {
+export function Dashboard({
+  prediction,
+  serie,
+  serieAVenir,
+  fenetreDebut,
+  dateCap,
+  decompte,
+  ajBrute,
+  ajNette,
+  sr,
+  nht,
+  sar,
+  profil,
+  contrats,
+  periodes,
+  montantsNonFiables = false,
+}: DashboardProps) {
   const bandeauReadmission = bandeauSeuilReadmission(prediction.seuilReadmission, prediction.seuilHeures);
   const r = decompte.repartition;
   const cachets = r.cachets;
@@ -158,6 +178,11 @@ export function Dashboard({ prediction, serie, serieAVenir, fenetreDebut, dateCa
           <p className="text-xs text-muted">Requis : {libelleRythmeRequis(prediction.rythmeRequis, prediction.seuilHeures)}</p>
         </div>
       </div>
+
+      {/* Déplacée ici depuis « Mon profil » (08/08/2026, demande de Benoît) : la simulation d'un
+          renouvellement anticipé a plus sa place à côté des chiffres du tableau de bord qu'elle
+          affecte qu'au milieu des formulaires de saisie du profil. */}
+      <RenouvellementAnticipe profil={profil} contrats={contrats} periodes={periodes} config={franceTravailConfig} />
 
       <DetailCalcul decompte={decompte} ajBrute={ajBrute} ajNette={ajNette} sr={sr} nht={nht} sar={sar} />
 

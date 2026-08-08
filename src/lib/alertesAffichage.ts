@@ -21,7 +21,7 @@ export interface AffichageCentreAlertes {
  * 1. **Le filtrage est ici, à l'AFFICHAGE — jamais dans `detecterAlertes`.** L'alerte doit continuer
  *    d'exister dans le modèle : le compteur d'alertes critiques (App.tsx, `AlertCenterResume`) est
  *    affiché sur TOUS les onglets, y compris les trois qui ne portent aucun bandeau (Contrats,
- *    Import PDF, Frais pro) — il y est le seul signal de la contradiction. La retirer du moteur
+ *    Déposer un document, Frais pro) — il y est le seul signal de la contradiction. La retirer du moteur
  *    rendrait la contradiction totalement invisible sur ces écrans.
  * 2. **Jamais « ✓ Aucune alerte pour l'instant » à côté d'un bandeau critique.** `AlertCenter`
  *    affiche ce message dès que sa liste est vide ; or la contradiction est souvent la seule alerte

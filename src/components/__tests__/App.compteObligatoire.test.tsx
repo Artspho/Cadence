@@ -153,7 +153,7 @@ describe("App — une fois connecté, l'app entière redevient accessible", () =
   it("tous les onglets restent atteignables, aucun mur résiduel à l'intérieur", async () => {
     render(<App />);
     const nav = await screen.findByRole("navigation", { name: /navigation principale/i });
-    for (const onglet of ["Tableau de bord", "Mon profil", "Contrats", "Import PDF", "Historique", "Simulateur", "Revenus mensuels", "Frais pro"]) {
+    for (const onglet of ["Tableau de bord", "Mon profil", "Contrats", "Déposer un document", "Historique", "Simulateur", "Revenus mensuels", "Frais pro"]) {
       fireEvent.click(within(nav).getByRole("button", { name: onglet }));
       expect(screen.queryByLabelText(/adresse e-mail/i)).not.toBeInTheDocument();
       await act(async () => {});

@@ -15,7 +15,7 @@ export const PERIMETRE_MVP: string[] = [
   "Annexe 10 uniquement. Pas d'arbitrage Annexe 8 ni régime général (article 65).",
   "Estimation, pas décision. Les montants sont indicatifs ; France Travail seul fait foi.",
   "Le suivi des jours réellement indemnisés mois par mois est disponible (onglet « Revenus mensuels »), calculé automatiquement depuis tes contrats et l'ouverture de tes droits (renseignée dans « Mon indemnisation en cours »). La franchise salaires et le plafond de cumul (118 % du PMSS) ne sont pas calculés.",
-  "Import PDF assisté, pas magique : extraction locale, revue avant enregistrement, non garantie exacte.",
+  "Dépôt de document assisté, pas magique : extraction locale ou par IA, revue avant enregistrement, non garantie exacte.",
 ];
 
 export const LIMITES_STRUCTURELLES: string[] = [

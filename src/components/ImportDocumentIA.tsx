@@ -16,7 +16,7 @@
  * l'envoi d'un fichier qu'on sait condamné serait lui faire prendre une décision pour rien.
  *
  * Le canal local (`ImportBulletins.tsx`, pdfjs, aucun réseau) est un chemin distinct et reste
- * intouché. Les deux cohabitent dans l'onglet « Import PDF » et n'ont ni état ni code en commun.
+ * intouché. Les deux cohabitent dans l'onglet « Déposer un document » et n'ont ni état ni code en commun.
  */
 
 import { useState } from "react";
@@ -56,6 +56,15 @@ interface ImportDocumentIAProps {
    * tient pas (elle peut très bien détecter autre chose que ce qui était suggéré).
    */
   typeSuggere?: TypeDocument | null;
+  /**
+   * Réduit l'affichage au strict nécessaire (08/08/2026, demande de Benoît) : masque le titre
+   * « Importer avec l'IA » (redondant avec le résumé qui ouvre déjà ce panneau, cf. MonProfil.tsx
+   * `ImportInline`) et le rappel « Documents à déposer » (redondant avec l'onglet « Déposer un
+   * document », qui liste déjà tout ça en détail). La mention de transparence (`ANNONCE_CANAL_IA`)
+   * reste TOUJOURS affichée, même en mode compact : elle doit être visible avant chaque envoi, quel
+   * que soit l'endroit d'où on l'atteint.
+   */
+  compact?: boolean;
 }
 
 const ECHEC_INATTENDU = "L'envoi a échoué pour une raison inattendue. Réessaie, ou saisis les informations à la main.";
@@ -123,6 +132,7 @@ export function ImportDocumentIA({
   clientDocuments = obtenirClientDocuments(),
   clientFichiers = obtenirClientFichiers(),
   typeSuggere = null,
+  compact = false,
 }: ImportDocumentIAProps) {
   const session = useSession(clientAuth);
   /** Fichier choisi et validé, en attente du consentement. Non nul ⇒ la modale est ouverte. */
@@ -338,29 +348,30 @@ export function ImportDocumentIA({
         />
       )}
 
-      <div>
-        <h3 className="font-display text-base font-medium tracking-tight">Importer avec l'IA</h3>
-        {/* Annonce permanente : ce que fait ce bouton, su avant de cliquer. Le détail complet reste
-            dans la modale, au moment de décider. */}
-        <p className="text-xs text-faint leading-relaxed mt-1">{ANNONCE_CANAL_IA}</p>
-        {/* Vient de la checklist (« Importer ce document ») — une aide, jamais une promesse : l'IA
-            détecte le type par elle-même, elle peut très bien reconnaître autre chose. */}
-        {typeSuggere && (
-          <p className="text-xs text-mint leading-relaxed mt-2 bg-mint/10 border border-mint/30 rounded-lg px-3 py-2">
-            Tu es venu importer : <strong className="font-medium">{LIBELLES_TYPE_DOCUMENT[typeSuggere]}</strong>
-          </p>
-        )}
-      </div>
+      {!compact && <h3 className="font-display text-base font-medium tracking-tight">Importer avec l'IA</h3>}
 
-      <div className="bg-surface-2 border border-line rounded-lg px-4 py-3">
-        <p className="text-xs uppercase tracking-[.03em] text-muted mb-2">Documents à déposer</p>
-        <ul className="text-sm text-muted space-y-1 list-disc list-inside">
-          <li>Notification d'admission ARE (une fois, à l'ouverture de droits)</li>
-          <li>Relevé de situation France Travail (un par mois — contient ton taux PAS et ton allocation à jour)</li>
-          <li>Bulletins de paie (un par contrat, spectacle ou enseignement)</li>
-          <li>Justificatif de déclaration de situation mensuelle (le récapitulatif reçu après ton actualisation)</li>
-        </ul>
-      </div>
+      {/* Annonce permanente : ce que fait ce bouton, su avant de cliquer. Le détail complet reste
+          dans la modale, au moment de décider. TOUJOURS affichée, compact ou non (cf. le prop). */}
+      <p className="text-xs text-faint leading-relaxed">{ANNONCE_CANAL_IA}</p>
+      {/* Vient de la checklist (« Importer ce document ») — une aide, jamais une promesse : l'IA
+          détecte le type par elle-même, elle peut très bien reconnaître autre chose. */}
+      {typeSuggere && (
+        <p className="text-xs text-mint leading-relaxed bg-mint/10 border border-mint/30 rounded-lg px-3 py-2">
+          Tu es venu importer : <strong className="font-medium">{LIBELLES_TYPE_DOCUMENT[typeSuggere]}</strong>
+        </p>
+      )}
+
+      {!compact && (
+        <div className="bg-surface-2 border border-line rounded-lg px-4 py-3">
+          <p className="text-xs uppercase tracking-[.03em] text-muted mb-2">Documents à déposer</p>
+          <ul className="text-sm text-muted space-y-1 list-disc list-inside">
+            <li>Notification d'admission ARE (une fois, à l'ouverture de droits)</li>
+            <li>Relevé de situation France Travail (un par mois — contient ton taux PAS et ton allocation à jour)</li>
+            <li>Bulletins de paie (un par contrat, spectacle ou enseignement)</li>
+            <li>Justificatif de déclaration de situation mensuelle (le récapitulatif reçu après ton actualisation)</li>
+          </ul>
+        </div>
+      )}
 
       <div
         onDragOver={(e) => {
@@ -374,15 +385,15 @@ export function ImportDocumentIA({
           const fichier = e.dataTransfer.files[0];
           if (fichier) choisirFichier(fichier);
         }}
-        className={`border-2 border-dashed rounded-card p-10 text-center transition-colors ${survole ? "border-amber bg-amber/5" : "border-line-strong"}`}
+        className={`border-2 border-dashed rounded-card text-center transition-colors ${compact ? "p-4" : "p-10"} ${survole ? "border-amber bg-amber/5" : "border-line-strong"}`}
       >
         {envoiEnCours && <Spinner className="h-6 w-6 mx-auto mb-3" />}
-        <p className="text-ink mb-2">
+        <p className={`text-ink ${compact ? "text-sm mb-1.5" : "mb-2"}`}>
           {envoiEnCours ? "Lecture du document en cours…" : "Dépose ici un bulletin, une AEM, une notification ou un relevé (PDF)"}
         </p>
         {!envoiEnCours && (
           <>
-            <p className="text-sm text-muted mb-4">ou</p>
+            {!compact && <p className="text-sm text-muted mb-4">ou</p>}
             <label className="inline-block bg-surface-2 border border-line rounded-lg px-4 py-2 text-sm cursor-pointer hover:border-amber/40 transition-colors">
               Choisir un fichier
               <input

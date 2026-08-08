@@ -10,7 +10,14 @@ import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { MonProfil } from "../MonProfil";
 import { profil } from "../../engine/__tests__/testUtils";
-import type { Profil } from "../../types";
+import type { DecompteHeuresResultat, Profil } from "../../types";
+
+const DECOMPTE: DecompteHeuresResultat = {
+  total: 0,
+  repartition: { cachets: 0, heuresScene: 0, eee: 0, assimilees: 0, ptp: 0, enseignementRetenu: 0, enseignementExcedentaire: 0, formationRetenue: 0, formationExcedentaire: 0 },
+  plafondEnseignementApplicable: 70,
+  cachetsParMois: {},
+};
 
 // La section « Mon indemnisation en cours » (où vit ce composant) n'est ouverte par défaut QUE
 // lorsque `profil.ouvertureDroits` est déjà renseigné (cf. MonProfil.tsx, `<details open=...>`) —
@@ -29,6 +36,9 @@ function rendre(profilInitial: Profil, onModifierProfil = vi.fn((_p: Profil) => 
       periodes={[]}
       onAjouterPeriode={vi.fn()}
       onSupprimerPeriode={vi.fn()}
+      decompteActuel={DECOMPTE}
+      onAjouterContrat={vi.fn()}
+      onModifierContrat={vi.fn()}
     />,
   );
   return onModifierProfil;
@@ -37,7 +47,7 @@ function rendre(profilInitial: Profil, onModifierProfil = vi.fn((_p: Profil) => 
 describe("MonProfil — historique des ouvertures de droits précédentes", () => {
   it("sans entrée : le dit, sans planter", () => {
     rendre(profilAvecOuverture());
-    expect(screen.getByText(/historique de tes ouvertures de droits précédentes/i)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /historique de tes ouvertures de droits précédentes/i })).toBeInTheDocument();
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
   });
 

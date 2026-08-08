@@ -73,8 +73,8 @@ export function RenouvellementAnticipe({ profil, contrats, periodes, config }: R
 
           {donneesManquantes ? (
             <p className="text-xs rounded-lg px-3 py-2 bg-amber/10 text-amber">
-              Renseigne d'abord ta date anniversaire (« Ton profil » ci-dessus), ton ouverture de droits et ton allocation journalière réelle (« Mon indemnisation en cours » ci-dessus) pour pouvoir
-              simuler un renouvellement anticipé.
+              Renseigne d'abord ta date anniversaire, ton ouverture de droits et ton allocation journalière réelle dans l'onglet « Mon profil » (sections « Ton profil » et « Mon indemnisation en
+              cours ») pour pouvoir simuler un renouvellement anticipé.
             </p>
           ) : (
             <>

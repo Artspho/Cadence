@@ -9,6 +9,14 @@ import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { MonProfil } from "../MonProfil";
 import { profil } from "../../engine/__tests__/testUtils";
+import type { DecompteHeuresResultat } from "../../types";
+
+const DECOMPTE: DecompteHeuresResultat = {
+  total: 0,
+  repartition: { cachets: 0, heuresScene: 0, eee: 0, assimilees: 0, ptp: 0, enseignementRetenu: 0, enseignementExcedentaire: 0, formationRetenue: 0, formationExcedentaire: 0 },
+  plafondEnseignementApplicable: 70,
+  cachetsParMois: {},
+};
 
 function rendre(profilInitial = profil({ dateAnniversaire: "" })) {
   render(
@@ -20,6 +28,9 @@ function rendre(profilInitial = profil({ dateAnniversaire: "" })) {
       periodes={[]}
       onAjouterPeriode={vi.fn()}
       onSupprimerPeriode={vi.fn()}
+      decompteActuel={DECOMPTE}
+      onAjouterContrat={vi.fn()}
+      onModifierContrat={vi.fn()}
     />,
   );
 }

@@ -16,7 +16,7 @@ describe("BottomTabBar — les 4 onglets fixes", () => {
     render(<BottomTabBar ongletActif="dashboard" onChangerOnglet={vi.fn()} onExporter={vi.fn()} onImporter={vi.fn()} />);
     expect(within(nav()).getByRole("button", { name: /tableau de bord/i })).toBeInTheDocument();
     expect(within(nav()).getByRole("button", { name: /^contrats$/i })).toBeInTheDocument();
-    expect(within(nav()).getByRole("button", { name: /import pdf/i })).toBeInTheDocument();
+    expect(within(nav()).getByRole("button", { name: /déposer un document/i })).toBeInTheDocument();
     expect(within(nav()).getByRole("button", { name: /revenus mensuels/i })).toBeInTheDocument();
     expect(within(nav()).getByRole("button", { name: /plus/i })).toBeInTheDocument();
   });
